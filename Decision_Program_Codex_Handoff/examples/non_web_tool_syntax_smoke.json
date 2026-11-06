@@ -1,0 +1,42 @@
+{
+  "kind": "live_non_web_tool_syntax_probe",
+  "tool": "openrouter:datetime",
+  "web_tools_enabled": false,
+  "requested_model": "tencent/hy4",
+  "requested_step_count": 1,
+  "requested_tool_budget_usd": 0.01,
+  "status": "http_success",
+  "returned_model": "tencent/hy4",
+  "provider": "Tencent",
+  "generation_id": "gen-1793986498-Gp5aWQZFAk30Kj4HuNgs",
+  "usage": {
+    "prompt_tokens": 545,
+    "completion_tokens": 209,
+    "total_tokens": 754,
+    "cost": 0.00043793149999999997,
+    "prompt_tokens_details": {
+      "cached_tokens": 128,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 166,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 0.00043793149999999997,
+      "upstream_inference_prompt_cost": 0.000176577,
+      "upstream_inference_completions_cost": 0.0002613545
+    },
+    "server_tool_use_details": {
+      "tool_calls_requested": 1,
+      "tool_calls_executed": 1
+    }
+  },
+  "finish_reason": "length",
+  "response_content_present": true,
+  "elapsed_seconds": 4.518,
+  "interpretation": "One non-web tool request. The provider reported one tool call executed; this does not independently verify execution, spending enforcement, or web-search limits."
+}

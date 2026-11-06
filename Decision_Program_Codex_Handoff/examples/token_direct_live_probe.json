@@ -1,0 +1,107 @@
+{
+  "classification": "Public-source development integration probe; not independent adjudication.",
+  "source": {
+    "id": "92ba0b17a4a740fca65663871707dcfb",
+    "title": "Python 3.12.10 token documentation",
+    "text": ":mod:`!token` --- Constants used with Python parse trees\n========================================================\n\n.. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.\n\n.. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>\n\n**Source code:** :source:`Lib/token.py`\n\n--------------\n\nThis module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.\n\nThe module also provides a mapping from numeric codes to names and some\nfunctions.  The functions mirror definitions in the Python C header files.\n\n\n.. data:: tok_name\n\n   Dictionary mapping the numeric values of the constants defined in this module\n   back to name strings, allowing more human-readable representation of parse trees\n   to be generated.\n\n\n.. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.\n\n\n.. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.\n\n\n.. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.\n\n\nThe token constants are:\n\n.. include:: token-list.inc\n\nThe following token type values aren't used by the C tokenizer but are needed for\nthe :mod:`tokenize` module.\n\n.. data:: COMMENT\n   :noindex:\n\n   Token value used to indicate a comment.\n\n\n.. data:: NL\n   :noindex:\n\n   Token value used to indicate a non-terminating newline.  The\n   :data:`NEWLINE` token indicates the end of a logical line of Python code;\n   ``NL`` tokens are generated when a logical line of code is continued over\n   multiple physical lines.\n\n\n.. data:: ENCODING\n\n   Token value that indicates the encoding used to decode the source bytes\n   into text. The first token returned by :func:`tokenize.tokenize` will\n   always be an ``ENCODING`` token.\n\n\n.. data:: TYPE_COMMENT\n   :noindex:\n\n   Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.\n\n\n.. data:: EXACT_TOKEN_TYPES\n\n   A dictionary mapping the string representation of a token to its numeric code.\n\n   .. versionadded:: 3.8\n\n\n.. versionchanged:: 3.5\n   Added :data:`AWAIT` and :data:`ASYNC` tokens.\n\n.. versionchanged:: 3.7\n   Added :data:`COMMENT`, :data:`NL` and :data:`ENCODING` tokens.\n\n.. versionchanged:: 3.7\n   Removed :data:`AWAIT` and :data:`ASYNC` tokens. \"async\" and \"await\" are\n   now tokenized as :data:`NAME` tokens.\n\n.. versionchanged:: 3.8\n   Added :data:`TYPE_COMMENT`, :data:`TYPE_IGNORE`, :data:`COLONEQUAL`.\n   Added :data:`AWAIT` and :data:`ASYNC` tokens back (they're needed\n   to support parsing older Python versions for :func:`ast.parse` with\n   ``feature_version`` set to 6 or lower).\n",
+    "scope": "",
+    "effective_from": "",
+    "effective_to": "",
+    "observed_at": "",
+    "origin": "starter_corpus/python-3.12.10-token.rst",
+    "sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+    "created_at": "2026-11-06T19:43:23.066159+00:00"
+  },
+  "run": {
+    "id": "6e704d85f8264820ad9d65b651c27f2b",
+    "schema_version": 1,
+    "created_at": "2026-11-06T19:43:23.149019+00:00",
+    "mode": "direct",
+    "request": {
+      "question": "Which function returns true for terminal token values?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "92ba0b17a4a740fca65663871707dcfb"
+    },
+    "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+    "source_metadata_sha256": "073b66aab8878c5ebfd7e09a6554248410343d59c6b4236d1284c274290e51e2",
+    "calls": [
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Venice",
+        "generation_id": "gen-1793994203-T1u7sVCk3CtT3gHfRJkU",
+        "elapsed_seconds": 0.989,
+        "usage": {
+          "prompt_tokens": 918,
+          "completion_tokens": 87,
+          "total_tokens": 1005,
+          "cost": 0.0002247,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002247,
+            "upstream_inference_prompt_cost": 0.0001377,
+            "upstream_inference_completions_cost": 8.7e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      }
+    ],
+    "trace": [],
+    "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+    "requested_model": "qwen/qwen3.5-35b-a3b",
+    "evidence_mode": "shared",
+    "answer_check_backend": "not_applicable",
+    "model_responses": [
+      {
+        "stage": "direct_answer",
+        "text": "```json\n{\n  \"status\": \"decided\",\n  \"answer\": \"The function ISTERMINAL(x) returns true for terminal token values.\",\n  \"quotes\": [\n    \"Return ``True`` for terminal token values.\"\n  ],\n  \"reason\": \"The source text explicitly states that the function ISTERMINAL(x) returns True for terminal token values.\"\n}\n```"
+      }
+    ],
+    "extra_search": true,
+    "execution_policy": "not_applicable",
+    "result": {
+      "status": "decided",
+      "answer": "The function ISTERMINAL(x) returns true for terminal token values.",
+      "reason": "The source text explicitly states that the function ISTERMINAL(x) returns True for terminal token values.",
+      "quotes": [
+        "Return ``True`` for terminal token values."
+      ],
+      "source_refs": [
+        {
+          "source_id": "92ba0b17a4a740fca65663871707dcfb",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1054,
+          "source_end": 1096
+        }
+      ],
+      "quote": "Return ``True`` for terminal token values.",
+      "source_ref": {
+        "source_id": "92ba0b17a4a740fca65663871707dcfb",
+        "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+        "source_title": "Python 3.12.10 token documentation",
+        "observed_at": "",
+        "source_start": 1054,
+        "source_end": 1096
+      }
+    },
+    "elapsed_seconds": 0.992
+  },
+  "developer_observation": "The answer matches the developer reference, but the quoted sentence omits the function name; the surrounding source supplies the binding. Structural citation verification alone does not establish support.",
+  "citation_verification": "Source and citation verified; composition unavailable."
+}

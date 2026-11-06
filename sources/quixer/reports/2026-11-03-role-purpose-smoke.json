@@ -1,0 +1,29 @@
+{
+  "schema": "quix-role-purpose-smoke-receipt-v1",
+  "prompt_contract": "quix-planner-role-purpose-v1",
+  "planner_sha256": "084463022895c722eac85b138282e361069e66e75d5644af7de11bedee2b7476",
+  "corpus_revision": "04c2c46636e1fc40f41ffeda6ca72a0179a1ea85e1d025a4aa85b8081be5e209",
+  "task_id": "dev-role-review",
+  "role": "reviewer",
+  "role_version": "1",
+  "results": [
+    {
+      "condition": "none",
+      "outcome": "ok",
+      "http_status": 200,
+      "requested_model": "openai/gpt-4o-mini",
+      "used_model": "openai/gpt-4o-mini",
+      "cost_usd": 0.00022365
+    },
+    {
+      "condition": "role",
+      "outcome": "ok",
+      "http_status": 200,
+      "requested_model": "openai/gpt-4o-mini",
+      "used_model": "openai/gpt-4o-mini",
+      "cost_usd": 0.0003513
+    }
+  ],
+  "total_reported_cost_usd": 0.00057495,
+  "limitations": "Two exploratory calls, not an independently reviewed comparison. Fake-agent Swift tests verify prompt inclusion; successful live calls alone do not establish understanding, quality, or retrieval benefit. This smoke predates study-request hashing and is separate from the earlier 64-attempt run."
+}

@@ -1,0 +1,57 @@
+{
+  "schema": "quix-retrieval-study-v1",
+  "description": "Prospective exploratory retrieval study over three project documents and explicitly synthetic fixtures; relevance labels are not yet independently reviewed.",
+  "source_baseline_commit": "deab94d",
+  "source_hash_method": "sha256-utf8-universal-newlines",
+  "sources": [
+    {"path":"docs/plans/2026-10-29-shared-knowledge-design.md","sha256":"fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92","kind":"project"},
+    {"path":"docs/plans/2026-10-29-shared-knowledge-implementation.md","sha256":"c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73","kind":"project"},
+    {"path":"docs/provider-evaluation.md","sha256":"4b3fa5a10c0eef73878dea3c78ce430fbc0ed84f1049b610c145d668a3d08aa4","kind":"project"},
+    {"path":"experiments/retrieval/fixtures/no-headings.txt","sha256":"08f501c5dd02819d9a3e9651032c0bb2e1ea42291820e034ab5be8c6636af11d","kind":"synthetic"},
+    {"path":"experiments/retrieval/fixtures/broad-topic.md","sha256":"5d8a5eec436b27db0c8df3bb132e4403d06cc469e7e7712bb048c25a53842352","kind":"synthetic"},
+    {"path":"experiments/retrieval/fixtures/conflicting-finding.md","sha256":"e89f6bb7c236ec6a39adfd0cecfe414e5b8ffb583ad622a247d52eed961c6d8f","kind":"synthetic"},
+    {"path":"experiments/retrieval/fixtures/stale-original.txt","sha256":"98542dc3173dadb6126e69d0c3eeadce5e1f1cb444fd25fbc0b0bdba4af4218f","kind":"synthetic_lifecycle_template"},
+    {"path":"experiments/retrieval/fixtures/stale-current.txt","sha256":"2d7b1cc4c1956a95f67b24ef8ad0ef07bc0f2873a032fb6a2323f45ebf6d21f2","kind":"synthetic_lifecycle_template"}
+  ],
+  "roles": {
+    "implementer": {"version":"1","purpose":"Implement the requested change with source evidence."},
+    "reviewer": {"version":"1","purpose":"Review implementation and source evidence for missing or unsupported claims."}
+  },
+  "groups": {
+    "ingestion":"development", "provenance":"development", "retrieval":"development", "roles":"development",
+    "lifecycle":"held_out", "conflicting_claims":"held_out", "provider":"held_out", "evaluation":"held_out"
+  },
+  "tasks": [
+    {"id":"dev-unheaded-impl","group":"ingestion","role":"implementer","role_version":"1","split":"development","query":"Implement a searchable source-linked fallback for a document with no headings."},
+    {"id":"dev-broad-review","group":"ingestion","role":"reviewer","role_version":"1","split":"development","query":"Review how broad document sections gain finer topic navigation without losing the original source."},
+    {"id":"dev-anchor-impl","group":"provenance","role":"implementer","role_version":"1","split":"development","query":"Implement a finding that cites its supporting source section and revision."},
+    {"id":"dev-unsupported-review","group":"provenance","role":"reviewer","role_version":"1","split":"development","query":"Review whether an agent claim with no evidence is presented as unsupported."},
+    {"id":"dev-timeout-impl","group":"retrieval","role":"implementer","role_version":"1","split":"development","query":"Handle a decision-model timeout without suppressing baseline source evidence."},
+    {"id":"dev-budget-review","group":"retrieval","role":"reviewer","role_version":"1","split":"development","query":"Review what a bounded context packet includes and what is outside its budget."},
+    {"id":"dev-role-impl","group":"roles","role":"implementer","role_version":"1","split":"development","query":"Use role-specific usefulness estimates without filtering a relevant source."},
+    {"id":"dev-role-review","group":"roles","role":"reviewer","role_version":"1","split":"development","query":"Review whether a low usefulness score can hide task-relevant evidence."},
+    {"id":"held-changed-impl","group":"lifecycle","role":"implementer","role_version":"1","split":"held_out","query":"Handle a source document that changes after an agent finding was created."},
+    {"id":"held-stale-review","group":"lifecycle","role":"reviewer","role_version":"1","split":"held_out","query":"Review whether a finding linked to the old retry limit has stale evidence."},
+    {"id":"held-conflict-impl","group":"conflicting_claims","role":"implementer","role_version":"1","split":"held_out","query":"Identify the documented retry limit when a synthetic agent finding states a conflicting limit."},
+    {"id":"held-conflict-review","group":"conflicting_claims","role":"reviewer","role_version":"1","split":"held_out","query":"Distinguish the synthetic conflicting finding from its source and an unsupported claim."},
+    {"id":"held-provider-impl","group":"provider","role":"implementer","role_version":"1","split":"held_out","query":"Choose a fallback when local decision-model inference is unavailable."},
+    {"id":"held-provider-review","group":"provider","role":"reviewer","role_version":"1","split":"held_out","query":"Assess whether the reported decision-model scores establish calibrated task accuracy."},
+    {"id":"held-manifest-impl","group":"evaluation","role":"implementer","role_version":"1","split":"held_out","query":"Record enough information to reproduce a matched retrieval comparison and account for provider calls."},
+    {"id":"held-outcome-review","group":"evaluation","role":"reviewer","role_version":"1","split":"held_out","query":"Review what independent labels and agent-outcome evidence are required before claiming a swarm benefit."}
+  ],
+  "comparison": {
+    "candidate_scope":"sections_and_records",
+    "ranking":"bm25",
+    "limit":3,
+    "packet_tokens":2000,
+    "tokenizer":"cl100k_base",
+    "include_proposed":true,
+    "switch_view_characters":5000,
+    "switch_max_steps":5,
+    "switch_max_model_calls":10,
+    "switch_trials":2,
+    "primary_metric":"per-task exact-ID recall at the fixed packet budget",
+    "secondary_metrics":["exact-ID precision", "stale and unsupported returned", "missing labels", "fallbacks", "provider failures", "elapsed time", "reported cost"],
+    "limits":"The packet budget excludes each model's prompt framing and input; switch performs its own extra decision calls. Exact-ID matching does not prove a truncated passage contains the required evidence. Shared project documents and earlier exploratory exposure prevent treating the split as independent by construction."
+  }
+}

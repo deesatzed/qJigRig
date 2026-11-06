@@ -1,0 +1,229 @@
+{
+  "label": "Synthetic developer-authored explicit negative probe; not independent evaluation",
+  "source": {
+    "id": "b83b8b25549b4e1f8dae893f19671cb9",
+    "title": "Synthetic explicit transaction denial",
+    "text": "Synthetic record: Gamma Inc did not acquire Beta Labs.\n",
+    "scope": "",
+    "effective_from": "",
+    "effective_to": "",
+    "observed_at": "",
+    "origin": "/tmp/decision-explicit-negative.txt",
+    "sha256": "a58f02b7fb63b6be97b77bc356610381af1fb5bc414c0b120aa2900053a88ea7",
+    "created_at": "2026-11-06T18:59:56.696581+00:00"
+  },
+  "run": {
+    "id": "20336a482f6344bf8156a96be9fcb5cd",
+    "schema_version": 1,
+    "created_at": "2026-11-06T19:00:04.286232+00:00",
+    "mode": "fresh",
+    "request": {
+      "question": "Did Gamma Inc acquire Beta Labs?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "b83b8b25549b4e1f8dae893f19671cb9"
+    },
+    "source_sha256": "a58f02b7fb63b6be97b77bc356610381af1fb5bc414c0b120aa2900053a88ea7",
+    "source_metadata_sha256": "c7ef83da5db88f58792087103eb1be4f06a7f381a421461acfdbdf8eefdb4d55",
+    "calls": [
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Parasail",
+        "generation_id": "gen-1793991604-rjaN5EgIvIAdeKUEbBmp",
+        "elapsed_seconds": 0.886,
+        "usage": {
+          "prompt_tokens": 422,
+          "completion_tokens": 159,
+          "total_tokens": 581,
+          "cost": 0.0002223,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002223,
+            "upstream_inference_prompt_cost": 6.33e-05,
+            "upstream_inference_completions_cost": 0.000159
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "61c8f60e788290c3963b5a05e797b627dcec73ca18d1cc2667ece9ea6bc994dd",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      },
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Parasail",
+        "generation_id": "gen-1793991605-prJc4BuCzkYfx2TjISDY",
+        "elapsed_seconds": 0.698,
+        "usage": {
+          "prompt_tokens": 309,
+          "completion_tokens": 59,
+          "total_tokens": 368,
+          "cost": 0.00010535,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00010535,
+            "upstream_inference_prompt_cost": 4.635e-05,
+            "upstream_inference_completions_cost": 5.9e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      },
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Venice",
+        "generation_id": "gen-1793991605-o3wUtVhkIH6Uffx3XNf0",
+        "elapsed_seconds": 1.11,
+        "usage": {
+          "prompt_tokens": 234,
+          "completion_tokens": 60,
+          "total_tokens": 294,
+          "cost": 9.51e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 9.51e-05,
+            "upstream_inference_prompt_cost": 3.51e-05,
+            "upstream_inference_completions_cost": 6e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "a42cfd486e07c4aea8f5e556e5e0ea81a279b3954cc1efc1ecc8feac0fce510c",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      }
+    ],
+    "trace": [
+      {
+        "predicate": {
+          "id": "p1",
+          "question": "Did Gamma Inc acquire Beta Labs?",
+          "evidence_requirement": "A direct statement confirming or denying the acquisition event between Gamma Inc and Beta Labs.",
+          "positive_claim": "Gamma Inc acquired Beta Labs.",
+          "negative_claim": "Gamma Inc did not acquire Beta Labs."
+        },
+        "outcome": "false",
+        "quote": "Gamma Inc did not acquire Beta Labs.",
+        "source_ref": {
+          "source_id": "b83b8b25549b4e1f8dae893f19671cb9",
+          "source_sha256": "a58f02b7fb63b6be97b77bc356610381af1fb5bc414c0b120aa2900053a88ea7",
+          "source_title": "Synthetic explicit transaction denial",
+          "observed_at": "",
+          "source_start": 18,
+          "source_end": 54
+        },
+        "reason": "The source explicitly states that Gamma Inc did not acquire Beta Labs, which directly contradicts the predicate question asking if they did acquire it."
+      }
+    ],
+    "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+    "requested_model": "qwen/qwen3.5-35b-a3b",
+    "evidence_mode": "shared",
+    "answer_check_backend": "remote",
+    "model_responses": [
+      {
+        "stage": "planner",
+        "text": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Did Gamma Inc acquire Beta Labs?\",\n      \"evidence_requirement\": \"A direct statement confirming or denying the acquisition event between Gamma Inc and Beta Labs.\",\n      \"positive_claim\": \"Gamma Inc acquired Beta Labs.\",\n      \"negative_claim\": \"Gamma Inc did not acquire Beta Labs.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"Gamma Inc acquired Beta Labs.\",\n  \"false_answer\": \"Gamma Inc did not acquire Beta Labs.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}"
+      },
+      {
+        "stage": "predicate_judge",
+        "text": "{\n  \"outcome\": \"false\",\n  \"quote\": \"Gamma Inc did not acquire Beta Labs.\",\n  \"reason\": \"The source explicitly states that Gamma Inc did not acquire Beta Labs, which directly contradicts the predicate question asking if they did acquire it.\"\n}",
+        "predicate_id": "p1"
+      },
+      {
+        "stage": "answer_check",
+        "text": "{\n  \"verdict\": \"supported\",\n  \"quotes\": [\n    \"Gamma Inc did not acquire Beta Labs.\"\n  ],\n  \"reason\": \"The source text explicitly states 'Gamma Inc did not acquire Beta Labs,' which directly matches the proposed answer.\"\n}"
+      }
+    ],
+    "extra_search": true,
+    "execution_policy": "targeted",
+    "planner_output": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Did Gamma Inc acquire Beta Labs?\",\n      \"evidence_requirement\": \"A direct statement confirming or denying the acquisition event between Gamma Inc and Beta Labs.\",\n      \"positive_claim\": \"Gamma Inc acquired Beta Labs.\",\n      \"negative_claim\": \"Gamma Inc did not acquire Beta Labs.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"Gamma Inc acquired Beta Labs.\",\n  \"false_answer\": \"Gamma Inc did not acquire Beta Labs.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}",
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Did Gamma Inc acquire Beta Labs?",
+          "evidence_requirement": "A direct statement confirming or denying the acquisition event between Gamma Inc and Beta Labs.",
+          "positive_claim": "Gamma Inc acquired Beta Labs.",
+          "negative_claim": "Gamma Inc did not acquire Beta Labs."
+        }
+      ],
+      "expression": {
+        "ref": "p1"
+      },
+      "true_answer": "Gamma Inc acquired Beta Labs.",
+      "false_answer": "Gamma Inc did not acquire Beta Labs.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "candidate_result": {
+      "status": "decided",
+      "answer": "Gamma Inc did not acquire Beta Labs.",
+      "reason": "Composed from predicate results"
+    },
+    "answer_check": {
+      "verdict": "supported",
+      "quotes": [
+        "Gamma Inc did not acquire Beta Labs."
+      ],
+      "reason": "The source text explicitly states 'Gamma Inc did not acquire Beta Labs,' which directly matches the proposed answer.",
+      "source_refs": [
+        {
+          "source_id": "b83b8b25549b4e1f8dae893f19671cb9",
+          "source_sha256": "a58f02b7fb63b6be97b77bc356610381af1fb5bc414c0b120aa2900053a88ea7",
+          "source_title": "Synthetic explicit transaction denial",
+          "observed_at": "",
+          "source_start": 18,
+          "source_end": 54
+        }
+      ]
+    },
+    "result": {
+      "status": "decided",
+      "answer": "Gamma Inc did not acquire Beta Labs.",
+      "reason": "Composed from predicate results"
+    },
+    "elapsed_seconds": 2.702
+  },
+  "offline_verification": {
+    "run_id": "20336a482f6344bf8156a96be9fcb5cd",
+    "source": "verified",
+    "composition": "verified",
+    "citations": "verified",
+    "issues": [],
+    "interpretation": "Checks recorded data and deterministic logic only; does not rerun models or establish semantic support, correctness, or authenticity.",
+    "recomputed_expression_value": false
+  }
+}

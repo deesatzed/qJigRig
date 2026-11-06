@@ -1,0 +1,10 @@
+{
+  "classification": "Developer-authored development references; not independently adjudicated, not pilot or holdout labels.",
+  "cases": [
+    {"case_id":"dev-keyword-soft-function","expected_answer":"keyword.issoftkeyword","evidence":[{"source":"python-3.12.10-keyword.rst","quote":".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`."}]},
+    {"case_id":"dev-keyword-soft-list","expected_answer":"keyword.softkwlist","evidence":[{"source":"python-3.12.10-keyword.rst","quote":".. data:: softkwlist\n\n   Sequence containing all the :ref:`soft keywords <soft-keywords>` defined for the\n   interpreter."}]},
+    {"case_id":"dev-token-terminal","expected_answer":"token.ISTERMINAL","evidence":[{"source":"python-3.12.10-token.rst","quote":".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values."}]},
+    {"case_id":"dev-soft-version","expected_answer":"yes","evidence":[{"source":"python-3.12.10-keyword.rst","quote":".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9"}]},
+    {"case_id":"dev-two-modules","expected_answer":"yes","evidence":[{"source":"python-3.12.10-keyword.rst","quote":".. function:: issoftkeyword(s)"},{"source":"python-3.12.10-token.rst","quote":".. function:: ISTERMINAL(x)"}]}
+  ]
+}

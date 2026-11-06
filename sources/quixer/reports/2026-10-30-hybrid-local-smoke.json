@@ -1,0 +1,21 @@
+{
+  "kind": "single unlabeled local integration smoke; not a quality or latency benchmark",
+  "source": "docs/plans/2026-10-29-shared-knowledge-design.md",
+  "source_sha256": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+  "query": "how to handle a document with no table of contents",
+  "ranking": "hybrid",
+  "embedding": {
+    "implementation": "JevEdge0 BertEmbedder",
+    "backend": "MLX",
+    "source_sha256": "1c82b120daab94c28e313a18fb875fcf74c53b1c448d16e915d88f5e15403599",
+    "weights_sha256": "53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db",
+    "config_sha256": "953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41",
+    "tokenizer_sha256": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037",
+    "max_input_tokens": 256
+  },
+  "top_titles": ["Architecture", "Prior work and boundaries", "Ingestion and indexing"],
+  "search_seconds_after_encoder_load": 0.153,
+  "final_implementation_rerun_seconds_after_encoder_load": 0.049,
+  "labels": null,
+  "notes": "Executed locally with Metal access outside the sandbox. One observed ordering; relevance and task benefit were not independently assessed. Inputs may be truncated by the encoder."
+}

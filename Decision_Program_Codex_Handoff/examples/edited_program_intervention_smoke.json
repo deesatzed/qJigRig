@@ -1,0 +1,275 @@
+{
+  "classification": "Synthetic development smoke; developer review is not independent adjudication.",
+  "original_draft": {
+    "id": "224fc60dcf254c1eb864b2fc5de93c1e",
+    "revision": 1,
+    "status": "draft",
+    "created_at": "2026-11-06T16:44:22.517628+00:00",
+    "source_run_id": "a7a4a0ae0f454495b5b0d0e2f02b40bb",
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the event have more than 50 attendees?",
+          "evidence_requirement": "The number of attendees at the event"
+        },
+        {
+          "id": "p2",
+          "question": "Is the event a school event?",
+          "evidence_requirement": "The classification or nature of the event"
+        }
+      ],
+      "expression": {
+        "op": "and",
+        "args": [
+          {
+            "ref": "p1"
+          },
+          {
+            "op": "not",
+            "args": [
+              {
+                "ref": "p2"
+              }
+            ]
+          }
+        ]
+      },
+      "true_answer": "Yes, the event requires a permit.",
+      "false_answer": "The event does not require a permit if it has 50 or fewer attendees, or if it is a school event.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "binding": {
+      "question": "Does the event require a permit?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "891db67604574b86aa0c89f56b5ba8c7"
+    },
+    "source_sha256": "8b3e7596eb8aa7ac40ba4811305e63bfa4a1c3a8e1393ed4a14947a0cf6b58a6",
+    "source_metadata_sha256": null,
+    "authoring": "fresh model plan",
+    "parent_id": null
+  },
+  "edited_draft": {
+    "id": "fa6b322632f74b9b844a9e7e26138486",
+    "revision": 2,
+    "status": "draft",
+    "created_at": "2026-11-06T16:45:14.585045+00:00",
+    "source_run_id": "a7a4a0ae0f454495b5b0d0e2f02b40bb",
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the event have more than 50 attendees?",
+          "evidence_requirement": "The number of attendees at the event"
+        },
+        {
+          "id": "p2",
+          "question": "Is the event a school event?",
+          "evidence_requirement": "The classification or nature of the event"
+        }
+      ],
+      "expression": {
+        "op": "and",
+        "args": [
+          {
+            "ref": "p1"
+          },
+          {
+            "op": "not",
+            "args": [
+              {
+                "ref": "p2"
+              }
+            ]
+          }
+        ]
+      },
+      "true_answer": "Yes, the event requires a permit.",
+      "false_answer": "No, the event does not require a permit.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "binding": {
+      "question": "Does the event require a permit?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "891db67604574b86aa0c89f56b5ba8c7"
+    },
+    "source_sha256": "8b3e7596eb8aa7ac40ba4811305e63bfa4a1c3a8e1393ed4a14947a0cf6b58a6",
+    "source_metadata_sha256": null,
+    "authoring": "human-edited draft",
+    "parent_id": "224fc60dcf254c1eb864b2fc5de93c1e",
+    "edit_author": "Developer smoke, not independent",
+    "edit_rationale": "Replace conditional rule with a case-specific no answer."
+  },
+  "reviewed_program": {
+    "id": "1011f5d5ec114136a1247e85a454dd25",
+    "revision": 3,
+    "status": "reviewed",
+    "created_at": "2026-11-06T16:45:28.151962+00:00",
+    "source_run_id": "a7a4a0ae0f454495b5b0d0e2f02b40bb",
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the event have more than 50 attendees?",
+          "evidence_requirement": "The number of attendees at the event"
+        },
+        {
+          "id": "p2",
+          "question": "Is the event a school event?",
+          "evidence_requirement": "The classification or nature of the event"
+        }
+      ],
+      "expression": {
+        "op": "and",
+        "args": [
+          {
+            "ref": "p1"
+          },
+          {
+            "op": "not",
+            "args": [
+              {
+                "ref": "p2"
+              }
+            ]
+          }
+        ]
+      },
+      "true_answer": "Yes, the event requires a permit.",
+      "false_answer": "No, the event does not require a permit.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "binding": {
+      "question": "Does the event require a permit?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "891db67604574b86aa0c89f56b5ba8c7"
+    },
+    "source_sha256": "8b3e7596eb8aa7ac40ba4811305e63bfa4a1c3a8e1393ed4a14947a0cf6b58a6",
+    "source_metadata_sha256": null,
+    "authoring": "human-edited draft",
+    "parent_id": "fa6b322632f74b9b844a9e7e26138486",
+    "edit_author": "Developer smoke, not independent",
+    "edit_rationale": "Replace conditional rule with a case-specific no answer.",
+    "reviewer": "Developer smoke, not independent",
+    "review_rationale": "Synthetic development review of the edited answer label and binding.",
+    "review_scope": "Exact original question, scope, date and snapshot only; manual review does not establish independent validation."
+  },
+  "report": {
+    "interpretation": "Exact status and answer text comparison only; semantic equivalence and causal correctness require review.",
+    "execution_comparison": {
+      "differences": {},
+      "unknown": [],
+      "interpretation": "Recorded settings only; matching fields do not establish identical model behavior or causal comparability."
+    },
+    "change": {
+      "kind": "modified",
+      "original_source_id": "891db67604574b86aa0c89f56b5ba8c7",
+      "new_source_id": "5a71295f099f4d9eb4ae7d32c5113613",
+      "original_snapshot_id": "891db67604574b86aa0c89f56b5ba8c7",
+      "intervention_snapshot_id": "5a71295f099f4d9eb4ae7d32c5113613",
+      "reason": "Change event type to school",
+      "interpretation": "Controlled experiment; not a reviewed program revision or evidence of applicability."
+    },
+    "result_changed": true,
+    "original": {
+      "run_id": "ff6602c472944f1ea225fa1235b5f5c0",
+      "snapshot_id": "891db67604574b86aa0c89f56b5ba8c7",
+      "result": {
+        "status": "decided",
+        "answer": "Yes, the event requires a permit.",
+        "reason": "Composed from predicate results"
+      },
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the event have more than 50 attendees?",
+            "evidence_requirement": "The number of attendees at the event"
+          },
+          "outcome": "true",
+          "quote": "The event has 75 attendees",
+          "source_ref": {
+            "source_id": "891db67604574b86aa0c89f56b5ba8c7",
+            "source_sha256": "8b3e7596eb8aa7ac40ba4811305e63bfa4a1c3a8e1393ed4a14947a0cf6b58a6",
+            "source_title": "Synthetic permit not_exempt",
+            "observed_at": "",
+            "source_start": 108,
+            "source_end": 134
+          },
+          "reason": "The source explicitly states the event has 75 attendees, which is more than 50."
+        },
+        {
+          "predicate": {
+            "id": "p2",
+            "question": "Is the event a school event?",
+            "evidence_requirement": "The classification or nature of the event"
+          },
+          "outcome": "false",
+          "quote": "The event has 75 attendees and is not a school event.",
+          "source_ref": {
+            "source_id": "891db67604574b86aa0c89f56b5ba8c7",
+            "source_sha256": "8b3e7596eb8aa7ac40ba4811305e63bfa4a1c3a8e1393ed4a14947a0cf6b58a6",
+            "source_title": "Synthetic permit not_exempt",
+            "observed_at": "",
+            "source_start": 108,
+            "source_end": 161
+          },
+          "reason": "The source explicitly states 'is not a school event', which directly contradicts the predicate question asking if it is a school event."
+        }
+      ]
+    },
+    "intervention": {
+      "run_id": "249557a73b974c75bc9189c9f37fa063",
+      "snapshot_id": "5a71295f099f4d9eb4ae7d32c5113613",
+      "result": {
+        "status": "decided",
+        "answer": "No, the event does not require a permit.",
+        "reason": "Composed from predicate results"
+      },
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the event have more than 50 attendees?",
+            "evidence_requirement": "The number of attendees at the event"
+          },
+          "outcome": "true",
+          "quote": "The event has 75 attendees",
+          "source_ref": {
+            "source_id": "5a71295f099f4d9eb4ae7d32c5113613",
+            "source_sha256": "96f96fa78955f64fd862cd7ff4439174aa826f51b85d6353d78d695554d3c2dd",
+            "source_title": "Browser changed event type",
+            "observed_at": "2026-11-06",
+            "source_start": 108,
+            "source_end": 134
+          },
+          "reason": "The source explicitly states the event has 75 attendees, which is more than 50."
+        },
+        {
+          "predicate": {
+            "id": "p2",
+            "question": "Is the event a school event?",
+            "evidence_requirement": "The classification or nature of the event"
+          },
+          "outcome": "true",
+          "quote": "The event has 75 attendees and is a school event.",
+          "source_ref": {
+            "source_id": "5a71295f099f4d9eb4ae7d32c5113613",
+            "source_sha256": "96f96fa78955f64fd862cd7ff4439174aa826f51b85d6353d78d695554d3c2dd",
+            "source_title": "Browser changed event type",
+            "observed_at": "2026-11-06",
+            "source_start": 108,
+            "source_end": 157
+          },
+          "reason": "The source explicitly states that the event is a school event, which directly confirms the predicate."
+        }
+      ]
+    }
+  }
+}

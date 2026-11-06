@@ -1,0 +1,70 @@
+{
+  "kind": "live_synthetic_paired_entity_development_probe",
+  "source": "Alpha Inc acquired Beta Labs. Gamma Inc did not acquire Beta Labs.",
+  "claims": [
+    "Gamma Inc acquired Beta Labs.",
+    "Gamma Inc did not acquire Beta Labs.",
+    "Delta Inc acquired Beta Labs.",
+    "Delta Inc did not acquire Beta Labs."
+  ],
+  "threshold": 0.8,
+  "support_results": [
+    "unknown",
+    "supported",
+    "unknown",
+    "unknown"
+  ],
+  "predicate_outcomes": {
+    "Gamma": "false",
+    "Delta": "unknown"
+  },
+  "backend": "local Unsloth MLX",
+  "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+  "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+  "inference_count": 4,
+  "worker_wall_seconds": 9.28,
+  "usage_status": "local resource cost unobserved",
+  "results": [
+    {
+      "choice": "false",
+      "probabilities": {
+        "true": 0.0439,
+        "false": 0.9561
+      },
+      "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+      "input_tokens": 185,
+      "elapsed_seconds": 0.393
+    },
+    {
+      "choice": "true",
+      "probabilities": {
+        "true": 0.9536,
+        "false": 0.0464
+      },
+      "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+      "input_tokens": 187,
+      "elapsed_seconds": 0.282
+    },
+    {
+      "choice": "false",
+      "probabilities": {
+        "true": 0.0756,
+        "false": 0.9244
+      },
+      "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+      "input_tokens": 185,
+      "elapsed_seconds": 0.287
+    },
+    {
+      "choice": "true",
+      "probabilities": {
+        "true": 0.5886,
+        "false": 0.4114
+      },
+      "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+      "input_tokens": 187,
+      "elapsed_seconds": 0.293
+    }
+  ],
+  "interpretation": "Synthetic development probe, uncalibrated threshold, not independent or a general correctness guarantee."
+}

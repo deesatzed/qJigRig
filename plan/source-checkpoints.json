@@ -1,0 +1,29 @@
+{
+  "schema": "qjig-source-checkpoints-v1",
+  "date": "2026-11-06",
+  "quixer": {
+    "commit": "1790086a5d3b178957ce80324c0f283dbcf78c97",
+    "remote": "https://github.com/deesatzed/QUIXER.git",
+    "tag": "checkpoint/quixer-before-qjig-2026-11-06",
+    "snapshot_path": "sources/quixer",
+    "tracked_tree": "git archive at exact commit"
+  },
+  "jig": {
+    "origin": "user moved folder /Volumes/WS4TB/qJig/Decision_Program_Codex_Handoff",
+    "git_identity": null,
+    "hash_manifest": "plan/jig-source-hashes.json",
+    "selected_files": 149,
+    "tree_sha256": "cbbc7d523f0f52fe42c3cc32f53a86aa1e9f76595a520ffdd645d895f9474036"
+  },
+  "hitm": {
+    "commit": "08a49cce014453afdb7be5e4a9909c2416454cf9",
+    "snapshot_included": false,
+    "status": "separate local worktree; no remote"
+  },
+  "review_limits": [
+    "no new paid model calls",
+    "no new local inference",
+    "no current GUI walkthrough",
+    "no independent outcome evaluation"
+  ]
+}

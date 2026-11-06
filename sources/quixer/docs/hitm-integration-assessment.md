@@ -1,0 +1,7 @@
+# HITMCockpit integration assessment
+
+This is a read-only assessment, not an implemented integration. The neighboring checkout has a Swift `MindStore` with propose/accept operations, `MindEntry`/`MindRecord` and `MindSlice` types, plus an `AgentAdapter` protocol for planner proposals. The current QUIX prototype has a separate Python SQLite catalog and CLI. No existing connection between them was established by this review.
+
+An initial integration candidate is a narrow read adapter: the orchestrator supplies a role and task to QUIX, then receives source anchors, lifecycle and evidence links as structured results. Keep HITMCockpit's shared-mind records and their approval lifecycle under their existing owner; do not silently copy or promote QUIX proposals into accepted cockpit memory. An optional write-back should be a separate explicit proposal to the existing store, carrying source references and provenance.
+
+Before implementation, inspect the current `MindStore`, `MindPolicy`, agent dispatch and persistence contracts, including stale evidence, status transitions, concurrent access and recovery. Decide which system owns each record, how the two source revisions map, and how failure is surfaced to agents. HITMCockpit's own project-level handling rules continue to apply; this experiment's non-sensitive-corpus assumption does not change them. Compare retrieval in the isolated prototype before connecting it to an agent workflow. Integration requires a separate concrete design and approval under the current plan.

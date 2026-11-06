@@ -1,0 +1,143 @@
+{
+  "schema": "quix-ai-review-exploration-v1",
+  "reviewer_type": "AI; not human, not independently validated",
+  "requested_model": "deepseek/deepseek-v4.1-flash-1017",
+  "corpus_revision": "04c2c46636e1fc40f41ffeda6ca72a0179a1ea85e1d025a4aa85b8081be5e209",
+  "planner_role_purpose_status": "not_recorded",
+  "study_request_hash_status": "not_recorded",
+  "blind_protocol": "Model was supplied no condition key or rankings; outputs and source IDs may reveal clues.",
+  "retrieval": {
+    "tasks_ai_reviewed": 16,
+    "comparison": {
+      "baseline": {
+        "tasks_with_nonempty_ai_labels": 16,
+        "tasks_with_empty_ai_labels": [],
+        "mean_exact_id_recall_against_ai_labels": 0.1787
+      },
+      "topic": {
+        "tasks_with_nonempty_ai_labels": 16,
+        "tasks_with_empty_ai_labels": [],
+        "mean_exact_id_recall_against_ai_labels": 0.1787
+      },
+      "decision": {
+        "tasks_with_nonempty_ai_labels": 16,
+        "tasks_with_empty_ai_labels": [],
+        "mean_exact_id_recall_against_ai_labels": 0.1787
+      },
+      "role": {
+        "tasks_with_nonempty_ai_labels": 16,
+        "tasks_with_empty_ai_labels": [],
+        "mean_exact_id_recall_against_ai_labels": 0.1787
+      },
+      "switch": {
+        "tasks_with_nonempty_ai_labels": 16,
+        "tasks_with_empty_ai_labels": [],
+        "mean_exact_id_recall_against_ai_labels": 0.1787
+      }
+    }
+  },
+  "agent_outcomes": {
+    "ai_reviewed": 55,
+    "ai_review_unavailable": [
+      "answer-034",
+      "answer-050"
+    ],
+    "original_missing_agent_runs": 7,
+    "conditions": {
+      "none": {
+        "ai_reviewed": 16,
+        "correctness": {
+          "partial": 14,
+          "incorrect": 2
+        },
+        "source_support": {
+          "partial": 13,
+          "unsupported": 1,
+          "supported": 1,
+          "no_citations": 1
+        },
+        "missing_evidence": {
+          "material": 15,
+          "none": 1
+        },
+        "task_completion": {
+          "partial": 12,
+          "incomplete": 4
+        }
+      },
+      "baseline": {
+        "ai_reviewed": 13,
+        "correctness": {
+          "partial": 11,
+          "correct": 2
+        },
+        "source_support": {
+          "partial": 11,
+          "supported": 2
+        },
+        "missing_evidence": {
+          "material": 11,
+          "none": 2
+        },
+        "task_completion": {
+          "partial": 10,
+          "incomplete": 1,
+          "complete": 2
+        }
+      },
+      "role": {
+        "ai_reviewed": 12,
+        "correctness": {
+          "partial": 11,
+          "correct": 1
+        },
+        "source_support": {
+          "partial": 11,
+          "supported": 1
+        },
+        "missing_evidence": {
+          "material": 11,
+          "none": 1
+        },
+        "task_completion": {
+          "partial": 11,
+          "complete": 1
+        }
+      },
+      "switch": {
+        "ai_reviewed": 14,
+        "correctness": {
+          "partial": 12,
+          "correct": 2
+        },
+        "source_support": {
+          "partial": 11,
+          "supported": 3
+        },
+        "missing_evidence": {
+          "material": 11,
+          "none": 3
+        },
+        "task_completion": {
+          "partial": 12,
+          "complete": 2
+        }
+      }
+    }
+  },
+  "review_calls": {
+    "initial": 73,
+    "retries": 3,
+    "known_cost_usd": 0.10021918665,
+    "unknown_cost_count": 0,
+    "excludes_smokes": true
+  },
+  "limitations": [
+    "AI judgments are uncalibrated, may be wrong and are not independently verified ground truth.",
+    "Exact-ID recall is against AI labels, not human labels; it does not verify truncated text contains evidence.",
+    "Previously observed tasks and shared documents do not support an independent held-out claim.",
+    "The original agent runs used a different planner prompt contract; do not pool with later role-purpose smoke.",
+    "Reported review costs exclude local computation and earlier smoke calls."
+  ],
+  "source_checks": "Point-in-time isolated source snapshot, catalog, source packet, recorded retrieval packets, review-key integrity, task/output bindings and report hashes verified."
+}

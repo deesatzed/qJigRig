@@ -1,0 +1,177 @@
+{
+  "label": "Synthetic developer-authored overlapping entity probe; not an independent evaluation",
+  "source": {
+    "id": "9b08337b23714f619fffa2ab7676cd81",
+    "title": "Synthetic overlapping entity probe",
+    "text": "Synthetic transaction records: Alpha Inc acquired Beta Labs. Gamma Inc acquired Delta Works. The records do not state that Gamma Inc acquired Beta Labs.\n",
+    "scope": "",
+    "effective_from": "",
+    "effective_to": "",
+    "observed_at": "",
+    "origin": "/tmp/decision-paired-entities.txt",
+    "sha256": "b4c4993549ebdb970bc04eef30c898a6bd02544ab4e8ccc7cda91151cdc669ff",
+    "created_at": "2026-11-06T18:32:05.918682+00:00"
+  },
+  "run": {
+    "id": "64652fbe381a402aa61d1ac12251d667",
+    "schema_version": 1,
+    "created_at": "2026-11-06T18:32:09.814365+00:00",
+    "mode": "fresh",
+    "request": {
+      "question": "Did Gamma Inc acquire Beta Labs?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "9b08337b23714f619fffa2ab7676cd81"
+    },
+    "source_sha256": "b4c4993549ebdb970bc04eef30c898a6bd02544ab4e8ccc7cda91151cdc669ff",
+    "source_metadata_sha256": "7eb0d33fdc7ddc0a0c329fbc270ffd8b18102a99a837b554c54b8ba920328d3e",
+    "calls": [
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Venice",
+        "generation_id": "gen-1793989929-STu5DFAuiJmBhi4ZnfHr",
+        "elapsed_seconds": 1.334,
+        "usage": {
+          "prompt_tokens": 439,
+          "completion_tokens": 176,
+          "total_tokens": 615,
+          "cost": 0.00024185,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00024185,
+            "upstream_inference_prompt_cost": 6.585e-05,
+            "upstream_inference_completions_cost": 0.000176
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "61c8f60e788290c3963b5a05e797b627dcec73ca18d1cc2667ece9ea6bc994dd",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      },
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Venice",
+        "generation_id": "gen-1793989931-qhNvHL627qg6Xsqw3mnQ",
+        "elapsed_seconds": 0.846,
+        "usage": {
+          "prompt_tokens": 324,
+          "completion_tokens": 70,
+          "total_tokens": 394,
+          "cost": 0.0001186,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0001186,
+            "upstream_inference_prompt_cost": 4.86e-05,
+            "upstream_inference_completions_cost": 7e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      }
+    ],
+    "trace": [
+      {
+        "predicate": {
+          "id": "p1",
+          "question": "Did Gamma Inc acquire Beta Labs?",
+          "evidence_requirement": "Direct statement or record confirming the acquisition of Beta Labs by Gamma Inc",
+          "positive_claim": "Gamma Inc acquired Beta Labs.",
+          "negative_claim": "Gamma Inc did not acquire Beta Labs."
+        },
+        "outcome": "unknown",
+        "quote": "Alpha Inc acquired Beta Labs.",
+        "source_ref": {
+          "source_id": "9b08337b23714f619fffa2ab7676cd81",
+          "source_sha256": "b4c4993549ebdb970bc04eef30c898a6bd02544ab4e8ccc7cda91151cdc669ff",
+          "source_title": "Synthetic overlapping entity probe",
+          "observed_at": "",
+          "source_start": 31,
+          "source_end": 60
+        },
+        "reason": "The negative citation omits distinctive terms from the predicate; it cannot establish a negative.",
+        "reported_outcome": "false",
+        "reported_reason": "The source explicitly states that Alpha Inc acquired Beta Labs, which directly contradicts the claim that Gamma Inc acquired Beta Labs, as a single entity cannot be acquired by two different companies in the same context without further qualification."
+      }
+    ],
+    "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+    "requested_model": "qwen/qwen3.5-35b-a3b",
+    "evidence_mode": "shared",
+    "answer_check_backend": "remote",
+    "model_responses": [
+      {
+        "stage": "planner",
+        "text": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Did Gamma Inc acquire Beta Labs?\",\n      \"evidence_requirement\": \"Direct statement or record confirming the acquisition of Beta Labs by Gamma Inc\",\n      \"positive_claim\": \"Gamma Inc acquired Beta Labs.\",\n      \"negative_claim\": \"Gamma Inc did not acquire Beta Labs.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"Yes, Gamma Inc acquired Beta Labs.\",\n  \"false_answer\": \"No, the available transaction records do not state that Gamma Inc acquired Beta Labs, though they confirm Alpha Inc acquired Beta Labs.\",\n  \"false_status\": \"deferred\",\n  \"ambiguity\": \"\"\n}"
+      },
+      {
+        "stage": "predicate_judge",
+        "text": "{\n\"outcome\": \"false\",\n\"quote\": \"Alpha Inc acquired Beta Labs.\",\n\"reason\": \"The source explicitly states that Alpha Inc acquired Beta Labs, which directly contradicts the claim that Gamma Inc acquired Beta Labs, as a single entity cannot be acquired by two different companies in the same context without further qualification.\"\n}",
+        "predicate_id": "p1"
+      }
+    ],
+    "extra_search": true,
+    "execution_policy": "targeted",
+    "planner_output": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Did Gamma Inc acquire Beta Labs?\",\n      \"evidence_requirement\": \"Direct statement or record confirming the acquisition of Beta Labs by Gamma Inc\",\n      \"positive_claim\": \"Gamma Inc acquired Beta Labs.\",\n      \"negative_claim\": \"Gamma Inc did not acquire Beta Labs.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"Yes, Gamma Inc acquired Beta Labs.\",\n  \"false_answer\": \"No, the available transaction records do not state that Gamma Inc acquired Beta Labs, though they confirm Alpha Inc acquired Beta Labs.\",\n  \"false_status\": \"deferred\",\n  \"ambiguity\": \"\"\n}",
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Did Gamma Inc acquire Beta Labs?",
+          "evidence_requirement": "Direct statement or record confirming the acquisition of Beta Labs by Gamma Inc",
+          "positive_claim": "Gamma Inc acquired Beta Labs.",
+          "negative_claim": "Gamma Inc did not acquire Beta Labs."
+        }
+      ],
+      "expression": {
+        "ref": "p1"
+      },
+      "true_answer": "Yes, Gamma Inc acquired Beta Labs.",
+      "false_answer": "No, the available transaction records do not state that Gamma Inc acquired Beta Labs, though they confirm Alpha Inc acquired Beta Labs.",
+      "false_status": "deferred",
+      "ambiguity": ""
+    },
+    "result": {
+      "status": "deferred",
+      "answer": null,
+      "reason": "Material predicate unresolved"
+    },
+    "elapsed_seconds": 2.185
+  },
+  "offline_verification": {
+    "run_id": "64652fbe381a402aa61d1ac12251d667",
+    "source": "verified",
+    "composition": "recomputed; no candidate recorded",
+    "citations": "verified",
+    "issues": [],
+    "interpretation": "Checks recorded data and deterministic logic only; does not rerun models or establish semantic support, correctness, or authenticity.",
+    "recomputed_expression_value": null
+  },
+  "counterfactual_lexical_check": {
+    "input": "Alpha Inc plans to acquire Beta Labs. Gamma Inc plans to acquire Delta Works.",
+    "passes": true,
+    "interpretation": "Separate hypothetical text, not presented to the live model. Measured after excluding the auxiliary did from anchor terms; passing lexical overlap does not establish whether Gamma acquired Beta."
+  }
+}

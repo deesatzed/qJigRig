@@ -1,0 +1,44 @@
+{
+  "schema": "quix-isolated-agent-exploration-v1",
+  "date": "2026-11-03",
+  "status": "exploratory; independent relevance and outcome review pending",
+  "corpus_fingerprint": "04c2c46636e1fc40f41ffeda6ca72a0179a1ea85e1d025a4aa85b8081be5e209",
+  "source_mode": "hash-checked isolated copies",
+  "tasks": 16,
+  "conditions": ["none", "baseline", "role", "switch"],
+  "planner_model": "openai/gpt-4o-mini",
+  "provisional_role_annotations": 56,
+  "role_scoring_calls": 56,
+  "role_scoring_reported_usd": 0.00016736,
+  "switch_physical_calls": 52,
+  "switch_reported_usd": 0.00178882,
+  "switch_fallback_tasks": 16,
+  "baseline_role_passage_order_different_tasks": 1,
+  "first_run": {
+    "completed_proposals": 40,
+    "input_too_large": 18,
+    "invalid_context": 6,
+    "reported_planner_usd_known_calls": 0.0113382,
+    "missing_cost_records": 24
+  },
+  "compact_prompt_retry": {
+    "completed_proposals": 57,
+    "input_too_large": 0,
+    "invalid_context": 6,
+    "invalid_planner_responses": 1,
+    "reported_planner_usd_known_calls": 0.0163164,
+    "missing_cost_records": 6,
+    "additional_switch_calls": 0,
+    "blinded_review_items": 57,
+    "missing_review_items": 7
+  },
+  "limits": [
+    "All 16 tasks and earlier retrieval behavior were observed before this experiment; this is not a fresh held-out study.",
+    "No independent relevance or outcome reviews were completed; no correctness, comparative quality or swarm benefit can be inferred.",
+    "Each agent call is isolated and has no tools; this is not a live swarm or MindStore integration.",
+    "The role-purpose definition is used for scoring but is not separately included in the planner prompt.",
+    "The initial run and retry use different planner prompts and must not be combined as one paired dataset.",
+    "The six invalid-context cases include stale or unsupported selected records; no missing cost is assumed to be zero.",
+    "The retry reused the first run's recorded retrieval and associated cost, which must be counted only once."
+  ]
+}

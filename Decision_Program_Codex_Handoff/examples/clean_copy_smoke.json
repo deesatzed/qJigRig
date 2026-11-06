@@ -1,0 +1,59 @@
+{
+  "kind": "clean-copy live synthetic smoke",
+  "independent_review": false,
+  "python": "3.12.16",
+  "source": "The object is blue.",
+  "run_id": "ed714c9210b741c0b57f1d1cd33e037d",
+  "mode": "direct",
+  "requested_model": "qwen/qwen3.5-35b-a3b",
+  "calls": [
+    {
+      "model": "qwen/qwen3.5-35b-a3b",
+      "provider": "Venice",
+      "generation_id": "gen-1793977354-QoMhxYKmGyN6yFUZaI34",
+      "elapsed_seconds": 0.628,
+      "usage": {
+        "prompt_tokens": 112,
+        "completion_tokens": 49,
+        "total_tokens": 161,
+        "cost": 6.58e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 6.58e-05,
+          "upstream_inference_prompt_cost": 1.68e-05,
+          "upstream_inference_completions_cost": 4.9e-05
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "cost_status": "provider reported",
+      "prompt_sha256": "3e354cbfc4d36584017fe8d259855b79a0c85711aea9d86aa4efffffdb481b3a",
+      "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+      "finish_reason": "stop"
+    }
+  ],
+  "result": {
+    "status": "decided",
+    "answer": "blue",
+    "quote": "The object is blue.",
+    "reason": "The source text explicitly states the color of the object.",
+    "source_ref": {
+      "source_id": "0302ad3c26f44d1fb626a5d18641b4d7",
+      "source_sha256": "7707d3975cd3da76f8373a0936a375c5e11854c6fc92a4b5ef64f220fad3f7c5",
+      "source_title": "Clean-copy synthetic source",
+      "observed_at": "",
+      "source_start": 0,
+      "source_end": 19
+    }
+  },
+  "limitations": "Synthetic direct-arm connectivity and replay only; not quality, independent adjudication, or full acceptance."
+}

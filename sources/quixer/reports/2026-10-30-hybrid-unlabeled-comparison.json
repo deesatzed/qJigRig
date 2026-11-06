@@ -1,0 +1,219 @@
+{
+  "note": "Unlabeled local integration comparison; not a relevance, speed, hardware-cost or quality benchmark. No decision models called. No role scores.",
+  "corpus_revision": "80dae433de2b770669b73845d18a85a6185ee1e33a830e96757b6fdce7e0c35d",
+  "model": {
+    "name": "JevEdge0 BertEmbedder",
+    "backend": "mlx",
+    "source_sha256": "1c82b120daab94c28e313a18fb875fcf74c53b1c448d16e915d88f5e15403599",
+    "config_sha256": "953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41",
+    "tokenizer_sha256": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037",
+    "weights_sha256": "53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db",
+    "max_input_tokens": 256,
+    "input_policy": "model tokenizer truncates input at max_input_tokens"
+  },
+  "encoder_load_seconds": 0.2626,
+  "budget_packet_tokens": 400,
+  "tokenizer": "cl100k_base",
+  "queries": [
+    "implement-fallback",
+    "review-evidence",
+    "implement-timeout",
+    "review-role",
+    "review-calibration"
+  ],
+  "runs": {
+    "bm25": {
+      "baseline": {
+        "implement-fallback": {
+          "result_ids": [
+            "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa"
+          ],
+          "titles": [
+            "Task 2: Ingest text with source anchors"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0044
+        },
+        "review-evidence": {
+          "result_ids": [
+            "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182"
+          ],
+          "titles": [
+            "Task 3: Evidence, topics and role annotations"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0031
+        },
+        "implement-timeout": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0029
+        },
+        "review-role": {
+          "result_ids": [
+            "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13"
+          ],
+          "titles": [
+            "Task 4: Baseline retrieval and role-aware ranking"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0028
+        },
+        "review-calibration": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0032
+        }
+      },
+      "topic": {
+        "implement-fallback": {
+          "result_ids": [
+            "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa"
+          ],
+          "titles": [
+            "Task 2: Ingest text with source anchors"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0047
+        },
+        "review-evidence": {
+          "result_ids": [
+            "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182"
+          ],
+          "titles": [
+            "Task 3: Evidence, topics and role annotations"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0049
+        },
+        "implement-timeout": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0048
+        },
+        "review-role": {
+          "result_ids": [
+            "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13"
+          ],
+          "titles": [
+            "Task 4: Baseline retrieval and role-aware ranking"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0045
+        },
+        "review-calibration": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_tokens": 400,
+          "omitted": 2,
+          "elapsed_seconds": 0.0048
+        }
+      }
+    },
+    "hybrid": {
+      "baseline": {
+        "implement-fallback": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 79,
+          "omitted": 3,
+          "elapsed_seconds": 0.2486
+        },
+        "review-evidence": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 77,
+          "omitted": 3,
+          "elapsed_seconds": 0.0759
+        },
+        "implement-timeout": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 77,
+          "omitted": 3,
+          "elapsed_seconds": 0.0708
+        },
+        "review-role": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 77,
+          "omitted": 3,
+          "elapsed_seconds": 0.0719
+        },
+        "review-calibration": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 77,
+          "omitted": 3,
+          "elapsed_seconds": 0.0824
+        }
+      },
+      "topic": {
+        "implement-fallback": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 79,
+          "omitted": 3,
+          "elapsed_seconds": 0.3738
+        },
+        "review-evidence": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 77,
+          "omitted": 3,
+          "elapsed_seconds": 0.207
+        },
+        "implement-timeout": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 77,
+          "omitted": 3,
+          "elapsed_seconds": 0.2066
+        },
+        "review-role": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 77,
+          "omitted": 3,
+          "elapsed_seconds": 0.2107
+        },
+        "review-calibration": {
+          "result_ids": [],
+          "titles": [],
+          "packet_tokens": 77,
+          "omitted": 3,
+          "elapsed_seconds": 0.2135
+        }
+      }
+    }
+  },
+  "baseline_top1_changed": 5
+}

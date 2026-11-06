@@ -1,0 +1,19 @@
+{
+  "schema":"quix-cascade-pilot-v1",
+  "description":"New planning questions over an already explored isolated corpus; exploratory AI review, not independent held-out evidence.",
+  "seed":619,
+  "candidate_limit":100,
+  "result_limit":3,
+  "body_characters":100,
+  "planner_model":"openai/gpt-4o-mini",
+  "escalation_model":"tencent/hy4",
+  "decision_model":"morph/reflex",
+  "rerank_model":"cohere/rerank-5-pro",
+  "conditions":["baseline","reflex","rerank","combined"],
+  "tasks":[
+    {"id":"cascade-index-review","role":"reviewer","role_version":"1","query":"Propose a review plan to verify that paragraph-level navigation retains its original section and revision."},
+    {"id":"cascade-fallback-impl","role":"implementer","role_version":"1","query":"Propose a plan to keep ordinary document search usable if a model-based relevance check is unavailable."},
+    {"id":"cascade-role-review","role":"reviewer","role_version":"1","query":"Propose checks to ensure agent-role usefulness scores cannot hide a relevant source passage."},
+    {"id":"cascade-conflict-impl","role":"implementer","role_version":"1","query":"Propose a source-backed plan to reconcile a synthetic conflicting retry-limit claim with its original document.","escalation":"synthesis_requested"}
+  ]
+}

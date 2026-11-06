@@ -1,0 +1,11 @@
+{
+  "source_id": "P01",
+  "role": "policy",
+  "fixture": "ALDERLINE-7759F34F9E",
+  "authority": "binding",
+  "from": "2026-10-01",
+  "through": "2026-10-31",
+  "maximum_lag_minutes": 90,
+  "signed_review_routes": [],
+  "decision_text": "Release if the report and route are identified, the route is allowed, the hold status is clear, and lag is at or below the cap or is covered by a signed lag waiver. A waiver overrides lag only. A confirmed hard blocker suffices to block. An unknown decisive condition requires deferral. No peer review is required in this version. Register dates are inclusive. When two equally recent applicable rows disagree, defer if material."
+}

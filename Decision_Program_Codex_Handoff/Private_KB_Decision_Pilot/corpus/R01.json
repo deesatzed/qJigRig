@@ -1,0 +1,149 @@
+{
+  "source_id": "R01",
+  "role": "routes",
+  "fixture": "ALDERLINE-7759F34F9E",
+  "authority": "binding",
+  "date_rule": "This snapshot is effective October 1 through December 31. An explicit denial is a hard blocker. An omitted route in the request is unknown.",
+  "rows": [
+    {
+      "report": "Acorn",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Acorn",
+      "route": "partner",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Beacon",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Beacon",
+      "route": "partner",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Cedar",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Cedar",
+      "route": "partner",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Dune",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Dune",
+      "route": "partner",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Elm",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Elm",
+      "route": "partner",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Finch",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Finch",
+      "route": "partner",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Grove",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Grove",
+      "route": "partner",
+      "status": "denied",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Haven",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Haven",
+      "route": "partner",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Ibis",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Ibis",
+      "route": "partner",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Larch",
+      "route": "internal",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Larch",
+      "route": "partner",
+      "status": "allowed",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    }
+  ]
+}

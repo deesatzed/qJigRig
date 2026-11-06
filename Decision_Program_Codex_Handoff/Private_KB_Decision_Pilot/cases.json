@@ -1,0 +1,148 @@
+[
+  {
+    "id": "C01",
+    "question": "What is the release decision for the Acorn report on 2026-10-28 via the internal route?",
+    "report": "Acorn",
+    "route": "internal",
+    "as_of": "2026-10-28",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C02",
+    "question": "What is the release decision for the Acorn report on 2026-11-03 via the internal route?",
+    "report": "Acorn",
+    "route": "internal",
+    "as_of": "2026-11-03",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C03",
+    "question": "What is the release decision for the Beacon report on 2026-11-04 via the partner route?",
+    "report": "Beacon",
+    "route": "partner",
+    "as_of": "2026-11-04",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C04",
+    "question": "What is the release decision for the Beacon report on 2026-11-06 via the partner route?",
+    "report": "Beacon",
+    "route": "partner",
+    "as_of": "2026-11-06",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C05",
+    "question": "What is the release decision for the Cedar report on 2026-11-03 via the internal route?",
+    "report": "Cedar",
+    "route": "internal",
+    "as_of": "2026-11-03",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C06",
+    "question": "What is the release decision for the Cedar report on 2026-11-03 via the partner route?",
+    "report": "Cedar",
+    "route": "partner",
+    "as_of": "2026-11-03",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C07",
+    "question": "What is the release decision for the Dune report on 2026-11-04 via the internal route?",
+    "report": "Dune",
+    "route": "internal",
+    "as_of": "2026-11-04",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C08",
+    "question": "What is the release decision for the Dune report on 2026-11-06 via the internal route?",
+    "report": "Dune",
+    "route": "internal",
+    "as_of": "2026-11-06",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C09",
+    "question": "What is the release decision for the Elm report on 2026-11-04 via the internal route?",
+    "report": "Elm",
+    "route": "internal",
+    "as_of": "2026-11-04",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C10",
+    "question": "What is the release decision for the Finch report on 2026-11-04 via the internal route?",
+    "report": "Finch",
+    "route": "internal",
+    "as_of": "2026-11-04",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C11",
+    "question": "What is the release decision for the Grove report on 2026-11-04 via the partner route?",
+    "report": "Grove",
+    "route": "partner",
+    "as_of": "2026-11-04",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C12",
+    "question": "What is the release decision for the Grove report on 2026-11-04?",
+    "report": "Grove",
+    "route": null,
+    "as_of": "2026-11-04",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C13",
+    "question": "What is the release decision for the Haven report on 2026-11-04 via the internal route?",
+    "report": "Haven",
+    "route": "internal",
+    "as_of": "2026-11-04",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C14",
+    "question": "What is the release decision for the Ibis report on 2026-11-04 via the internal route?",
+    "report": "Ibis",
+    "route": "internal",
+    "as_of": "2026-11-04",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C15",
+    "question": "What is the release decision for the Cedar report on 2026-11-03 via the internal route?",
+    "report": "Cedar",
+    "route": "internal",
+    "as_of": "2026-11-03",
+    "unavailable_source_ids": [
+      "W01"
+    ]
+  },
+  {
+    "id": "C16",
+    "question": "What is the release decision for the Larch report on 2026-11-05 via the internal route?",
+    "report": "Larch",
+    "route": "internal",
+    "as_of": "2026-11-05",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C17",
+    "question": "What is the release decision for the Dune report on 2026-11-06 via the partner route?",
+    "report": "Dune",
+    "route": "partner",
+    "as_of": "2026-11-06",
+    "unavailable_source_ids": []
+  },
+  {
+    "id": "C18",
+    "question": "Someone asked for blue headers on next month’s slide. What is the release decision for the Cedar report on 2026-11-03 via the internal route?",
+    "report": "Cedar",
+    "route": "internal",
+    "as_of": "2026-11-03",
+    "unavailable_source_ids": []
+  }
+]

@@ -1,0 +1,57 @@
+{
+  "source_id": "L01",
+  "role": "lag",
+  "fixture": "ALDERLINE-7759F34F9E",
+  "authority": "binding",
+  "date_rule": "The logged lag is the governing measured lag during the row validity interval. Absent lag evidence is unknown.",
+  "rows": [
+    {
+      "report": "Acorn",
+      "lag_minutes": 72,
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Beacon",
+      "lag_minutes": 40,
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Cedar",
+      "lag_minutes": 75,
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Dune",
+      "lag_minutes": 44,
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Finch",
+      "lag_minutes": 40,
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Haven",
+      "lag_minutes": 60,
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Ibis",
+      "lag_minutes": 61,
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Larch",
+      "lag_minutes": 75,
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    }
+  ]
+}

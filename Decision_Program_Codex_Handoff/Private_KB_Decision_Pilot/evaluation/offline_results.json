@@ -1,0 +1,2690 @@
+{
+  "mode": "deterministic fixture with authored decision structure",
+  "arms": {
+    "whole_folder": {
+      "score": {
+        "cases": 18,
+        "correct_decisions": 18,
+        "expected_source_ids_present": 18,
+        "document_accesses": 179,
+        "source_payload_bytes": 187565,
+        "outcomes": {
+          "RELEASE": 6,
+          "BLOCK": 7,
+          "DEFER": 5
+        }
+      },
+      "rows": [
+        {
+          "id": "C01",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P01",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P01",
+            "R01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C02",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C03",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "UNKNOWN",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "P02",
+            "V01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C04",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "V01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C05",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C06",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C07",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "BLOCK",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C08",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C09",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag known",
+              "value": "UNKNOWN",
+              "citations": [
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C10",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "UNKNOWN",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C11",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "BLOCK",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "UNKNOWN",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag known",
+              "value": "UNKNOWN",
+              "citations": [
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "R01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C12",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route specified",
+              "value": "UNKNOWN",
+              "citations": []
+            }
+          ],
+          "cites": [],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C13",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C14",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C15",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "UNKNOWN",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02"
+          ],
+          "documents_read": 9,
+          "source_payload_bytes": 9558,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01"
+          ]
+        },
+        {
+          "id": "C16",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C17",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "P02",
+            "V01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C18",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ],
+          "documents_read": 10,
+          "source_payload_bytes": 10471,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "N01",
+            "N02",
+            "N03",
+            "P01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        }
+      ]
+    },
+    "predicate_directed": {
+      "score": {
+        "cases": 18,
+        "correct_decisions": 18,
+        "expected_source_ids_present": 18,
+        "document_accesses": 72,
+        "source_payload_bytes": 123625,
+        "outcomes": {
+          "RELEASE": 6,
+          "BLOCK": 7,
+          "DEFER": 5
+        }
+      },
+      "rows": [
+        {
+          "id": "C01",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P01",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P01",
+            "R01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 6961,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P01",
+            "R01"
+          ]
+        },
+        {
+          "id": "C02",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 8149,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C03",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "UNKNOWN",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "P02",
+            "V01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 7926,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "V01"
+          ]
+        },
+        {
+          "id": "C04",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "V01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 7926,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "V01"
+          ]
+        },
+        {
+          "id": "C05",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 8149,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C06",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 6,
+          "source_payload_bytes": 8839,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C07",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "BLOCK",
+              "citations": [
+                "H01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01"
+          ],
+          "documents_read": 2,
+          "source_payload_bytes": 5074,
+          "source_ids_read": [
+            "H01",
+            "R01"
+          ]
+        },
+        {
+          "id": "C08",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 7236,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C09",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag known",
+              "value": "UNKNOWN",
+              "citations": [
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 7236,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C10",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "UNKNOWN",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 7236,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C11",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "BLOCK",
+              "citations": [
+                "R01"
+              ]
+            }
+          ],
+          "cites": [
+            "R01"
+          ],
+          "documents_read": 1,
+          "source_payload_bytes": 3265,
+          "source_ids_read": [
+            "R01"
+          ]
+        },
+        {
+          "id": "C12",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route specified",
+              "value": "UNKNOWN",
+              "citations": []
+            }
+          ],
+          "cites": [],
+          "documents_read": 0,
+          "source_payload_bytes": 0,
+          "source_ids_read": []
+        },
+        {
+          "id": "C13",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 7236,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C14",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 8149,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C15",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "UNKNOWN",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 7236,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C16",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 8149,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C17",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            }
+          ],
+          "cites": [
+            "P02",
+            "V01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 6709,
+          "source_ids_read": [
+            "H01",
+            "P02",
+            "R01",
+            "V01"
+          ]
+        },
+        {
+          "id": "C18",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 8149,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        }
+      ]
+    },
+    "predicate_directed_keyed_rows": {
+      "score": {
+        "cases": 18,
+        "correct_decisions": 18,
+        "expected_source_ids_present": 18,
+        "document_accesses": 72,
+        "source_payload_bytes": 38059,
+        "outcomes": {
+          "RELEASE": 6,
+          "BLOCK": 7,
+          "DEFER": 5
+        }
+      },
+      "rows": [
+        {
+          "id": "C01",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P01",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P01",
+            "R01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 1832,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P01",
+            "R01"
+          ]
+        },
+        {
+          "id": "C02",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 2654,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C03",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "UNKNOWN",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "P02",
+            "V01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 2503,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "V01"
+          ]
+        },
+        {
+          "id": "C04",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "V01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 2503,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "V01"
+          ]
+        },
+        {
+          "id": "C05",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 2838,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C06",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 6,
+          "source_payload_bytes": 3046,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "V01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C07",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "BLOCK",
+              "citations": [
+                "H01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01"
+          ],
+          "documents_read": 2,
+          "source_payload_bytes": 910,
+          "source_ids_read": [
+            "H01",
+            "R01"
+          ]
+        },
+        {
+          "id": "C08",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 2225,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C09",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag known",
+              "value": "UNKNOWN",
+              "citations": [
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 1980,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C10",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "UNKNOWN",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 2350,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C11",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "BLOCK",
+              "citations": [
+                "R01"
+              ]
+            }
+          ],
+          "cites": [
+            "R01"
+          ],
+          "documents_read": 1,
+          "source_payload_bytes": 430,
+          "source_ids_read": [
+            "R01"
+          ]
+        },
+        {
+          "id": "C12",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route specified",
+              "value": "UNKNOWN",
+              "citations": []
+            }
+          ],
+          "cites": [],
+          "documents_read": 0,
+          "source_payload_bytes": 0,
+          "source_ids_read": []
+        },
+        {
+          "id": "C13",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag cap met",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 2107,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C14",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 2651,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C15",
+          "label": "DEFER",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "UNKNOWN",
+              "citations": [
+                "P02",
+                "L01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 2107,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01"
+          ]
+        },
+        {
+          "id": "C16",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "L01",
+            "P02",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 2838,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        },
+        {
+          "id": "C17",
+          "label": "BLOCK",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "peer review",
+              "value": "BLOCK",
+              "citations": [
+                "P02",
+                "V01"
+              ]
+            }
+          ],
+          "cites": [
+            "P02",
+            "V01"
+          ],
+          "documents_read": 4,
+          "source_payload_bytes": 2247,
+          "source_ids_read": [
+            "H01",
+            "P02",
+            "R01",
+            "V01"
+          ]
+        },
+        {
+          "id": "C18",
+          "label": "RELEASE",
+          "findings": [
+            {
+              "predicate": "route authorized",
+              "value": "PASS",
+              "citations": [
+                "R01"
+              ]
+            },
+            {
+              "predicate": "hold clear",
+              "value": "PASS",
+              "citations": [
+                "H01"
+              ]
+            },
+            {
+              "predicate": "governing policy",
+              "value": "PASS",
+              "citations": [
+                "P02"
+              ]
+            },
+            {
+              "predicate": "lag exception",
+              "value": "PASS",
+              "citations": [
+                "P02",
+                "L01",
+                "W01"
+              ]
+            }
+          ],
+          "cites": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ],
+          "documents_read": 5,
+          "source_payload_bytes": 2838,
+          "source_ids_read": [
+            "H01",
+            "L01",
+            "P02",
+            "R01",
+            "W01"
+          ]
+        }
+      ]
+    }
+  },
+  "live_model_calls": 0,
+  "model_accuracy_cost_latency": null
+}

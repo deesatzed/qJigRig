@@ -1,0 +1,10 @@
+# Switch assessment
+
+Reviewed sibling `switch` at commit `7c5b6b9`. It can contribute a decision-model control loop around QUIX, but is not yet integrated or evaluated with QUIX's OpenRouter adapter.
+
+- Its [state-machine loop](../../switch/src/core/loop.ts) runs bounded rounds of typed questions, state transitions and recorded outcomes. A QUIX domain could offer actions such as inspect a topic, inspect a source span, broaden retrieval or stop, with the role and source-linked evidence in the state. Code would define the actions; the decision model would choose among them.
+- The [rubric-judge example](../../switch/examples/rubric-judge/README.md) gathers evidence one file or search at a time and records what it inspected. Its read, search, page-image and stop actions are useful design examples for agent navigation and later outcome review. Its existing labeled cases are legal tasks, not a validation of QUIX retrieval.
+- [Trace replay](../../switch/src/core/replay.ts) repeats recorded steps and can fork a run. This could support reproducible comparisons of policies and audit why an agent chose a source; it does not prove that the retrieved evidence or model judgment is correct.
+- Its [model adapter](../../switch/src/models/pi-ai.ts) resolves classifiers through a pi-ai registry. QUIX currently uses a Python OpenRouter adapter; compatibility for our configured OpenRouter endpoint and models has not been verified. A bridge or custom decider would be needed, with explicit usage accounting, timeouts and `unknown` fallback. `switch` requires Node 22.18+ and adds a TypeScript runtime boundary.
+
+Suggested first experiment: keep QUIX as the catalog and source-of-truth, define a small read-only switch domain over a fixed set of catalog-derived choices, record source revisions and action traces, then compare it with QUIX's matched-candidate baseline on independently reviewed tasks. Do not accept topic links, calibrate thresholds, or claim lower cost or better agent outcomes merely from a trace. Inspect `switch`'s MIT license when reusing code; no switch code was copied in this assessment.

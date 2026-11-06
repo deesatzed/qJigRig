@@ -1,0 +1,90 @@
+{
+  "interpretation": "Exact status and answer text comparison only; semantic equivalence and causal correctness require review.",
+  "change": {
+    "kind": "modified",
+    "original_source_id": "891db67604574b86aa0c89f56b5ba8c7",
+    "new_source_id": "078abb5c4fbb4ee18535f57a8d18fc7c",
+    "original_snapshot_id": "891db67604574b86aa0c89f56b5ba8c7",
+    "intervention_snapshot_id": "078abb5c4fbb4ee18535f57a8d18fc7c",
+    "reason": "Change event type to school",
+    "interpretation": "Controlled experiment; not a reviewed program revision or evidence of applicability."
+  },
+  "result_changed": true,
+  "original": {
+    "run_id": "a7a4a0ae0f454495b5b0d0e2f02b40bb",
+    "snapshot_id": "891db67604574b86aa0c89f56b5ba8c7",
+    "result": {
+      "status": "decided",
+      "answer": "Yes, the event requires a permit.",
+      "reason": "Composed from predicate results"
+    },
+    "trace": [
+      {
+        "predicate": {
+          "id": "p1",
+          "question": "Does the event have more than 50 attendees?",
+          "evidence_requirement": "The number of attendees at the event"
+        },
+        "outcome": "true",
+        "quote": "The event has 75 attendees",
+        "reason": "The source explicitly states the event has 75 attendees, which is more than 50."
+      },
+      {
+        "predicate": {
+          "id": "p2",
+          "question": "Is the event a school event?",
+          "evidence_requirement": "The classification or nature of the event"
+        },
+        "outcome": "false",
+        "quote": "The event has 75 attendees and is not a school event.",
+        "reason": "The source explicitly states 'is not a school event', which directly contradicts the predicate question asking if it is a school event."
+      }
+    ]
+  },
+  "intervention": {
+    "run_id": "180daccdbf9c4c2eb5805dba7b65be00",
+    "snapshot_id": "078abb5c4fbb4ee18535f57a8d18fc7c",
+    "result": {
+      "status": "decided",
+      "answer": "The event does not require a permit if it has 50 or fewer attendees, or if it is a school event.",
+      "reason": "Composed from predicate results"
+    },
+    "trace": [
+      {
+        "predicate": {
+          "id": "p1",
+          "question": "Does the event have more than 50 attendees?",
+          "evidence_requirement": "The number of attendees at the event"
+        },
+        "outcome": "true",
+        "quote": "The event has 75 attendees",
+        "source_ref": {
+          "source_id": "078abb5c4fbb4ee18535f57a8d18fc7c",
+          "source_sha256": "96f96fa78955f64fd862cd7ff4439174aa826f51b85d6353d78d695554d3c2dd",
+          "source_title": "Synthetic changed school status",
+          "source_start": 108,
+          "source_end": 134
+        },
+        "reason": "The source explicitly states the event has 75 attendees, which is more than 50."
+      },
+      {
+        "predicate": {
+          "id": "p2",
+          "question": "Is the event a school event?",
+          "evidence_requirement": "The classification or nature of the event"
+        },
+        "outcome": "true",
+        "quote": "The event has 75 attendees and is a school event.",
+        "source_ref": {
+          "source_id": "078abb5c4fbb4ee18535f57a8d18fc7c",
+          "source_sha256": "96f96fa78955f64fd862cd7ff4439174aa826f51b85d6353d78d695554d3c2dd",
+          "source_title": "Synthetic changed school status",
+          "source_start": 108,
+          "source_end": 157
+        },
+        "reason": "The source explicitly states that the event is a school event, which directly confirms the predicate."
+      }
+    ]
+  },
+  "review_limitations": "Synthetic developer workflow test; not independently adjudicated or a general applicability claim."
+}

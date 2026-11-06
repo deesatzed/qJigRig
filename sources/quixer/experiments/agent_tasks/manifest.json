@@ -1,0 +1,14 @@
+{
+  "schema": "quix-agent-study-manifest-v1",
+  "status": "exploratory tasks; independent review pending",
+  "seed": 174,
+  "max_input_characters": 12000,
+  "conditions": ["none", "baseline", "role", "switch"],
+  "tasks": [
+    {"id":"agent-unheaded", "query":"Propose a source-linked indexing fallback for a document without headings.", "role":"implementer", "role_version":"1"},
+    {"id":"agent-evidence", "query":"Review how an agent finding identifies its supporting source and revision.", "role":"reviewer", "role_version":"1"},
+    {"id":"agent-timeout", "query":"Propose how to handle a decision-model timeout without suppressing source evidence.", "role":"implementer", "role_version":"1"},
+    {"id":"agent-role", "query":"Review whether role usefulness estimates can hide relevant evidence.", "role":"reviewer", "role_version":"1"},
+    {"id":"agent-provider", "query":"Assess whether decision-model scores establish calibrated task accuracy.", "role":"reviewer", "role_version":"1"}
+  ]
+}

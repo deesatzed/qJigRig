@@ -1,0 +1,9 @@
+{
+  "title": "Python 3.12.10 token module documentation",
+  "upstream": "https://raw.githubusercontent.com/python/cpython/v3.12.10/Doc/library/token.rst",
+  "version": "CPython v3.12.10",
+  "sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+  "retrieved_at": "2026-11-06T14:28:08.801043+00:00",
+  "license": "Python Software Foundation License Version 2",
+  "note": "Public documentation source; frozen by content hash."
+}

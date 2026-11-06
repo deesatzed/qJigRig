@@ -1,0 +1,214 @@
+{
+  "schema": "quix-cascade-pilot-summary-v1",
+  "pilot_recorded": "2026-11-04",
+  "report_created": "2026-11-05",
+  "status": "exploratory, AI-reviewed, not independently validated",
+  "corpus_revision": "04c2c46636e1fc40f41ffeda6ca72a0179a1ea85e1d025a4aa85b8081be5e209",
+  "tasks": 4,
+  "conditions": {
+    "baseline": {
+      "run_statuses": {
+        "completed": 3,
+        "unsupported_or_stale_evidence": 1
+      },
+      "ai_review_statuses": {
+        "ai_reviewed": 3,
+        "missing_output": 1
+      },
+      "mean_essential_id_recall": 0.2875,
+      "ai_plan_quality": {
+        "inadequate": 1,
+        "partial": 2,
+        "unknown": 1
+      },
+      "ai_source_support": {
+        "partial": 3,
+        "unknown": 1
+      },
+      "tasks_with_unrecognized_full_hex_tokens": 0
+    },
+    "reflex": {
+      "run_statuses": {
+        "completed": 3,
+        "unsupported_or_stale_evidence": 1
+      },
+      "ai_review_statuses": {
+        "ai_reviewed": 3,
+        "missing_output": 1
+      },
+      "mean_essential_id_recall": 0.1875,
+      "ai_plan_quality": {
+        "inadequate": 2,
+        "partial": 1,
+        "unknown": 1
+      },
+      "ai_source_support": {
+        "partial": 3,
+        "unknown": 1
+      },
+      "tasks_with_unrecognized_full_hex_tokens": 0
+    },
+    "rerank": {
+      "run_statuses": {
+        "completed": 4
+      },
+      "ai_review_statuses": {
+        "ai_reviewed": 4
+      },
+      "mean_essential_id_recall": 0.4625,
+      "ai_plan_quality": {
+        "inadequate": 1,
+        "partial": 2,
+        "adequate": 1
+      },
+      "ai_source_support": {
+        "partial": 3,
+        "supported": 1
+      },
+      "tasks_with_unrecognized_full_hex_tokens": 0
+    },
+    "combined": {
+      "run_statuses": {
+        "completed": 4
+      },
+      "ai_review_statuses": {
+        "unknown": 1,
+        "ai_reviewed": 3
+      },
+      "mean_essential_id_recall": 0.4125,
+      "ai_plan_quality": {
+        "unknown": 1,
+        "partial": 2,
+        "inadequate": 1
+      },
+      "ai_source_support": {
+        "unknown": 1,
+        "partial": 2,
+        "supported": 1
+      },
+      "tasks_with_unrecognized_full_hex_tokens": 0
+    }
+  },
+  "switch_statuses": {
+    "insufficient_evidence:decision_failed": 3,
+    "complete:None": 1
+  },
+  "rerank_statuses": {
+    "ok": 4
+  },
+  "retrieval_review_statuses": {
+    "ai_reviewed": 4
+  },
+  "planner_prompt_tokens": {
+    "baseline": [
+      null,
+      700,
+      688,
+      705
+    ],
+    "reflex": [
+      700,
+      422,
+      705,
+      null
+    ],
+    "rerank": [
+      721,
+      696,
+      693,
+      693
+    ],
+    "combined": [
+      626,
+      660,
+      634,
+      702
+    ]
+  },
+  "costs_v2": {
+    "planner": {
+      "known_usd": 0.0078949455,
+      "unknown_count": 0,
+      "calls": 14
+    },
+    "rerank": {
+      "known_usd": 0.0009608,
+      "unknown_count": 0,
+      "calls": 4
+    },
+    "reflex": {
+      "known_usd": 0.000422016,
+      "unknown_count": 0,
+      "calls": 12
+    },
+    "ai_review": {
+      "known_usd": 0.020901581,
+      "unknown_count": 0,
+      "calls": 20
+    }
+  },
+  "escalation": {
+    "model": "tencent/hy4",
+    "reasoning_enabled": false,
+    "called": 3,
+    "completed": 3
+  },
+  "initial_v1": {
+    "statuses": {
+      "completed": 11,
+      "unsupported_or_stale_evidence": 1,
+      "agent_failure": 4
+    },
+    "hy4_failed": 4,
+    "planner_reported_usd": 0.012117527999999999,
+    "note": "Initial planner binary did not disable Hy4 reasoning; prior attempt is not pooled with v2."
+  },
+  "clairic": {
+    "status": "ok",
+    "fixture_field_matches": {
+      "document_title": true,
+      "owner": true,
+      "revision_date": true,
+      "missing_author": true
+    },
+    "usage": {
+      "input_tokens": 650,
+      "output_tokens": 0,
+      "state_tokens": 40,
+      "image_tokens": 0,
+      "schema_tokens": 490,
+      "passes": 4,
+      "cost": 6.5e-05
+    },
+    "source_sha256": "e9de32d093f7d7d4d2695b851b7235a32aa0480c419b508b8bbc7446b812738f"
+  },
+  "cohere_hybrid": {
+    "tasks": 4,
+    "statuses": {
+      "ok": 4
+    },
+    "ordering_changed": 4,
+    "mean_essential_id_recall_against_ai_labels": 0.35,
+    "reported_cost_usd": 0.001812,
+    "unknown_cost_count": 0,
+    "document_embedding_calls_not_cached": true
+  },
+  "artifact_hashes": {
+    "stage_sha256": "not_recorded",
+    "packets_sha256": "not_recorded",
+    "schedule_sha256": "not_recorded"
+  },
+  "limitations": [
+    "Same explored corpus; four new tasks, not independently held out.",
+    "AI-generated essential labels and plan assessments are unvalidated proxies.",
+    "Exact-ID overlap does not verify that truncated context includes the needed passage.",
+    "Full model input budgets and cost differ by condition.",
+    "The hex-token check excludes supplied IDs and revision hashes but is not a citation validator; short IDs and paraphrases are not checked.",
+    "Evidence source checks are point-in-time.",
+    "Shared retrieval stages incur costs once in this experimental design.",
+    "Four tasks and shared previously explored source corpus do not establish a benefit.",
+    "One combined plan has an unknown AI review after a retry; two baseline/reflex attempts were rejected for unsupported or stale evidence.",
+    "Cohere hybrid runs were separate from the paired agent proposals.",
+    "No live swarm or MindStore integration."
+  ]
+}

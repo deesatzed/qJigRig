@@ -1,0 +1,13 @@
+{
+  "source_id": "P02",
+  "role": "policy",
+  "fixture": "ALDERLINE-7759F34F9E",
+  "authority": "binding",
+  "from": "2026-11-01",
+  "through": "2026-12-31",
+  "maximum_lag_minutes": 60,
+  "signed_review_routes": [
+    "partner"
+  ],
+  "decision_text": "Release requires an identified report and route, allowed route, clear hold status, and lag at or below the cap or covered by a signed lag waiver. Partner routes also require a signed peer review in effect as of the request date. A waiver overrides lag only. A confirmed hard blocker suffices to block. A known pending or rejected review blocks partner release. If no applicable review record is available, review status is unknown. Missing material evidence or competing equally recent applicable rows require deferral unless another confirmed blocker settles the result. Register dates are inclusive. For a given key, use the applicable row or rows with the latest effective start date."
+}

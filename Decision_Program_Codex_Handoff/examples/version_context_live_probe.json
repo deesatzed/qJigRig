@@ -1,0 +1,915 @@
+{
+  "classification": "Public-source development probe, not independent assessment.",
+  "source": {
+    "id": "65a189c62ed341688aaf76994f733b75",
+    "title": "Python 3.12.10 keyword documentation",
+    "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================\n\n.. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.\n\n**Source code:** :source:`Lib/keyword.py`\n\n--------------\n\nThis module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.\n\n\n.. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.\n\n\n.. data:: kwlist\n\n   Sequence containing all the :ref:`keywords <keywords>` defined for the\n   interpreter.  If any keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n\n.. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9\n\n\n.. data:: softkwlist\n\n   Sequence containing all the :ref:`soft keywords <soft-keywords>` defined for the\n   interpreter.  If any soft keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n   .. versionadded:: 3.9\n",
+    "scope": "",
+    "effective_from": "",
+    "effective_to": "",
+    "observed_at": "",
+    "origin": "https://raw.githubusercontent.com/python/cpython/v3.12.10/Doc/library/keyword.rst",
+    "sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+    "created_at": "2026-11-06T20:49:09.065206+00:00"
+  },
+  "comparison": {
+    "id": "26f7ff1467204742bef274e5cbc31e95",
+    "schema_version": 2,
+    "created_at": "2026-11-06T20:49:09.136201+00:00",
+    "stage": "shared-corpus",
+    "question": "Was keyword.issoftkeyword added in Python 3.9?",
+    "scope": "",
+    "as_of": "",
+    "snapshot_id": "65a189c62ed341688aaf76994f733b75",
+    "snapshot_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+    "snapshot_metadata_sha256": "802563a0ad67a0e7fb3f359e5f0dfca346e10ab33f061ee70fbe416b7d082b8e",
+    "model_config": {
+      "small_model": "qwen/qwen3.5-35b-a3b",
+      "frontier_model": "tencent/hy4",
+      "prompt_hashes": {
+        "planner": "b6b5037c49f63eeb99399b0ddac44fc666d5cee94977b1746258cacb623e5094",
+        "predicate_judge": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "predicate_repair": "5fdbb91947a6751ef945c6432f3661c8fe7161010b40a0e3b6da0e7dd2408c1c",
+        "repair": "3f8ddb69c418acc432a5b57db23df0a4a30fa77a582015a30f2fb8337b7b4a25",
+        "answer_check": "a42cfd486e07c4aea8f5e556e5e0ea81a279b3954cc1efc1ecc8feac0fce510c",
+        "answer_check_repair": "dad7ca7dc80abe0d24876c53640e4596a7f1b3d2e67d59176fd37b386e5e58b9",
+        "direct": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+        "direct_repair": "d143b071be5abd67edd46e9299e6c4c20b01d31ea2ffc4caa866639bd1efd6df",
+        "search": "426399e1c89319c0d7283de28a0263bf76afc5d53f23d1d11c47ba30a1a5adbc"
+      },
+      "runtime_hashes": {
+        "core.py": "a6c02ec70dbe99abe1adb4423049ef40ea2353b380530e217b5560a873f7a403",
+        "collections.py": "cda109e597f17e476a4e334b8f35211440cbfbb948ea1e743df19f290215404a",
+        "retrieval.py": "d6dc3fdef58412b4cbcd5bed261b54527062e24f71a45fd3182a25c14d235929",
+        "local_retrieval.py": "221a36750f13636c7d0f3e854d923e477afb55d60a48dba7db564087ade09bc8",
+        "local_judge.py": "b5c033f3a8186b8f0634a1a2ae6f9ed9c0a64e28efd5bc51a0e6a826ab5895e2",
+        "local_worker.py": "4ca00f41e3cee0c90d84097edd931b57d36079767532dcad50f5c26486fcbb0b",
+        "programs.py": "d903433a42078740a633ea0109615946205632f8faa941910e306d932b977cb9",
+        "compare.py": "03397304dfc0c63761ef86abb833d542903556637db2ad969423fb2863b7af7e",
+        "datasets.py": "c35063765a542a70102f0c7be6dd26baf9c5817f0980cfea5ae0da8ae761a8a1",
+        "jobs.py": "124b4ee1cb952c302db97cffa896292cf50139a914144e329d5989a3acce47de",
+        "experiments.py": "acff61c9669f5242c2d101a6d0921a55fe54cbd07831b3ba443a7d55c40064aa",
+        "web_research.py": "ff60bd0f776a1f321c9d8ecaa2537d809ca3ae15152c609c1ee1d36e7a2df6c8",
+        "verify_run.py": "aab8facb76addb5e9414872b72525543a3a1f1c391ec5b8bdf8728b97e921c87"
+      },
+      "web_plugin": "explicitly disabled for bounded calls",
+      "provider_revision": "resolved model and provider are recorded per call when returned"
+    },
+    "historical_as_known": false,
+    "targeted": true,
+    "extra_search": false,
+    "status": "awaiting adjudication",
+    "answer_check_backend": "local",
+    "local_support_threshold": 0.8,
+    "web_authorized": false,
+    "items": [
+      {
+        "review_id": "ee9bc126c4454454b01a9743098e9dbf",
+        "arm": "fresh",
+        "run_id": "4fb2dc556805418dba47aff2f38e3e57"
+      },
+      {
+        "review_id": "560ccf0dd46e4950842c8e7c5b3973c6",
+        "arm": "direct",
+        "run_id": "bac82cef4c514b9796a110f5b1c1096e"
+      },
+      {
+        "review_id": "569d168eef59453ebd120764754b5a00",
+        "arm": "frontier",
+        "run_id": "39d062a605b04887b0a8d979dc97d0b7"
+      }
+    ]
+  },
+  "runs": {
+    "fresh": {
+      "id": "4fb2dc556805418dba47aff2f38e3e57",
+      "schema_version": 1,
+      "created_at": "2026-11-06T20:49:09.137723+00:00",
+      "mode": "fresh",
+      "request": {
+        "question": "Was keyword.issoftkeyword added in Python 3.9?",
+        "scope": "",
+        "as_of": "",
+        "snapshot_id": "65a189c62ed341688aaf76994f733b75"
+      },
+      "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+      "source_metadata_sha256": "802563a0ad67a0e7fb3f359e5f0dfca346e10ab33f061ee70fbe416b7d082b8e",
+      "calls": [
+        {
+          "model": "qwen/qwen3.5-35b-a3b",
+          "provider": "Venice",
+          "generation_id": "gen-1793998149-sodtGnYdReuZdafIjTOh",
+          "elapsed_seconds": 1.206,
+          "usage": {
+            "prompt_tokens": 662,
+            "completion_tokens": 210,
+            "total_tokens": 872,
+            "cost": 0.0003093,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0003093,
+              "upstream_inference_prompt_cost": 9.93e-05,
+              "upstream_inference_completions_cost": 0.00021
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "b6b5037c49f63eeb99399b0ddac44fc666d5cee94977b1746258cacb623e5094",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        }
+      ],
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Was the function keyword.issoftkeyword added in Python 3.9?",
+            "evidence_requirement": "Documentation stating the version in which keyword.issoftkeyword was introduced",
+            "positive_claim": "The function keyword.issoftkeyword was added in Python 3.9.",
+            "negative_claim": "The function keyword.issoftkeyword was not added in Python 3.9."
+          },
+          "outcome": "true",
+          "quote": "",
+          "evidence_spans": [
+            {
+              "start": 718,
+              "end": 850,
+              "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9",
+              "score": 7.680911,
+              "matched_terms": [
+                "function",
+                "issoftkeyword",
+                "keyword",
+                "python"
+              ],
+              "source_ref": {
+                "source_id": "65a189c62ed341688aaf76994f733b75",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 718,
+                "source_end": 850
+              }
+            },
+            {
+              "start": 371,
+              "end": 463,
+              "text": ".. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+              "score": 5.071473,
+              "matched_terms": [
+                "function",
+                "keyword",
+                "python"
+              ],
+              "source_ref": {
+                "source_id": "65a189c62ed341688aaf76994f733b75",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 371,
+                "source_end": 463
+              }
+            },
+            {
+              "start": 0,
+              "end": 95,
+              "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+              "score": 2.867501,
+              "matched_terms": [
+                "keyword",
+                "python"
+              ],
+              "source_ref": {
+                "source_id": "65a189c62ed341688aaf76994f733b75",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 0,
+                "source_end": 95
+              }
+            }
+          ],
+          "retrieval_rounds": [
+            {
+              "query": "Was the function keyword.issoftkeyword added in Python 3.9?",
+              "hits": 3
+            }
+          ],
+          "followup_status": "not_needed",
+          "positive_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.906,
+              "false": 0.094
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 272,
+            "elapsed_seconds": 0.554
+          },
+          "negative_support": {
+            "choice": "false",
+            "probabilities": {
+              "true": 0.4696,
+              "false": 0.5304
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 273,
+            "elapsed_seconds": 0.436
+          },
+          "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+        }
+      ],
+      "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+      "requested_model": "qwen/qwen3.5-35b-a3b",
+      "evidence_mode": "lexical",
+      "answer_check_backend": "local",
+      "model_responses": [
+        {
+          "stage": "planner",
+          "text": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Was the function keyword.issoftkeyword added in Python 3.9?\",\n      \"evidence_requirement\": \"Documentation stating the version in which keyword.issoftkeyword was introduced\",\n      \"positive_claim\": \"The function keyword.issoftkeyword was added in Python 3.9.\",\n      \"negative_claim\": \"The function keyword.issoftkeyword was not added in Python 3.9.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"Yes, the function keyword.issoftkeyword was added in Python 3.9.\",\n  \"false_answer\": \"No, the function keyword.issoftkeyword was not added in Python 3.9; it was added in a different version.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}"
+        }
+      ],
+      "extra_search": false,
+      "execution_policy": "batch_no_extra_search",
+      "local_support_threshold": 0.8,
+      "planning_evidence": [
+        {
+          "start": 718,
+          "end": 850,
+          "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9",
+          "score": 5.476938,
+          "matched_terms": [
+            "issoftkeyword",
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 850
+          }
+        },
+        {
+          "start": 0,
+          "end": 95,
+          "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 0,
+            "source_end": 95
+          }
+        },
+        {
+          "start": 97,
+          "end": 176,
+          "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        },
+        {
+          "start": 237,
+          "end": 368,
+          "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 237,
+            "source_end": 368
+          }
+        },
+        {
+          "start": 371,
+          "end": 463,
+          "text": ".. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 371,
+            "source_end": 463
+          }
+        }
+      ],
+      "planner_output": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Was the function keyword.issoftkeyword added in Python 3.9?\",\n      \"evidence_requirement\": \"Documentation stating the version in which keyword.issoftkeyword was introduced\",\n      \"positive_claim\": \"The function keyword.issoftkeyword was added in Python 3.9.\",\n      \"negative_claim\": \"The function keyword.issoftkeyword was not added in Python 3.9.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"Yes, the function keyword.issoftkeyword was added in Python 3.9.\",\n  \"false_answer\": \"No, the function keyword.issoftkeyword was not added in Python 3.9; it was added in a different version.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}",
+      "plan": {
+        "predicates": [
+          {
+            "id": "p1",
+            "question": "Was the function keyword.issoftkeyword added in Python 3.9?",
+            "evidence_requirement": "Documentation stating the version in which keyword.issoftkeyword was introduced",
+            "positive_claim": "The function keyword.issoftkeyword was added in Python 3.9.",
+            "negative_claim": "The function keyword.issoftkeyword was not added in Python 3.9."
+          }
+        ],
+        "expression": {
+          "ref": "p1"
+        },
+        "true_answer": "Yes, the function keyword.issoftkeyword was added in Python 3.9.",
+        "false_answer": "No, the function keyword.issoftkeyword was not added in Python 3.9; it was added in a different version.",
+        "false_status": "decided",
+        "ambiguity": ""
+      },
+      "local_predicate_batches": [
+        {
+          "backend": "local Unsloth MLX",
+          "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+          "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+          "max_tokens": 4096,
+          "worker_wall_seconds": 9.91,
+          "inference_count": 2,
+          "usage_status": "local resource cost unobserved",
+          "worker_environment": {
+            "python": "3.12.16",
+            "packages": {
+              "unsloth": "2026.11.2",
+              "mlx": "0.32.4",
+              "transformers": "5.17.0",
+              "huggingface-hub": "1.33.0"
+            }
+          }
+        }
+      ],
+      "candidate_result": {
+        "status": "decided",
+        "answer": "Yes, the function keyword.issoftkeyword was added in Python 3.9.",
+        "reason": "Composed from predicate results"
+      },
+      "answer_check_evidence": [
+        {
+          "start": 718,
+          "end": 850,
+          "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9",
+          "score": 7.680911,
+          "matched_terms": [
+            "function",
+            "issoftkeyword",
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 850
+          }
+        },
+        {
+          "start": 371,
+          "end": 463,
+          "text": ".. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+          "score": 5.071473,
+          "matched_terms": [
+            "function",
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 371,
+            "source_end": 463
+          }
+        },
+        {
+          "start": 0,
+          "end": 95,
+          "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 0,
+            "source_end": 95
+          }
+        },
+        {
+          "start": 97,
+          "end": 176,
+          "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        },
+        {
+          "start": 237,
+          "end": 368,
+          "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 237,
+            "source_end": 368
+          }
+        }
+      ],
+      "answer_check": {
+        "choice": "true",
+        "probabilities": {
+          "true": 0.8986,
+          "false": 0.1014
+        },
+        "interpretation": "User-selected exploratory support threshold applied; not calibrated or independently validated. False and low scores remain unknown.",
+        "backend": "local Unsloth MLX",
+        "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+        "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+        "input_tokens": 331,
+        "max_tokens": 4096,
+        "elapsed_seconds": 0.605,
+        "worker_wall_seconds": 9.109,
+        "usage_status": "local resource cost unobserved",
+        "worker_environment": {
+          "python": "3.12.16",
+          "packages": {
+            "unsloth": "2026.11.2",
+            "mlx": "0.32.4",
+            "transformers": "5.17.0",
+            "huggingface-hub": "1.33.0"
+          }
+        },
+        "support_threshold": 0.8,
+        "verdict": "supported"
+      },
+      "result": {
+        "status": "decided",
+        "answer": "Yes, the function keyword.issoftkeyword was added in Python 3.9.",
+        "reason": "Composed from predicate results"
+      },
+      "elapsed_seconds": 20.295
+    },
+    "direct": {
+      "id": "bac82cef4c514b9796a110f5b1c1096e",
+      "schema_version": 1,
+      "created_at": "2026-11-06T20:49:29.434861+00:00",
+      "mode": "direct",
+      "request": {
+        "question": "Was keyword.issoftkeyword added in Python 3.9?",
+        "scope": "",
+        "as_of": "",
+        "snapshot_id": "65a189c62ed341688aaf76994f733b75"
+      },
+      "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+      "source_metadata_sha256": "802563a0ad67a0e7fb3f359e5f0dfca346e10ab33f061ee70fbe416b7d082b8e",
+      "calls": [
+        {
+          "model": "qwen/qwen3.5-35b-a3b",
+          "provider": "Alibaba",
+          "generation_id": "gen-1793998169-fbQUUNsdcKPjBWyJKJJI",
+          "elapsed_seconds": 0.843,
+          "usage": {
+            "prompt_tokens": 287,
+            "completion_tokens": 81,
+            "total_tokens": 368,
+            "cost": 0.0001519375,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0001519375,
+              "upstream_inference_prompt_cost": 4.66375e-05,
+              "upstream_inference_completions_cost": 0.0001053
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        },
+        {
+          "model": "qwen/qwen3.5-35b-a3b",
+          "provider": "Venice",
+          "generation_id": "gen-1793998170-ks9bmEWT89mEx89AYnaQ",
+          "elapsed_seconds": 1.004,
+          "usage": {
+            "prompt_tokens": 437,
+            "completion_tokens": 132,
+            "total_tokens": 569,
+            "cost": 0.00019755,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00019755,
+              "upstream_inference_prompt_cost": 6.555e-05,
+              "upstream_inference_completions_cost": 0.000132
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "d143b071be5abd67edd46e9299e6c4c20b01d31ea2ffc4caa866639bd1efd6df",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        }
+      ],
+      "trace": [],
+      "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+      "requested_model": "qwen/qwen3.5-35b-a3b",
+      "evidence_mode": "lexical",
+      "answer_check_backend": "not_applicable",
+      "model_responses": [
+        {
+          "stage": "direct_answer",
+          "text": "{\n  \"status\": \"decided\",\n  \"answer\": \"Yes, keyword.issoftkeyword was added in Python 3.9.\",\n  \"quotes\": [\n    \".. versionadded:: 3.9\"\n  ],\n  \"reason\": \"The source text explicitly states that the issoftkeyword function has a versionadded directive of 3.9.\"\n}"
+        },
+        {
+          "stage": "direct_repair",
+          "text": "{\n  \"status\": \"decided\",\n  \"answer\": \"Yes, keyword.issoftkeyword was added in Python 3.9.\",\n  \"quotes\": [\n    \".. function:: issoftkeyword(s)\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\\n\\n   .. versionadded:: 3.9\"\n  ],\n  \"reason\": \"The source text explicitly defines the issoftkeyword function and includes the directive '.. versionadded:: 3.9' immediately following its description, indicating it was added in that version.\"\n}"
+        }
+      ],
+      "extra_search": false,
+      "execution_policy": "not_applicable",
+      "planning_evidence": [
+        {
+          "start": 718,
+          "end": 850,
+          "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9",
+          "score": 5.476938,
+          "matched_terms": [
+            "issoftkeyword",
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 850
+          }
+        },
+        {
+          "start": 0,
+          "end": 95,
+          "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 0,
+            "source_end": 95
+          }
+        },
+        {
+          "start": 97,
+          "end": 176,
+          "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        },
+        {
+          "start": 237,
+          "end": 368,
+          "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 237,
+            "source_end": 368
+          }
+        },
+        {
+          "start": 371,
+          "end": 463,
+          "text": ".. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 371,
+            "source_end": 463
+          }
+        }
+      ],
+      "result": {
+        "status": "decided",
+        "answer": "Yes, keyword.issoftkeyword was added in Python 3.9.",
+        "reason": "The source text explicitly defines the issoftkeyword function and includes the directive '.. versionadded:: 3.9' immediately following its description, indicating it was added in that version.",
+        "quotes": [
+          ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9"
+        ],
+        "source_refs": [
+          {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 850
+          }
+        ],
+        "quote": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9",
+        "source_ref": {
+          "source_id": "65a189c62ed341688aaf76994f733b75",
+          "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+          "source_title": "Python 3.12.10 keyword documentation",
+          "observed_at": "",
+          "source_start": 718,
+          "source_end": 850
+        }
+      },
+      "elapsed_seconds": 1.851
+    },
+    "frontier": {
+      "id": "39d062a605b04887b0a8d979dc97d0b7",
+      "schema_version": 1,
+      "created_at": "2026-11-06T20:49:31.287373+00:00",
+      "mode": "frontier",
+      "request": {
+        "question": "Was keyword.issoftkeyword added in Python 3.9?",
+        "scope": "",
+        "as_of": "",
+        "snapshot_id": "65a189c62ed341688aaf76994f733b75"
+      },
+      "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+      "source_metadata_sha256": "802563a0ad67a0e7fb3f359e5f0dfca346e10ab33f061ee70fbe416b7d082b8e",
+      "calls": [
+        {
+          "model": "tencent/hy4",
+          "provider": "Tencent",
+          "generation_id": "gen-1793998171-owtChCDBEzInIEcrtbgE",
+          "elapsed_seconds": 2.052,
+          "usage": {
+            "prompt_tokens": 301,
+            "completion_tokens": 95,
+            "total_tokens": 396,
+            "cost": 0.0002443145,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0002443145,
+              "upstream_inference_prompt_cost": 0.000125517,
+              "upstream_inference_completions_cost": 0.0001187975
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        }
+      ],
+      "trace": [],
+      "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+      "requested_model": "tencent/hy4",
+      "evidence_mode": "lexical",
+      "answer_check_backend": "not_applicable",
+      "model_responses": [
+        {
+          "stage": "direct_answer",
+          "text": "{\"status\":\"decided\",\"answer\":\"Yes.\",\"quotes\":[\".. function:: issoftkeyword(s)\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\\n\\n   .. versionadded:: 3.9\"],\"reason\":\"The supplied documentation for keyword.issoftkeyword includes a versionadded directive stating 3.9, indicating it was added in Python 3.9.\"}"
+        }
+      ],
+      "extra_search": false,
+      "execution_policy": "not_applicable",
+      "planning_evidence": [
+        {
+          "start": 718,
+          "end": 850,
+          "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9",
+          "score": 5.476938,
+          "matched_terms": [
+            "issoftkeyword",
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 850
+          }
+        },
+        {
+          "start": 0,
+          "end": 95,
+          "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 0,
+            "source_end": 95
+          }
+        },
+        {
+          "start": 97,
+          "end": 176,
+          "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        },
+        {
+          "start": 237,
+          "end": 368,
+          "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 237,
+            "source_end": 368
+          }
+        },
+        {
+          "start": 371,
+          "end": 463,
+          "text": ".. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+          "score": 2.867501,
+          "matched_terms": [
+            "keyword",
+            "python"
+          ],
+          "source_ref": {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 371,
+            "source_end": 463
+          }
+        }
+      ],
+      "result": {
+        "status": "decided",
+        "answer": "Yes.",
+        "reason": "The supplied documentation for keyword.issoftkeyword includes a versionadded directive stating 3.9, indicating it was added in Python 3.9.",
+        "quotes": [
+          ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9"
+        ],
+        "source_refs": [
+          {
+            "source_id": "65a189c62ed341688aaf76994f733b75",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 850
+          }
+        ],
+        "quote": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9",
+        "source_ref": {
+          "source_id": "65a189c62ed341688aaf76994f733b75",
+          "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+          "source_title": "Python 3.12.10 keyword documentation",
+          "observed_at": "",
+          "source_start": 718,
+          "source_end": 850
+        }
+      },
+      "elapsed_seconds": 2.055
+    }
+  }
+}

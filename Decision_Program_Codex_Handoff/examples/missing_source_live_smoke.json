@@ -1,0 +1,326 @@
+{
+  "evidence_label": "Public-source developer-reviewed diagnostic; evaluator and evidence mode differ. Not independent or causal evidence.",
+  "report": {
+    "interpretation": "Exact status and answer text comparison only; semantic equivalence and causal correctness require review.",
+    "execution_comparison": {
+      "differences": {
+        "answer_check_backend": {
+          "original": "remote",
+          "intervention": "local"
+        },
+        "evidence_mode": {
+          "original": "shared",
+          "intervention": "lexical"
+        },
+        "execution_policy": {
+          "original": "targeted",
+          "intervention": "batch_targeted_retrieval"
+        }
+      },
+      "unknown": [],
+      "interpretation": "Recorded settings only; matching fields do not establish identical model behavior or causal comparability."
+    },
+    "change": {
+      "kind": "removed",
+      "original_source_id": "83ca696dac9f46ee9521c516f4ffca40",
+      "new_source_id": null,
+      "original_snapshot_id": "d990cf618c9b43a5a778ed560e58c720",
+      "intervention_snapshot_id": "4f98a72b87c94d0bbd8b467550f275db",
+      "reason": "Remove token source; local judge diagnostic",
+      "interpretation": "Controlled experiment; not a reviewed program revision or evidence of applicability."
+    },
+    "result_changed": true,
+    "original": {
+      "run_id": "55295fd3a22e48049198262c967f5fef",
+      "snapshot_id": "d990cf618c9b43a5a778ed560e58c720",
+      "result": {
+        "status": "decided",
+        "answer": "Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL in Python 3.12.10.",
+        "reason": "Composed from predicate results"
+      },
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the keyword module in Python 3.12.10 provide the issoftkeyword function?",
+            "evidence_requirement": "Documentation or source code confirming the existence of issoftkeyword in the keyword module for Python 3.12.10",
+            "positive_claim": "The keyword module in Python 3.12.10 provides the issoftkeyword function.",
+            "negative_claim": "The keyword module in Python 3.12.10 does not provide the issoftkeyword function."
+          },
+          "outcome": "true",
+          "quote": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9",
+          "source_ref": {
+            "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 850
+          },
+          "reason": "The provided documentation for the keyword module explicitly lists the function issoftkeyword and notes it was added in version 3.9. Since Python 3.12.10 is a later version than 3.9, the function is available."
+        },
+        {
+          "predicate": {
+            "id": "p2",
+            "question": "Does the token module in Python 3.12.10 provide the ISTERMINAL function?",
+            "evidence_requirement": "Documentation or source code confirming the existence of ISTERMINAL in the token module for Python 3.12.10",
+            "positive_claim": "The token module in Python 3.12.10 provides the ISTERMINAL function.",
+            "negative_claim": "The token module in Python 3.12.10 does not provide the ISTERMINAL function."
+          },
+          "outcome": "true",
+          "quote": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+          "source_ref": {
+            "source_id": "83ca696dac9f46ee9521c516f4ffca40",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1022,
+            "source_end": 1096
+          },
+          "reason": "The provided documentation for the :mod:`token` module explicitly lists the function ISTERMINAL(x) and describes its purpose, confirming its existence in the module."
+        }
+      ]
+    },
+    "intervention": {
+      "run_id": "7fb836789db045679c2986fc54dc5fc0",
+      "snapshot_id": "4f98a72b87c94d0bbd8b467550f275db",
+      "result": {
+        "status": "deferred",
+        "answer": null,
+        "reason": "Material predicate unresolved"
+      },
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the keyword module in Python 3.12.10 provide the issoftkeyword function?",
+            "evidence_requirement": "Documentation or source code confirming the existence of issoftkeyword in the keyword module for Python 3.12.10",
+            "positive_claim": "The keyword module in Python 3.12.10 provides the issoftkeyword function.",
+            "negative_claim": "The keyword module in Python 3.12.10 does not provide the issoftkeyword function."
+          },
+          "outcome": "true",
+          "quote": "",
+          "evidence_spans": [
+            {
+              "start": 97,
+              "end": 176,
+              "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+              "score": 6.287869,
+              "matched_terms": [
+                "keyword",
+                "module",
+                "python"
+              ],
+              "source_ref": {
+                "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 97,
+                "source_end": 176
+              }
+            },
+            {
+              "start": 237,
+              "end": 368,
+              "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+              "score": 6.287869,
+              "matched_terms": [
+                "keyword",
+                "module",
+                "python"
+              ],
+              "source_ref": {
+                "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 237,
+                "source_end": 368
+              }
+            },
+            {
+              "start": 718,
+              "end": 748,
+              "text": ".. function:: issoftkeyword(s)",
+              "score": 5.624341,
+              "matched_terms": [
+                "function",
+                "issoftkeyword"
+              ],
+              "source_ref": {
+                "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 718,
+                "source_end": 748
+              }
+            }
+          ],
+          "retrieval_rounds": [
+            {
+              "query": "Does the keyword module in Python 3.12.10 provide the issoftkeyword function?",
+              "hits": 3
+            }
+          ],
+          "followup_status": "not_needed",
+          "positive_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.8728,
+              "false": 0.1272
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 250,
+            "elapsed_seconds": 0.46
+          },
+          "negative_support": {
+            "choice": "false",
+            "probabilities": {
+              "true": 0.3189,
+              "false": 0.6811
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 252,
+            "elapsed_seconds": 0.351
+          },
+          "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+        },
+        {
+          "predicate": {
+            "id": "p2",
+            "question": "Does the token module in Python 3.12.10 provide the ISTERMINAL function?",
+            "evidence_requirement": "Documentation or source code confirming the existence of ISTERMINAL in the token module for Python 3.12.10",
+            "positive_claim": "The token module in Python 3.12.10 provides the ISTERMINAL function.",
+            "negative_claim": "The token module in Python 3.12.10 does not provide the ISTERMINAL function."
+          },
+          "outcome": "unknown",
+          "quote": "",
+          "evidence_spans": [
+            {
+              "start": 97,
+              "end": 176,
+              "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+              "score": 4.525729,
+              "matched_terms": [
+                "module",
+                "python"
+              ],
+              "source_ref": {
+                "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 97,
+                "source_end": 176
+              }
+            },
+            {
+              "start": 237,
+              "end": 368,
+              "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+              "score": 4.525729,
+              "matched_terms": [
+                "module",
+                "python"
+              ],
+              "source_ref": {
+                "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 237,
+                "source_end": 368
+              }
+            },
+            {
+              "start": 371,
+              "end": 397,
+              "text": ".. function:: iskeyword(s)",
+              "score": 2.609438,
+              "matched_terms": [
+                "function"
+              ],
+              "source_ref": {
+                "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 371,
+                "source_end": 397
+              }
+            },
+            {
+              "start": 178,
+              "end": 219,
+              "text": "**Source code:** :source:`Lib/keyword.py`",
+              "score": 6.029806,
+              "matched_terms": [
+                "code",
+                "source"
+              ],
+              "source_ref": {
+                "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 178,
+                "source_end": 219
+              }
+            },
+            {
+              "start": 718,
+              "end": 748,
+              "text": ".. function:: issoftkeyword(s)",
+              "score": 2.609438,
+              "matched_terms": [
+                "function"
+              ],
+              "source_ref": {
+                "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword documentation",
+                "observed_at": "",
+                "source_start": 718,
+                "source_end": 748
+              }
+            }
+          ],
+          "retrieval_rounds": [
+            {
+              "query": "Does the token module in Python 3.12.10 provide the ISTERMINAL function?",
+              "hits": 3
+            },
+            {
+              "query": "Documentation or source code confirming the existence of ISTERMINAL in the token module for Python 3.12.10 The token module in Python 3.12.10 provides the ISTERMINAL function. The token module in Python 3.12.10 does not provide the ISTERMINAL function.",
+              "hits": 2
+            }
+          ],
+          "followup_status": "searched",
+          "positive_support": {
+            "choice": "false",
+            "probabilities": {
+              "true": 0.1161,
+              "false": 0.8839
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 274,
+            "elapsed_seconds": 0.521
+          },
+          "negative_support": {
+            "choice": "false",
+            "probabilities": {
+              "true": 0.3094,
+              "false": 0.6906
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 276,
+            "elapsed_seconds": 0.441
+          },
+          "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+        }
+      ]
+    }
+  }
+}

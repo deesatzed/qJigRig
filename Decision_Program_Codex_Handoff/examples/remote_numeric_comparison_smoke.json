@@ -1,0 +1,25 @@
+{
+  "kind": "live_synthetic_numeric_comparison_probe",
+  "run_id": "00881b3f666c4c43a489a5634135ffb5",
+  "program_id": "8e3f1333b9544892ae8c59e053753c7e",
+  "authoring": "developer-authored fixed plan, developer reviewed",
+  "source_sha256": "d1b69cd06b934f8200725f8f21892ae4b5703087e66f59aed8b57bebb08b3695",
+  "question": "Does the event have more than 50 attendees?",
+  "result": {
+    "status": "decided",
+    "answer": "No, the event does not have more than 50 attendees.",
+    "reason": "Composed from predicate results"
+  },
+  "trace": [
+    {
+      "outcome": "false",
+      "reported_outcome": null,
+      "reason": "The source explicitly states the event has 40 attendees, which is not more than 50.",
+      "quote": "The event has 40 attendees."
+    }
+  ],
+  "model": "qwen/qwen3.5-35b-a3b",
+  "provider_calls": 2,
+  "provider_reported_cost_usd": 0.00021165,
+  "interpretation": "One live synthetic development example. The lexical gate does not compute arithmetic or establish relevance, and model output is not independently adjudicated."
+}

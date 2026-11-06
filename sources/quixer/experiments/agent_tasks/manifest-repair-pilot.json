@@ -1,0 +1,13 @@
+{
+  "schema":"quix-agent-study-manifest-v1",
+  "status":"exploratory new questions over a previously observed shared corpus; not independently held out",
+  "seed":911,
+  "max_input_characters":12000,
+  "conditions":["none","baseline","role","switch"],
+  "tasks":[
+    {"id":"repair-dev-index-impl","group":"indexing","split":"development","role":"implementer","role_version":"1","query":"Propose a plan to build a navigation index for a long section while preserving its original source anchors."},
+    {"id":"repair-dev-fallback-review","group":"fallback","split":"development","role":"reviewer","role_version":"1","query":"Propose a review plan for checking that an unavailable decision service does not remove baseline evidence."},
+    {"id":"repair-test-evidence-impl","group":"evidence","split":"held_out","role":"implementer","role_version":"1","query":"Propose a plan to make a source revision change visible on a previously linked finding."},
+    {"id":"repair-test-calibration-review","group":"calibration","split":"held_out","role":"reviewer","role_version":"1","query":"Propose a review plan for distinguishing a role usefulness estimate from verified retrieval relevance."}
+  ]
+}

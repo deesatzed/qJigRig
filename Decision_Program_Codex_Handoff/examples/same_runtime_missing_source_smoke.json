@@ -1,0 +1,606 @@
+{
+  "classification": "Public-source developer-reviewed development diagnostic; not independent or confirmatory. Matching recorded settings do not prove causal attribution.",
+  "report": {
+    "interpretation": "Exact status and answer text comparison only; semantic equivalence and causal correctness require review.",
+    "execution_comparison": {
+      "differences": {},
+      "unknown": [],
+      "interpretation": "Recorded settings only; matching fields do not establish identical model behavior or causal comparability."
+    },
+    "change": {
+      "kind": "removed",
+      "original_source_id": "83ca696dac9f46ee9521c516f4ffca40",
+      "new_source_id": null,
+      "original_snapshot_id": "d990cf618c9b43a5a778ed560e58c720",
+      "intervention_snapshot_id": "4f98a72b87c94d0bbd8b467550f275db",
+      "reason": "Remove token source in same-runtime development diagnostic",
+      "interpretation": "Controlled experiment; not a reviewed program revision or evidence of applicability."
+    },
+    "result_changed": true,
+    "original": {
+      "run_id": "1a5c5d71f7004fc799164db522938887",
+      "snapshot_id": "d990cf618c9b43a5a778ed560e58c720",
+      "result": {
+        "status": "decided",
+        "answer": "Yes, the Python keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+        "reason": "Composed from predicate results"
+      },
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the Python keyword module provide issoftkeyword?",
+            "evidence_requirement": "Documentation for the keyword module in Python 3.12.10 must explicitly list issoftkeyword as a function or attribute.",
+            "positive_claim": "The Python keyword module provides the issoftkeyword function.",
+            "negative_claim": "The Python keyword module does not provide the issoftkeyword function."
+          },
+          "outcome": "true",
+          "quote": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+          "source_ref": {
+            "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 824
+          },
+          "reason": "The provided documentation for the Python keyword module explicitly lists 'issoftkeyword' as a function available in the module."
+        },
+        {
+          "predicate": {
+            "id": "p2",
+            "question": "Does the Python token module provide ISTERMINAL?",
+            "evidence_requirement": "Documentation for the token module in Python 3.12.10 must explicitly list ISTERMINAL as a function or attribute.",
+            "positive_claim": "The Python token module provides the ISTERMINAL function.",
+            "negative_claim": "The Python token module does not provide the ISTERMINAL function."
+          },
+          "outcome": "true",
+          "quote": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+          "source_ref": {
+            "source_id": "83ca696dac9f46ee9521c516f4ffca40",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1022,
+            "source_end": 1096
+          },
+          "reason": "The provided documentation for the Python token module explicitly lists 'ISTERMINAL' as a function."
+        }
+      ]
+    },
+    "intervention": {
+      "run_id": "5f692cbcb2fe4b569739d849639492c0",
+      "snapshot_id": "4f98a72b87c94d0bbd8b467550f275db",
+      "result": {
+        "status": "deferred",
+        "answer": null,
+        "reason": "Material predicate unresolved"
+      },
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the Python keyword module provide issoftkeyword?",
+            "evidence_requirement": "Documentation for the keyword module in Python 3.12.10 must explicitly list issoftkeyword as a function or attribute.",
+            "positive_claim": "The Python keyword module provides the issoftkeyword function.",
+            "negative_claim": "The Python keyword module does not provide the issoftkeyword function."
+          },
+          "outcome": "true",
+          "quote": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+          "source_ref": {
+            "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 824
+          },
+          "reason": "The provided documentation for the Python keyword module explicitly defines the function issoftkeyword(s), confirming that the module provides this function."
+        },
+        {
+          "predicate": {
+            "id": "p2",
+            "question": "Does the Python token module provide ISTERMINAL?",
+            "evidence_requirement": "Documentation for the token module in Python 3.12.10 must explicitly list ISTERMINAL as a function or attribute.",
+            "positive_claim": "The Python token module provides the ISTERMINAL function.",
+            "negative_claim": "The Python token module does not provide the ISTERMINAL function."
+          },
+          "outcome": "unknown",
+          "quote": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "source_ref": {
+            "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          },
+          "reason": "The negative citation has no distinctive term from the predicate; it cannot establish a negative.",
+          "reported_outcome": "false",
+          "reported_reason": "The provided source document explicitly describes the 'keyword' module, not the 'token' module. Furthermore, the functions listed within this 'keyword' module are 'iskeyword', 'issoftkeyword', and data attributes 'kwlist', 'softkwlist'. There is no mention of a function named 'ISTERMINAL' in the token module or anywhere else in the text."
+        }
+      ]
+    }
+  },
+  "original_run": {
+    "id": "1a5c5d71f7004fc799164db522938887",
+    "schema_version": 1,
+    "created_at": "2026-11-06T16:04:22.746535+00:00",
+    "mode": "fresh",
+    "request": {
+      "question": "Does the Python keyword module provide issoftkeyword and the token module provide ISTERMINAL?",
+      "scope": "Python 3.12.10",
+      "as_of": "",
+      "snapshot_id": "d990cf618c9b43a5a778ed560e58c720"
+    },
+    "source_sha256": "e4e2720f0eda57ab584a741ec64778d3ce48c3654c3afdce1f6d59d2c578c053",
+    "source_metadata_sha256": "a9033ef1dfe0fc9ab93d5955b949383b7ffda20bad22c7eb084b4720d195f026",
+    "calls": [
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Venice",
+        "generation_id": "gen-1793981062-ZWVX7uXgmlp96kYbRdhj",
+        "elapsed_seconds": 2.252,
+        "usage": {
+          "prompt_tokens": 1526,
+          "completion_tokens": 365,
+          "total_tokens": 1891,
+          "cost": 0.0004883,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 1056,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0004883,
+            "upstream_inference_prompt_cost": 0.0001233,
+            "upstream_inference_completions_cost": 0.000365
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "61c8f60e788290c3963b5a05e797b627dcec73ca18d1cc2667ece9ea6bc994dd",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      },
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Alibaba",
+        "generation_id": "gen-1793981065-EePv01Jg9G1WknGuPaSD",
+        "elapsed_seconds": 1.236,
+        "usage": {
+          "prompt_tokens": 1425,
+          "completion_tokens": 73,
+          "total_tokens": 1498,
+          "cost": 0.0003264625,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0003264625,
+            "upstream_inference_prompt_cost": 0.0002315625,
+            "upstream_inference_completions_cost": 9.49e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      },
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Alibaba",
+        "generation_id": "gen-1793981066-OLnhCOW4ApT2FvbgSPbF",
+        "elapsed_seconds": 0.886,
+        "usage": {
+          "prompt_tokens": 1429,
+          "completion_tokens": 57,
+          "total_tokens": 1486,
+          "cost": 0.0003063125,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0003063125,
+            "upstream_inference_prompt_cost": 0.0002322125,
+            "upstream_inference_completions_cost": 7.41e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      },
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Alibaba",
+        "generation_id": "gen-1793981067-6b13STpkStOrDoxyKam8",
+        "elapsed_seconds": 1.138,
+        "usage": {
+          "prompt_tokens": 1350,
+          "completion_tokens": 120,
+          "total_tokens": 1470,
+          "cost": 0.000375375,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.000375375,
+            "upstream_inference_prompt_cost": 0.000219375,
+            "upstream_inference_completions_cost": 0.000156
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "a42cfd486e07c4aea8f5e556e5e0ea81a279b3954cc1efc1ecc8feac0fce510c",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      }
+    ],
+    "trace": [
+      {
+        "predicate": {
+          "id": "p1",
+          "question": "Does the Python keyword module provide issoftkeyword?",
+          "evidence_requirement": "Documentation for the keyword module in Python 3.12.10 must explicitly list issoftkeyword as a function or attribute.",
+          "positive_claim": "The Python keyword module provides the issoftkeyword function.",
+          "negative_claim": "The Python keyword module does not provide the issoftkeyword function."
+        },
+        "outcome": "true",
+        "quote": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+        "source_ref": {
+          "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+          "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+          "source_title": "Python 3.12.10 keyword documentation",
+          "observed_at": "",
+          "source_start": 718,
+          "source_end": 824
+        },
+        "reason": "The provided documentation for the Python keyword module explicitly lists 'issoftkeyword' as a function available in the module."
+      },
+      {
+        "predicate": {
+          "id": "p2",
+          "question": "Does the Python token module provide ISTERMINAL?",
+          "evidence_requirement": "Documentation for the token module in Python 3.12.10 must explicitly list ISTERMINAL as a function or attribute.",
+          "positive_claim": "The Python token module provides the ISTERMINAL function.",
+          "negative_claim": "The Python token module does not provide the ISTERMINAL function."
+        },
+        "outcome": "true",
+        "quote": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+        "source_ref": {
+          "source_id": "83ca696dac9f46ee9521c516f4ffca40",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1022,
+          "source_end": 1096
+        },
+        "reason": "The provided documentation for the Python token module explicitly lists 'ISTERMINAL' as a function."
+      }
+    ],
+    "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+    "requested_model": "qwen/qwen3.5-35b-a3b",
+    "evidence_mode": "shared",
+    "answer_check_backend": "remote",
+    "model_responses": [
+      {
+        "stage": "planner",
+        "text": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the Python keyword module provide issoftkeyword?\",\n      \"evidence_requirement\": \"Documentation for the keyword module in Python 3.12.10 must explicitly list issoftkeyword as a function or attribute.\",\n      \"positive_claim\": \"The Python keyword module provides the issoftkeyword function.\",\n      \"negative_claim\": \"The Python keyword module does not provide the issoftkeyword function.\"\n    },\n    {\n      \"id\": \"p2\",\n      \"question\": \"Does the Python token module provide ISTERMINAL?\",\n      \"evidence_requirement\": \"Documentation for the token module in Python 3.12.10 must explicitly list ISTERMINAL as a function or attribute.\",\n      \"positive_claim\": \"The Python token module provides the ISTERMINAL function.\",\n      \"negative_claim\": \"The Python token module does not provide the ISTERMINAL function.\"\n    }\n  ],\n  \"expression\": {\n    \"op\": \"and\",\n    \"args\": [\n      {\n        \"ref\": \"p1\"\n      },\n      {\n        \"ref\": \"p2\"\n      }\n    ]\n  },\n  \"true_answer\": \"Yes, the Python keyword module provides issoftkeyword and the token module provides ISTERMINAL.\",\n  \"false_answer\": \"No, either the Python keyword module does not provide issoftkeyword, or the token module does not provide ISTERMINAL, or both.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}"
+      },
+      {
+        "stage": "predicate_judge",
+        "text": "{\n\"outcome\":\"true\",\n\"quote\":\".. function:: issoftkeyword(s)\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\",\n\"reason\":\"The provided documentation for the Python keyword module explicitly lists 'issoftkeyword' as a function available in the module.\"\n}",
+        "predicate_id": "p1"
+      },
+      {
+        "stage": "predicate_judge",
+        "text": "{\n\"outcome\":\"true\",\n\"quote\":\".. function:: ISTERMINAL(x)\\n\\n   Return ``True`` for terminal token values.\",\n\"reason\":\"The provided documentation for the Python token module explicitly lists 'ISTERMINAL' as a function.\"\n}",
+        "predicate_id": "p2"
+      },
+      {
+        "stage": "answer_check",
+        "text": "{\n\"verdict\": \"supported\",\n\"quotes\": [\n\".. function:: issoftkeyword(s)\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\",\n\".. function:: ISTERMINAL(x)\\n\\n   Return ``True`` for terminal token values.\"\n],\n\"reason\": \"The source text explicitly documents the existence of the 'issoftkeyword' function within the 'keyword' module and the 'ISTERMINAL' function within the 'token' module, confirming the proposed answer.\"\n}"
+      }
+    ],
+    "extra_search": true,
+    "execution_policy": "targeted",
+    "planner_output": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the Python keyword module provide issoftkeyword?\",\n      \"evidence_requirement\": \"Documentation for the keyword module in Python 3.12.10 must explicitly list issoftkeyword as a function or attribute.\",\n      \"positive_claim\": \"The Python keyword module provides the issoftkeyword function.\",\n      \"negative_claim\": \"The Python keyword module does not provide the issoftkeyword function.\"\n    },\n    {\n      \"id\": \"p2\",\n      \"question\": \"Does the Python token module provide ISTERMINAL?\",\n      \"evidence_requirement\": \"Documentation for the token module in Python 3.12.10 must explicitly list ISTERMINAL as a function or attribute.\",\n      \"positive_claim\": \"The Python token module provides the ISTERMINAL function.\",\n      \"negative_claim\": \"The Python token module does not provide the ISTERMINAL function.\"\n    }\n  ],\n  \"expression\": {\n    \"op\": \"and\",\n    \"args\": [\n      {\n        \"ref\": \"p1\"\n      },\n      {\n        \"ref\": \"p2\"\n      }\n    ]\n  },\n  \"true_answer\": \"Yes, the Python keyword module provides issoftkeyword and the token module provides ISTERMINAL.\",\n  \"false_answer\": \"No, either the Python keyword module does not provide issoftkeyword, or the token module does not provide ISTERMINAL, or both.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}",
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the Python keyword module provide issoftkeyword?",
+          "evidence_requirement": "Documentation for the keyword module in Python 3.12.10 must explicitly list issoftkeyword as a function or attribute.",
+          "positive_claim": "The Python keyword module provides the issoftkeyword function.",
+          "negative_claim": "The Python keyword module does not provide the issoftkeyword function."
+        },
+        {
+          "id": "p2",
+          "question": "Does the Python token module provide ISTERMINAL?",
+          "evidence_requirement": "Documentation for the token module in Python 3.12.10 must explicitly list ISTERMINAL as a function or attribute.",
+          "positive_claim": "The Python token module provides the ISTERMINAL function.",
+          "negative_claim": "The Python token module does not provide the ISTERMINAL function."
+        }
+      ],
+      "expression": {
+        "op": "and",
+        "args": [
+          {
+            "ref": "p1"
+          },
+          {
+            "ref": "p2"
+          }
+        ]
+      },
+      "true_answer": "Yes, the Python keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+      "false_answer": "No, either the Python keyword module does not provide issoftkeyword, or the token module does not provide ISTERMINAL, or both.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "candidate_result": {
+      "status": "decided",
+      "answer": "Yes, the Python keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+      "reason": "Composed from predicate results"
+    },
+    "answer_check": {
+      "verdict": "supported",
+      "quotes": [
+        ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+        ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values."
+      ],
+      "reason": "The source text explicitly documents the existence of the 'issoftkeyword' function within the 'keyword' module and the 'ISTERMINAL' function within the 'token' module, confirming the proposed answer.",
+      "source_refs": [
+        {
+          "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+          "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+          "source_title": "Python 3.12.10 keyword documentation",
+          "observed_at": "",
+          "source_start": 718,
+          "source_end": 824
+        },
+        {
+          "source_id": "83ca696dac9f46ee9521c516f4ffca40",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1022,
+          "source_end": 1096
+        }
+      ]
+    },
+    "result": {
+      "status": "decided",
+      "answer": "Yes, the Python keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+      "reason": "Composed from predicate results"
+    },
+    "elapsed_seconds": 5.516
+  },
+  "intervention_run": {
+    "id": "5f692cbcb2fe4b569739d849639492c0",
+    "schema_version": 1,
+    "created_at": "2026-11-06T16:04:28.272509+00:00",
+    "mode": "intervention",
+    "request": {
+      "question": "Does the Python keyword module provide issoftkeyword and the token module provide ISTERMINAL?",
+      "scope": "Python 3.12.10",
+      "as_of": "",
+      "snapshot_id": "4f98a72b87c94d0bbd8b467550f275db"
+    },
+    "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+    "source_metadata_sha256": "fd19bcb9cdea91fb97924727aa2d238859c7528192913dac7a7ae04101e8d989",
+    "calls": [
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Venice",
+        "generation_id": "gen-1793981068-gOF8iLFgNJc4J9C4jgOW",
+        "elapsed_seconds": 0.708,
+        "usage": {
+          "prompt_tokens": 639,
+          "completion_tokens": 76,
+          "total_tokens": 715,
+          "cost": 0.00017185,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00017185,
+            "upstream_inference_prompt_cost": 9.585e-05,
+            "upstream_inference_completions_cost": 7.6e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      },
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Alibaba",
+        "generation_id": "gen-1793981069-FU7PPRwmBsddgSpyf9rf",
+        "elapsed_seconds": 1.11,
+        "usage": {
+          "prompt_tokens": 643,
+          "completion_tokens": 113,
+          "total_tokens": 756,
+          "cost": 0.0002513875,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002513875,
+            "upstream_inference_prompt_cost": 0.0001044875,
+            "upstream_inference_completions_cost": 0.0001469
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      }
+    ],
+    "trace": [
+      {
+        "predicate": {
+          "id": "p1",
+          "question": "Does the Python keyword module provide issoftkeyword?",
+          "evidence_requirement": "Documentation for the keyword module in Python 3.12.10 must explicitly list issoftkeyword as a function or attribute.",
+          "positive_claim": "The Python keyword module provides the issoftkeyword function.",
+          "negative_claim": "The Python keyword module does not provide the issoftkeyword function."
+        },
+        "outcome": "true",
+        "quote": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+        "source_ref": {
+          "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+          "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+          "source_title": "Python 3.12.10 keyword documentation",
+          "observed_at": "",
+          "source_start": 718,
+          "source_end": 824
+        },
+        "reason": "The provided documentation for the Python keyword module explicitly defines the function issoftkeyword(s), confirming that the module provides this function."
+      },
+      {
+        "predicate": {
+          "id": "p2",
+          "question": "Does the Python token module provide ISTERMINAL?",
+          "evidence_requirement": "Documentation for the token module in Python 3.12.10 must explicitly list ISTERMINAL as a function or attribute.",
+          "positive_claim": "The Python token module provides the ISTERMINAL function.",
+          "negative_claim": "The Python token module does not provide the ISTERMINAL function."
+        },
+        "outcome": "unknown",
+        "quote": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+        "source_ref": {
+          "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+          "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+          "source_title": "Python 3.12.10 keyword documentation",
+          "observed_at": "",
+          "source_start": 97,
+          "source_end": 176
+        },
+        "reason": "The negative citation has no distinctive term from the predicate; it cannot establish a negative.",
+        "reported_outcome": "false",
+        "reported_reason": "The provided source document explicitly describes the 'keyword' module, not the 'token' module. Furthermore, the functions listed within this 'keyword' module are 'iskeyword', 'issoftkeyword', and data attributes 'kwlist', 'softkwlist'. There is no mention of a function named 'ISTERMINAL' in the token module or anywhere else in the text."
+      }
+    ],
+    "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+    "requested_model": "qwen/qwen3.5-35b-a3b",
+    "evidence_mode": "shared",
+    "answer_check_backend": "remote",
+    "model_responses": [
+      {
+        "stage": "predicate_judge",
+        "text": "{\n\"outcome\":\"true\",\n\"quote\":\".. function:: issoftkeyword(s)\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\",\n\"reason\":\"The provided documentation for the Python keyword module explicitly defines the function issoftkeyword(s), confirming that the module provides this function.\"\n}",
+        "predicate_id": "p1"
+      },
+      {
+        "stage": "predicate_judge",
+        "text": "{\n\"outcome\":\"false\",\n\"quote\":\".. module:: keyword\\n   :synopsis: Test whether a string is a keyword in Python.\",\n\"reason\":\"The provided source document explicitly describes the 'keyword' module, not the 'token' module. Furthermore, the functions listed within this 'keyword' module are 'iskeyword', 'issoftkeyword', and data attributes 'kwlist', 'softkwlist'. There is no mention of a function named 'ISTERMINAL' in the token module or anywhere else in the text.\"\n}",
+        "predicate_id": "p2"
+      }
+    ],
+    "extra_search": true,
+    "execution_policy": "targeted",
+    "intervention": {
+      "kind": "removed",
+      "original_source_id": "83ca696dac9f46ee9521c516f4ffca40",
+      "new_source_id": null,
+      "original_snapshot_id": "d990cf618c9b43a5a778ed560e58c720",
+      "intervention_snapshot_id": "4f98a72b87c94d0bbd8b467550f275db",
+      "reason": "Remove token source in same-runtime development diagnostic",
+      "interpretation": "Controlled experiment; not a reviewed program revision or evidence of applicability."
+    },
+    "program_id": "f65e8560dedf4b869dc3b8fdb4c2d053",
+    "program_revision": 2,
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the Python keyword module provide issoftkeyword?",
+          "evidence_requirement": "Documentation for the keyword module in Python 3.12.10 must explicitly list issoftkeyword as a function or attribute.",
+          "positive_claim": "The Python keyword module provides the issoftkeyword function.",
+          "negative_claim": "The Python keyword module does not provide the issoftkeyword function."
+        },
+        {
+          "id": "p2",
+          "question": "Does the Python token module provide ISTERMINAL?",
+          "evidence_requirement": "Documentation for the token module in Python 3.12.10 must explicitly list ISTERMINAL as a function or attribute.",
+          "positive_claim": "The Python token module provides the ISTERMINAL function.",
+          "negative_claim": "The Python token module does not provide the ISTERMINAL function."
+        }
+      ],
+      "expression": {
+        "op": "and",
+        "args": [
+          {
+            "ref": "p1"
+          },
+          {
+            "ref": "p2"
+          }
+        ]
+      },
+      "true_answer": "Yes, the Python keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+      "false_answer": "No, either the Python keyword module does not provide issoftkeyword, or the token module does not provide ISTERMINAL, or both.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "result": {
+      "status": "deferred",
+      "answer": null,
+      "reason": "Material predicate unresolved"
+    },
+    "elapsed_seconds": 1.822
+  }
+}

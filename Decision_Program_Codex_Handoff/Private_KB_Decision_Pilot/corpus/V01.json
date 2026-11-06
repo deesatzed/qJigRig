@@ -1,0 +1,30 @@
+{
+  "source_id": "V01",
+  "role": "reviews",
+  "fixture": "ALDERLINE-7759F34F9E",
+  "authority": "binding",
+  "date_rule": "No applicable review record means unknown, including a record effective only after the decision date.",
+  "rows": [
+    {
+      "report": "Beacon",
+      "route": "partner",
+      "status": "signed",
+      "from": "2026-11-05",
+      "through": "2026-11-30"
+    },
+    {
+      "report": "Cedar",
+      "route": "partner",
+      "status": "signed",
+      "from": "2026-11-02",
+      "through": "2026-11-30"
+    },
+    {
+      "report": "Dune",
+      "route": "partner",
+      "status": "pending",
+      "from": "2026-11-06",
+      "through": "2026-11-30"
+    }
+  ]
+}

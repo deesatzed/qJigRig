@@ -1,0 +1,3 @@
+Synthetic fixture for indexing tests.
+
+When a document has no headings, retain a source-linked fallback section so its text remains searchable. A generated paragraph index is a proposed navigation aid until reviewed.

@@ -1,0 +1,20 @@
+{
+  "kind": "live_local_judge_development_probe",
+  "scope": "Public Python 3.12.10 keyword documentation; local snapshot ID is workspace-specific.",
+  "source_snapshot_id": "f236ee9f4fdc480dbf0595d6f9277a7e",
+  "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+  "claim": "The keyword module provides issoftkeyword.",
+  "result": {
+    "choice": "true",
+    "probabilities": {"true": 0.9263, "false": 0.0737},
+    "backend": "local Unsloth MLX",
+    "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+    "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+    "input_tokens": 483,
+    "max_tokens": 4096,
+    "elapsed_seconds": 0.8,
+    "worker_wall_seconds": 11.401,
+    "usage_status": "local resource cost unobserved"
+  },
+  "interpretation": "One live local adapter probe after the worker check; scores are uncalibrated and do not establish general accuracy or independent adjudication."
+}

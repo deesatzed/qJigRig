@@ -1,0 +1,7 @@
+[
+  {"case_id":"dev-keyword-soft-function","source":"keyword","question":"Which keyword module function tests whether a string is a soft keyword?"},
+  {"case_id":"dev-keyword-soft-list","source":"keyword","question":"Which keyword module sequence contains the soft keywords defined for the interpreter?"},
+  {"case_id":"dev-token-terminal","source":"token","question":"Which token module function tests whether a token value is terminal?"},
+  {"case_id":"dev-soft-version","source":"keyword","question":"Was keyword.issoftkeyword added in Python 3.9?"},
+  {"case_id":"dev-two-modules","source":"collection","question":"Does the keyword module provide issoftkeyword and the token module provide ISTERMINAL?"}
+]

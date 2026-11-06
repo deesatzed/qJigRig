@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "One independently reviewed agent output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["correctness", "source_support", "missing_evidence", "task_completion", "explanation", "source_ids"],
+  "properties": {
+    "correctness": {"enum": ["correct", "partial", "incorrect", "unknown"]},
+    "source_support": {"enum": ["supported", "partial", "unsupported", "no_citations", "unknown"]},
+    "missing_evidence": {"enum": ["none", "material", "unknown"]},
+    "task_completion": {"enum": ["complete", "partial", "incomplete", "unknown"]},
+    "explanation": {"type": "string", "minLength": 1},
+    "source_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+  }
+}

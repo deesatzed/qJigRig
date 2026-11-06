@@ -1,0 +1,39 @@
+{
+  "schema": "quix-live-switch-replay-summary-v1",
+  "date": "2026-11-03",
+  "task_id": "agent-timeout",
+  "recorded_navigation": {
+    "status": "complete",
+    "configured_model": "baseten/joey-1",
+    "resolved_model": "baseten/joey-1-20261029",
+    "logical_model_calls": 3,
+    "physical_requests": 6,
+    "reported_usd": 0.0001651,
+    "source_bound_evidence_items": 1
+  },
+  "offline_replay": {
+    "status": "complete",
+    "ended": "done",
+    "final_state_matches_recording": true,
+    "source_bound_evidence_items": 1,
+    "new_model_calls": 0,
+    "catalog_fingerprint": "e48854e078bdcdf796cf05e29d108f349c3314f7ba7c867df3892af740b64d5e",
+    "trace_sha256": "7a878f5a4313437ade280e8c6ad3c5b1d11ce6bc5bb81d37e5dc6c28829f8bdf"
+  },
+  "insufficient_evidence_replay": {
+    "task_id": "agent-role",
+    "recorded_reason": "unstable_choice",
+    "recorded_physical_requests": 2,
+    "recorded_reported_usd": 0.0000439,
+    "replayed_status": "insufficient_evidence",
+    "replayed_reason": "decision_failed",
+    "source_bound_evidence_items": 0,
+    "new_model_calls": 0,
+    "trace_sha256": "155db33e2cb9d9dc77beb80c896d759b75b53c2ac21a397c2004b4aaab26c41e"
+  },
+  "limitations": [
+    "Replay checks the recorded choices and current source revisions; it does not independently validate relevance or factual claims.",
+    "The catalog fingerprint includes local source paths, and this result is not evidence of a live swarm integration.",
+    "The trace digest detects accidental changes when compared with a trusted receipt; it does not authenticate the trace."
+  ]
+}

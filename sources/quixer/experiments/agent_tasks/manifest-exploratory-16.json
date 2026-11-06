@@ -1,0 +1,142 @@
+{
+  "schema": "quix-agent-study-manifest-v1",
+  "status": "exploratory; tasks and retrieval behavior previously observed; no independent review",
+  "seed": 275,
+  "max_input_characters": 12000,
+  "conditions": [
+    "none",
+    "baseline",
+    "role",
+    "switch"
+  ],
+  "tasks": [
+    {
+      "id": "dev-unheaded-impl",
+      "group": "ingestion",
+      "role": "implementer",
+      "role_version": "1",
+      "split": "development",
+      "query": "Implement a searchable source-linked fallback for a document with no headings."
+    },
+    {
+      "id": "dev-broad-review",
+      "group": "ingestion",
+      "role": "reviewer",
+      "role_version": "1",
+      "split": "development",
+      "query": "Review how broad document sections gain finer topic navigation without losing the original source."
+    },
+    {
+      "id": "dev-anchor-impl",
+      "group": "provenance",
+      "role": "implementer",
+      "role_version": "1",
+      "split": "development",
+      "query": "Implement a finding that cites its supporting source section and revision."
+    },
+    {
+      "id": "dev-unsupported-review",
+      "group": "provenance",
+      "role": "reviewer",
+      "role_version": "1",
+      "split": "development",
+      "query": "Review whether an agent claim with no evidence is presented as unsupported."
+    },
+    {
+      "id": "dev-timeout-impl",
+      "group": "retrieval",
+      "role": "implementer",
+      "role_version": "1",
+      "split": "development",
+      "query": "Handle a decision-model timeout without suppressing baseline source evidence."
+    },
+    {
+      "id": "dev-budget-review",
+      "group": "retrieval",
+      "role": "reviewer",
+      "role_version": "1",
+      "split": "development",
+      "query": "Review what a bounded context packet includes and what is outside its budget."
+    },
+    {
+      "id": "dev-role-impl",
+      "group": "roles",
+      "role": "implementer",
+      "role_version": "1",
+      "split": "development",
+      "query": "Use role-specific usefulness estimates without filtering a relevant source."
+    },
+    {
+      "id": "dev-role-review",
+      "group": "roles",
+      "role": "reviewer",
+      "role_version": "1",
+      "split": "development",
+      "query": "Review whether a low usefulness score can hide task-relevant evidence."
+    },
+    {
+      "id": "held-changed-impl",
+      "group": "lifecycle",
+      "role": "implementer",
+      "role_version": "1",
+      "split": "held_out",
+      "query": "Handle a source document that changes after an agent finding was created."
+    },
+    {
+      "id": "held-stale-review",
+      "group": "lifecycle",
+      "role": "reviewer",
+      "role_version": "1",
+      "split": "held_out",
+      "query": "Review whether a finding linked to the old retry limit has stale evidence."
+    },
+    {
+      "id": "held-conflict-impl",
+      "group": "conflicting_claims",
+      "role": "implementer",
+      "role_version": "1",
+      "split": "held_out",
+      "query": "Identify the documented retry limit when a synthetic agent finding states a conflicting limit."
+    },
+    {
+      "id": "held-conflict-review",
+      "group": "conflicting_claims",
+      "role": "reviewer",
+      "role_version": "1",
+      "split": "held_out",
+      "query": "Distinguish the synthetic conflicting finding from its source and an unsupported claim."
+    },
+    {
+      "id": "held-provider-impl",
+      "group": "provider",
+      "role": "implementer",
+      "role_version": "1",
+      "split": "held_out",
+      "query": "Choose a fallback when local decision-model inference is unavailable."
+    },
+    {
+      "id": "held-provider-review",
+      "group": "provider",
+      "role": "reviewer",
+      "role_version": "1",
+      "split": "held_out",
+      "query": "Assess whether the reported decision-model scores establish calibrated task accuracy."
+    },
+    {
+      "id": "held-manifest-impl",
+      "group": "evaluation",
+      "role": "implementer",
+      "role_version": "1",
+      "split": "held_out",
+      "query": "Record enough information to reproduce a matched retrieval comparison and account for provider calls."
+    },
+    {
+      "id": "held-outcome-review",
+      "group": "evaluation",
+      "role": "reviewer",
+      "role_version": "1",
+      "split": "held_out",
+      "query": "Review what independent labels and agent-outcome evidence are required before claiming a swarm benefit."
+    }
+  ]
+}

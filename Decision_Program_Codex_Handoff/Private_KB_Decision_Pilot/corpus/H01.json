@@ -1,0 +1,87 @@
+{
+  "source_id": "H01",
+  "role": "holds",
+  "fixture": "ALDERLINE-7759F34F9E",
+  "authority": "binding",
+  "date_rule": "Only an explicit active or clear row establishes the hold state. A dated hold is a hard blocker.",
+  "rows": [
+    {
+      "report": "Acorn",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Beacon",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Cedar",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Dune",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Elm",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Finch",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Grove",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Haven",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Ibis",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Larch",
+      "status": "clear",
+      "from": "2026-10-01",
+      "through": "2026-12-31"
+    },
+    {
+      "report": "Dune",
+      "status": "active",
+      "from": "2026-11-04",
+      "through": "2026-11-05"
+    },
+    {
+      "report": "Finch",
+      "status": "active",
+      "from": "2026-11-03",
+      "through": "2026-11-07"
+    },
+    {
+      "report": "Finch",
+      "status": "clear",
+      "from": "2026-11-03",
+      "through": "2026-11-07"
+    }
+  ]
+}

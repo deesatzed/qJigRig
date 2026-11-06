@@ -1,0 +1,860 @@
+{
+  "classification": "Live public-source development comparison, unreviewed; not a benchmark.",
+  "source": {
+    "id": "b3affb2413e644d4b65c65e5fcd41d9f",
+    "title": "Python 3.12.10 token documentation",
+    "text": ":mod:`!token` --- Constants used with Python parse trees\n========================================================\n\n.. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.\n\n.. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>\n\n**Source code:** :source:`Lib/token.py`\n\n--------------\n\nThis module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.\n\nThe module also provides a mapping from numeric codes to names and some\nfunctions.  The functions mirror definitions in the Python C header files.\n\n\n.. data:: tok_name\n\n   Dictionary mapping the numeric values of the constants defined in this module\n   back to name strings, allowing more human-readable representation of parse trees\n   to be generated.\n\n\n.. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.\n\n\n.. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.\n\n\n.. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.\n\n\nThe token constants are:\n\n.. include:: token-list.inc\n\nThe following token type values aren't used by the C tokenizer but are needed for\nthe :mod:`tokenize` module.\n\n.. data:: COMMENT\n   :noindex:\n\n   Token value used to indicate a comment.\n\n\n.. data:: NL\n   :noindex:\n\n   Token value used to indicate a non-terminating newline.  The\n   :data:`NEWLINE` token indicates the end of a logical line of Python code;\n   ``NL`` tokens are generated when a logical line of code is continued over\n   multiple physical lines.\n\n\n.. data:: ENCODING\n\n   Token value that indicates the encoding used to decode the source bytes\n   into text. The first token returned by :func:`tokenize.tokenize` will\n   always be an ``ENCODING`` token.\n\n\n.. data:: TYPE_COMMENT\n   :noindex:\n\n   Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.\n\n\n.. data:: EXACT_TOKEN_TYPES\n\n   A dictionary mapping the string representation of a token to its numeric code.\n\n   .. versionadded:: 3.8\n\n\n.. versionchanged:: 3.5\n   Added :data:`AWAIT` and :data:`ASYNC` tokens.\n\n.. versionchanged:: 3.7\n   Added :data:`COMMENT`, :data:`NL` and :data:`ENCODING` tokens.\n\n.. versionchanged:: 3.7\n   Removed :data:`AWAIT` and :data:`ASYNC` tokens. \"async\" and \"await\" are\n   now tokenized as :data:`NAME` tokens.\n\n.. versionchanged:: 3.8\n   Added :data:`TYPE_COMMENT`, :data:`TYPE_IGNORE`, :data:`COLONEQUAL`.\n   Added :data:`AWAIT` and :data:`ASYNC` tokens back (they're needed\n   to support parsing older Python versions for :func:`ast.parse` with\n   ``feature_version`` set to 6 or lower).\n",
+    "scope": "",
+    "effective_from": "",
+    "effective_to": "",
+    "observed_at": "",
+    "origin": "starter_corpus/python-3.12.10-token.rst",
+    "sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+    "created_at": "2026-11-06T20:01:27.140130+00:00"
+  },
+  "comparison": {
+    "id": "d8e8180d2df44f25be08c0a3da27f9de",
+    "schema_version": 2,
+    "created_at": "2026-11-06T20:01:27.301927+00:00",
+    "stage": "shared-corpus",
+    "question": "Which function returns true for terminal token values?",
+    "scope": "",
+    "as_of": "",
+    "snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+    "snapshot_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+    "snapshot_metadata_sha256": "ce93e6089948c6818cb7fcb19fd9d2001ac1ad34925400a5a35c47058091c59f",
+    "model_config": {
+      "small_model": "qwen/qwen3.5-35b-a3b",
+      "frontier_model": "tencent/hy4",
+      "prompt_hashes": {
+        "planner": "b6b5037c49f63eeb99399b0ddac44fc666d5cee94977b1746258cacb623e5094",
+        "predicate_judge": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "predicate_repair": "5fdbb91947a6751ef945c6432f3661c8fe7161010b40a0e3b6da0e7dd2408c1c",
+        "repair": "3f8ddb69c418acc432a5b57db23df0a4a30fa77a582015a30f2fb8337b7b4a25",
+        "answer_check": "a42cfd486e07c4aea8f5e556e5e0ea81a279b3954cc1efc1ecc8feac0fce510c",
+        "answer_check_repair": "dad7ca7dc80abe0d24876c53640e4596a7f1b3d2e67d59176fd37b386e5e58b9",
+        "direct": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+        "direct_repair": "d143b071be5abd67edd46e9299e6c4c20b01d31ea2ffc4caa866639bd1efd6df",
+        "search": "426399e1c89319c0d7283de28a0263bf76afc5d53f23d1d11c47ba30a1a5adbc"
+      },
+      "runtime_hashes": {
+        "core.py": "e44a3efc7d79a7f9d138fdf7177dda2aa5238d17b664821a2516f139e4b50353",
+        "collections.py": "990715cf667fccb10cc8b566124ecb57409dc2f38bcde49d5398175bbe15f325",
+        "retrieval.py": "479f2f4c7a17ddfb52b8d3f5bb1c77e0c70f384b18226078b9e3929b43522a9c",
+        "local_retrieval.py": "1b5665e13a7ae33b3fb0a54c2c0a43a9580174a223ecf996b0302168f9379116",
+        "local_judge.py": "b5c033f3a8186b8f0634a1a2ae6f9ed9c0a64e28efd5bc51a0e6a826ab5895e2",
+        "local_worker.py": "4ca00f41e3cee0c90d84097edd931b57d36079767532dcad50f5c26486fcbb0b",
+        "programs.py": "391b251d0c2a3524905d7beff6a9f7086ec387f0a2caa66715cdc12287b52ec3",
+        "compare.py": "a647fd244c2813a2ca9dc7018566cf88f4f0a743666eb5a53f9c1aa5aec6c22b",
+        "datasets.py": "f932000848fad90f318408d9d6be373298f3e40b6c89fddd5b5f18c8f591e528",
+        "jobs.py": "124b4ee1cb952c302db97cffa896292cf50139a914144e329d5989a3acce47de",
+        "experiments.py": "8d4183803ad88ea199effd435c750a4918050ba38687a1c59517c1aa07f4e353",
+        "web_research.py": "ff60bd0f776a1f321c9d8ecaa2537d809ca3ae15152c609c1ee1d36e7a2df6c8"
+      },
+      "web_plugin": "explicitly disabled for bounded calls",
+      "provider_revision": "resolved model and provider are recorded per call when returned"
+    },
+    "historical_as_known": false,
+    "targeted": true,
+    "extra_search": false,
+    "status": "awaiting adjudication",
+    "answer_check_backend": "local",
+    "local_support_threshold": 0.8,
+    "web_authorized": false,
+    "items": [
+      {
+        "review_id": "bb230952d0754788b90d61c4eb797bff",
+        "arm": "fresh",
+        "run_id": "bfbf900635df4f9ca65296da4e308c0c"
+      },
+      {
+        "review_id": "901294e477494a45b50274928a08f76d",
+        "arm": "direct",
+        "run_id": "563624a20e5d4a88953f81f7b7b73ab9"
+      },
+      {
+        "review_id": "8d20217aa750479e98ccf8f1c8cfa631",
+        "arm": "frontier",
+        "run_id": "0b362f58202c47d2b17bc4b2eabd32c3"
+      }
+    ]
+  },
+  "runs": {
+    "fresh": {
+      "id": "bfbf900635df4f9ca65296da4e308c0c",
+      "schema_version": 1,
+      "created_at": "2026-11-06T20:01:27.303471+00:00",
+      "mode": "fresh",
+      "request": {
+        "question": "Which function returns true for terminal token values?",
+        "scope": "",
+        "as_of": "",
+        "snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f"
+      },
+      "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+      "source_metadata_sha256": "ce93e6089948c6818cb7fcb19fd9d2001ac1ad34925400a5a35c47058091c59f",
+      "calls": [
+        {
+          "model": "qwen/qwen3.5-35b-a3b",
+          "provider": "Alibaba",
+          "generation_id": "gen-1793995287-pjrUKuKSQ0Abwgqy89ic",
+          "elapsed_seconds": 2.652,
+          "usage": {
+            "prompt_tokens": 660,
+            "completion_tokens": 377,
+            "total_tokens": 1037,
+            "cost": 0.00059735,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00059735,
+              "upstream_inference_prompt_cost": 0.00010725,
+              "upstream_inference_completions_cost": 0.0004901
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "b6b5037c49f63eeb99399b0ddac44fc666d5cee94977b1746258cacb623e5094",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        }
+      ],
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the text explicitly name a function that returns true for terminal token values?",
+            "evidence_requirement": "A sentence in the source text must contain the name of a function (e.g., 'def func_name' or 'func_name()') and state that it returns True specifically for terminal token values.",
+            "positive_claim": "The text explicitly names a function that returns true for terminal token values.",
+            "negative_claim": "The text does not explicitly name any function that returns true for terminal token values."
+          },
+          "outcome": "true",
+          "quote": "",
+          "evidence_spans": [
+            {
+              "start": 1054,
+              "end": 1096,
+              "text": "Return ``True`` for terminal token values.",
+              "score": 10.336338,
+              "matched_terms": [
+                "terminal",
+                "token",
+                "true",
+                "values"
+              ],
+              "source_ref": {
+                "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token documentation",
+                "observed_at": "",
+                "source_start": 1054,
+                "source_end": 1096
+              }
+            },
+            {
+              "start": 1134,
+              "end": 1180,
+              "text": "Return ``True`` for non-terminal token values.",
+              "score": 10.336338,
+              "matched_terms": [
+                "terminal",
+                "token",
+                "true",
+                "values"
+              ],
+              "source_ref": {
+                "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token documentation",
+                "observed_at": "",
+                "source_start": 1134,
+                "source_end": 1180
+              }
+            },
+            {
+              "start": 838,
+              "end": 1019,
+              "text": "Dictionary mapping the numeric values of the constants defined in this module\n   back to name strings, allowing more human-readable representation of parse trees\n   to be generated.",
+              "score": 6.102643,
+              "matched_terms": [
+                "name",
+                "values"
+              ],
+              "source_ref": {
+                "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token documentation",
+                "observed_at": "",
+                "source_start": 838,
+                "source_end": 1019
+              }
+            }
+          ],
+          "retrieval_rounds": [
+            {
+              "query": "Does the text explicitly name a function that returns true for terminal token values?",
+              "hits": 3
+            }
+          ],
+          "followup_status": "not_needed",
+          "positive_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.8118,
+              "false": 0.1882
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 235,
+            "elapsed_seconds": 0.579
+          },
+          "negative_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.6275,
+              "false": 0.3725
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 237,
+            "elapsed_seconds": 0.39
+          },
+          "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+        },
+        {
+          "predicate": {
+            "id": "p2",
+            "question": "Is there a material exception in the text regarding which tokens return true?",
+            "evidence_requirement": "The text must define specific conditions under which the behavior of returning true for terminal tokens is excluded or modified.",
+            "positive_claim": "The text defines a material exception regarding which tokens return true.",
+            "negative_claim": "The text does not define any material exception regarding which tokens return true."
+          },
+          "outcome": "unknown",
+          "quote": "",
+          "evidence_spans": [
+            {
+              "start": 1054,
+              "end": 1096,
+              "text": "Return ``True`` for terminal token values.",
+              "score": 5.997283,
+              "matched_terms": [
+                "return",
+                "true"
+              ],
+              "source_ref": {
+                "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token documentation",
+                "observed_at": "",
+                "source_start": 1054,
+                "source_end": 1096
+              }
+            },
+            {
+              "start": 1134,
+              "end": 1180,
+              "text": "Return ``True`` for non-terminal token values.",
+              "score": 5.997283,
+              "matched_terms": [
+                "return",
+                "true"
+              ],
+              "source_ref": {
+                "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token documentation",
+                "observed_at": "",
+                "source_start": 1134,
+                "source_end": 1180
+              }
+            },
+            {
+              "start": 1210,
+              "end": 1275,
+              "text": "Return ``True`` if *x* is the marker indicating the end of input.",
+              "score": 5.997283,
+              "matched_terms": [
+                "return",
+                "true"
+              ],
+              "source_ref": {
+                "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token documentation",
+                "observed_at": "",
+                "source_start": 1210,
+                "source_end": 1275
+              }
+            }
+          ],
+          "retrieval_rounds": [
+            {
+              "query": "Is there a material exception in the text regarding which tokens return true?",
+              "hits": 3
+            }
+          ],
+          "followup_status": "disabled",
+          "positive_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.6103,
+              "false": 0.3897
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 217,
+            "elapsed_seconds": 0.391
+          },
+          "negative_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.6227,
+              "false": 0.3773
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 219,
+            "elapsed_seconds": 0.414
+          },
+          "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+        }
+      ],
+      "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+      "requested_model": "qwen/qwen3.5-35b-a3b",
+      "evidence_mode": "lexical",
+      "answer_check_backend": "local",
+      "model_responses": [
+        {
+          "stage": "planner",
+          "text": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the text explicitly name a function that returns true for terminal token values?\",\n      \"evidence_requirement\": \"A sentence in the source text must contain the name of a function (e.g., 'def func_name' or 'func_name()') and state that it returns True specifically for terminal token values.\",\n      \"positive_claim\": \"The text explicitly names a function that returns true for terminal token values.\",\n      \"negative_claim\": \"The text does not explicitly name any function that returns true for terminal token values.\"\n    },\n    {\n      \"id\": \"p2\",\n      \"question\": \"Is there a material exception in the text regarding which tokens return true?\",\n      \"evidence_requirement\": \"The text must define specific conditions under which the behavior of returning true for terminal tokens is excluded or modified.\",\n      \"positive_claim\": \"The text defines a material exception regarding which tokens return true.\",\n      \"negative_claim\": \"The text does not define any material exception regarding which tokens return true.\"\n    }\n  ],\n  \"expression\": {\n    \"op\": \"and\",\n    \"args\": [\n      {\"ref\": \"p1\"},\n      {\"ref\": \"p2\"}\n    ]\n  },\n  \"true_answer\": \"The text explicitly names a function that returns true for terminal token values and defines a material exception regarding which tokens return true.\",\n  \"false_answer\": \"The text does not explicitly name a function that returns true for terminal token values, or it fails to define a material exception as required by the conjunction.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}"
+        }
+      ],
+      "extra_search": false,
+      "execution_policy": "batch_no_extra_search",
+      "local_support_threshold": 0.8,
+      "planning_evidence": [
+        {
+          "start": 1054,
+          "end": 1096,
+          "text": "Return ``True`` for terminal token values.",
+          "score": 10.336338,
+          "matched_terms": [
+            "terminal",
+            "token",
+            "true",
+            "values"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1054,
+            "source_end": 1096
+          }
+        },
+        {
+          "start": 1134,
+          "end": 1180,
+          "text": "Return ``True`` for non-terminal token values.",
+          "score": 10.336338,
+          "matched_terms": [
+            "terminal",
+            "token",
+            "true",
+            "values"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1134,
+            "source_end": 1180
+          }
+        },
+        {
+          "start": 318,
+          "end": 664,
+          "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+          "score": 5.591818,
+          "matched_terms": [
+            "terminal",
+            "values"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 318,
+            "source_end": 664
+          }
+        },
+        {
+          "start": 115,
+          "end": 203,
+          "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+          "score": 4.74452,
+          "matched_terms": [
+            "terminal",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 115,
+            "source_end": 203
+          }
+        },
+        {
+          "start": 2042,
+          "end": 2200,
+          "text": "Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.",
+          "score": 4.74452,
+          "matched_terms": [
+            "token",
+            "true"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 2042,
+            "source_end": 2200
+          }
+        }
+      ],
+      "planner_output": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the text explicitly name a function that returns true for terminal token values?\",\n      \"evidence_requirement\": \"A sentence in the source text must contain the name of a function (e.g., 'def func_name' or 'func_name()') and state that it returns True specifically for terminal token values.\",\n      \"positive_claim\": \"The text explicitly names a function that returns true for terminal token values.\",\n      \"negative_claim\": \"The text does not explicitly name any function that returns true for terminal token values.\"\n    },\n    {\n      \"id\": \"p2\",\n      \"question\": \"Is there a material exception in the text regarding which tokens return true?\",\n      \"evidence_requirement\": \"The text must define specific conditions under which the behavior of returning true for terminal tokens is excluded or modified.\",\n      \"positive_claim\": \"The text defines a material exception regarding which tokens return true.\",\n      \"negative_claim\": \"The text does not define any material exception regarding which tokens return true.\"\n    }\n  ],\n  \"expression\": {\n    \"op\": \"and\",\n    \"args\": [\n      {\"ref\": \"p1\"},\n      {\"ref\": \"p2\"}\n    ]\n  },\n  \"true_answer\": \"The text explicitly names a function that returns true for terminal token values and defines a material exception regarding which tokens return true.\",\n  \"false_answer\": \"The text does not explicitly name a function that returns true for terminal token values, or it fails to define a material exception as required by the conjunction.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}",
+      "plan": {
+        "predicates": [
+          {
+            "id": "p1",
+            "question": "Does the text explicitly name a function that returns true for terminal token values?",
+            "evidence_requirement": "A sentence in the source text must contain the name of a function (e.g., 'def func_name' or 'func_name()') and state that it returns True specifically for terminal token values.",
+            "positive_claim": "The text explicitly names a function that returns true for terminal token values.",
+            "negative_claim": "The text does not explicitly name any function that returns true for terminal token values."
+          },
+          {
+            "id": "p2",
+            "question": "Is there a material exception in the text regarding which tokens return true?",
+            "evidence_requirement": "The text must define specific conditions under which the behavior of returning true for terminal tokens is excluded or modified.",
+            "positive_claim": "The text defines a material exception regarding which tokens return true.",
+            "negative_claim": "The text does not define any material exception regarding which tokens return true."
+          }
+        ],
+        "expression": {
+          "op": "and",
+          "args": [
+            {
+              "ref": "p1"
+            },
+            {
+              "ref": "p2"
+            }
+          ]
+        },
+        "true_answer": "The text explicitly names a function that returns true for terminal token values and defines a material exception regarding which tokens return true.",
+        "false_answer": "The text does not explicitly name a function that returns true for terminal token values, or it fails to define a material exception as required by the conjunction.",
+        "false_status": "decided",
+        "ambiguity": ""
+      },
+      "local_predicate_batches": [
+        {
+          "backend": "local Unsloth MLX",
+          "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+          "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+          "max_tokens": 4096,
+          "worker_wall_seconds": 16.206,
+          "inference_count": 4,
+          "usage_status": "local resource cost unobserved",
+          "worker_environment": {
+            "python": "3.12.16",
+            "packages": {
+              "unsloth": "2026.11.2",
+              "mlx": "0.32.4",
+              "transformers": "5.17.0",
+              "huggingface-hub": "1.33.0"
+            }
+          }
+        }
+      ],
+      "result": {
+        "status": "deferred",
+        "answer": null,
+        "reason": "Material predicate unresolved"
+      },
+      "elapsed_seconds": 18.932
+    },
+    "direct": {
+      "id": "563624a20e5d4a88953f81f7b7b73ab9",
+      "schema_version": 1,
+      "created_at": "2026-11-06T20:01:46.237723+00:00",
+      "mode": "direct",
+      "request": {
+        "question": "Which function returns true for terminal token values?",
+        "scope": "",
+        "as_of": "",
+        "snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f"
+      },
+      "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+      "source_metadata_sha256": "ce93e6089948c6818cb7fcb19fd9d2001ac1ad34925400a5a35c47058091c59f",
+      "calls": [
+        {
+          "model": "qwen/qwen3.5-35b-a3b",
+          "provider": "Alibaba",
+          "generation_id": "gen-1793995306-VPzrGdDIdgLiYjiWad0v",
+          "elapsed_seconds": 0.894,
+          "usage": {
+            "prompt_tokens": 285,
+            "completion_tokens": 67,
+            "total_tokens": 352,
+            "cost": 0.0001334125,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0001334125,
+              "upstream_inference_prompt_cost": 4.63125e-05,
+              "upstream_inference_completions_cost": 8.71e-05
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        }
+      ],
+      "trace": [],
+      "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+      "requested_model": "qwen/qwen3.5-35b-a3b",
+      "evidence_mode": "lexical",
+      "answer_check_backend": "not_applicable",
+      "model_responses": [
+        {
+          "stage": "direct_answer",
+          "text": "{\"status\":\"deferred\",\"answer\":\"\",\"quotes\":[],\"reason\":\"The provided text mentions 'Return True for terminal token values' and 'Return True for non-terminal token values' as separate sentences but does not explicitly name the function that performs these checks. Without the function name in the source, the question cannot be answered definitively.\"}"
+        }
+      ],
+      "extra_search": false,
+      "execution_policy": "not_applicable",
+      "planning_evidence": [
+        {
+          "start": 1054,
+          "end": 1096,
+          "text": "Return ``True`` for terminal token values.",
+          "score": 10.336338,
+          "matched_terms": [
+            "terminal",
+            "token",
+            "true",
+            "values"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1054,
+            "source_end": 1096
+          }
+        },
+        {
+          "start": 1134,
+          "end": 1180,
+          "text": "Return ``True`` for non-terminal token values.",
+          "score": 10.336338,
+          "matched_terms": [
+            "terminal",
+            "token",
+            "true",
+            "values"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1134,
+            "source_end": 1180
+          }
+        },
+        {
+          "start": 318,
+          "end": 664,
+          "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+          "score": 5.591818,
+          "matched_terms": [
+            "terminal",
+            "values"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 318,
+            "source_end": 664
+          }
+        },
+        {
+          "start": 115,
+          "end": 203,
+          "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+          "score": 4.74452,
+          "matched_terms": [
+            "terminal",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 115,
+            "source_end": 203
+          }
+        },
+        {
+          "start": 2042,
+          "end": 2200,
+          "text": "Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.",
+          "score": 4.74452,
+          "matched_terms": [
+            "token",
+            "true"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 2042,
+            "source_end": 2200
+          }
+        }
+      ],
+      "result": {
+        "status": "deferred",
+        "answer": "",
+        "reason": "The provided text mentions 'Return True for terminal token values' and 'Return True for non-terminal token values' as separate sentences but does not explicitly name the function that performs these checks. Without the function name in the source, the question cannot be answered definitively.",
+        "quotes": [],
+        "source_refs": []
+      },
+      "elapsed_seconds": 0.898
+    },
+    "frontier": {
+      "id": "0b362f58202c47d2b17bc4b2eabd32c3",
+      "schema_version": 1,
+      "created_at": "2026-11-06T20:01:47.137204+00:00",
+      "mode": "frontier",
+      "request": {
+        "question": "Which function returns true for terminal token values?",
+        "scope": "",
+        "as_of": "",
+        "snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f"
+      },
+      "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+      "source_metadata_sha256": "ce93e6089948c6818cb7fcb19fd9d2001ac1ad34925400a5a35c47058091c59f",
+      "calls": [
+        {
+          "model": "tencent/hy4",
+          "provider": "Tencent",
+          "generation_id": "gen-1793995307-aeRHNSlHVLmmYs43kPHP",
+          "elapsed_seconds": 1.977,
+          "usage": {
+            "prompt_tokens": 303,
+            "completion_tokens": 70,
+            "total_tokens": 373,
+            "cost": 0.000213886,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.000213886,
+              "upstream_inference_prompt_cost": 0.000126351,
+              "upstream_inference_completions_cost": 8.7535e-05
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        }
+      ],
+      "trace": [],
+      "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+      "requested_model": "tencent/hy4",
+      "evidence_mode": "lexical",
+      "answer_check_backend": "not_applicable",
+      "model_responses": [
+        {
+          "stage": "direct_answer",
+          "text": "{\"status\":\"deferred\",\"answer\":\"\",\"quotes\":[\"Return ``True`` for terminal token values.\",\"Return ``True`` for non-terminal token values.\"],\"reason\":\"The supplied text states what two functions do but omits their names, so the function that returns true for terminal token values cannot be identified from the evidence.\"}"
+        }
+      ],
+      "extra_search": false,
+      "execution_policy": "not_applicable",
+      "planning_evidence": [
+        {
+          "start": 1054,
+          "end": 1096,
+          "text": "Return ``True`` for terminal token values.",
+          "score": 10.336338,
+          "matched_terms": [
+            "terminal",
+            "token",
+            "true",
+            "values"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1054,
+            "source_end": 1096
+          }
+        },
+        {
+          "start": 1134,
+          "end": 1180,
+          "text": "Return ``True`` for non-terminal token values.",
+          "score": 10.336338,
+          "matched_terms": [
+            "terminal",
+            "token",
+            "true",
+            "values"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1134,
+            "source_end": 1180
+          }
+        },
+        {
+          "start": 318,
+          "end": 664,
+          "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+          "score": 5.591818,
+          "matched_terms": [
+            "terminal",
+            "values"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 318,
+            "source_end": 664
+          }
+        },
+        {
+          "start": 115,
+          "end": 203,
+          "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+          "score": 4.74452,
+          "matched_terms": [
+            "terminal",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 115,
+            "source_end": 203
+          }
+        },
+        {
+          "start": 2042,
+          "end": 2200,
+          "text": "Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.",
+          "score": 4.74452,
+          "matched_terms": [
+            "token",
+            "true"
+          ],
+          "source_ref": {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 2042,
+            "source_end": 2200
+          }
+        }
+      ],
+      "result": {
+        "status": "deferred",
+        "answer": "",
+        "reason": "The supplied text states what two functions do but omits their names, so the function that returns true for terminal token values cannot be identified from the evidence.",
+        "quotes": [
+          "Return ``True`` for terminal token values.",
+          "Return ``True`` for non-terminal token values."
+        ],
+        "source_refs": [
+          {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1054,
+            "source_end": 1096
+          },
+          {
+            "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token documentation",
+            "observed_at": "",
+            "source_start": 1134,
+            "source_end": 1180
+          }
+        ],
+        "quote": "Return ``True`` for terminal token values.",
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1054,
+          "source_end": 1096
+        }
+      },
+      "elapsed_seconds": 1.98
+    }
+  },
+  "developer_observation": "All arms deferred. Direct and frontier stated that retrieved text omitted function names; the source contains names in reStructuredText directives separated from their descriptions by blank lines. Review and independent scoring are not supplied."
+}

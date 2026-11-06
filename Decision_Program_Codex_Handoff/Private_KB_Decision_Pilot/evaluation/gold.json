@@ -1,0 +1,176 @@
+[
+  {
+    "id": "C01",
+    "label": "RELEASE",
+    "required_source_ids": [
+      "P01",
+      "R01",
+      "H01",
+      "L01"
+    ],
+    "reason": "72 minutes meets the 90-minute cap in force in October."
+  },
+  {
+    "id": "C02",
+    "label": "BLOCK",
+    "required_source_ids": [
+      "P02",
+      "L01",
+      "W01"
+    ],
+    "reason": "72 minutes exceeds the November cap and no waiver covers Acorn."
+  },
+  {
+    "id": "C03",
+    "label": "DEFER",
+    "required_source_ids": [
+      "P02",
+      "V01"
+    ],
+    "reason": "The only signed review begins November 5 and cannot be used on November 4."
+  },
+  {
+    "id": "C04",
+    "label": "RELEASE",
+    "required_source_ids": [
+      "P02",
+      "R01",
+      "H01",
+      "L01",
+      "V01"
+    ],
+    "reason": "The review is now in force and all other requirements pass."
+  },
+  {
+    "id": "C05",
+    "label": "RELEASE",
+    "required_source_ids": [
+      "P02",
+      "R01",
+      "H01",
+      "L01",
+      "W01"
+    ],
+    "reason": "75 minutes exceeds the ordinary cap but the signed internal waiver allows up to 80."
+  },
+  {
+    "id": "C06",
+    "label": "BLOCK",
+    "required_source_ids": [
+      "P02",
+      "L01",
+      "W01"
+    ],
+    "reason": "The internal waiver does not apply to the partner route."
+  },
+  {
+    "id": "C07",
+    "label": "BLOCK",
+    "required_source_ids": [
+      "H01"
+    ],
+    "reason": "A time-limited hold is active."
+  },
+  {
+    "id": "C08",
+    "label": "RELEASE",
+    "required_source_ids": [
+      "P02",
+      "R01",
+      "H01",
+      "L01"
+    ],
+    "reason": "The temporary hold expired, the governing clear row applies, and 44 minutes meets the cap."
+  },
+  {
+    "id": "C09",
+    "label": "DEFER",
+    "required_source_ids": [
+      "L01"
+    ],
+    "reason": "No applicable lag observation is available."
+  },
+  {
+    "id": "C10",
+    "label": "DEFER",
+    "required_source_ids": [
+      "H01"
+    ],
+    "reason": "Two equally recent, applicable hold records disagree."
+  },
+  {
+    "id": "C11",
+    "label": "BLOCK",
+    "required_source_ids": [
+      "R01"
+    ],
+    "reason": "The explicitly prohibited route settles the result even though lag is missing."
+  },
+  {
+    "id": "C12",
+    "label": "DEFER",
+    "required_source_ids": [],
+    "reason": "No route was specified. The internal and partner routes differ."
+  },
+  {
+    "id": "C13",
+    "label": "RELEASE",
+    "required_source_ids": [
+      "P02",
+      "R01",
+      "H01",
+      "L01"
+    ],
+    "reason": "Lag equals the inclusive cap of 60 minutes."
+  },
+  {
+    "id": "C14",
+    "label": "BLOCK",
+    "required_source_ids": [
+      "P02",
+      "L01",
+      "W01"
+    ],
+    "reason": "61 minutes exceeds the cap, and the complete register shows no waiver."
+  },
+  {
+    "id": "C15",
+    "label": "DEFER",
+    "required_source_ids": [
+      "P02",
+      "L01"
+    ],
+    "reason": "Lag exceeds the cap; the withheld waiver register could establish an exception."
+  },
+  {
+    "id": "C16",
+    "label": "BLOCK",
+    "required_source_ids": [
+      "P02",
+      "L01",
+      "W01"
+    ],
+    "reason": "The lag waiver expired November 4."
+  },
+  {
+    "id": "C17",
+    "label": "BLOCK",
+    "required_source_ids": [
+      "P02",
+      "V01"
+    ],
+    "reason": "The current peer review is explicitly pending."
+  },
+  {
+    "id": "C18",
+    "label": "RELEASE",
+    "required_source_ids": [
+      "P02",
+      "R01",
+      "H01",
+      "L01",
+      "W01"
+    ],
+    "reason": "The unrelated wording does not alter the active internal waiver."
+  }
+]

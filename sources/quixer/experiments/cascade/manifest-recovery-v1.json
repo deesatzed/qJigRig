@@ -1,0 +1,21 @@
+{
+  "schema":"quix-cascade-pilot-v1",
+  "description":"Six exploratory recovery questions over previously explored sources; one repeats the prior rejected case. Not independent held-out evidence.",
+  "seed":827,
+  "candidate_limit":100,
+  "result_limit":3,
+  "body_characters":100,
+  "planner_model":"openai/gpt-4o-mini",
+  "escalation_model":"tencent/hy4",
+  "decision_model":"morph/reflex",
+  "rerank_model":"cohere/rerank-5-pro",
+  "conditions":["baseline","reflex","rerank","combined"],
+  "tasks":[
+    {"id":"cascade-conflict-impl","role":"implementer","role_version":"1","query":"Propose a source-backed plan to reconcile a synthetic conflicting retry-limit claim with its original document.","escalation":"synthesis_requested"},
+    {"id":"recover-stale-review","role":"reviewer","role_version":"1","query":"Propose a review plan for a finding whose cited document was revised after the finding was written."},
+    {"id":"recover-missing-impl","role":"implementer","role_version":"1","query":"Propose how a retrieval agent can continue when a document source is missing, while identifying the missing evidence."},
+    {"id":"recover-unsupported-review","role":"reviewer","role_version":"1","query":"Propose checks for an agent claim that lacks supporting source evidence."},
+    {"id":"recover-role-impl","role":"implementer","role_version":"1","query":"Propose how two agent roles can prioritize shared source passages without treating usefulness scores as truth."},
+    {"id":"recover-budget-review","role":"reviewer","role_version":"1","query":"Propose tests for a source-linked context packet that must fit a fixed size limit."}
+  ]
+}

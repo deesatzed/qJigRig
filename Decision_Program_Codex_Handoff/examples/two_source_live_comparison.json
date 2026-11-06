@@ -1,0 +1,1096 @@
+{
+  "classification": "Unreviewed public-source development comparison; not independent evaluation.",
+  "source": {
+    "id": "981b1715235c48968ce66672ee6994f1",
+    "title": "Python keyword and token",
+    "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================\n\n.. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.\n\n**Source code:** :source:`Lib/keyword.py`\n\n--------------\n\nThis module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.\n\n\n.. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.\n\n\n.. data:: kwlist\n\n   Sequence containing all the :ref:`keywords <keywords>` defined for the\n   interpreter.  If any keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n\n.. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9\n\n\n.. data:: softkwlist\n\n   Sequence containing all the :ref:`soft keywords <soft-keywords>` defined for the\n   interpreter.  If any soft keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n   .. versionadded:: 3.9\n\n\n:mod:`!token` --- Constants used with Python parse trees\n========================================================\n\n.. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.\n\n.. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>\n\n**Source code:** :source:`Lib/token.py`\n\n--------------\n\nThis module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.\n\nThe module also provides a mapping from numeric codes to names and some\nfunctions.  The functions mirror definitions in the Python C header files.\n\n\n.. data:: tok_name\n\n   Dictionary mapping the numeric values of the constants defined in this module\n   back to name strings, allowing more human-readable representation of parse trees\n   to be generated.\n\n\n.. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.\n\n\n.. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.\n\n\n.. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.\n\n\nThe token constants are:\n\n.. include:: token-list.inc\n\nThe following token type values aren't used by the C tokenizer but are needed for\nthe :mod:`tokenize` module.\n\n.. data:: COMMENT\n   :noindex:\n\n   Token value used to indicate a comment.\n\n\n.. data:: NL\n   :noindex:\n\n   Token value used to indicate a non-terminating newline.  The\n   :data:`NEWLINE` token indicates the end of a logical line of Python code;\n   ``NL`` tokens are generated when a logical line of code is continued over\n   multiple physical lines.\n\n\n.. data:: ENCODING\n\n   Token value that indicates the encoding used to decode the source bytes\n   into text. The first token returned by :func:`tokenize.tokenize` will\n   always be an ``ENCODING`` token.\n\n\n.. data:: TYPE_COMMENT\n   :noindex:\n\n   Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.\n\n\n.. data:: EXACT_TOKEN_TYPES\n\n   A dictionary mapping the string representation of a token to its numeric code.\n\n   .. versionadded:: 3.8\n\n\n.. versionchanged:: 3.5\n   Added :data:`AWAIT` and :data:`ASYNC` tokens.\n\n.. versionchanged:: 3.7\n   Added :data:`COMMENT`, :data:`NL` and :data:`ENCODING` tokens.\n\n.. versionchanged:: 3.7\n   Removed :data:`AWAIT` and :data:`ASYNC` tokens. \"async\" and \"await\" are\n   now tokenized as :data:`NAME` tokens.\n\n.. versionchanged:: 3.8\n   Added :data:`TYPE_COMMENT`, :data:`TYPE_IGNORE`, :data:`COLONEQUAL`.\n   Added :data:`AWAIT` and :data:`ASYNC` tokens back (they're needed\n   to support parsing older Python versions for :func:`ast.parse` with\n   ``feature_version`` set to 6 or lower).\n",
+    "scope": "",
+    "effective_from": "",
+    "effective_to": "",
+    "origin": "pinned collection",
+    "sha256": "e4e2720f0eda57ab584a741ec64778d3ce48c3654c3afdce1f6d59d2c578c053",
+    "members": [
+      {
+        "source_id": "adc20c123f444df1b50dfd01def71003",
+        "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+        "title": "Python 3.12.10 keyword",
+        "observed_at": "",
+        "start": 0,
+        "end": 1148
+      },
+      {
+        "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+        "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+        "title": "Python 3.12.10 token",
+        "observed_at": "",
+        "start": 1150,
+        "end": 4077
+      }
+    ],
+    "created_at": "2026-11-06T20:16:59.773502+00:00"
+  },
+  "source_members": [
+    {
+      "id": "adc20c123f444df1b50dfd01def71003",
+      "title": "Python 3.12.10 keyword",
+      "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================\n\n.. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.\n\n**Source code:** :source:`Lib/keyword.py`\n\n--------------\n\nThis module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.\n\n\n.. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.\n\n\n.. data:: kwlist\n\n   Sequence containing all the :ref:`keywords <keywords>` defined for the\n   interpreter.  If any keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n\n.. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9\n\n\n.. data:: softkwlist\n\n   Sequence containing all the :ref:`soft keywords <soft-keywords>` defined for the\n   interpreter.  If any soft keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n   .. versionadded:: 3.9\n",
+      "scope": "",
+      "effective_from": "",
+      "effective_to": "",
+      "observed_at": "",
+      "origin": "user supplied",
+      "sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+      "created_at": "2026-11-06T20:16:59.771719+00:00"
+    },
+    {
+      "id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+      "title": "Python 3.12.10 token",
+      "text": ":mod:`!token` --- Constants used with Python parse trees\n========================================================\n\n.. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.\n\n.. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>\n\n**Source code:** :source:`Lib/token.py`\n\n--------------\n\nThis module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.\n\nThe module also provides a mapping from numeric codes to names and some\nfunctions.  The functions mirror definitions in the Python C header files.\n\n\n.. data:: tok_name\n\n   Dictionary mapping the numeric values of the constants defined in this module\n   back to name strings, allowing more human-readable representation of parse trees\n   to be generated.\n\n\n.. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.\n\n\n.. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.\n\n\n.. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.\n\n\nThe token constants are:\n\n.. include:: token-list.inc\n\nThe following token type values aren't used by the C tokenizer but are needed for\nthe :mod:`tokenize` module.\n\n.. data:: COMMENT\n   :noindex:\n\n   Token value used to indicate a comment.\n\n\n.. data:: NL\n   :noindex:\n\n   Token value used to indicate a non-terminating newline.  The\n   :data:`NEWLINE` token indicates the end of a logical line of Python code;\n   ``NL`` tokens are generated when a logical line of code is continued over\n   multiple physical lines.\n\n\n.. data:: ENCODING\n\n   Token value that indicates the encoding used to decode the source bytes\n   into text. The first token returned by :func:`tokenize.tokenize` will\n   always be an ``ENCODING`` token.\n\n\n.. data:: TYPE_COMMENT\n   :noindex:\n\n   Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.\n\n\n.. data:: EXACT_TOKEN_TYPES\n\n   A dictionary mapping the string representation of a token to its numeric code.\n\n   .. versionadded:: 3.8\n\n\n.. versionchanged:: 3.5\n   Added :data:`AWAIT` and :data:`ASYNC` tokens.\n\n.. versionchanged:: 3.7\n   Added :data:`COMMENT`, :data:`NL` and :data:`ENCODING` tokens.\n\n.. versionchanged:: 3.7\n   Removed :data:`AWAIT` and :data:`ASYNC` tokens. \"async\" and \"await\" are\n   now tokenized as :data:`NAME` tokens.\n\n.. versionchanged:: 3.8\n   Added :data:`TYPE_COMMENT`, :data:`TYPE_IGNORE`, :data:`COLONEQUAL`.\n   Added :data:`AWAIT` and :data:`ASYNC` tokens back (they're needed\n   to support parsing older Python versions for :func:`ast.parse` with\n   ``feature_version`` set to 6 or lower).\n",
+      "scope": "",
+      "effective_from": "",
+      "effective_to": "",
+      "observed_at": "",
+      "origin": "user supplied",
+      "sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+      "created_at": "2026-11-06T20:16:59.772910+00:00"
+    }
+  ],
+  "comparison": {
+    "id": "63a2aa625caa4542a9c00d652a57eed8",
+    "schema_version": 2,
+    "created_at": "2026-11-06T20:16:59.907248+00:00",
+    "stage": "shared-corpus",
+    "question": "Does the keyword module provide issoftkeyword and the token module provide ISTERMINAL?",
+    "scope": "",
+    "as_of": "",
+    "snapshot_id": "981b1715235c48968ce66672ee6994f1",
+    "snapshot_sha256": "e4e2720f0eda57ab584a741ec64778d3ce48c3654c3afdce1f6d59d2c578c053",
+    "snapshot_metadata_sha256": "b81344b16ee06e92be2fd7712f790c5e1c83096476971c9e9d69d11e98fa460d",
+    "model_config": {
+      "small_model": "qwen/qwen3.5-35b-a3b",
+      "frontier_model": "tencent/hy4",
+      "prompt_hashes": {
+        "planner": "b6b5037c49f63eeb99399b0ddac44fc666d5cee94977b1746258cacb623e5094",
+        "predicate_judge": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "predicate_repair": "5fdbb91947a6751ef945c6432f3661c8fe7161010b40a0e3b6da0e7dd2408c1c",
+        "repair": "3f8ddb69c418acc432a5b57db23df0a4a30fa77a582015a30f2fb8337b7b4a25",
+        "answer_check": "a42cfd486e07c4aea8f5e556e5e0ea81a279b3954cc1efc1ecc8feac0fce510c",
+        "answer_check_repair": "dad7ca7dc80abe0d24876c53640e4596a7f1b3d2e67d59176fd37b386e5e58b9",
+        "direct": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+        "direct_repair": "d143b071be5abd67edd46e9299e6c4c20b01d31ea2ffc4caa866639bd1efd6df",
+        "search": "426399e1c89319c0d7283de28a0263bf76afc5d53f23d1d11c47ba30a1a5adbc"
+      },
+      "runtime_hashes": {
+        "core.py": "c54a9b2abec57623b9ab25f1eadaa0e6892d186572da6e431fde32f796f252f5",
+        "collections.py": "990715cf667fccb10cc8b566124ecb57409dc2f38bcde49d5398175bbe15f325",
+        "retrieval.py": "cd9508ff9281d39c952d0d689260341dceb840df8401c21e2708c0102867696b",
+        "local_retrieval.py": "221a36750f13636c7d0f3e854d923e477afb55d60a48dba7db564087ade09bc8",
+        "local_judge.py": "b5c033f3a8186b8f0634a1a2ae6f9ed9c0a64e28efd5bc51a0e6a826ab5895e2",
+        "local_worker.py": "4ca00f41e3cee0c90d84097edd931b57d36079767532dcad50f5c26486fcbb0b",
+        "programs.py": "391b251d0c2a3524905d7beff6a9f7086ec387f0a2caa66715cdc12287b52ec3",
+        "compare.py": "a647fd244c2813a2ca9dc7018566cf88f4f0a743666eb5a53f9c1aa5aec6c22b",
+        "datasets.py": "bbb35e1459bfe5885fff8dfe08e1d5cb8ac4cf77eedc0c721ec3dad23fd0c65c",
+        "jobs.py": "124b4ee1cb952c302db97cffa896292cf50139a914144e329d5989a3acce47de",
+        "experiments.py": "8d4183803ad88ea199effd435c750a4918050ba38687a1c59517c1aa07f4e353",
+        "web_research.py": "ff60bd0f776a1f321c9d8ecaa2537d809ca3ae15152c609c1ee1d36e7a2df6c8"
+      },
+      "web_plugin": "explicitly disabled for bounded calls",
+      "provider_revision": "resolved model and provider are recorded per call when returned"
+    },
+    "historical_as_known": false,
+    "targeted": true,
+    "extra_search": false,
+    "status": "awaiting adjudication",
+    "answer_check_backend": "local",
+    "local_support_threshold": 0.8,
+    "web_authorized": false,
+    "items": [
+      {
+        "review_id": "a860aeeb629b481cb9b8306e11ae83d9",
+        "arm": "fresh",
+        "run_id": "bbd91a85e3434948bfa009489cd3ffa6"
+      },
+      {
+        "review_id": "28f848a08d8d4b3d9bc9eb8a3e942ac7",
+        "arm": "direct",
+        "run_id": "25844021d78140f3ab17f7f61c270317"
+      },
+      {
+        "review_id": "ddf05bae3e594d5e9f7382cc2f8b0630",
+        "arm": "frontier",
+        "run_id": "18f35b10ef42496b96e56edf3e31195e"
+      }
+    ]
+  },
+  "runs": {
+    "fresh": {
+      "id": "bbd91a85e3434948bfa009489cd3ffa6",
+      "schema_version": 1,
+      "created_at": "2026-11-06T20:16:59.909034+00:00",
+      "mode": "fresh",
+      "request": {
+        "question": "Does the keyword module provide issoftkeyword and the token module provide ISTERMINAL?",
+        "scope": "",
+        "as_of": "",
+        "snapshot_id": "981b1715235c48968ce66672ee6994f1"
+      },
+      "source_sha256": "e4e2720f0eda57ab584a741ec64778d3ce48c3654c3afdce1f6d59d2c578c053",
+      "source_metadata_sha256": "b81344b16ee06e92be2fd7712f790c5e1c83096476971c9e9d69d11e98fa460d",
+      "calls": [
+        {
+          "model": "qwen/qwen3.5-35b-a3b",
+          "provider": "Venice",
+          "generation_id": "gen-1793996220-2DQ7lnGO39D1ucPUpNTy",
+          "elapsed_seconds": 2.26,
+          "usage": {
+            "prompt_tokens": 652,
+            "completion_tokens": 337,
+            "total_tokens": 989,
+            "cost": 0.0004348,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0004348,
+              "upstream_inference_prompt_cost": 9.78e-05,
+              "upstream_inference_completions_cost": 0.000337
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "b6b5037c49f63eeb99399b0ddac44fc666d5cee94977b1746258cacb623e5094",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        }
+      ],
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the keyword module provide the function issoftkeyword?",
+            "evidence_requirement": "Confirmation that the keyword module documentation explicitly defines a function named issoftkeyword",
+            "positive_claim": "The keyword module provides the function issoftkeyword.",
+            "negative_claim": "The keyword module does not provide the function issoftkeyword."
+          },
+          "outcome": "true",
+          "quote": "",
+          "evidence_spans": [
+            {
+              "start": 718,
+              "end": 824,
+              "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+              "score": 9.481942,
+              "matched_terms": [
+                "function",
+                "issoftkeyword",
+                "keyword"
+              ],
+              "source_ref": {
+                "source_id": "adc20c123f444df1b50dfd01def71003",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword",
+                "observed_at": "",
+                "source_start": 718,
+                "source_end": 824
+              }
+            },
+            {
+              "start": 371,
+              "end": 463,
+              "text": ".. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+              "score": 5.537503,
+              "matched_terms": [
+                "function",
+                "keyword"
+              ],
+              "source_ref": {
+                "source_id": "adc20c123f444df1b50dfd01def71003",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword",
+                "observed_at": "",
+                "source_start": 371,
+                "source_end": 463
+              }
+            },
+            {
+              "start": 97,
+              "end": 176,
+              "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+              "score": 5.249821,
+              "matched_terms": [
+                "keyword",
+                "module"
+              ],
+              "source_ref": {
+                "source_id": "adc20c123f444df1b50dfd01def71003",
+                "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                "source_title": "Python 3.12.10 keyword",
+                "observed_at": "",
+                "source_start": 97,
+                "source_end": 176
+              }
+            }
+          ],
+          "retrieval_rounds": [
+            {
+              "query": "Does the keyword module provide the function issoftkeyword?",
+              "hits": 3
+            }
+          ],
+          "followup_status": "not_needed",
+          "positive_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.9236,
+              "false": 0.0764
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 261,
+            "elapsed_seconds": 0.527
+          },
+          "negative_support": {
+            "choice": "false",
+            "probabilities": {
+              "true": 0.4588,
+              "false": 0.5412
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 263,
+            "elapsed_seconds": 0.43
+          },
+          "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+        },
+        {
+          "predicate": {
+            "id": "p2",
+            "question": "Does the token module provide the function ISTERMINAL?",
+            "evidence_requirement": "Confirmation that the token module documentation explicitly defines a function named ISTERMINAL",
+            "positive_claim": "The token module provides the function ISTERMINAL.",
+            "negative_claim": "The token module does not provide the function ISTERMINAL."
+          },
+          "outcome": "true",
+          "quote": "",
+          "evidence_spans": [
+            {
+              "start": 2172,
+              "end": 2246,
+              "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+              "score": 8.788794,
+              "matched_terms": [
+                "function",
+                "isterminal",
+                "token"
+              ],
+              "source_ref": {
+                "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token",
+                "observed_at": "",
+                "source_start": 1022,
+                "source_end": 1096
+              }
+            },
+            {
+              "start": 2249,
+              "end": 2330,
+              "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+              "score": 4.844356,
+              "matched_terms": [
+                "function",
+                "token"
+              ],
+              "source_ref": {
+                "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token",
+                "observed_at": "",
+                "source_start": 1099,
+                "source_end": 1180
+              }
+            },
+            {
+              "start": 1265,
+              "end": 1353,
+              "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+              "score": 4.556673,
+              "matched_terms": [
+                "module",
+                "token"
+              ],
+              "source_ref": {
+                "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token",
+                "observed_at": "",
+                "source_start": 115,
+                "source_end": 203
+              }
+            }
+          ],
+          "retrieval_rounds": [
+            {
+              "query": "Does the token module provide the function ISTERMINAL?",
+              "hits": 3
+            }
+          ],
+          "followup_status": "not_needed",
+          "positive_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.9059,
+              "false": 0.0941
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 243,
+            "elapsed_seconds": 0.349
+          },
+          "negative_support": {
+            "choice": "false",
+            "probabilities": {
+              "true": 0.4574,
+              "false": 0.5426
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 245,
+            "elapsed_seconds": 0.348
+          },
+          "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+        }
+      ],
+      "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+      "requested_model": "qwen/qwen3.5-35b-a3b",
+      "evidence_mode": "lexical",
+      "answer_check_backend": "local",
+      "model_responses": [
+        {
+          "stage": "planner",
+          "text": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the keyword module provide the function issoftkeyword?\",\n      \"evidence_requirement\": \"Confirmation that the keyword module documentation explicitly defines a function named issoftkeyword\",\n      \"positive_claim\": \"The keyword module provides the function issoftkeyword.\",\n      \"negative_claim\": \"The keyword module does not provide the function issoftkeyword.\"\n    },\n    {\n      \"id\": \"p2\",\n      \"question\": \"Does the token module provide the function ISTERMINAL?\",\n      \"evidence_requirement\": \"Confirmation that the token module documentation explicitly defines a function named ISTERMINAL\",\n      \"positive_claim\": \"The token module provides the function ISTERMINAL.\",\n      \"negative_claim\": \"The token module does not provide the function ISTERMINAL.\"\n    }\n  ],\n  \"expression\": {\n    \"op\": \"and\",\n    \"args\": [\n      {\n        \"ref\": \"p1\"\n      },\n      {\n        \"ref\": \"p2\"\n      }\n    ]\n  },\n  \"true_answer\": \"Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.\",\n  \"false_answer\": \"No, either the keyword module does not provide issoftkeyword, or the token module does not provide ISTERMINAL, or both.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}"
+        }
+      ],
+      "extra_search": false,
+      "execution_policy": "batch_no_extra_search",
+      "local_support_threshold": 0.8,
+      "planning_evidence": [
+        {
+          "start": 718,
+          "end": 824,
+          "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+          "score": 6.636115,
+          "matched_terms": [
+            "issoftkeyword",
+            "keyword"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 824
+          }
+        },
+        {
+          "start": 2172,
+          "end": 2246,
+          "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+          "score": 5.942968,
+          "matched_terms": [
+            "isterminal",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 1022,
+            "source_end": 1096
+          }
+        },
+        {
+          "start": 97,
+          "end": 176,
+          "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "score": 5.249821,
+          "matched_terms": [
+            "keyword",
+            "module"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        },
+        {
+          "start": 237,
+          "end": 368,
+          "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+          "score": 5.249821,
+          "matched_terms": [
+            "keyword",
+            "module"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 237,
+            "source_end": 368
+          }
+        },
+        {
+          "start": 1265,
+          "end": 1353,
+          "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+          "score": 4.556673,
+          "matched_terms": [
+            "module",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 115,
+            "source_end": 203
+          }
+        }
+      ],
+      "planner_output": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the keyword module provide the function issoftkeyword?\",\n      \"evidence_requirement\": \"Confirmation that the keyword module documentation explicitly defines a function named issoftkeyword\",\n      \"positive_claim\": \"The keyword module provides the function issoftkeyword.\",\n      \"negative_claim\": \"The keyword module does not provide the function issoftkeyword.\"\n    },\n    {\n      \"id\": \"p2\",\n      \"question\": \"Does the token module provide the function ISTERMINAL?\",\n      \"evidence_requirement\": \"Confirmation that the token module documentation explicitly defines a function named ISTERMINAL\",\n      \"positive_claim\": \"The token module provides the function ISTERMINAL.\",\n      \"negative_claim\": \"The token module does not provide the function ISTERMINAL.\"\n    }\n  ],\n  \"expression\": {\n    \"op\": \"and\",\n    \"args\": [\n      {\n        \"ref\": \"p1\"\n      },\n      {\n        \"ref\": \"p2\"\n      }\n    ]\n  },\n  \"true_answer\": \"Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.\",\n  \"false_answer\": \"No, either the keyword module does not provide issoftkeyword, or the token module does not provide ISTERMINAL, or both.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}",
+      "plan": {
+        "predicates": [
+          {
+            "id": "p1",
+            "question": "Does the keyword module provide the function issoftkeyword?",
+            "evidence_requirement": "Confirmation that the keyword module documentation explicitly defines a function named issoftkeyword",
+            "positive_claim": "The keyword module provides the function issoftkeyword.",
+            "negative_claim": "The keyword module does not provide the function issoftkeyword."
+          },
+          {
+            "id": "p2",
+            "question": "Does the token module provide the function ISTERMINAL?",
+            "evidence_requirement": "Confirmation that the token module documentation explicitly defines a function named ISTERMINAL",
+            "positive_claim": "The token module provides the function ISTERMINAL.",
+            "negative_claim": "The token module does not provide the function ISTERMINAL."
+          }
+        ],
+        "expression": {
+          "op": "and",
+          "args": [
+            {
+              "ref": "p1"
+            },
+            {
+              "ref": "p2"
+            }
+          ]
+        },
+        "true_answer": "Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+        "false_answer": "No, either the keyword module does not provide issoftkeyword, or the token module does not provide ISTERMINAL, or both.",
+        "false_status": "decided",
+        "ambiguity": ""
+      },
+      "local_predicate_batches": [
+        {
+          "backend": "local Unsloth MLX",
+          "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+          "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+          "max_tokens": 4096,
+          "worker_wall_seconds": 8.317,
+          "inference_count": 4,
+          "usage_status": "local resource cost unobserved",
+          "worker_environment": {
+            "python": "3.12.16",
+            "packages": {
+              "unsloth": "2026.11.2",
+              "mlx": "0.32.4",
+              "transformers": "5.17.0",
+              "huggingface-hub": "1.33.0"
+            }
+          }
+        }
+      ],
+      "candidate_result": {
+        "status": "decided",
+        "answer": "Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+        "reason": "Composed from predicate results"
+      },
+      "answer_check_evidence": [
+        {
+          "start": 718,
+          "end": 824,
+          "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+          "score": 6.636115,
+          "matched_terms": [
+            "issoftkeyword",
+            "keyword"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 824
+          }
+        },
+        {
+          "start": 1468,
+          "end": 1814,
+          "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+          "score": 6.097118,
+          "matched_terms": [
+            "module",
+            "provides"
+          ],
+          "source_ref": {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 318,
+            "source_end": 664
+          }
+        },
+        {
+          "start": 1816,
+          "end": 1962,
+          "text": "The module also provides a mapping from numeric codes to names and some\nfunctions.  The functions mirror definitions in the Python C header files.",
+          "score": 6.097118,
+          "matched_terms": [
+            "module",
+            "provides"
+          ],
+          "source_ref": {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 666,
+            "source_end": 812
+          }
+        },
+        {
+          "start": 2172,
+          "end": 2246,
+          "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+          "score": 5.942968,
+          "matched_terms": [
+            "isterminal",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 1022,
+            "source_end": 1096
+          }
+        },
+        {
+          "start": 97,
+          "end": 176,
+          "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "score": 5.249821,
+          "matched_terms": [
+            "keyword",
+            "module"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        }
+      ],
+      "answer_check": {
+        "choice": "true",
+        "probabilities": {
+          "true": 0.9076,
+          "false": 0.0924
+        },
+        "interpretation": "User-selected exploratory support threshold applied; not calibrated or independently validated. False and low scores remain unknown.",
+        "backend": "local Unsloth MLX",
+        "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+        "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+        "input_tokens": 363,
+        "max_tokens": 4096,
+        "elapsed_seconds": 0.6,
+        "worker_wall_seconds": 8.148,
+        "usage_status": "local resource cost unobserved",
+        "worker_environment": {
+          "python": "3.12.16",
+          "packages": {
+            "unsloth": "2026.11.2",
+            "mlx": "0.32.4",
+            "transformers": "5.17.0",
+            "huggingface-hub": "1.33.0"
+          }
+        },
+        "support_threshold": 0.8,
+        "verdict": "supported"
+      },
+      "result": {
+        "status": "decided",
+        "answer": "Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+        "reason": "Composed from predicate results"
+      },
+      "elapsed_seconds": 18.797
+    },
+    "direct": {
+      "id": "25844021d78140f3ab17f7f61c270317",
+      "schema_version": 1,
+      "created_at": "2026-11-06T20:17:18.709011+00:00",
+      "mode": "direct",
+      "request": {
+        "question": "Does the keyword module provide issoftkeyword and the token module provide ISTERMINAL?",
+        "scope": "",
+        "as_of": "",
+        "snapshot_id": "981b1715235c48968ce66672ee6994f1"
+      },
+      "source_sha256": "e4e2720f0eda57ab584a741ec64778d3ce48c3654c3afdce1f6d59d2c578c053",
+      "source_metadata_sha256": "b81344b16ee06e92be2fd7712f790c5e1c83096476971c9e9d69d11e98fa460d",
+      "calls": [
+        {
+          "model": "qwen/qwen3.5-35b-a3b",
+          "provider": "Parasail",
+          "generation_id": "gen-1793996238-v2SlpWvYQBh5sEI8F41H",
+          "elapsed_seconds": 0.882,
+          "usage": {
+            "prompt_tokens": 277,
+            "completion_tokens": 137,
+            "total_tokens": 414,
+            "cost": 0.00017855,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00017855,
+              "upstream_inference_prompt_cost": 4.155e-05,
+              "upstream_inference_completions_cost": 0.000137
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        }
+      ],
+      "trace": [],
+      "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+      "requested_model": "qwen/qwen3.5-35b-a3b",
+      "evidence_mode": "lexical",
+      "answer_check_backend": "not_applicable",
+      "model_responses": [
+        {
+          "stage": "direct_answer",
+          "text": "{\n  \"status\": \"decided\",\n  \"answer\": \"Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.\",\n  \"quotes\": [\n    \".. function:: issoftkeyword(s)\",\n    \"Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\",\n    \".. function:: ISTERMINAL(x)\",\n    \"Return ``True`` for terminal token values.\"\n  ],\n  \"reason\": \"The source text explicitly defines the function issoftkeyword in the keyword module and the function ISTERMINAL in the token module.\"\n}"
+        }
+      ],
+      "extra_search": false,
+      "execution_policy": "not_applicable",
+      "planning_evidence": [
+        {
+          "start": 718,
+          "end": 824,
+          "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+          "score": 6.636115,
+          "matched_terms": [
+            "issoftkeyword",
+            "keyword"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 824
+          }
+        },
+        {
+          "start": 2172,
+          "end": 2246,
+          "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+          "score": 5.942968,
+          "matched_terms": [
+            "isterminal",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 1022,
+            "source_end": 1096
+          }
+        },
+        {
+          "start": 97,
+          "end": 176,
+          "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "score": 5.249821,
+          "matched_terms": [
+            "keyword",
+            "module"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        },
+        {
+          "start": 237,
+          "end": 368,
+          "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+          "score": 5.249821,
+          "matched_terms": [
+            "keyword",
+            "module"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 237,
+            "source_end": 368
+          }
+        },
+        {
+          "start": 1265,
+          "end": 1353,
+          "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+          "score": 4.556673,
+          "matched_terms": [
+            "module",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 115,
+            "source_end": 203
+          }
+        }
+      ],
+      "result": {
+        "status": "decided",
+        "answer": "Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+        "reason": "The source text explicitly defines the function issoftkeyword in the keyword module and the function ISTERMINAL in the token module.",
+        "quotes": [
+          ".. function:: issoftkeyword(s)",
+          "Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+          ".. function:: ISTERMINAL(x)",
+          "Return ``True`` for terminal token values."
+        ],
+        "source_refs": [
+          {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 748
+          },
+          {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 753,
+            "source_end": 824
+          },
+          {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 1022,
+            "source_end": 1049
+          },
+          {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 1054,
+            "source_end": 1096
+          }
+        ],
+        "quote": ".. function:: issoftkeyword(s)",
+        "source_ref": {
+          "source_id": "adc20c123f444df1b50dfd01def71003",
+          "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+          "source_title": "Python 3.12.10 keyword",
+          "observed_at": "",
+          "source_start": 718,
+          "source_end": 748
+        }
+      },
+      "elapsed_seconds": 0.885
+    },
+    "frontier": {
+      "id": "18f35b10ef42496b96e56edf3e31195e",
+      "schema_version": 1,
+      "created_at": "2026-11-06T20:17:19.595381+00:00",
+      "mode": "frontier",
+      "request": {
+        "question": "Does the keyword module provide issoftkeyword and the token module provide ISTERMINAL?",
+        "scope": "",
+        "as_of": "",
+        "snapshot_id": "981b1715235c48968ce66672ee6994f1"
+      },
+      "source_sha256": "e4e2720f0eda57ab584a741ec64778d3ce48c3654c3afdce1f6d59d2c578c053",
+      "source_metadata_sha256": "b81344b16ee06e92be2fd7712f790c5e1c83096476971c9e9d69d11e98fa460d",
+      "calls": [
+        {
+          "model": "tencent/hy4",
+          "provider": "Tencent",
+          "generation_id": "gen-1793996239-KVoD2ykjcIZ33iJ6FBA5",
+          "elapsed_seconds": 2.576,
+          "usage": {
+            "prompt_tokens": 289,
+            "completion_tokens": 193,
+            "total_tokens": 482,
+            "cost": 0.0003618595,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0003618595,
+              "upstream_inference_prompt_cost": 0.000120513,
+              "upstream_inference_completions_cost": 0.0002413465
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "00ebc65a150995137828172a9b8e3b8c61c198c4982cd4a431880969dbc3b457",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        },
+        {
+          "model": "tencent/hy4",
+          "provider": "Tencent",
+          "generation_id": "gen-1793996242-2YTQYfduzdniK5gVNBJx",
+          "elapsed_seconds": 1.914,
+          "usage": {
+            "prompt_tokens": 557,
+            "completion_tokens": 80,
+            "total_tokens": 637,
+            "cost": 0.000332309,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.000332309,
+              "upstream_inference_prompt_cost": 0.000232269,
+              "upstream_inference_completions_cost": 0.00010004
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          },
+          "cost_status": "provider reported",
+          "prompt_sha256": "d143b071be5abd67edd46e9299e6c4c20b01d31ea2ffc4caa866639bd1efd6df",
+          "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+          "finish_reason": "stop"
+        }
+      ],
+      "trace": [],
+      "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+      "requested_model": "tencent/hy4",
+      "evidence_mode": "lexical",
+      "answer_check_backend": "not_applicable",
+      "model_responses": [
+        {
+          "stage": "direct_answer",
+          "text": "{\"status\":\"decided\",\"answer\":\"Yes. The keyword module provides issoftkeyword, and the token module provides ISTERMINAL.\",\"quotes\":[\".. module:: keyword\\n   :synopsis: Test whether a string is a keyword in Python.\\n\\nThis module allows a Python program to determine if a string is a\\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.\\n\\n.. function:: issoftkeyword(s)\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\",\".. module:: token\\n   :synopsis: Constants representing terminal nodes of the parse tree.\\n\\n.. function:: ISTERMINAL(x)\\n\\n   Return ``True`` for terminal token values.\"],\"reason\":\"The source explicitly documents issoftkeyword under the keyword module and ISTERMINAL under the token module.\"}"
+        },
+        {
+          "stage": "direct_repair",
+          "text": "{\"status\":\"decided\",\"answer\":\"Yes. The keyword module provides issoftkeyword, and the token module provides ISTERMINAL.\",\"quotes\":[\".. function:: issoftkeyword(s)\",\".. function:: ISTERMINAL(x)\"],\"reason\":\"The source explicitly documents issoftkeyword in the keyword module section and ISTERMINAL in the token module section.\"}"
+        }
+      ],
+      "extra_search": false,
+      "execution_policy": "not_applicable",
+      "planning_evidence": [
+        {
+          "start": 718,
+          "end": 824,
+          "text": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+          "score": 6.636115,
+          "matched_terms": [
+            "issoftkeyword",
+            "keyword"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 824
+          }
+        },
+        {
+          "start": 2172,
+          "end": 2246,
+          "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+          "score": 5.942968,
+          "matched_terms": [
+            "isterminal",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 1022,
+            "source_end": 1096
+          }
+        },
+        {
+          "start": 97,
+          "end": 176,
+          "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "score": 5.249821,
+          "matched_terms": [
+            "keyword",
+            "module"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        },
+        {
+          "start": 237,
+          "end": 368,
+          "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+          "score": 5.249821,
+          "matched_terms": [
+            "keyword",
+            "module"
+          ],
+          "source_ref": {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 237,
+            "source_end": 368
+          }
+        },
+        {
+          "start": 1265,
+          "end": 1353,
+          "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+          "score": 4.556673,
+          "matched_terms": [
+            "module",
+            "token"
+          ],
+          "source_ref": {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 115,
+            "source_end": 203
+          }
+        }
+      ],
+      "result": {
+        "status": "decided",
+        "answer": "Yes. The keyword module provides issoftkeyword, and the token module provides ISTERMINAL.",
+        "reason": "The source explicitly documents issoftkeyword in the keyword module section and ISTERMINAL in the token module section.",
+        "quotes": [
+          ".. function:: issoftkeyword(s)",
+          ".. function:: ISTERMINAL(x)"
+        ],
+        "source_refs": [
+          {
+            "source_id": "adc20c123f444df1b50dfd01def71003",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword",
+            "observed_at": "",
+            "source_start": 718,
+            "source_end": 748
+          },
+          {
+            "source_id": "8cb6fb3d99b24aaa82fa67bdcde9f14c",
+            "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+            "source_title": "Python 3.12.10 token",
+            "observed_at": "",
+            "source_start": 1022,
+            "source_end": 1049
+          }
+        ],
+        "quote": ".. function:: issoftkeyword(s)",
+        "source_ref": {
+          "source_id": "adc20c123f444df1b50dfd01def71003",
+          "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+          "source_title": "Python 3.12.10 keyword",
+          "observed_at": "",
+          "source_start": 718,
+          "source_end": 748
+        }
+      },
+      "elapsed_seconds": 4.495
+    }
+  }
+}

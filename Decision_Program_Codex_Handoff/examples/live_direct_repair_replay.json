@@ -1,0 +1,92 @@
+{
+  "classification": "Development diagnostic: first response replayed from an earlier failed live run; repair is a new live OpenRouter call, not independent adjudication.",
+  "original_run_id": "420c9d56964748fc9fe6928ce81a8b13",
+  "question": "Does the Python keyword module provide issoftkeyword and the token module provide ISTERMINAL?",
+  "result": {
+    "status": "decided",
+    "answer": "Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.",
+    "reason": "The source text explicitly defines the function issoftkeyword in the keyword module documentation and the function ISTERMINAL in the token module documentation.",
+    "quotes": [
+      ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+      ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values."
+    ],
+    "source_refs": [
+      {
+        "source_id": "ca0577b88c1248f7b996b9f6eb7e0d83",
+        "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+        "source_title": "Python 3.12.10 keyword module documentation",
+        "observed_at": "2026-11-06",
+        "source_start": 718,
+        "source_end": 824
+      },
+      {
+        "source_id": "5f04536e7ed94b64824f201abb815869",
+        "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+        "source_title": "Python 3.12.10 token module documentation",
+        "observed_at": "2026-11-06",
+        "source_start": 1022,
+        "source_end": 1096
+      }
+    ],
+    "quote": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+    "source_ref": {
+      "source_id": "ca0577b88c1248f7b996b9f6eb7e0d83",
+      "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+      "source_title": "Python 3.12.10 keyword module documentation",
+      "observed_at": "2026-11-06",
+      "source_start": 718,
+      "source_end": 824
+    }
+  },
+  "model_responses": [
+    {
+      "stage": "direct_answer",
+      "text": "{\n\"status\":\"decided\",\n\"answer\":\"Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.\",\n\"quotes\":[\n\"Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>.\",\n\"Return ``True`` for terminal token values.\"\n],\n\"reason\":\"The source text explicitly documents the function issoftkeyword in the keyword module and the function ISTERMINAL in the token module.\"\n}"
+    },
+    {
+      "stage": "direct_repair",
+      "text": "{\n\"status\":\"decided\",\n\"answer\":\"Yes, the keyword module provides issoftkeyword and the token module provides ISTERMINAL.\",\n\"quotes\":[\n\".. function:: issoftkeyword(s)\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\",\n\".. function:: ISTERMINAL(x)\\n\\n   Return ``True`` for terminal token values.\"\n],\n\"reason\":\"The source text explicitly defines the function issoftkeyword in the keyword module documentation and the function ISTERMINAL in the token module documentation.\"\n}"
+    }
+  ],
+  "calls": [
+    {
+      "status": "historical replay",
+      "replay_of_run": "420c9d56964748fc9fe6928ce81a8b13",
+      "usage": null,
+      "cost_status": "not a new provider call"
+    },
+    {
+      "model": "qwen/qwen3.5-35b-a3b",
+      "provider": "Alibaba",
+      "generation_id": "gen-1793982719-E2uLIcfbB6rkUPr746DG",
+      "elapsed_seconds": 1.256,
+      "usage": {
+        "prompt_tokens": 1423,
+        "completion_tokens": 127,
+        "total_tokens": 1550,
+        "cost": 0.0003963375,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0003963375,
+          "upstream_inference_prompt_cost": 0.0002312375,
+          "upstream_inference_completions_cost": 0.0001651
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "cost_status": "provider reported",
+      "prompt_sha256": "d143b071be5abd67edd46e9299e6c4c20b01d31ea2ffc4caa866639bd1efd6df",
+      "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+      "finish_reason": "stop"
+    }
+  ]
+}

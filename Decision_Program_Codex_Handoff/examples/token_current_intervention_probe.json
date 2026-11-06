@@ -1,0 +1,1470 @@
+{
+  "classification": "Developer-reviewed synthetic intervention on public documentation; not independent evaluation.",
+  "source": {
+    "id": "b3affb2413e644d4b65c65e5fcd41d9f",
+    "title": "Python 3.12.10 token documentation",
+    "text": ":mod:`!token` --- Constants used with Python parse trees\n========================================================\n\n.. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.\n\n.. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>\n\n**Source code:** :source:`Lib/token.py`\n\n--------------\n\nThis module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.\n\nThe module also provides a mapping from numeric codes to names and some\nfunctions.  The functions mirror definitions in the Python C header files.\n\n\n.. data:: tok_name\n\n   Dictionary mapping the numeric values of the constants defined in this module\n   back to name strings, allowing more human-readable representation of parse trees\n   to be generated.\n\n\n.. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.\n\n\n.. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.\n\n\n.. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.\n\n\nThe token constants are:\n\n.. include:: token-list.inc\n\nThe following token type values aren't used by the C tokenizer but are needed for\nthe :mod:`tokenize` module.\n\n.. data:: COMMENT\n   :noindex:\n\n   Token value used to indicate a comment.\n\n\n.. data:: NL\n   :noindex:\n\n   Token value used to indicate a non-terminating newline.  The\n   :data:`NEWLINE` token indicates the end of a logical line of Python code;\n   ``NL`` tokens are generated when a logical line of code is continued over\n   multiple physical lines.\n\n\n.. data:: ENCODING\n\n   Token value that indicates the encoding used to decode the source bytes\n   into text. The first token returned by :func:`tokenize.tokenize` will\n   always be an ``ENCODING`` token.\n\n\n.. data:: TYPE_COMMENT\n   :noindex:\n\n   Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.\n\n\n.. data:: EXACT_TOKEN_TYPES\n\n   A dictionary mapping the string representation of a token to its numeric code.\n\n   .. versionadded:: 3.8\n\n\n.. versionchanged:: 3.5\n   Added :data:`AWAIT` and :data:`ASYNC` tokens.\n\n.. versionchanged:: 3.7\n   Added :data:`COMMENT`, :data:`NL` and :data:`ENCODING` tokens.\n\n.. versionchanged:: 3.7\n   Removed :data:`AWAIT` and :data:`ASYNC` tokens. \"async\" and \"await\" are\n   now tokenized as :data:`NAME` tokens.\n\n.. versionchanged:: 3.8\n   Added :data:`TYPE_COMMENT`, :data:`TYPE_IGNORE`, :data:`COLONEQUAL`.\n   Added :data:`AWAIT` and :data:`ASYNC` tokens back (they're needed\n   to support parsing older Python versions for :func:`ast.parse` with\n   ``feature_version`` set to 6 or lower).\n",
+    "scope": "",
+    "effective_from": "",
+    "effective_to": "",
+    "observed_at": "",
+    "origin": "starter_corpus/python-3.12.10-token.rst",
+    "sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+    "created_at": "2026-11-06T20:01:27.140130+00:00"
+  },
+  "fresh": {
+    "id": "4218f952ea4440b98a11c58e770833f0",
+    "schema_version": 1,
+    "created_at": "2026-11-06T20:04:50.346805+00:00",
+    "mode": "fresh",
+    "request": {
+      "question": "Which function returns true for terminal token values?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f"
+    },
+    "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+    "source_metadata_sha256": "ce93e6089948c6818cb7fcb19fd9d2001ac1ad34925400a5a35c47058091c59f",
+    "calls": [
+      {
+        "model": "qwen/qwen3.5-35b-a3b",
+        "provider": "Alibaba",
+        "generation_id": "gen-1793995490-0VfDjsJxVrhjSQqagt5C",
+        "elapsed_seconds": 1.701,
+        "usage": {
+          "prompt_tokens": 677,
+          "completion_tokens": 216,
+          "total_tokens": 893,
+          "cost": 0.0003908125,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0003908125,
+            "upstream_inference_prompt_cost": 0.0001100125,
+            "upstream_inference_completions_cost": 0.0002808
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "cost_status": "provider reported",
+        "prompt_sha256": "b6b5037c49f63eeb99399b0ddac44fc666d5cee94977b1746258cacb623e5094",
+        "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+        "finish_reason": "stop"
+      }
+    ],
+    "trace": [
+      {
+        "predicate": {
+          "id": "p1",
+          "question": "Does the ISTERMINAL function return true for terminal token values?",
+          "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+          "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+          "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+        },
+        "outcome": "true",
+        "quote": "",
+        "evidence_spans": [
+          {
+            "start": 1022,
+            "end": 1096,
+            "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+            "score": 19.395044,
+            "matched_terms": [
+              "function",
+              "isterminal",
+              "return",
+              "terminal",
+              "token",
+              "true",
+              "values"
+            ],
+            "source_ref": {
+              "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+              "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+              "source_title": "Python 3.12.10 token documentation",
+              "observed_at": "",
+              "source_start": 1022,
+              "source_end": 1096
+            }
+          },
+          {
+            "start": 1099,
+            "end": 1180,
+            "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+            "score": 15.997148,
+            "matched_terms": [
+              "function",
+              "return",
+              "terminal",
+              "token",
+              "true",
+              "values"
+            ],
+            "source_ref": {
+              "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+              "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+              "source_title": "Python 3.12.10 token documentation",
+              "observed_at": "",
+              "source_start": 1099,
+              "source_end": 1180
+            }
+          },
+          {
+            "start": 1183,
+            "end": 1275,
+            "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+            "score": 8.54788,
+            "matched_terms": [
+              "function",
+              "return",
+              "true"
+            ],
+            "source_ref": {
+              "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+              "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+              "source_title": "Python 3.12.10 token documentation",
+              "observed_at": "",
+              "source_start": 1183,
+              "source_end": 1275
+            }
+          }
+        ],
+        "retrieval_rounds": [
+          {
+            "query": "Does the ISTERMINAL function return true for terminal token values?",
+            "hits": 3
+          }
+        ],
+        "followup_status": "not_needed",
+        "positive_support": {
+          "choice": "true",
+          "probabilities": {
+            "true": 0.9353,
+            "false": 0.0647
+          },
+          "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+          "input_tokens": 254,
+          "elapsed_seconds": 0.446
+        },
+        "negative_support": {
+          "choice": "false",
+          "probabilities": {
+            "true": 0.1391,
+            "false": 0.8609
+          },
+          "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+          "input_tokens": 256,
+          "elapsed_seconds": 0.436
+        },
+        "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+      }
+    ],
+    "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+    "requested_model": "qwen/qwen3.5-35b-a3b",
+    "evidence_mode": "lexical",
+    "answer_check_backend": "local",
+    "model_responses": [
+      {
+        "stage": "planner",
+        "text": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the ISTERMINAL function return true for terminal token values?\",\n      \"evidence_requirement\": \"Documentation stating the return value of the ISTERMINAL function when given a terminal token value.\",\n      \"positive_claim\": \"The ISTERMINAL function returns true for terminal token values.\",\n      \"negative_claim\": \"The ISTERMINAL function does not return true for terminal token values.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"The ISTERMINAL function returns true for terminal token values.\",\n  \"false_answer\": \"The ISTERMINAL function does not return true for terminal token values; it may return false or behave differently, but the documentation explicitly states it returns True for these values.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}"
+      }
+    ],
+    "extra_search": false,
+    "execution_policy": "batch_no_extra_search",
+    "local_support_threshold": 0.8,
+    "planning_evidence": [
+      {
+        "start": 1022,
+        "end": 1096,
+        "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+        "score": 12.886935,
+        "matched_terms": [
+          "function",
+          "terminal",
+          "token",
+          "true",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1022,
+          "source_end": 1096
+        }
+      },
+      {
+        "start": 1099,
+        "end": 1180,
+        "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+        "score": 12.886935,
+        "matched_terms": [
+          "function",
+          "terminal",
+          "token",
+          "true",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1099,
+          "source_end": 1180
+        }
+      },
+      {
+        "start": 318,
+        "end": 664,
+        "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+        "score": 5.591818,
+        "matched_terms": [
+          "terminal",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 318,
+          "source_end": 664
+        }
+      },
+      {
+        "start": 1183,
+        "end": 1275,
+        "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+        "score": 5.437667,
+        "matched_terms": [
+          "function",
+          "true"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1183,
+          "source_end": 1275
+        }
+      },
+      {
+        "start": 115,
+        "end": 203,
+        "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+        "score": 4.74452,
+        "matched_terms": [
+          "terminal",
+          "token"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 115,
+          "source_end": 203
+        }
+      }
+    ],
+    "planner_output": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the ISTERMINAL function return true for terminal token values?\",\n      \"evidence_requirement\": \"Documentation stating the return value of the ISTERMINAL function when given a terminal token value.\",\n      \"positive_claim\": \"The ISTERMINAL function returns true for terminal token values.\",\n      \"negative_claim\": \"The ISTERMINAL function does not return true for terminal token values.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"The ISTERMINAL function returns true for terminal token values.\",\n  \"false_answer\": \"The ISTERMINAL function does not return true for terminal token values; it may return false or behave differently, but the documentation explicitly states it returns True for these values.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}",
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the ISTERMINAL function return true for terminal token values?",
+          "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+          "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+          "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+        }
+      ],
+      "expression": {
+        "ref": "p1"
+      },
+      "true_answer": "The ISTERMINAL function returns true for terminal token values.",
+      "false_answer": "The ISTERMINAL function does not return true for terminal token values; it may return false or behave differently, but the documentation explicitly states it returns True for these values.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "local_predicate_batches": [
+      {
+        "backend": "local Unsloth MLX",
+        "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+        "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+        "max_tokens": 4096,
+        "worker_wall_seconds": 11.953,
+        "inference_count": 2,
+        "usage_status": "local resource cost unobserved",
+        "worker_environment": {
+          "python": "3.12.16",
+          "packages": {
+            "unsloth": "2026.11.2",
+            "mlx": "0.32.4",
+            "transformers": "5.17.0",
+            "huggingface-hub": "1.33.0"
+          }
+        }
+      }
+    ],
+    "candidate_result": {
+      "status": "decided",
+      "answer": "The ISTERMINAL function returns true for terminal token values.",
+      "reason": "Composed from predicate results"
+    },
+    "answer_check_evidence": [
+      {
+        "start": 1022,
+        "end": 1096,
+        "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+        "score": 16.28483,
+        "matched_terms": [
+          "function",
+          "isterminal",
+          "terminal",
+          "token",
+          "true",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1022,
+          "source_end": 1096
+        }
+      },
+      {
+        "start": 1099,
+        "end": 1180,
+        "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+        "score": 12.886935,
+        "matched_terms": [
+          "function",
+          "terminal",
+          "token",
+          "true",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1099,
+          "source_end": 1180
+        }
+      },
+      {
+        "start": 1022,
+        "end": 1049,
+        "text": ".. function:: ISTERMINAL(x)",
+        "score": 5.948493,
+        "matched_terms": [
+          "function",
+          "isterminal"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1022,
+          "source_end": 1049
+        }
+      },
+      {
+        "start": 318,
+        "end": 664,
+        "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+        "score": 5.591818,
+        "matched_terms": [
+          "terminal",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 318,
+          "source_end": 664
+        }
+      },
+      {
+        "start": 1183,
+        "end": 1275,
+        "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+        "score": 5.437667,
+        "matched_terms": [
+          "function",
+          "true"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1183,
+          "source_end": 1275
+        }
+      }
+    ],
+    "answer_check": {
+      "choice": "true",
+      "probabilities": {
+        "true": 0.932,
+        "false": 0.068
+      },
+      "interpretation": "User-selected exploratory support threshold applied; not calibrated or independently validated. False and low scores remain unknown.",
+      "backend": "local Unsloth MLX",
+      "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+      "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+      "input_tokens": 336,
+      "max_tokens": 4096,
+      "elapsed_seconds": 0.658,
+      "worker_wall_seconds": 10.047,
+      "usage_status": "local resource cost unobserved",
+      "worker_environment": {
+        "python": "3.12.16",
+        "packages": {
+          "unsloth": "2026.11.2",
+          "mlx": "0.32.4",
+          "transformers": "5.17.0",
+          "huggingface-hub": "1.33.0"
+        }
+      },
+      "support_threshold": 0.8,
+      "verdict": "supported"
+    },
+    "result": {
+      "status": "decided",
+      "answer": "The ISTERMINAL function returns true for terminal token values.",
+      "reason": "Composed from predicate results"
+    },
+    "elapsed_seconds": 23.774
+  },
+  "draft": {
+    "id": "3f52371b31e44776b660ac98a46d94b2",
+    "revision": 1,
+    "status": "draft",
+    "created_at": "2026-11-06T20:08:27.340315+00:00",
+    "source_run_id": "4218f952ea4440b98a11c58e770833f0",
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the ISTERMINAL function return true for terminal token values?",
+          "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+          "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+          "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+        }
+      ],
+      "expression": {
+        "ref": "p1"
+      },
+      "true_answer": "The ISTERMINAL function returns true for terminal token values.",
+      "false_answer": "The ISTERMINAL function does not return true for terminal token values; it may return false or behave differently, but the documentation explicitly states it returns True for these values.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "binding": {
+      "question": "Which function returns true for terminal token values?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f"
+    },
+    "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+    "source_metadata_sha256": "ce93e6089948c6818cb7fcb19fd9d2001ac1ad34925400a5a35c47058091c59f",
+    "authoring": "fresh model plan",
+    "parent_id": null
+  },
+  "reviewed": {
+    "id": "a5291a56eb27460584d90a49f7db3527",
+    "revision": 2,
+    "status": "reviewed",
+    "created_at": "2026-11-06T20:08:27.341151+00:00",
+    "source_run_id": "4218f952ea4440b98a11c58e770833f0",
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the ISTERMINAL function return true for terminal token values?",
+          "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+          "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+          "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+        }
+      ],
+      "expression": {
+        "ref": "p1"
+      },
+      "true_answer": "The ISTERMINAL function returns true for terminal token values.",
+      "false_answer": "The ISTERMINAL function does not return true for terminal token values; it may return false or behave differently, but the documentation explicitly states it returns True for these values.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "binding": {
+      "question": "Which function returns true for terminal token values?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f"
+    },
+    "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+    "source_metadata_sha256": "ce93e6089948c6818cb7fcb19fd9d2001ac1ad34925400a5a35c47058091c59f",
+    "authoring": "fresh model plan",
+    "parent_id": "3f52371b31e44776b660ac98a46d94b2",
+    "reviewer": "Developer test",
+    "review_rationale": "Development inspection of the single function predicate; not independent review.",
+    "review_scope": "Exact original question, scope, date and snapshot only; manual review does not establish independent validation."
+  },
+  "baseline": {
+    "id": "d0dac5dae6274fd1b93e294f595c18d9",
+    "schema_version": 1,
+    "created_at": "2026-11-06T20:08:27.341670+00:00",
+    "mode": "reviewed",
+    "request": {
+      "question": "Which function returns true for terminal token values?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f"
+    },
+    "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+    "source_metadata_sha256": "ce93e6089948c6818cb7fcb19fd9d2001ac1ad34925400a5a35c47058091c59f",
+    "calls": [],
+    "trace": [
+      {
+        "predicate": {
+          "id": "p1",
+          "question": "Does the ISTERMINAL function return true for terminal token values?",
+          "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+          "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+          "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+        },
+        "outcome": "true",
+        "quote": "",
+        "evidence_spans": [
+          {
+            "start": 1022,
+            "end": 1096,
+            "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+            "score": 19.395044,
+            "matched_terms": [
+              "function",
+              "isterminal",
+              "return",
+              "terminal",
+              "token",
+              "true",
+              "values"
+            ],
+            "source_ref": {
+              "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+              "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+              "source_title": "Python 3.12.10 token documentation",
+              "observed_at": "",
+              "source_start": 1022,
+              "source_end": 1096
+            }
+          },
+          {
+            "start": 1099,
+            "end": 1180,
+            "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+            "score": 15.997148,
+            "matched_terms": [
+              "function",
+              "return",
+              "terminal",
+              "token",
+              "true",
+              "values"
+            ],
+            "source_ref": {
+              "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+              "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+              "source_title": "Python 3.12.10 token documentation",
+              "observed_at": "",
+              "source_start": 1099,
+              "source_end": 1180
+            }
+          },
+          {
+            "start": 1183,
+            "end": 1275,
+            "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+            "score": 8.54788,
+            "matched_terms": [
+              "function",
+              "return",
+              "true"
+            ],
+            "source_ref": {
+              "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+              "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+              "source_title": "Python 3.12.10 token documentation",
+              "observed_at": "",
+              "source_start": 1183,
+              "source_end": 1275
+            }
+          }
+        ],
+        "retrieval_rounds": [
+          {
+            "query": "Does the ISTERMINAL function return true for terminal token values?",
+            "hits": 3
+          }
+        ],
+        "followup_status": "not_needed",
+        "positive_support": {
+          "choice": "true",
+          "probabilities": {
+            "true": 0.9353,
+            "false": 0.0647
+          },
+          "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+          "input_tokens": 254,
+          "elapsed_seconds": 0.443
+        },
+        "negative_support": {
+          "choice": "false",
+          "probabilities": {
+            "true": 0.1391,
+            "false": 0.8609
+          },
+          "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+          "input_tokens": 256,
+          "elapsed_seconds": 0.345
+        },
+        "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+      }
+    ],
+    "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+    "requested_model": "qwen/qwen3.5-35b-a3b",
+    "evidence_mode": "lexical",
+    "answer_check_backend": "local",
+    "model_responses": [],
+    "extra_search": false,
+    "execution_policy": "batch_no_extra_search",
+    "local_support_threshold": 0.8,
+    "program_id": "a5291a56eb27460584d90a49f7db3527",
+    "program_revision": 2,
+    "planning_evidence": [
+      {
+        "start": 1022,
+        "end": 1096,
+        "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+        "score": 12.886935,
+        "matched_terms": [
+          "function",
+          "terminal",
+          "token",
+          "true",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1022,
+          "source_end": 1096
+        }
+      },
+      {
+        "start": 1099,
+        "end": 1180,
+        "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+        "score": 12.886935,
+        "matched_terms": [
+          "function",
+          "terminal",
+          "token",
+          "true",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1099,
+          "source_end": 1180
+        }
+      },
+      {
+        "start": 318,
+        "end": 664,
+        "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+        "score": 5.591818,
+        "matched_terms": [
+          "terminal",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 318,
+          "source_end": 664
+        }
+      },
+      {
+        "start": 1183,
+        "end": 1275,
+        "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+        "score": 5.437667,
+        "matched_terms": [
+          "function",
+          "true"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1183,
+          "source_end": 1275
+        }
+      },
+      {
+        "start": 115,
+        "end": 203,
+        "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+        "score": 4.74452,
+        "matched_terms": [
+          "terminal",
+          "token"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 115,
+          "source_end": 203
+        }
+      }
+    ],
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the ISTERMINAL function return true for terminal token values?",
+          "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+          "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+          "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+        }
+      ],
+      "expression": {
+        "ref": "p1"
+      },
+      "true_answer": "The ISTERMINAL function returns true for terminal token values.",
+      "false_answer": "The ISTERMINAL function does not return true for terminal token values; it may return false or behave differently, but the documentation explicitly states it returns True for these values.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "local_predicate_batches": [
+      {
+        "backend": "local Unsloth MLX",
+        "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+        "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+        "max_tokens": 4096,
+        "worker_wall_seconds": 8.527,
+        "inference_count": 2,
+        "usage_status": "local resource cost unobserved",
+        "worker_environment": {
+          "python": "3.12.16",
+          "packages": {
+            "unsloth": "2026.11.2",
+            "mlx": "0.32.4",
+            "transformers": "5.17.0",
+            "huggingface-hub": "1.33.0"
+          }
+        }
+      }
+    ],
+    "candidate_result": {
+      "status": "decided",
+      "answer": "The ISTERMINAL function returns true for terminal token values.",
+      "reason": "Composed from predicate results"
+    },
+    "answer_check_evidence": [
+      {
+        "start": 1022,
+        "end": 1096,
+        "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+        "score": 16.28483,
+        "matched_terms": [
+          "function",
+          "isterminal",
+          "terminal",
+          "token",
+          "true",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1022,
+          "source_end": 1096
+        }
+      },
+      {
+        "start": 1099,
+        "end": 1180,
+        "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+        "score": 12.886935,
+        "matched_terms": [
+          "function",
+          "terminal",
+          "token",
+          "true",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1099,
+          "source_end": 1180
+        }
+      },
+      {
+        "start": 1022,
+        "end": 1049,
+        "text": ".. function:: ISTERMINAL(x)",
+        "score": 5.948493,
+        "matched_terms": [
+          "function",
+          "isterminal"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1022,
+          "source_end": 1049
+        }
+      },
+      {
+        "start": 318,
+        "end": 664,
+        "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+        "score": 5.591818,
+        "matched_terms": [
+          "terminal",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 318,
+          "source_end": 664
+        }
+      },
+      {
+        "start": 1183,
+        "end": 1275,
+        "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+        "score": 5.437667,
+        "matched_terms": [
+          "function",
+          "true"
+        ],
+        "source_ref": {
+          "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+          "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+          "source_title": "Python 3.12.10 token documentation",
+          "observed_at": "",
+          "source_start": 1183,
+          "source_end": 1275
+        }
+      }
+    ],
+    "answer_check": {
+      "choice": "true",
+      "probabilities": {
+        "true": 0.932,
+        "false": 0.068
+      },
+      "interpretation": "User-selected exploratory support threshold applied; not calibrated or independently validated. False and low scores remain unknown.",
+      "backend": "local Unsloth MLX",
+      "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+      "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+      "input_tokens": 336,
+      "max_tokens": 4096,
+      "elapsed_seconds": 0.597,
+      "worker_wall_seconds": 8.366,
+      "usage_status": "local resource cost unobserved",
+      "worker_environment": {
+        "python": "3.12.16",
+        "packages": {
+          "unsloth": "2026.11.2",
+          "mlx": "0.32.4",
+          "transformers": "5.17.0",
+          "huggingface-hub": "1.33.0"
+        }
+      },
+      "support_threshold": 0.8,
+      "verdict": "supported"
+    },
+    "result": {
+      "status": "decided",
+      "answer": "The ISTERMINAL function returns true for terminal token values.",
+      "reason": "Composed from predicate results"
+    },
+    "elapsed_seconds": 16.901
+  },
+  "modified_source": {
+    "id": "fda7990e646c49aca6fb8ab246655832",
+    "title": "Synthetic removal of function documentation",
+    "text": ":mod:`!token` --- Constants used with Python parse trees\n========================================================\n\n.. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.\n\n.. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>\n\n**Source code:** :source:`Lib/token.py`\n\n--------------\n\nThis module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.\n\nThe module also provides a mapping from numeric codes to names and some\nfunctions.  The functions mirror definitions in the Python C header files.\n\n\n.. data:: tok_name\n\n   Dictionary mapping the numeric values of the constants defined in this module\n   back to name strings, allowing more human-readable representation of parse trees\n   to be generated.\n\n\n\n\n\n.. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.\n\n\n.. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.\n\n\nThe token constants are:\n\n.. include:: token-list.inc\n\nThe following token type values aren't used by the C tokenizer but are needed for\nthe :mod:`tokenize` module.\n\n.. data:: COMMENT\n   :noindex:\n\n   Token value used to indicate a comment.\n\n\n.. data:: NL\n   :noindex:\n\n   Token value used to indicate a non-terminating newline.  The\n   :data:`NEWLINE` token indicates the end of a logical line of Python code;\n   ``NL`` tokens are generated when a logical line of code is continued over\n   multiple physical lines.\n\n\n.. data:: ENCODING\n\n   Token value that indicates the encoding used to decode the source bytes\n   into text. The first token returned by :func:`tokenize.tokenize` will\n   always be an ``ENCODING`` token.\n\n\n.. data:: TYPE_COMMENT\n   :noindex:\n\n   Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.\n\n\n.. data:: EXACT_TOKEN_TYPES\n\n   A dictionary mapping the string representation of a token to its numeric code.\n\n   .. versionadded:: 3.8\n\n\n.. versionchanged:: 3.5\n   Added :data:`AWAIT` and :data:`ASYNC` tokens.\n\n.. versionchanged:: 3.7\n   Added :data:`COMMENT`, :data:`NL` and :data:`ENCODING` tokens.\n\n.. versionchanged:: 3.7\n   Removed :data:`AWAIT` and :data:`ASYNC` tokens. \"async\" and \"await\" are\n   now tokenized as :data:`NAME` tokens.\n\n.. versionchanged:: 3.8\n   Added :data:`TYPE_COMMENT`, :data:`TYPE_IGNORE`, :data:`COLONEQUAL`.\n   Added :data:`AWAIT` and :data:`ASYNC` tokens back (they're needed\n   to support parsing older Python versions for :func:`ast.parse` with\n   ``feature_version`` set to 6 or lower).\n",
+    "scope": "",
+    "effective_from": "",
+    "effective_to": "",
+    "observed_at": "2026-11-06",
+    "origin": "controlled intervention",
+    "sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+    "created_at": "2026-11-06T20:08:44.243657+00:00",
+    "parent_snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+    "intervention_reason": "Remove the decisive function documentation for a development intervention"
+  },
+  "intervention": {
+    "id": "26c8ee4492fe4f55ac751f64a61726e0",
+    "schema_version": 1,
+    "created_at": "2026-11-06T20:08:44.244222+00:00",
+    "mode": "intervention",
+    "request": {
+      "question": "Which function returns true for terminal token values?",
+      "scope": "",
+      "as_of": "",
+      "snapshot_id": "fda7990e646c49aca6fb8ab246655832"
+    },
+    "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+    "source_metadata_sha256": "ddd180d843fb7426bac54125837a709303cdf0f7d3ccfb2880f25ebc4ae7b9c4",
+    "calls": [],
+    "trace": [
+      {
+        "predicate": {
+          "id": "p1",
+          "question": "Does the ISTERMINAL function return true for terminal token values?",
+          "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+          "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+          "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+        },
+        "outcome": "unknown",
+        "quote": "",
+        "evidence_spans": [
+          {
+            "start": 1025,
+            "end": 1106,
+            "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+            "score": 16.948897,
+            "matched_terms": [
+              "function",
+              "return",
+              "terminal",
+              "token",
+              "true",
+              "values"
+            ],
+            "source_ref": {
+              "source_id": "fda7990e646c49aca6fb8ab246655832",
+              "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+              "source_title": "Synthetic removal of function documentation",
+              "observed_at": "2026-11-06",
+              "source_start": 1025,
+              "source_end": 1106
+            }
+          },
+          {
+            "start": 1109,
+            "end": 1201,
+            "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+            "score": 9.207617,
+            "matched_terms": [
+              "function",
+              "return",
+              "true"
+            ],
+            "source_ref": {
+              "source_id": "fda7990e646c49aca6fb8ab246655832",
+              "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+              "source_title": "Synthetic removal of function documentation",
+              "observed_at": "2026-11-06",
+              "source_start": 1109,
+              "source_end": 1201
+            }
+          },
+          {
+            "start": 318,
+            "end": 664,
+            "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+            "score": 5.872242,
+            "matched_terms": [
+              "terminal",
+              "values"
+            ],
+            "source_ref": {
+              "source_id": "fda7990e646c49aca6fb8ab246655832",
+              "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+              "source_title": "Synthetic removal of function documentation",
+              "observed_at": "2026-11-06",
+              "source_start": 318,
+              "source_end": 664
+            }
+          }
+        ],
+        "retrieval_rounds": [
+          {
+            "query": "Does the ISTERMINAL function return true for terminal token values?",
+            "hits": 3
+          }
+        ],
+        "followup_status": "disabled",
+        "positive_support": {
+          "choice": "true",
+          "probabilities": {
+            "true": 0.6106,
+            "false": 0.3894
+          },
+          "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+          "input_tokens": 302,
+          "elapsed_seconds": 0.522
+        },
+        "negative_support": {
+          "choice": "true",
+          "probabilities": {
+            "true": 0.5384,
+            "false": 0.4616
+          },
+          "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+          "input_tokens": 304,
+          "elapsed_seconds": 0.436
+        },
+        "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+      }
+    ],
+    "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+    "requested_model": "qwen/qwen3.5-35b-a3b",
+    "evidence_mode": "lexical",
+    "answer_check_backend": "local",
+    "model_responses": [],
+    "extra_search": false,
+    "execution_policy": "batch_no_extra_search",
+    "local_support_threshold": 0.8,
+    "intervention": {
+      "kind": "modified",
+      "original_source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+      "new_source_id": "fda7990e646c49aca6fb8ab246655832",
+      "original_snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+      "intervention_snapshot_id": "fda7990e646c49aca6fb8ab246655832",
+      "reason": "Remove the decisive function documentation for a development intervention",
+      "interpretation": "Controlled experiment; not a reviewed program revision or evidence of applicability."
+    },
+    "program_id": "a5291a56eb27460584d90a49f7db3527",
+    "program_revision": 2,
+    "planning_evidence": [
+      {
+        "start": 1025,
+        "end": 1106,
+        "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+        "score": 13.613522,
+        "matched_terms": [
+          "function",
+          "terminal",
+          "token",
+          "true",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "fda7990e646c49aca6fb8ab246655832",
+          "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+          "source_title": "Synthetic removal of function documentation",
+          "observed_at": "2026-11-06",
+          "source_start": 1025,
+          "source_end": 1106
+        }
+      },
+      {
+        "start": 318,
+        "end": 664,
+        "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+        "score": 5.872242,
+        "matched_terms": [
+          "terminal",
+          "values"
+        ],
+        "source_ref": {
+          "source_id": "fda7990e646c49aca6fb8ab246655832",
+          "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+          "source_title": "Synthetic removal of function documentation",
+          "observed_at": "2026-11-06",
+          "source_start": 318,
+          "source_end": 664
+        }
+      },
+      {
+        "start": 1109,
+        "end": 1201,
+        "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+        "score": 5.872242,
+        "matched_terms": [
+          "function",
+          "true"
+        ],
+        "source_ref": {
+          "source_id": "fda7990e646c49aca6fb8ab246655832",
+          "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+          "source_title": "Synthetic removal of function documentation",
+          "observed_at": "2026-11-06",
+          "source_start": 1109,
+          "source_end": 1201
+        }
+      },
+      {
+        "start": 115,
+        "end": 203,
+        "text": ".. module:: token\n   :synopsis: Constants representing terminal nodes of the parse tree.",
+        "score": 4.916731,
+        "matched_terms": [
+          "terminal",
+          "token"
+        ],
+        "source_ref": {
+          "source_id": "fda7990e646c49aca6fb8ab246655832",
+          "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+          "source_title": "Synthetic removal of function documentation",
+          "observed_at": "2026-11-06",
+          "source_start": 115,
+          "source_end": 203
+        }
+      },
+      {
+        "start": 1968,
+        "end": 2126,
+        "text": "Token value indicating that a type comment was recognized.  Such\n   tokens are only produced when :func:`ast.parse` is invoked with\n   ``type_comments=True``.",
+        "score": 4.916731,
+        "matched_terms": [
+          "token",
+          "true"
+        ],
+        "source_ref": {
+          "source_id": "fda7990e646c49aca6fb8ab246655832",
+          "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+          "source_title": "Synthetic removal of function documentation",
+          "observed_at": "2026-11-06",
+          "source_start": 1968,
+          "source_end": 2126
+        }
+      }
+    ],
+    "plan": {
+      "predicates": [
+        {
+          "id": "p1",
+          "question": "Does the ISTERMINAL function return true for terminal token values?",
+          "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+          "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+          "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+        }
+      ],
+      "expression": {
+        "ref": "p1"
+      },
+      "true_answer": "The ISTERMINAL function returns true for terminal token values.",
+      "false_answer": "The ISTERMINAL function does not return true for terminal token values; it may return false or behave differently, but the documentation explicitly states it returns True for these values.",
+      "false_status": "decided",
+      "ambiguity": ""
+    },
+    "local_predicate_batches": [
+      {
+        "backend": "local Unsloth MLX",
+        "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+        "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+        "max_tokens": 4096,
+        "worker_wall_seconds": 8.575,
+        "inference_count": 2,
+        "usage_status": "local resource cost unobserved",
+        "worker_environment": {
+          "python": "3.12.16",
+          "packages": {
+            "unsloth": "2026.11.2",
+            "mlx": "0.32.4",
+            "transformers": "5.17.0",
+            "huggingface-hub": "1.33.0"
+          }
+        }
+      }
+    ],
+    "result": {
+      "status": "deferred",
+      "answer": null,
+      "reason": "Material predicate unresolved"
+    },
+    "elapsed_seconds": 8.577
+  },
+  "report": {
+    "interpretation": "Exact status and answer text comparison only; semantic equivalence and causal correctness require review.",
+    "execution_comparison": {
+      "differences": {},
+      "unknown": [],
+      "interpretation": "Recorded settings only; matching fields do not establish identical model behavior or causal comparability."
+    },
+    "change": {
+      "kind": "modified",
+      "original_source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+      "new_source_id": "fda7990e646c49aca6fb8ab246655832",
+      "original_snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+      "intervention_snapshot_id": "fda7990e646c49aca6fb8ab246655832",
+      "reason": "Remove the decisive function documentation for a development intervention",
+      "interpretation": "Controlled experiment; not a reviewed program revision or evidence of applicability."
+    },
+    "result_changed": true,
+    "original": {
+      "run_id": "d0dac5dae6274fd1b93e294f595c18d9",
+      "snapshot_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+      "result": {
+        "status": "decided",
+        "answer": "The ISTERMINAL function returns true for terminal token values.",
+        "reason": "Composed from predicate results"
+      },
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the ISTERMINAL function return true for terminal token values?",
+            "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+            "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+            "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+          },
+          "outcome": "true",
+          "quote": "",
+          "evidence_spans": [
+            {
+              "start": 1022,
+              "end": 1096,
+              "text": ".. function:: ISTERMINAL(x)\n\n   Return ``True`` for terminal token values.",
+              "score": 19.395044,
+              "matched_terms": [
+                "function",
+                "isterminal",
+                "return",
+                "terminal",
+                "token",
+                "true",
+                "values"
+              ],
+              "source_ref": {
+                "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token documentation",
+                "observed_at": "",
+                "source_start": 1022,
+                "source_end": 1096
+              }
+            },
+            {
+              "start": 1099,
+              "end": 1180,
+              "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+              "score": 15.997148,
+              "matched_terms": [
+                "function",
+                "return",
+                "terminal",
+                "token",
+                "true",
+                "values"
+              ],
+              "source_ref": {
+                "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token documentation",
+                "observed_at": "",
+                "source_start": 1099,
+                "source_end": 1180
+              }
+            },
+            {
+              "start": 1183,
+              "end": 1275,
+              "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+              "score": 8.54788,
+              "matched_terms": [
+                "function",
+                "return",
+                "true"
+              ],
+              "source_ref": {
+                "source_id": "b3affb2413e644d4b65c65e5fcd41d9f",
+                "source_sha256": "43b8618f7403e55181ed756c13688f00b5ab890959d49a76bc50ea5a734841c0",
+                "source_title": "Python 3.12.10 token documentation",
+                "observed_at": "",
+                "source_start": 1183,
+                "source_end": 1275
+              }
+            }
+          ],
+          "retrieval_rounds": [
+            {
+              "query": "Does the ISTERMINAL function return true for terminal token values?",
+              "hits": 3
+            }
+          ],
+          "followup_status": "not_needed",
+          "positive_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.9353,
+              "false": 0.0647
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 254,
+            "elapsed_seconds": 0.443
+          },
+          "negative_support": {
+            "choice": "false",
+            "probabilities": {
+              "true": 0.1391,
+              "false": 0.8609
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 256,
+            "elapsed_seconds": 0.345
+          },
+          "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+        }
+      ]
+    },
+    "intervention": {
+      "run_id": "26c8ee4492fe4f55ac751f64a61726e0",
+      "snapshot_id": "fda7990e646c49aca6fb8ab246655832",
+      "result": {
+        "status": "deferred",
+        "answer": null,
+        "reason": "Material predicate unresolved"
+      },
+      "trace": [
+        {
+          "predicate": {
+            "id": "p1",
+            "question": "Does the ISTERMINAL function return true for terminal token values?",
+            "evidence_requirement": "Documentation stating the return value of the ISTERMINAL function when given a terminal token value.",
+            "positive_claim": "The ISTERMINAL function returns true for terminal token values.",
+            "negative_claim": "The ISTERMINAL function does not return true for terminal token values."
+          },
+          "outcome": "unknown",
+          "quote": "",
+          "evidence_spans": [
+            {
+              "start": 1025,
+              "end": 1106,
+              "text": ".. function:: ISNONTERMINAL(x)\n\n   Return ``True`` for non-terminal token values.",
+              "score": 16.948897,
+              "matched_terms": [
+                "function",
+                "return",
+                "terminal",
+                "token",
+                "true",
+                "values"
+              ],
+              "source_ref": {
+                "source_id": "fda7990e646c49aca6fb8ab246655832",
+                "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+                "source_title": "Synthetic removal of function documentation",
+                "observed_at": "2026-11-06",
+                "source_start": 1025,
+                "source_end": 1106
+              }
+            },
+            {
+              "start": 1109,
+              "end": 1201,
+              "text": ".. function:: ISEOF(x)\n\n   Return ``True`` if *x* is the marker indicating the end of input.",
+              "score": 9.207617,
+              "matched_terms": [
+                "function",
+                "return",
+                "true"
+              ],
+              "source_ref": {
+                "source_id": "fda7990e646c49aca6fb8ab246655832",
+                "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+                "source_title": "Synthetic removal of function documentation",
+                "observed_at": "2026-11-06",
+                "source_start": 1109,
+                "source_end": 1201
+              }
+            },
+            {
+              "start": 318,
+              "end": 664,
+              "text": "This module provides constants which represent the numeric values of leaf nodes\nof the parse tree (terminal tokens).  Refer to the file :file:`Grammar/Tokens`\nin the Python distribution for the definitions of the names in the context of\nthe language grammar.  The specific numeric values which the names map to may\nchange between Python versions.",
+              "score": 5.872242,
+              "matched_terms": [
+                "terminal",
+                "values"
+              ],
+              "source_ref": {
+                "source_id": "fda7990e646c49aca6fb8ab246655832",
+                "source_sha256": "b5c912a1771fd8021ed6d80f7cc80098cfcbf78459687c04f5a0b085efbd6259",
+                "source_title": "Synthetic removal of function documentation",
+                "observed_at": "2026-11-06",
+                "source_start": 318,
+                "source_end": 664
+              }
+            }
+          ],
+          "retrieval_rounds": [
+            {
+              "query": "Does the ISTERMINAL function return true for terminal token values?",
+              "hits": 3
+            }
+          ],
+          "followup_status": "disabled",
+          "positive_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.6106,
+              "false": 0.3894
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 302,
+            "elapsed_seconds": 0.522
+          },
+          "negative_support": {
+            "choice": "true",
+            "probabilities": {
+              "true": 0.5384,
+              "false": 0.4616
+            },
+            "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+            "input_tokens": 304,
+            "elapsed_seconds": 0.436
+          },
+          "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "classification": "Synthetic clean-copy integration smoke; not an accuracy evaluation",
+  "environment": "Python 3.12 virtual environment, copy without .env, data, judge environment, or reference directory",
+  "tests": "120 offline tests passed",
+  "fixture": "passed",
+  "archive_verification": "matched",
+  "live_run_id": "72c72bad0da34162b842c76b06b39166",
+  "question": "Is the blue widget enabled?",
+  "result": {
+    "status": "decided",
+    "answer": "Yes",
+    "reason": "The source text explicitly states that the blue widget is enabled.",
+    "quotes": [
+      "The blue widget is enabled."
+    ],
+    "source_refs": [
+      {
+        "source_id": "04dcf5ebf21f48f09fb265e25009e8a8",
+        "source_sha256": "4c0971d4e67fb8939a67716326c556bcff53d62950ed3889b06d617247b95d1c",
+        "source_title": "Synthetic clean-copy source",
+        "observed_at": "",
+        "source_start": 0,
+        "source_end": 27
+      }
+    ],
+    "quote": "The blue widget is enabled.",
+    "source_ref": {
+      "source_id": "04dcf5ebf21f48f09fb265e25009e8a8",
+      "source_sha256": "4c0971d4e67fb8939a67716326c556bcff53d62950ed3889b06d617247b95d1c",
+      "source_title": "Synthetic clean-copy source",
+      "observed_at": "",
+      "source_start": 0,
+      "source_end": 27
+    }
+  },
+  "calls": [
+    {
+      "model": "qwen/qwen3.5-35b-a3b",
+      "provider": "Venice",
+      "elapsed_seconds": 0.775,
+      "cost_status": "provider reported",
+      "usage": {
+        "prompt_tokens": 138,
+        "completion_tokens": 57,
+        "total_tokens": 195,
+        "cost": 7.77e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 7.77e-05,
+          "upstream_inference_prompt_cost": 2.07e-05,
+          "upstream_inference_completions_cost": 5.7e-05
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    }
+  ]
+}

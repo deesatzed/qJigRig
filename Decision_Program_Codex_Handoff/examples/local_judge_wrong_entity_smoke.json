@@ -1,0 +1,48 @@
+{
+  "kind": "live_synthetic_wrong_entity_development_probe",
+  "source": "Alpha Inc acquired Beta Labs. Gamma Inc did not acquire Beta Labs.",
+  "claims": [
+    "Alpha Inc acquired Beta Labs.",
+    "Gamma Inc acquired Beta Labs.",
+    "Delta Inc acquired Beta Labs."
+  ],
+  "backend": "local Unsloth MLX",
+  "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+  "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+  "inference_count": 3,
+  "worker_wall_seconds": 9.395,
+  "usage_status": "local resource cost unobserved",
+  "results": [
+    {
+      "choice": "true",
+      "probabilities": {
+        "true": 0.9455,
+        "false": 0.0545
+      },
+      "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+      "input_tokens": 185,
+      "elapsed_seconds": 0.403
+    },
+    {
+      "choice": "false",
+      "probabilities": {
+        "true": 0.0439,
+        "false": 0.9561
+      },
+      "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+      "input_tokens": 185,
+      "elapsed_seconds": 0.282
+    },
+    {
+      "choice": "false",
+      "probabilities": {
+        "true": 0.0756,
+        "false": 0.9244
+      },
+      "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+      "input_tokens": 185,
+      "elapsed_seconds": 0.287
+    }
+  ],
+  "interpretation": "Synthetic three-claim probe, uncalibrated and not independently adjudicated; not a general evidence-integrity result."
+}

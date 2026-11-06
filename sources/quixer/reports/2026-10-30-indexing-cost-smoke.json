@@ -1,0 +1,657 @@
+{
+  "manifest": {
+    "created_at": "2026-10-30T14:24:29.598609+00:00",
+    "corpus_revision": "63951212006d49d54b5959fdb70d59338cccd1a71178ef3bb2fa4b15a2f830e2",
+    "tasks": [
+      {
+        "id": "implement-fallback",
+        "query": "missing unstructured headings fallback source anchors",
+        "role": "implementer",
+        "role_version": "1",
+        "split": "unassigned",
+        "labels": null
+      },
+      {
+        "id": "review-evidence",
+        "query": "agent findings supporting evidence links",
+        "role": "reviewer",
+        "role_version": "1",
+        "split": "unassigned",
+        "labels": null
+      }
+    ],
+    "label_provenance": "unreviewed draft; labels absent",
+    "provider_configured": true,
+    "limit": 2,
+    "context_chars": null,
+    "context_tokens": 100,
+    "tokenizer": "cl100k_base",
+    "include_proposed": true,
+    "indexing": {
+      "decision_calls": 2,
+      "unknown_decisions": 0,
+      "reported_cost": 1.029e-05,
+      "input_tokens": 1029,
+      "receipts": [
+        {
+          "id": 1,
+          "provider": "openrouter",
+          "model": "baseten/joey-1-20261029",
+          "outcome": "unclear",
+          "detail": {
+            "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+            "question": "structure usable",
+            "probability": 0.8535028547093136,
+            "usage": {
+              "input_tokens": 840,
+              "output_tokens": 1,
+              "cost": 8.4e-06
+            },
+            "thresholds": null,
+            "reason": null
+          }
+        },
+        {
+          "id": 2,
+          "provider": "openrouter",
+          "model": "baseten/joey-1-20261029",
+          "outcome": "unclear",
+          "detail": {
+            "section_id": "6d3d152070d805a323d775e58125c9d72fc45fcd2b5b6e00cc8dfd1d68e43d94",
+            "topic": "Evidence-linked shared knowledge for agent swarms",
+            "reason": null,
+            "probability": 0.03730507700578734,
+            "usage": {
+              "input_tokens": 189,
+              "output_tokens": 1,
+              "cost": 1.89e-06
+            },
+            "thresholds": null
+          }
+        }
+      ]
+    },
+    "configuration": {
+      "model_slot": 2,
+      "thresholds": null
+    },
+    "artifact_note": "Body text, local paths and request IDs omitted; labels absent and provisional indexes are enabled."
+  },
+  "variants": {
+    "baseline": {
+      "metrics": {
+        "answerable": 0,
+        "unanswerable": 0,
+        "unlabeled": 2,
+        "mean_recall": null,
+        "mean_precision": null,
+        "unsupported_returned": 0,
+        "stale_returned": 0
+      },
+      "queries": {
+        "implement-fallback": {
+          "elapsed_seconds": 0.0006815839442424476,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 546,
+          "returned_body_tokens": 100,
+          "receipts": [],
+          "results": [
+            {
+              "id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Ingestion and indexing",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_token_count": 100,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-evidence": {
+          "elapsed_seconds": 0.00046908302465453744,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 582,
+          "returned_body_tokens": 100,
+          "receipts": [],
+          "results": [
+            {
+              "id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Architecture",
+              "start_line": 9,
+              "end_line": 14,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_token_count": 100,
+              "context_truncated": true
+            }
+          ]
+        }
+      }
+    },
+    "topic": {
+      "metrics": {
+        "answerable": 0,
+        "unanswerable": 0,
+        "unlabeled": 2,
+        "mean_recall": null,
+        "mean_precision": null,
+        "unsupported_returned": 0,
+        "stale_returned": 0
+      },
+      "queries": {
+        "implement-fallback": {
+          "elapsed_seconds": 0.0007224580040201545,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 538,
+          "returned_body_tokens": 100,
+          "receipts": [],
+          "results": [
+            {
+              "id": "e7301718b3cfbc4ccf2e3fc62cd7fc81dbe0115617d25365ee7cd273fcc1a06e",
+              "title": "Extract text and anchors; retain existing ToC or headings when usable.",
+              "start_offset": 27,
+              "end_offset": 494,
+              "method": "extractive-paragraph-v1",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "generated_index",
+              "source_section_id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "index_status": "proposed",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 4,
+              "topic_score": 2,
+              "topics": [
+                "Extract text and anchors; retain existing ToC or headings when usable."
+              ],
+              "role_score": null,
+              "decision": null,
+              "score": 6,
+              "context_token_count": 85,
+              "context_truncated": false
+            },
+            {
+              "id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Ingestion and indexing",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_token_count": 15,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-evidence": {
+          "elapsed_seconds": 0.0006360840052366257,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 587,
+          "returned_body_tokens": 100,
+          "receipts": [],
+          "results": [
+            {
+              "id": "573dcac0d348f8a4cce8b340c369853df3808e90030d8f0f3d8327a22d0e8b71",
+              "title": "An orchestrator or agent requests a task-specific slice using a task, role and budget.",
+              "start_offset": 527,
+              "end_offset": 1001,
+              "method": "extractive-paragraph-v1",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "start_line": 9,
+              "end_line": 14,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "generated_index",
+              "source_section_id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+              "index_status": "proposed",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 4,
+              "topic_score": 1,
+              "topics": [
+                "An orchestrator or agent requests a task-specific slice using a task, role and budget."
+              ],
+              "role_score": null,
+              "decision": null,
+              "score": 5,
+              "context_token_count": 81,
+              "context_truncated": false
+            },
+            {
+              "id": "2c64ddeb0822e465a42b36347ff8b12bb5aac05d23940a41f1e7a423d0ff2932",
+              "title": "Generate candidate topics and links to sections or agent records.",
+              "start_offset": 496,
+              "end_offset": 885,
+              "method": "extractive-paragraph-v1",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "generated_index",
+              "source_section_id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "index_status": "proposed",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 2,
+              "topic_score": 2,
+              "topics": [
+                "Generate candidate topics and links to sections or agent records."
+              ],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_token_count": 19,
+              "context_truncated": true
+            }
+          ]
+        }
+      }
+    },
+    "decision": {
+      "metrics": {
+        "answerable": 0,
+        "unanswerable": 0,
+        "unlabeled": 2,
+        "mean_recall": null,
+        "mean_precision": null,
+        "unsupported_returned": 0,
+        "stale_returned": 0
+      },
+      "queries": {
+        "implement-fallback": {
+          "elapsed_seconds": 0.29773849999764934,
+          "decision_calls": 2,
+          "decision_failures": 0,
+          "reported_cost": 5.33e-06,
+          "returned_body_chars": 546,
+          "returned_body_tokens": 100,
+          "receipts": [
+            {
+              "id": 3,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "e7301718b3cfbc4ccf2e3fc62cd7fc81dbe0115617d25365ee7cd273fcc1a06e",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.3969135215300229,
+                "usage": {
+                  "input_tokens": 232,
+                  "output_tokens": 1,
+                  "cost": 2.32e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 4,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.4666567275241013,
+                "usage": {
+                  "input_tokens": 301,
+                  "output_tokens": 1,
+                  "cost": 3.01e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Ingestion and indexing",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.4666567275241013,
+                "usage": {
+                  "input_tokens": 301,
+                  "output_tokens": 1,
+                  "cost": 3.01e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "fallback_reason": "decision_unclear",
+              "context_token_count": 100,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-evidence": {
+          "elapsed_seconds": 0.27618475002236664,
+          "decision_calls": 2,
+          "decision_failures": 0,
+          "reported_cost": 4.43e-06,
+          "returned_body_chars": 582,
+          "returned_body_tokens": 100,
+          "receipts": [
+            {
+              "id": 5,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "573dcac0d348f8a4cce8b340c369853df3808e90030d8f0f3d8327a22d0e8b71",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.30579265518092075,
+                "usage": {
+                  "input_tokens": 232,
+                  "output_tokens": 1,
+                  "cost": 2.32e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 6,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "2c64ddeb0822e465a42b36347ff8b12bb5aac05d23940a41f1e7a423d0ff2932",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.5164546236288713,
+                "usage": {
+                  "input_tokens": 211,
+                  "output_tokens": 1,
+                  "cost": 2.11e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Architecture",
+              "start_line": 9,
+              "end_line": 14,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "fallback_reason": "decision_unclear",
+              "context_token_count": 100,
+              "context_truncated": true
+            }
+          ]
+        }
+      }
+    },
+    "role": {
+      "metrics": {
+        "answerable": 0,
+        "unanswerable": 0,
+        "unlabeled": 2,
+        "mean_recall": null,
+        "mean_precision": null,
+        "unsupported_returned": 0,
+        "stale_returned": 0
+      },
+      "queries": {
+        "implement-fallback": {
+          "elapsed_seconds": 1.0390724170138128,
+          "decision_calls": 2,
+          "decision_failures": 0,
+          "reported_cost": 5.33e-06,
+          "returned_body_chars": 546,
+          "returned_body_tokens": 100,
+          "receipts": [
+            {
+              "id": 7,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "e7301718b3cfbc4ccf2e3fc62cd7fc81dbe0115617d25365ee7cd273fcc1a06e",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.3969135215300229,
+                "usage": {
+                  "input_tokens": 232,
+                  "output_tokens": 1,
+                  "cost": 2.32e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 8,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.4666567275241013,
+                "usage": {
+                  "input_tokens": 301,
+                  "output_tokens": 1,
+                  "cost": 3.01e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Ingestion and indexing",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.4666567275241013,
+                "usage": {
+                  "input_tokens": 301,
+                  "output_tokens": 1,
+                  "cost": 3.01e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "fallback_reason": "decision_unclear",
+              "context_token_count": 100,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-evidence": {
+          "elapsed_seconds": 0.32405900000594556,
+          "decision_calls": 2,
+          "decision_failures": 0,
+          "reported_cost": 4.43e-06,
+          "returned_body_chars": 582,
+          "returned_body_tokens": 100,
+          "receipts": [
+            {
+              "id": 9,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "573dcac0d348f8a4cce8b340c369853df3808e90030d8f0f3d8327a22d0e8b71",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.30579265518092075,
+                "usage": {
+                  "input_tokens": 232,
+                  "output_tokens": 1,
+                  "cost": 2.32e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 10,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "2c64ddeb0822e465a42b36347ff8b12bb5aac05d23940a41f1e7a423d0ff2932",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.5164546236288713,
+                "usage": {
+                  "input_tokens": 211,
+                  "output_tokens": 1,
+                  "cost": 2.11e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Architecture",
+              "start_line": 9,
+              "end_line": 14,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "page_start": null,
+              "page_end": null,
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "source_warning_pages": [],
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "fallback_reason": "decision_unclear",
+              "context_token_count": 100,
+              "context_truncated": true
+            }
+          ]
+        }
+      }
+    }
+  }
+}

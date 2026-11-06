@@ -1,0 +1,13 @@
+{
+  "kind": "historical_response_replay",
+  "original_run_id": "a6fb59cb2f8d4c9885229854a986bdc1",
+  "network_calls": 0,
+  "reconstruction": "Original answer, provider annotations and usage copied from the saved run; other raw response fields were not retained.",
+  "original_status": "decided",
+  "current_status": "failed",
+  "reported_web_search_requests": 2,
+  "original_reported_cost_usd": 0.0082746235,
+  "replayed_reported_cost_usd": 0.0082746235,
+  "provider_citation_count": 5,
+  "interpretation": "Offline reconstruction of one historical response; no evidence of current provider limit enforcement."
+}

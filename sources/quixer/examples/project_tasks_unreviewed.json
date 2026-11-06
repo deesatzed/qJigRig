@@ -1,0 +1,7 @@
+[
+  {"id":"implement-fallback","query":"missing unstructured headings fallback source anchors", "role":"implementer", "role_version":"1", "split":"unassigned", "labels":null},
+  {"id":"review-evidence","query":"agent findings supporting evidence links", "role":"reviewer", "role_version":"1", "split":"unassigned", "labels":null},
+  {"id":"implement-timeout","query":"decision timeout fallback broader retrieval", "role":"implementer", "role_version":"1", "split":"unassigned", "labels":null},
+  {"id":"review-role","query":"role usefulness ranking relevant evidence", "role":"reviewer", "role_version":"1", "split":"unassigned", "labels":null},
+  {"id":"review-calibration","query":"decision scores calibrated probability accuracy", "role":"reviewer", "role_version":"1", "split":"unassigned", "labels":null}
+]

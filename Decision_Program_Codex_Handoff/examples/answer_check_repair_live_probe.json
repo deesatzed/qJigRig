@@ -1,0 +1,72 @@
+{
+  "kind": "live isolated answer-check repair development probe; not an end-to-end run or independent evaluation",
+  "created_at": "2026-11-06T18:14:38.173168+00:00",
+  "original_run_id": "d86628cd7a58466d8b01c4594c641c96",
+  "source_id": "f236ee9f4fdc480dbf0595d6f9277a7e",
+  "model": "qwen/qwen3.5-35b-a3b",
+  "response": "```json\n{\n  \"verdict\": \"supported\",\n  \"quotes\": [\n    \".. function:: issoftkeyword(s)\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\"\n  ],\n  \"reason\": \"The source explicitly defines the function 'issoftkeyword' in the 'keyword' module and states that it returns True if the input string is a Python soft keyword, which directly supports the proposed answer.\"\n}\n```",
+  "metadata": {
+    "model": "qwen/qwen3.5-35b-a3b",
+    "provider": "Venice",
+    "generation_id": "gen-1793988877-DyuFUhrynKgCNXe7LlOu",
+    "elapsed_seconds": 1.111,
+    "usage": {
+      "prompt_tokens": 774,
+      "completion_tokens": 108,
+      "total_tokens": 882,
+      "cost": 0.0002241,
+      "is_byok": false,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "cost_details": {
+        "upstream_inference_cost": 0.0002241,
+        "upstream_inference_prompt_cost": 0.0001161,
+        "upstream_inference_completions_cost": 0.000108
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "image_tokens": 0,
+        "audio_tokens": 0
+      }
+    },
+    "cost_status": "provider reported",
+    "prompt_sha256": "dad7ca7dc80abe0d24876c53640e4596a7f1b3d2e67d59176fd37b386e5e58b9",
+    "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+    "finish_reason": "stop"
+  },
+  "validation_status": "valid",
+  "validated_check": {
+    "verdict": "supported",
+    "quotes": [
+      ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`."
+    ],
+    "reason": "The source explicitly defines the function 'issoftkeyword' in the 'keyword' module and states that it returns True if the input string is a Python soft keyword, which directly supports the proposed answer.",
+    "source_refs": [
+      {
+        "source_id": "f236ee9f4fdc480dbf0595d6f9277a7e",
+        "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+        "source_title": "Python 3.12.10 keyword module documentation",
+        "observed_at": "2026-11-06",
+        "source_start": 718,
+        "source_end": 824
+      }
+    ]
+  },
+  "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+  "probe_input": {
+    "question": "Which keyword module function tests whether a string is a soft keyword?",
+    "scope": "",
+    "as_of": "",
+    "source": ":mod:`!keyword` --- Testing for Python keywords\n===============================================\n\n.. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.\n\n**Source code:** :source:`Lib/keyword.py`\n\n--------------\n\nThis module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.\n\n\n.. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.\n\n\n.. data:: kwlist\n\n   Sequence containing all the :ref:`keywords <keywords>` defined for the\n   interpreter.  If any keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n\n.. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9\n\n\n.. data:: softkwlist\n\n   Sequence containing all the :ref:`soft keywords <soft-keywords>` defined for the\n   interpreter.  If any soft keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n   .. versionadded:: 3.9\n",
+    "proposed_answer": "The keyword module function issoftkeyword tests whether a string is a soft keyword.",
+    "invalid_response": "```json\n{\n  \"verdict\": \"supported\",\n  \"quotes\": [\n    \".. function:: issoftkeyword\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\"\n  ],\n  \"reason\": \"The source explicitly defines the function 'issoftkeyword' within the 'keyword' module and states that it returns True if the input string is a Python soft keyword, which directly supports the proposed answer.\"\n}\n```",
+    "validation_error": "Citation missing, ambiguous, or crosses a source boundary",
+    "prior_exact_quotes": [
+      ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`."
+    ]
+  }
+}

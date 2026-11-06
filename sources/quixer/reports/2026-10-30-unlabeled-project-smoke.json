@@ -1,0 +1,1883 @@
+{
+  "manifest": {
+    "created_at": "2026-10-30T14:11:00.546826+00:00",
+    "corpus_revision": "d87fe2464c13eefadbcc32896ff9c435c39220fdcf76cafbf7c36502e9697e84",
+    "tasks": [
+      {
+        "id": "implement-fallback",
+        "query": "missing unstructured headings fallback source anchors",
+        "role": "implementer",
+        "role_version": "1",
+        "split": "unassigned",
+        "labels": null
+      },
+      {
+        "id": "review-evidence",
+        "query": "agent findings supporting evidence links",
+        "role": "reviewer",
+        "role_version": "1",
+        "split": "unassigned",
+        "labels": null
+      },
+      {
+        "id": "implement-timeout",
+        "query": "decision timeout fallback broader retrieval",
+        "role": "implementer",
+        "role_version": "1",
+        "split": "unassigned",
+        "labels": null
+      },
+      {
+        "id": "review-role",
+        "query": "role usefulness ranking relevant evidence",
+        "role": "reviewer",
+        "role_version": "1",
+        "split": "unassigned",
+        "labels": null
+      },
+      {
+        "id": "review-calibration",
+        "query": "decision scores calibrated probability accuracy",
+        "role": "reviewer",
+        "role_version": "1",
+        "split": "unassigned",
+        "labels": null
+      }
+    ],
+    "label_provenance": "unreviewed draft; all labels absent",
+    "provider_configured": true,
+    "limit": 3,
+    "context_chars": 1500,
+    "configuration": {
+      "model_slot": 2,
+      "thresholds": null,
+      "topic_links": "proposed; not accepted",
+      "role_annotations": "none"
+    },
+    "artifact_note": "Body text, local paths and request IDs omitted from this copy; raw report remains in local temporary storage. Labels are absent; scores are provisional."
+  },
+  "variants": {
+    "baseline": {
+      "metrics": {
+        "answerable": 0,
+        "unanswerable": 0,
+        "unlabeled": 5,
+        "mean_recall": null,
+        "mean_precision": null,
+        "unsupported_returned": 0,
+        "stale_returned": 0
+      },
+      "queries": {
+        "implement-fallback": {
+          "elapsed_seconds": 0.0005072919884696603,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Ingestion and indexing",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": false
+            },
+            {
+              "id": "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 2: Ingest text with source anchors",
+              "start_line": 25,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-evidence": {
+          "elapsed_seconds": 0.00041029200656339526,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 3: Evidence, topics and role annotations",
+              "start_line": 33,
+              "end_line": 40,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": false
+            },
+            {
+              "id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Architecture",
+              "start_line": 9,
+              "end_line": 14,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "implement-timeout": {
+          "elapsed_seconds": 0.0003837500116787851,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Retrieval and failure handling",
+              "start_line": 27,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 5,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 5,
+              "context_truncated": false
+            },
+            {
+              "id": "e099d87e511a8dc5c48f6983d865dde287d8de64856e49735cf63c19f277b605",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 5: Typed decision boundary and fallback",
+              "start_line": 49,
+              "end_line": 56,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-role": {
+          "elapsed_seconds": 0.00041812501149252057,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 4: Baseline retrieval and role-aware ranking",
+              "start_line": 41,
+              "end_line": 48,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 5,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 5,
+              "context_truncated": false
+            },
+            {
+              "id": "4ef2d1c109f24bcc7e06d6ddd554fb80f522dbcf46f1c72459b887f471d86b87",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Evaluation",
+              "start_line": 37,
+              "end_line": 42,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-calibration": {
+          "elapsed_seconds": 0.0004255000385455787,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Retrieval and failure handling",
+              "start_line": 27,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 3,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 3,
+              "context_truncated": false
+            },
+            {
+              "id": "d05ab5f1490c0cf4501e03bbf748d277f8178db785e0f01d87dd4fd43451731f",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Records and metadata",
+              "start_line": 15,
+              "end_line": 20,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 3,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 3,
+              "context_truncated": true
+            }
+          ]
+        }
+      }
+    },
+    "topic": {
+      "metrics": {
+        "answerable": 0,
+        "unanswerable": 0,
+        "unlabeled": 5,
+        "mean_recall": null,
+        "mean_precision": null,
+        "unsupported_returned": 0,
+        "stale_returned": 0
+      },
+      "queries": {
+        "implement-fallback": {
+          "elapsed_seconds": 0.0003955840365961194,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Ingestion and indexing",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": false
+            },
+            {
+              "id": "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 2: Ingest text with source anchors",
+              "start_line": 25,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-evidence": {
+          "elapsed_seconds": 0.00038187496829777956,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 3: Evidence, topics and role annotations",
+              "start_line": 33,
+              "end_line": 40,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": false
+            },
+            {
+              "id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Architecture",
+              "start_line": 9,
+              "end_line": 14,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "implement-timeout": {
+          "elapsed_seconds": 0.000358333985786885,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Retrieval and failure handling",
+              "start_line": 27,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 5,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 5,
+              "context_truncated": false
+            },
+            {
+              "id": "e099d87e511a8dc5c48f6983d865dde287d8de64856e49735cf63c19f277b605",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 5: Typed decision boundary and fallback",
+              "start_line": 49,
+              "end_line": 56,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-role": {
+          "elapsed_seconds": 0.00034958397736772895,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 4: Baseline retrieval and role-aware ranking",
+              "start_line": 41,
+              "end_line": 48,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 5,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 5,
+              "context_truncated": false
+            },
+            {
+              "id": "4ef2d1c109f24bcc7e06d6ddd554fb80f522dbcf46f1c72459b887f471d86b87",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Evaluation",
+              "start_line": 37,
+              "end_line": 42,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-calibration": {
+          "elapsed_seconds": 0.0003470000228844583,
+          "decision_calls": 0,
+          "decision_failures": 0,
+          "reported_cost": null,
+          "returned_body_chars": 1500,
+          "receipts": [],
+          "results": [
+            {
+              "id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Retrieval and failure handling",
+              "start_line": 27,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 3,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 3,
+              "context_truncated": false
+            },
+            {
+              "id": "d05ab5f1490c0cf4501e03bbf748d277f8178db785e0f01d87dd4fd43451731f",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Records and metadata",
+              "start_line": 15,
+              "end_line": 20,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 3,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": null,
+              "score": 3,
+              "context_truncated": true
+            }
+          ]
+        }
+      }
+    },
+    "decision": {
+      "metrics": {
+        "answerable": 0,
+        "unanswerable": 0,
+        "unlabeled": 5,
+        "mean_recall": null,
+        "mean_precision": null,
+        "unsupported_returned": 0,
+        "stale_returned": 0
+      },
+      "queries": {
+        "implement-fallback": {
+          "elapsed_seconds": 0.5468429579632357,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 9.62e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 1,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.4666567275241013,
+                "usage": {
+                  "input_tokens": 301,
+                  "output_tokens": 1,
+                  "cost": 3.01e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 2,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.23456670570663524,
+                "usage": {
+                  "input_tokens": 329,
+                  "output_tokens": 1,
+                  "cost": 3.29e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 3,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.09386154389869131,
+                "usage": {
+                  "input_tokens": 332,
+                  "output_tokens": 1,
+                  "cost": 3.32e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Ingestion and indexing",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.4666567275241013,
+                "usage": {
+                  "input_tokens": 301,
+                  "output_tokens": 1,
+                  "cost": 3.01e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": false
+            },
+            {
+              "id": "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 2: Ingest text with source anchors",
+              "start_line": 25,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.23456670570663524,
+                "usage": {
+                  "input_tokens": 329,
+                  "output_tokens": 1,
+                  "cost": 3.29e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-evidence": {
+          "elapsed_seconds": 2.123123041994404,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 8.42e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 4,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.4665795868715196,
+                "usage": {
+                  "input_tokens": 322,
+                  "output_tokens": 1,
+                  "cost": 3.22e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 5,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.1786307619439266,
+                "usage": {
+                  "input_tokens": 309,
+                  "output_tokens": 1,
+                  "cost": 3.09e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 6,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "25784ee00da8b938610f3a4cdf805f6643995c180b67e885dfc3de5b8c52550c",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.10409213222926438,
+                "usage": {
+                  "input_tokens": 211,
+                  "output_tokens": 1,
+                  "cost": 2.11e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 3: Evidence, topics and role annotations",
+              "start_line": 33,
+              "end_line": 40,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.4665795868715196,
+                "usage": {
+                  "input_tokens": 322,
+                  "output_tokens": 1,
+                  "cost": 3.22e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": false
+            },
+            {
+              "id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Architecture",
+              "start_line": 9,
+              "end_line": 14,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.1786307619439266,
+                "usage": {
+                  "input_tokens": 309,
+                  "output_tokens": 1,
+                  "cost": 3.09e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "implement-timeout": {
+          "elapsed_seconds": 0.4477575419587083,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 9.87e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 7,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+                "query": "decision timeout fallback broader retrieval",
+                "reason": null,
+                "probability": 0.6739468637782682,
+                "usage": {
+                  "input_tokens": 330,
+                  "output_tokens": 1,
+                  "cost": 3.3e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 8,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "e099d87e511a8dc5c48f6983d865dde287d8de64856e49735cf63c19f277b605",
+                "query": "decision timeout fallback broader retrieval",
+                "reason": null,
+                "probability": 0.5127432460014926,
+                "usage": {
+                  "input_tokens": 326,
+                  "output_tokens": 1,
+                  "cost": 3.26e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 9,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "46625a4005fd14812cd05727a43320c31d0499b48f64b03ccb7eaa16b0c87451",
+                "query": "decision timeout fallback broader retrieval",
+                "reason": null,
+                "probability": 0.08523290250313498,
+                "usage": {
+                  "input_tokens": 331,
+                  "output_tokens": 1,
+                  "cost": 3.31e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Retrieval and failure handling",
+              "start_line": 27,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 5,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.6739468637782682,
+                "usage": {
+                  "input_tokens": 330,
+                  "output_tokens": 1,
+                  "cost": 3.3e-06
+                },
+                "thresholds": null
+              },
+              "score": 5,
+              "context_truncated": false
+            },
+            {
+              "id": "e099d87e511a8dc5c48f6983d865dde287d8de64856e49735cf63c19f277b605",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 5: Typed decision boundary and fallback",
+              "start_line": 49,
+              "end_line": 56,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.5127432460014926,
+                "usage": {
+                  "input_tokens": 326,
+                  "output_tokens": 1,
+                  "cost": 3.26e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-role": {
+          "elapsed_seconds": 0.48859283403726295,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 9.5e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 10,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13",
+                "query": "role usefulness ranking relevant evidence",
+                "reason": null,
+                "probability": 0.5105430649182771,
+                "usage": {
+                  "input_tokens": 331,
+                  "output_tokens": 1,
+                  "cost": 3.31e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 11,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "4ef2d1c109f24bcc7e06d6ddd554fb80f522dbcf46f1c72459b887f471d86b87",
+                "query": "role usefulness ranking relevant evidence",
+                "reason": null,
+                "probability": 0.26255040746243685,
+                "usage": {
+                  "input_tokens": 310,
+                  "output_tokens": 1,
+                  "cost": 3.1e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 12,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+                "query": "role usefulness ranking relevant evidence",
+                "reason": null,
+                "probability": 0.34961031657596997,
+                "usage": {
+                  "input_tokens": 309,
+                  "output_tokens": 1,
+                  "cost": 3.09e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 4: Baseline retrieval and role-aware ranking",
+              "start_line": 41,
+              "end_line": 48,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 5,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.5105430649182771,
+                "usage": {
+                  "input_tokens": 331,
+                  "output_tokens": 1,
+                  "cost": 3.31e-06
+                },
+                "thresholds": null
+              },
+              "score": 5,
+              "context_truncated": false
+            },
+            {
+              "id": "4ef2d1c109f24bcc7e06d6ddd554fb80f522dbcf46f1c72459b887f471d86b87",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Evaluation",
+              "start_line": 37,
+              "end_line": 42,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.26255040746243685,
+                "usage": {
+                  "input_tokens": 310,
+                  "output_tokens": 1,
+                  "cost": 3.1e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-calibration": {
+          "elapsed_seconds": 0.4832997080520727,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 9.66e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 13,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+                "query": "decision scores calibrated probability accuracy",
+                "reason": null,
+                "probability": 0.21763456896999267,
+                "usage": {
+                  "input_tokens": 330,
+                  "output_tokens": 1,
+                  "cost": 3.3e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 14,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "d05ab5f1490c0cf4501e03bbf748d277f8178db785e0f01d87dd4fd43451731f",
+                "query": "decision scores calibrated probability accuracy",
+                "reason": null,
+                "probability": 0.14933688922319538,
+                "usage": {
+                  "input_tokens": 326,
+                  "output_tokens": 1,
+                  "cost": 3.26e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 15,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "4ef2d1c109f24bcc7e06d6ddd554fb80f522dbcf46f1c72459b887f471d86b87",
+                "query": "decision scores calibrated probability accuracy",
+                "reason": null,
+                "probability": 0.11905832929012754,
+                "usage": {
+                  "input_tokens": 310,
+                  "output_tokens": 1,
+                  "cost": 3.1e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Retrieval and failure handling",
+              "start_line": 27,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 3,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.21763456896999267,
+                "usage": {
+                  "input_tokens": 330,
+                  "output_tokens": 1,
+                  "cost": 3.3e-06
+                },
+                "thresholds": null
+              },
+              "score": 3,
+              "context_truncated": false
+            },
+            {
+              "id": "d05ab5f1490c0cf4501e03bbf748d277f8178db785e0f01d87dd4fd43451731f",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Records and metadata",
+              "start_line": 15,
+              "end_line": 20,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 3,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.14933688922319538,
+                "usage": {
+                  "input_tokens": 326,
+                  "output_tokens": 1,
+                  "cost": 3.26e-06
+                },
+                "thresholds": null
+              },
+              "score": 3,
+              "context_truncated": true
+            }
+          ]
+        }
+      }
+    },
+    "role": {
+      "metrics": {
+        "answerable": 0,
+        "unanswerable": 0,
+        "unlabeled": 5,
+        "mean_recall": null,
+        "mean_precision": null,
+        "unsupported_returned": 0,
+        "stale_returned": 0
+      },
+      "queries": {
+        "implement-fallback": {
+          "elapsed_seconds": 0.4194847500184551,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 9.62e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 16,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.4666567275241013,
+                "usage": {
+                  "input_tokens": 301,
+                  "output_tokens": 1,
+                  "cost": 3.01e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 17,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.23456670570663524,
+                "usage": {
+                  "input_tokens": 329,
+                  "output_tokens": 1,
+                  "cost": 3.29e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 18,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+                "query": "missing unstructured headings fallback source anchors",
+                "reason": null,
+                "probability": 0.09386154389869131,
+                "usage": {
+                  "input_tokens": 332,
+                  "output_tokens": 1,
+                  "cost": 3.32e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Ingestion and indexing",
+              "start_line": 21,
+              "end_line": 26,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.4666567275241013,
+                "usage": {
+                  "input_tokens": 301,
+                  "output_tokens": 1,
+                  "cost": 3.01e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": false
+            },
+            {
+              "id": "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 2: Ingest text with source anchors",
+              "start_line": 25,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.23456670570663524,
+                "usage": {
+                  "input_tokens": 329,
+                  "output_tokens": 1,
+                  "cost": 3.29e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-evidence": {
+          "elapsed_seconds": 0.4440794999827631,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 8.42e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 19,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.4665795868715196,
+                "usage": {
+                  "input_tokens": 322,
+                  "output_tokens": 1,
+                  "cost": 3.22e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 20,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.1786307619439266,
+                "usage": {
+                  "input_tokens": 309,
+                  "output_tokens": 1,
+                  "cost": 3.09e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 21,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "25784ee00da8b938610f3a4cdf805f6643995c180b67e885dfc3de5b8c52550c",
+                "query": "agent findings supporting evidence links",
+                "reason": null,
+                "probability": 0.10409213222926438,
+                "usage": {
+                  "input_tokens": 211,
+                  "output_tokens": 1,
+                  "cost": 2.11e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 3: Evidence, topics and role annotations",
+              "start_line": 33,
+              "end_line": 40,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.4665795868715196,
+                "usage": {
+                  "input_tokens": 322,
+                  "output_tokens": 1,
+                  "cost": 3.22e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": false
+            },
+            {
+              "id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Architecture",
+              "start_line": 9,
+              "end_line": 14,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.1786307619439266,
+                "usage": {
+                  "input_tokens": 309,
+                  "output_tokens": 1,
+                  "cost": 3.09e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "implement-timeout": {
+          "elapsed_seconds": 0.4115519169718027,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 9.87e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 22,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+                "query": "decision timeout fallback broader retrieval",
+                "reason": null,
+                "probability": 0.6739468637782682,
+                "usage": {
+                  "input_tokens": 330,
+                  "output_tokens": 1,
+                  "cost": 3.3e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 23,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "e099d87e511a8dc5c48f6983d865dde287d8de64856e49735cf63c19f277b605",
+                "query": "decision timeout fallback broader retrieval",
+                "reason": null,
+                "probability": 0.5127432460014926,
+                "usage": {
+                  "input_tokens": 326,
+                  "output_tokens": 1,
+                  "cost": 3.26e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 24,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "46625a4005fd14812cd05727a43320c31d0499b48f64b03ccb7eaa16b0c87451",
+                "query": "decision timeout fallback broader retrieval",
+                "reason": null,
+                "probability": 0.08523290250313498,
+                "usage": {
+                  "input_tokens": 331,
+                  "output_tokens": 1,
+                  "cost": 3.31e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Retrieval and failure handling",
+              "start_line": 27,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 5,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.6739468637782682,
+                "usage": {
+                  "input_tokens": 330,
+                  "output_tokens": 1,
+                  "cost": 3.3e-06
+                },
+                "thresholds": null
+              },
+              "score": 5,
+              "context_truncated": false
+            },
+            {
+              "id": "e099d87e511a8dc5c48f6983d865dde287d8de64856e49735cf63c19f277b605",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 5: Typed decision boundary and fallback",
+              "start_line": 49,
+              "end_line": 56,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.5127432460014926,
+                "usage": {
+                  "input_tokens": 326,
+                  "output_tokens": 1,
+                  "cost": 3.26e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-role": {
+          "elapsed_seconds": 0.43581104098120704,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 9.5e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 25,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13",
+                "query": "role usefulness ranking relevant evidence",
+                "reason": null,
+                "probability": 0.5105430649182771,
+                "usage": {
+                  "input_tokens": 331,
+                  "output_tokens": 1,
+                  "cost": 3.31e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 26,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "4ef2d1c109f24bcc7e06d6ddd554fb80f522dbcf46f1c72459b887f471d86b87",
+                "query": "role usefulness ranking relevant evidence",
+                "reason": null,
+                "probability": 0.26255040746243685,
+                "usage": {
+                  "input_tokens": 310,
+                  "output_tokens": 1,
+                  "cost": 3.1e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 27,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "faa687f7d79251b66c5859bef79670b3f4cdd6edddf7a23629cf507f6451d3f6",
+                "query": "role usefulness ranking relevant evidence",
+                "reason": null,
+                "probability": 0.34961031657596997,
+                "usage": {
+                  "input_tokens": 309,
+                  "output_tokens": 1,
+                  "cost": 3.09e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13",
+              "source_id": "de4be98867b52aed085dfc99c751149e62f1ffcd6f1d6a2783d8b2afea65b878",
+              "title": "Task 4: Baseline retrieval and role-aware ranking",
+              "start_line": 41,
+              "end_line": 48,
+              "generated": 0,
+              "revision": "c162d8eb085afdb557e02d94fe6090a0a6fa52b85cf0792683f440f66d8e8c73",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 5,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.5105430649182771,
+                "usage": {
+                  "input_tokens": 331,
+                  "output_tokens": 1,
+                  "cost": 3.31e-06
+                },
+                "thresholds": null
+              },
+              "score": 5,
+              "context_truncated": false
+            },
+            {
+              "id": "4ef2d1c109f24bcc7e06d6ddd554fb80f522dbcf46f1c72459b887f471d86b87",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Evaluation",
+              "start_line": 37,
+              "end_line": 42,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 4,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.26255040746243685,
+                "usage": {
+                  "input_tokens": 310,
+                  "output_tokens": 1,
+                  "cost": 3.1e-06
+                },
+                "thresholds": null
+              },
+              "score": 4,
+              "context_truncated": true
+            }
+          ]
+        },
+        "review-calibration": {
+          "elapsed_seconds": 0.4544175829505548,
+          "decision_calls": 3,
+          "decision_failures": 0,
+          "reported_cost": 9.66e-06,
+          "returned_body_chars": 1500,
+          "receipts": [
+            {
+              "id": 28,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+                "query": "decision scores calibrated probability accuracy",
+                "reason": null,
+                "probability": 0.21763456896999267,
+                "usage": {
+                  "input_tokens": 330,
+                  "output_tokens": 1,
+                  "cost": 3.3e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 29,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "d05ab5f1490c0cf4501e03bbf748d277f8178db785e0f01d87dd4fd43451731f",
+                "query": "decision scores calibrated probability accuracy",
+                "reason": null,
+                "probability": 0.14933688922319538,
+                "usage": {
+                  "input_tokens": 326,
+                  "output_tokens": 1,
+                  "cost": 3.26e-06
+                },
+                "thresholds": null
+              }
+            },
+            {
+              "id": 30,
+              "provider": "openrouter",
+              "model": "baseten/joey-1-20261029",
+              "outcome": "unclear",
+              "detail": {
+                "item_id": "4ef2d1c109f24bcc7e06d6ddd554fb80f522dbcf46f1c72459b887f471d86b87",
+                "query": "decision scores calibrated probability accuracy",
+                "reason": null,
+                "probability": 0.11905832929012754,
+                "usage": {
+                  "input_tokens": 310,
+                  "output_tokens": 1,
+                  "cost": 3.1e-06
+                },
+                "thresholds": null
+              }
+            }
+          ],
+          "results": [
+            {
+              "id": "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Retrieval and failure handling",
+              "start_line": 27,
+              "end_line": 32,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 3,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.21763456896999267,
+                "usage": {
+                  "input_tokens": 330,
+                  "output_tokens": 1,
+                  "cost": 3.3e-06
+                },
+                "thresholds": null
+              },
+              "score": 3,
+              "context_truncated": false
+            },
+            {
+              "id": "d05ab5f1490c0cf4501e03bbf748d277f8178db785e0f01d87dd4fd43451731f",
+              "source_id": "404e14b78e143462f7b14a1ff4986e943cbd5bb04d9c3df598a5f07e4243f2c4",
+              "title": "Records and metadata",
+              "start_line": 15,
+              "end_line": 20,
+              "generated": 0,
+              "revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+              "source_status": "current",
+              "record_type": "section",
+              "evidence": [],
+              "unsupported": false,
+              "lexical_score": 3,
+              "topic_score": 0,
+              "topics": [],
+              "role_score": null,
+              "decision": {
+                "outcome": "unclear",
+                "provider": "openrouter",
+                "model": "baseten/joey-1-20261029",
+                "probability": 0.14933688922319538,
+                "usage": {
+                  "input_tokens": 326,
+                  "output_tokens": 1,
+                  "cost": 3.26e-06
+                },
+                "thresholds": null
+              },
+              "score": 3,
+              "context_truncated": true
+            }
+          ]
+        }
+      }
+    }
+  }
+}

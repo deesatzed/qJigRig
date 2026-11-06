@@ -1,0 +1,9 @@
+{
+  "title": "Python 3.12.10 keyword module documentation",
+  "upstream": "https://raw.githubusercontent.com/python/cpython/v3.12.10/Doc/library/keyword.rst",
+  "version": "CPython v3.12.10",
+  "sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+  "retrieved_at": "2026-11-06T14:03:44.734801+00:00",
+  "license": "Python Software Foundation License Version 2",
+  "note": "Public documentation source; frozen by content hash. Questions and labels are maintained separately."
+}

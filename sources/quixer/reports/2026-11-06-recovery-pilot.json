@@ -1,0 +1,190 @@
+{
+  "schema": "quix-recovery-pilot-summary-v1",
+  "date": "2026-11-06",
+  "status": "exploratory AI review, not independently validated",
+  "corpus_revision": "04c2c46636e1fc40f41ffeda6ca72a0179a1ea85e1d025a4aa85b8081be5e209",
+  "tasks": 6,
+  "conditions": {
+    "baseline": {
+      "statuses": {
+        "completed": 6
+      },
+      "review_statuses": {
+        "ai_reviewed": 5,
+        "unknown": 1
+      },
+      "mean_essential_id_recall_against_ai_labels": 0.3126984126984127,
+      "plan_quality": {
+        "partial": 3,
+        "inadequate": 2,
+        "unknown": 1
+      },
+      "source_support": {
+        "partial": 5,
+        "unknown": 1
+      }
+    },
+    "reflex": {
+      "statuses": {
+        "completed": 6
+      },
+      "review_statuses": {
+        "ai_reviewed": 6
+      },
+      "mean_essential_id_recall_against_ai_labels": 0.346031746031746,
+      "plan_quality": {
+        "partial": 5,
+        "inadequate": 1
+      },
+      "source_support": {
+        "partial": 6
+      }
+    },
+    "rerank": {
+      "statuses": {
+        "completed": 6
+      },
+      "review_statuses": {
+        "ai_reviewed": 6
+      },
+      "mean_essential_id_recall_against_ai_labels": 0.40753968253968254,
+      "plan_quality": {
+        "partial": 4,
+        "inadequate": 2
+      },
+      "source_support": {
+        "partial": 6
+      }
+    },
+    "combined": {
+      "statuses": {
+        "completed": 4,
+        "agent_failure": 2
+      },
+      "review_statuses": {
+        "ai_reviewed": 4,
+        "missing_output": 2
+      },
+      "mean_essential_id_recall_against_ai_labels": 0.40753968253968254,
+      "plan_quality": {
+        "partial": 4,
+        "unknown": 2
+      },
+      "source_support": {
+        "partial": 3,
+        "unknown": 2,
+        "supported": 1
+      }
+    }
+  },
+  "retrieval_review_statuses": {
+    "ai_reviewed": 6
+  },
+  "costs": {
+    "planner": {
+      "known_usd": 0.010702681,
+      "unknown_count": 0,
+      "calls": 24
+    },
+    "rerank": {
+      "known_usd": 0.00143975,
+      "unknown_count": 0,
+      "calls": 6
+    },
+    "reflex": {
+      "known_usd": 0.000846384,
+      "unknown_count": 0,
+      "calls": 24
+    },
+    "ai_review": {
+      "known_usd": 0.02830195175,
+      "unknown_count": 0,
+      "calls": 29
+    }
+  },
+  "switch_statuses": {
+    "complete:None": 2,
+    "insufficient_evidence:decision_failed": 4
+  },
+  "rerank_statuses": {
+    "ok": 6
+  },
+  "recorded_artifact_hashes": {
+    "stage_sha256": "verified",
+    "packets_sha256": "verified",
+    "schedule_sha256": "verified"
+  },
+  "reflex_order_reversal_pairs": {
+    "cascade-conflict-impl": [
+      [
+        "o1",
+        "o1"
+      ],
+      [
+        "o4",
+        "o4"
+      ],
+      [
+        "o8",
+        "o8"
+      ]
+    ],
+    "recover-stale-review": [
+      [
+        "o1",
+        "o9"
+      ]
+    ],
+    "recover-missing-impl": [
+      [
+        "o8",
+        "o8"
+      ],
+      [
+        "o1",
+        "o1"
+      ],
+      [
+        "o5",
+        "o5"
+      ],
+      [
+        "o9",
+        "o9"
+      ]
+    ],
+    "recover-unsupported-review": [
+      [
+        "o8",
+        "o8"
+      ],
+      [
+        "o9",
+        "o1"
+      ]
+    ],
+    "recover-role-impl": [
+      [
+        "o1",
+        "o2"
+      ]
+    ],
+    "recover-budget-review": [
+      [
+        "o2",
+        "o7"
+      ]
+    ]
+  },
+  "recovery_observation": "Two packets excluded synthetic-unsupported-finding and supplied alternatives; both resulting proposals completed. Other stale or missing file cases are unit/integration tests, not live corpus mutations.",
+  "limitations": [
+    "Six questions on a previously explored corpus; one repeated earlier task.",
+    "Separate AI reviewer is not independently validated; one plan remains unknown after a retry.",
+    "No production swarm or MindStore use.",
+    "This study requires frozen source files and does not test actual missing or changed files during live calls.",
+    "PDF bytes and page anchors do not verify extracted text; supported agent findings are still unverified claims.",
+    "Order-dependent decisions are observed, but cause and generalization are unknown.",
+    "Recovery changes fallback selection, so prior study scores are not directly comparable.",
+    "Provider costs omit prior indexing and local compute."
+  ]
+}

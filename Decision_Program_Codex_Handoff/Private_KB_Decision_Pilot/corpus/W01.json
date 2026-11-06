@@ -1,0 +1,27 @@
+{
+  "source_id": "W01",
+  "role": "waivers",
+  "fixture": "ALDERLINE-7759F34F9E",
+  "authority": "binding",
+  "coverage_from": "2026-10-01",
+  "coverage_through": "2026-12-31",
+  "coverage_rule": "This is the complete signed waiver register for the stated interval. A present, complete register with no applicable report/route waiver establishes that no waiver applies. A missing register does not. A waiver is route-specific and allows lag up to its listed maximum. It never bypasses a hold, route denial, or review requirement.",
+  "rows": [
+    {
+      "report": "Cedar",
+      "route": "internal",
+      "status": "signed",
+      "maximum_lag_minutes": 80,
+      "from": "2026-11-02",
+      "through": "2026-11-08"
+    },
+    {
+      "report": "Larch",
+      "route": "internal",
+      "status": "signed",
+      "maximum_lag_minutes": 80,
+      "from": "2026-11-01",
+      "through": "2026-11-04"
+    }
+  ]
+}

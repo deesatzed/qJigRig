@@ -1,0 +1,86 @@
+{
+  "classification": "Development diagnostic: initial planner, predicate, and answer-check responses replayed from an earlier live run; repair is a new live OpenRouter call, not independent adjudication.",
+  "original_run_id": "2e2a69f33b6b4c0daf87167a0a497e5e",
+  "question": "Which keyword module function tests whether a string is a soft keyword?",
+  "result": {
+    "status": "deferred",
+    "answer": null,
+    "reason": "Proposed answer was not supported by the separate model check."
+  },
+  "answer_check": {
+    "verdict": "invalid",
+    "reason": "Answer check and repair failed validation"
+  },
+  "model_responses": [
+    {
+      "stage": "planner",
+      "text": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the keyword module in Python 3.12.10 provide a function named issoftkeyword that tests whether a string is a soft keyword?\",\n      \"evidence_requirement\": \"The documentation must explicitly define a function named issoftkeyword within the keyword module that returns True if the input string is a soft keyword.\",\n      \"positive_claim\": \"The keyword module in Python 3.12.10 provides the function issoftkeyword which tests whether a string is a soft keyword.\",\n      \"negative_claim\": \"The keyword module in Python 3.12.10 does not provide a function named issoftkeyword to test whether a string is a soft keyword.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"The keyword module function issoftkeyword tests whether a string is a soft keyword.\",\n  \"false_answer\": \"The keyword module does not contain a function named issoftkeyword for this purpose; the documentation does not support the existence of such a function in Python 3.12.10.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}"
+    },
+    {
+      "stage": "predicate_judge",
+      "text": "{\n  \"outcome\": \"true\",\n  \"quote\": \".. function:: issoftkeyword(s)\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\",\n  \"reason\": \"The provided documentation for the keyword module explicitly defines the function issoftkeyword(s) which returns True if the input string is a soft keyword, confirming the predicate.\"\n}",
+      "predicate_id": "p1"
+    },
+    {
+      "stage": "answer_check",
+      "text": "```json\n{\n  \"verdict\": \"supported\",\n  \"quotes\": [\n    \".. function:: issoftkeyword\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\"\n  ],\n  \"reason\": \"The source explicitly defines the function 'issoftkeyword' in the keyword module and states that it returns True if the string is a Python soft keyword, which directly supports the proposed answer.\"\n}\n```"
+    },
+    {
+      "stage": "answer_check_repair",
+      "text": "```json\n{\n  \"verdict\": \"supported\",\n  \"quotes\": [\n    \".. function:: issoftkeyword\\n\\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\"\n  ],\n  \"reason\": \"The source explicitly defines the function 'issoftkeyword' within the 'keyword' module and states that it returns True if the input string is a Python soft keyword, which directly supports the proposed answer.\"\n}\n```"
+    }
+  ],
+  "calls": [
+    {
+      "status": "historical replay",
+      "replay_of_run": "2e2a69f33b6b4c0daf87167a0a497e5e",
+      "usage": null,
+      "cost_status": "not a new provider call"
+    },
+    {
+      "status": "historical replay",
+      "replay_of_run": "2e2a69f33b6b4c0daf87167a0a497e5e",
+      "usage": null,
+      "cost_status": "not a new provider call"
+    },
+    {
+      "status": "historical replay",
+      "replay_of_run": "2e2a69f33b6b4c0daf87167a0a497e5e",
+      "usage": null,
+      "cost_status": "not a new provider call"
+    },
+    {
+      "model": "qwen/qwen3.5-35b-a3b",
+      "provider": "Venice",
+      "generation_id": "gen-1793983124-KtBjnqKFSEkM5KJedwLP",
+      "elapsed_seconds": 0.998,
+      "usage": {
+        "prompt_tokens": 718,
+        "completion_tokens": 106,
+        "total_tokens": 824,
+        "cost": 0.0002137,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0002137,
+          "upstream_inference_prompt_cost": 0.0001077,
+          "upstream_inference_completions_cost": 0.000106
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "cost_status": "provider reported",
+      "prompt_sha256": "657ab43fd0af50785297ef7a1fe25f18c13d37d2c60c7d43c1fec13bb8022c15",
+      "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+      "finish_reason": "stop"
+    }
+  ]
+}

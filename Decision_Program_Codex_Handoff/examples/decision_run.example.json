@@ -1,0 +1,74 @@
+{
+  "schema_version": "0.1-illustrative",
+  "run_id": "example-run-001",
+  "case_id": "example-case-001",
+  "mode": "offline_fixture",
+  "measurement_status": "illustrative",
+  "request": {
+    "question": "May unit K enter mode A on 2026-10-15 under the supplied procedure?",
+    "scope": "Synthetic procedure governing mode A",
+    "as_of": "2026-10-15",
+    "knowledge_snapshot": "synthetic-snapshot-01"
+  },
+  "plan": {
+    "origin": "curated",
+    "id": "fixture-plan-01",
+    "revision": "1",
+    "predicates": [
+      {
+        "id": "P1",
+        "question": "Does the current procedure authorize mode A for unit K?",
+        "evidence_requirement": "Applicable procedure identifying the unit and mode",
+        "evaluator_kind": "exact"
+      },
+      {
+        "id": "P2",
+        "question": "Does the exception currently prohibit mode A for unit K?",
+        "evidence_requirement": "Exception rule and inspection status valid on the request date",
+        "evaluator_kind": "semantic"
+      }
+    ],
+    "composition": {
+      "and": [{"predicate": "P1"}, {"not": {"predicate": "P2"}}]
+    }
+  },
+  "evidence": [
+    {
+      "id": "E1",
+      "source_id": "synthetic-procedure",
+      "revision": "1",
+      "locator": "section 1",
+      "effective_from": "2026-10-01",
+      "span": "Unit K may enter mode A subject to the inspection exception."
+    },
+    {
+      "id": "E2",
+      "source_id": "synthetic-procedure",
+      "revision": "1",
+      "locator": "section 2",
+      "effective_from": "2026-10-01",
+      "span": "The inspection exception prohibits mode A if the inspection has expired."
+    },
+    {
+      "id": "E3",
+      "source_id": "synthetic-inspection-register",
+      "revision": "2026-10-10",
+      "locator": "unit K record",
+      "effective_from": "2026-10-10",
+      "span": "Unit K inspection completed 2026-10-10 and valid through 2026-12-31."
+    }
+  ],
+  "findings": [
+    {"predicate_id": "P1", "value": "true", "evaluator": "fixture-exact", "evidence_ids": ["E1"]},
+    {"predicate_id": "P2", "value": "false", "evaluator": "fixture-scripted", "evidence_ids": ["E2", "E3"]}
+  ],
+  "decision": {
+    "status": "decided",
+    "answer": "permitted",
+    "decisive_predicate_ids": ["P1", "P2"],
+    "evidence_ids": ["E1", "E2", "E3"],
+    "gaps": [],
+    "stop_reason": "resolved"
+  },
+  "metrics": {"latency_ms": null, "provider_cost": null}
+}

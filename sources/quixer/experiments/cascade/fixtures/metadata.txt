@@ -1,0 +1,4 @@
+Document title: Retry Policy.
+Owner: Platform Team.
+Revision date: 2026-10-01.
+On decision-service timeout, retain the baseline evidence.

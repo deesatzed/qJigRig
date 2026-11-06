@@ -1,0 +1,226 @@
+{
+  "note": "Unlabeled comparison of ranking output; not a relevance or quality benchmark. No model calls. Packet budget includes metadata, excludes chat wrapper.",
+  "corpus_revision": "80dae433de2b770669b73845d18a85a6185ee1e33a830e96757b6fdce7e0c35d",
+  "tasks": [
+    "implement-fallback",
+    "review-evidence",
+    "implement-timeout",
+    "review-role",
+    "review-calibration"
+  ],
+  "variants": {
+    "overlap": {
+      "baseline": {
+        "implement-fallback": {
+          "result_ids": [
+            "4b43f54a85e732d36f8c422a2e72a3426dd09576ac38df0565b3d99f99051799"
+          ],
+          "titles": [
+            "Ingestion and indexing"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-evidence": {
+          "result_ids": [
+            "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182"
+          ],
+          "titles": [
+            "Task 3: Evidence, topics and role annotations"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "implement-timeout": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-role": {
+          "result_ids": [
+            "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13"
+          ],
+          "titles": [
+            "Task 4: Baseline retrieval and role-aware ranking"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-calibration": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        }
+      },
+      "topic": {
+        "implement-fallback": {
+          "result_ids": [
+            "e7301718b3cfbc4ccf2e3fc62cd7fc81dbe0115617d25365ee7cd273fcc1a06e"
+          ],
+          "titles": [
+            "Extract text and anchors; retain existing ToC or headings when usable."
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-evidence": {
+          "result_ids": [
+            "2c64ddeb0822e465a42b36347ff8b12bb5aac05d23940a41f1e7a423d0ff2932"
+          ],
+          "titles": [
+            "Generate candidate topics and links to sections or agent records."
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "implement-timeout": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-role": {
+          "result_ids": [
+            "bd85ad43d1cd891f92446a7571652bb6caa6d71f9a2b9e63ccb9353793f678fb"
+          ],
+          "titles": [
+            "Use real implementation and review tasks with independently identified relevant evidence, including missing ToCs, broad "
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-calibration": {
+          "result_ids": [
+            "a76f272222de57e847ba1f59f7342ede2e86ba264cb2cbe970583e0e1425d708"
+          ],
+          "titles": [
+            "Decision calls are behind a provider-neutral interface."
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        }
+      }
+    },
+    "bm25": {
+      "baseline": {
+        "implement-fallback": {
+          "result_ids": [
+            "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa"
+          ],
+          "titles": [
+            "Task 2: Ingest text with source anchors"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-evidence": {
+          "result_ids": [
+            "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182"
+          ],
+          "titles": [
+            "Task 3: Evidence, topics and role annotations"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "implement-timeout": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-role": {
+          "result_ids": [
+            "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13"
+          ],
+          "titles": [
+            "Task 4: Baseline retrieval and role-aware ranking"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-calibration": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        }
+      },
+      "topic": {
+        "implement-fallback": {
+          "result_ids": [
+            "cfa60287629210be4df01ba933109c0143338edbb2e9e9e8e8506394ff8525aa"
+          ],
+          "titles": [
+            "Task 2: Ingest text with source anchors"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-evidence": {
+          "result_ids": [
+            "7ee583b4a655eca051a87859dd7f06a6a030c41a2568671db7ce0afc75cc8182"
+          ],
+          "titles": [
+            "Task 3: Evidence, topics and role annotations"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "implement-timeout": {
+          "result_ids": [
+            "149b221380bd02dd86a8a3f93af5564fa80978f3c4e5b03aa7bdf4daf7e18ddb"
+          ],
+          "titles": [
+            "Retrieval and failure handling"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-role": {
+          "result_ids": [
+            "a72b5a2d770ed955f4b6e6def56a6eb11f70b837209b684987e78f854a749b13"
+          ],
+          "titles": [
+            "Task 4: Baseline retrieval and role-aware ranking"
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        },
+        "review-calibration": {
+          "result_ids": [
+            "a76f272222de57e847ba1f59f7342ede2e86ba264cb2cbe970583e0e1425d708"
+          ],
+          "titles": [
+            "Decision calls are behind a provider-neutral interface."
+          ],
+          "packet_token_count": 400,
+          "omitted_count": 2
+        }
+      }
+    }
+  },
+  "baseline_top1_changed": 1
+}

@@ -1,0 +1,1 @@
+Synthetic source revision: the retry limit is now two attempts.

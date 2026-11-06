@@ -1,0 +1,14 @@
+# Model Cascade Implementation Plan
+
+**Goal:** Implement and evaluate the user-approved Reflex, Cohere rerank, Hy4 escalation, Clairic extraction and Cohere embedding research steps without enabling live swarm writes.
+
+**Architecture:** Reuse the source-checked isolated catalog and switch transport. Add opt-in OpenRouter model selection and bounded provider-neutral typed adapters. A research cascade preserves original candidates, explicit uncertainty, provenance, source checks, usage and deterministic baseline fallback. Compare fixed tasks and budgets with a separate AI reviewer; record all failures and avoid equating AI judgments with truth. Hy4 receives only bounded source-linked packets and produces an untrusted proposal. Clairic and embeddings remain independent optional tests.
+
+**Tech stack:** Python, SQLite, pytest, TypeScript, Node, OpenRouter APIs and the existing Swift planner. Credentials come only from the existing `.env` loader.
+
+1. Wire a caller-specified Reflex model into the existing switch runner without modifying `.env`; retain configured/resolved model and legacy replay. Test transport environment, model selection, malformed output, timeouts and fallback.
+2. Add a bounded Cohere rerank adapter: validate complete, unique candidate indices, finite scores and usage, preserve original candidate IDs and evidence, and fall back to the unchanged baseline on errors. Test injection, malformed/partial/duplicate results and task role inputs.
+3. Implement a bounded escalation policy: Hy4 only when declared uncertainty, failure or conflict demands it; send exact role purpose, source anchors and uncertainty. Return a proposal, receipts and explicit failure; never write to catalog or dispatch. Test deterministic triggers, no escalation for clear cases, role and evidence fidelity, budget and failures.
+4. Prepare new task manifest and paired baseline, Reflex, rerank and combined conditions on the same isolated corpus/candidates and packet constraints. Record full prompts/tokens and separate per-stage costs; use a separate AI reviewer with correct plan rubric and unknowns. Run fixtures then bounded live pilot using `.env`, report all cases and source checks. Previously seen corpus is not independent held out.
+5. Implement and evaluate optional Clairic extraction (null/guess/offset distinction) and Cohere query/document embeddings (dimensions and finite values). Test provider error and malformed output; compare semantic search using fixed tasks with source revisions and explicit provider provenance.
+6. Run full Python, TypeScript and focused real boundary tests; document outcomes, exact known and unknown costs, remaining calibration/quality gaps, commit and push scoped QUIXER changes. Never modify the live HITMCockpit swarm or MindStore without a separate decision.

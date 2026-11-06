@@ -1,0 +1,39 @@
+{
+  "classification": "Development replay of two prior live model outputs; no new provider calls or independent review.",
+  "original_run_id": "58c024571f624f5fa1e8455c927d6cb4",
+  "result": {
+    "status": "decided",
+    "answer": "issoftkeyword",
+    "reason": "The source text explicitly defines the function issoftkeyword(s) as the one that returns True if the string is a soft keyword.",
+    "quotes": [
+      ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`."
+    ],
+    "source_refs": [
+      {
+        "source_id": "ca0577b88c1248f7b996b9f6eb7e0d83",
+        "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+        "source_title": "Python 3.12.10 keyword module documentation",
+        "observed_at": "2026-11-06",
+        "source_start": 718,
+        "source_end": 824
+      }
+    ],
+    "quote": ".. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+    "source_ref": {
+      "source_id": "ca0577b88c1248f7b996b9f6eb7e0d83",
+      "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+      "source_title": "Python 3.12.10 keyword module documentation",
+      "observed_at": "2026-11-06",
+      "source_start": 718,
+      "source_end": 824
+    }
+  },
+  "citation_adjustment": {
+    "original_quote": ".. function:: issoftkeyword(s)\n\nReturn ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+    "method": "unique whitespace-only source match"
+  },
+  "stages": [
+    "search_query",
+    "direct_answer"
+  ]
+}

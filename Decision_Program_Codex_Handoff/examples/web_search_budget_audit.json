@@ -1,0 +1,25 @@
+{
+  "run_id": "a6fb59cb2f8d4c9885229854a986bdc1",
+  "classification": "budget_exceeded",
+  "note": "The original run was saved before over-budget detection was implemented; its decided status is superseded by this audit. The route is disabled for comparisons.",
+  "requested": {
+    "tool": "openrouter:web_search",
+    "engine": "exa",
+    "max_uses": 1,
+    "max_results": 5,
+    "max_tool_calls": 1,
+    "query_and_tool_trace": "not exposed unless included in provider response",
+    "tool_usage": {
+      "web_search_requests": 2,
+      "tool_calls_requested": 2,
+      "tool_calls_executed": 2
+    }
+  },
+  "observed_tool_usage": {
+    "web_search_requests": 2,
+    "tool_calls_requested": 2,
+    "tool_calls_executed": 2
+  },
+  "provider_reported_cost_usd": 0.0082746235,
+  "reassessment": "Two web searches were reported despite one requested; result must not be counted as an in-budget success."
+}

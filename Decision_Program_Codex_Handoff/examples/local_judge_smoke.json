@@ -1,0 +1,79 @@
+{
+  "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+  "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+  "unsloth": "2026.11.2",
+  "max_seq_length": 4096,
+  "load_in_4bit": false,
+  "load_seconds": 21.174,
+  "probes": [
+    {
+      "probe": "support",
+      "state": "{\"authoritative_context\": \"The ball is red.\", \"assistant_response\": \"The ball is red.\"}",
+      "output": {
+        "decision": {
+          "type": "choice",
+          "choice": "true",
+          "confidence": 0.9312,
+          "probabilities": {
+            "true": 0.9312,
+            "false": 0.0688
+          },
+          "answer": "true"
+        }
+      },
+      "elapsed_seconds": 0.405
+    },
+    {
+      "probe": "unsupported",
+      "state": "{\"authoritative_context\": \"The ball is red.\", \"assistant_response\": \"The ball is heavy.\"}",
+      "output": {
+        "decision": {
+          "type": "choice",
+          "choice": "false",
+          "confidence": 0.9431,
+          "probabilities": {
+            "true": 0.0569,
+            "false": 0.9431
+          },
+          "answer": "false"
+        }
+      },
+      "elapsed_seconds": 0.29
+    },
+    {
+      "probe": "negation",
+      "state": "{\"authoritative_context\": \"The ball is not red.\", \"assistant_response\": \"The ball is red.\"}",
+      "output": {
+        "decision": {
+          "type": "choice",
+          "choice": "false",
+          "confidence": 0.9659,
+          "probabilities": {
+            "true": 0.0341,
+            "false": 0.9659
+          },
+          "answer": "false"
+        }
+      },
+      "elapsed_seconds": 0.297
+    },
+    {
+      "probe": "negation_supported",
+      "state": "{\"authoritative_context\": \"The ball is not red.\", \"assistant_response\": \"The ball is not red.\"}",
+      "output": {
+        "decision": {
+          "type": "choice",
+          "choice": "true",
+          "confidence": 0.9343,
+          "probabilities": {
+            "true": 0.9343,
+            "false": 0.0657
+          },
+          "answer": "true"
+        }
+      },
+      "elapsed_seconds": 0.3
+    }
+  ],
+  "interpretation": "Synthetic adapter probes only; not model quality validation."
+}

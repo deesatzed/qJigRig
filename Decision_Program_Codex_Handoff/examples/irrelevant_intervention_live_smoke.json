@@ -1,0 +1,50 @@
+{
+  "kind": "live_synthetic_irrelevant_intervention",
+  "program_id": "1011f5d5ec114136a1247e85a454dd25",
+  "change": "Added venue door color, which is not referenced by the stated synthetic permit rule.",
+  "baseline": {
+    "id": "da18bacacd1443ad89ea7416bc24525c",
+    "source_sha256": "8b3e7596eb8aa7ac40ba4811305e63bfa4a1c3a8e1393ed4a14947a0cf6b58a6",
+    "status": "decided",
+    "answer": "Yes, the event requires a permit.",
+    "predicate_outcomes": [
+      {
+        "id": "p1",
+        "outcome": "true"
+      },
+      {
+        "id": "p2",
+        "outcome": "false"
+      }
+    ],
+    "calls": 3,
+    "provider_reported_cost_usd": 0.000364325,
+    "requested_model": "qwen/qwen3.5-35b-a3b"
+  },
+  "intervention": {
+    "id": "12113d77db4448e2921fecea00de5ea1",
+    "source_sha256": "b3c29219f37c1eab54eb9310bf325230aad0f2239ce724593aab7f7d610a66d9",
+    "status": "decided",
+    "answer": "Yes, the event requires a permit.",
+    "predicate_outcomes": [
+      {
+        "id": "p1",
+        "outcome": "true"
+      },
+      {
+        "id": "p2",
+        "outcome": "false"
+      }
+    ],
+    "calls": 3,
+    "provider_reported_cost_usd": 0.0003474,
+    "requested_model": "qwen/qwen3.5-35b-a3b"
+  },
+  "recorded_result_changed": false,
+  "execution_comparison": {
+    "differences": {},
+    "unknown": [],
+    "interpretation": "Recorded settings only; matching fields do not establish identical model behavior or causal comparability."
+  },
+  "interpretation": "Developer-reviewed synthetic development probe; same recorded settings do not establish provider determinism, causal effect, or independent accuracy."
+}

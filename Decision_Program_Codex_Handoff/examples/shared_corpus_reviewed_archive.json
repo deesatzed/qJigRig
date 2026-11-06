@@ -1,0 +1,1158 @@
+{
+  "format": "decision-workbench-dataset-v1",
+  "notice": "Contains source text, model responses, and human review details; handle accordingly.",
+  "dataset_run_id": "e05af1a18465494b89e760d2c2e18357",
+  "records": {
+    "datasets": [
+      {
+        "id": "fc1da9c6a9df45848b67cd5b6b15f293",
+        "title": "metadata fingerprint development smoke",
+        "schema_version": 1,
+        "created_at": "2026-11-06T15:21:19.261973+00:00",
+        "sha256": "9e8db1bab2e21f6ed422cdaeebabb73050c70eae9954ea062cb78cf05f47d315",
+        "cases": [
+          {
+            "case_id": "keyword",
+            "question": "What module tests Python keywords?",
+            "snapshot_id": "ecbe060d52e44f428e8016ab42064fa4",
+            "scope": "Python 3.12.10",
+            "as_of": "",
+            "snapshot_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "snapshot_metadata_sha256": "5c8bcfba92096df38099b8777f6984643ec8b4eb298b712f99ae0e5d2a8aad79"
+          }
+        ],
+        "labels": "not included"
+      }
+    ],
+    "dataset_runs": [
+      {
+        "id": "e05af1a18465494b89e760d2c2e18357",
+        "created_at": "2026-11-06T15:22:05.979464+00:00",
+        "dataset_id": "fc1da9c6a9df45848b67cd5b6b15f293",
+        "dataset_sha256": "9e8db1bab2e21f6ed422cdaeebabb73050c70eae9954ea062cb78cf05f47d315",
+        "stage": "shared-corpus",
+        "max_provider_calls": 11,
+        "model_config": {
+          "small_model": "qwen/qwen3.5-35b-a3b",
+          "frontier_model": "tencent/hy4",
+          "prompt_hashes": {
+            "planner": "61c8f60e788290c3963b5a05e797b627dcec73ca18d1cc2667ece9ea6bc994dd",
+            "predicate_judge": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+            "repair": "7625903745c86c3bd8f65e7e560522d02d6c36f5061a6db37f7ddf62ef93e8a2",
+            "answer_check": "d96ba651b7282dd844fb63b44ad22bd7993d7a69062cb9a1e3e35aaa2abe2267",
+            "direct": "3e354cbfc4d36584017fe8d259855b79a0c85711aea9d86aa4efffffdb481b3a",
+            "search": "426399e1c89319c0d7283de28a0263bf76afc5d53f23d1d11c47ba30a1a5adbc"
+          },
+          "web_plugin": "explicitly disabled for bounded calls",
+          "provider_revision": "resolved model and provider are recorded per call when returned"
+        },
+        "max_calls_per_case": 11,
+        "journal_version": 1,
+        "retrieval_policy_version": 1,
+        "targeted": true,
+        "extra_search": false,
+        "answer_check_backend": "local",
+        "local_support_threshold": 0.8,
+        "web_authorized": false,
+        "case_count": 1,
+        "status": "started"
+      }
+    ],
+    "dataset_receipts": [
+      {
+        "id": "5f5605fcf08dace7837de4c0fa37518f",
+        "dataset_run_id": "e05af1a18465494b89e760d2c2e18357",
+        "index": 0,
+        "case_id": "keyword",
+        "comparison_id": "12e3719e5992a55e6546e74dbcbc64dd",
+        "created_at": "2026-11-06T15:22:30.181814+00:00"
+      }
+    ],
+    "dataset_intents": [
+      {
+        "id": "b1373dda4d13560094665efa00007a9e",
+        "dataset_run_id": "e05af1a18465494b89e760d2c2e18357",
+        "index": 0,
+        "case_id": "keyword",
+        "comparison_id": "12e3719e5992a55e6546e74dbcbc64dd",
+        "created_at": "2026-11-06T15:22:05.981102+00:00"
+      }
+    ],
+    "comparisons": [
+      {
+        "id": "12e3719e5992a55e6546e74dbcbc64dd",
+        "schema_version": 2,
+        "created_at": "2026-11-06T15:22:05.981578+00:00",
+        "stage": "shared-corpus",
+        "question": "What module tests Python keywords?",
+        "scope": "Python 3.12.10",
+        "as_of": "",
+        "snapshot_id": "ecbe060d52e44f428e8016ab42064fa4",
+        "snapshot_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+        "snapshot_metadata_sha256": "5c8bcfba92096df38099b8777f6984643ec8b4eb298b712f99ae0e5d2a8aad79",
+        "model_config": {
+          "small_model": "qwen/qwen3.5-35b-a3b",
+          "frontier_model": "tencent/hy4",
+          "prompt_hashes": {
+            "planner": "61c8f60e788290c3963b5a05e797b627dcec73ca18d1cc2667ece9ea6bc994dd",
+            "predicate_judge": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+            "repair": "7625903745c86c3bd8f65e7e560522d02d6c36f5061a6db37f7ddf62ef93e8a2",
+            "answer_check": "d96ba651b7282dd844fb63b44ad22bd7993d7a69062cb9a1e3e35aaa2abe2267",
+            "direct": "3e354cbfc4d36584017fe8d259855b79a0c85711aea9d86aa4efffffdb481b3a",
+            "search": "426399e1c89319c0d7283de28a0263bf76afc5d53f23d1d11c47ba30a1a5adbc"
+          },
+          "web_plugin": "explicitly disabled for bounded calls",
+          "provider_revision": "resolved model and provider are recorded per call when returned"
+        },
+        "historical_as_known": false,
+        "targeted": true,
+        "extra_search": false,
+        "status": "awaiting adjudication",
+        "answer_check_backend": "local",
+        "local_support_threshold": 0.8,
+        "web_authorized": false,
+        "items": [
+          {
+            "review_id": "ee4522a27499402f8e6cfbe51f9bb38a",
+            "arm": "fresh",
+            "run_id": "483c747005754b4eabd8753ad96e28fd"
+          },
+          {
+            "review_id": "bc3ff503c88f401f9b529abdf4b590bd",
+            "arm": "direct",
+            "run_id": "5ddea7eb9ae44720bd90f0b8aec7342e"
+          },
+          {
+            "review_id": "27ac3badb42847529862d7b167f6a024",
+            "arm": "frontier",
+            "run_id": "ce2b0757c7224d358111c488e574c8ee"
+          }
+        ]
+      }
+    ],
+    "snapshots": [
+      {
+        "id": "ecbe060d52e44f428e8016ab42064fa4",
+        "title": "Python 3.12.10 keyword documentation",
+        "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================\n\n.. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.\n\n**Source code:** :source:`Lib/keyword.py`\n\n--------------\n\nThis module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.\n\n\n.. function:: iskeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.\n\n\n.. data:: kwlist\n\n   Sequence containing all the :ref:`keywords <keywords>` defined for the\n   interpreter.  If any keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n\n.. function:: issoftkeyword(s)\n\n   Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.\n\n   .. versionadded:: 3.9\n\n\n.. data:: softkwlist\n\n   Sequence containing all the :ref:`soft keywords <soft-keywords>` defined for the\n   interpreter.  If any soft keywords are defined to only be active when particular\n   :mod:`__future__` statements are in effect, these will be included as well.\n\n   .. versionadded:: 3.9\n",
+        "scope": "Python 3.12.10",
+        "effective_from": "",
+        "effective_to": "",
+        "origin": "https://raw.githubusercontent.com/python/cpython/v3.12.10/Doc/library/keyword.rst",
+        "sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+        "created_at": "2026-11-06T14:03:53.356609+00:00"
+      }
+    ],
+    "runs": [
+      {
+        "id": "483c747005754b4eabd8753ad96e28fd",
+        "schema_version": 1,
+        "created_at": "2026-11-06T15:22:05.981619+00:00",
+        "mode": "fresh",
+        "request": {
+          "question": "What module tests Python keywords?",
+          "scope": "Python 3.12.10",
+          "as_of": "",
+          "snapshot_id": "ecbe060d52e44f428e8016ab42064fa4"
+        },
+        "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+        "source_metadata_sha256": "5c8bcfba92096df38099b8777f6984643ec8b4eb298b712f99ae0e5d2a8aad79",
+        "calls": [
+          {
+            "model": "qwen/qwen3.5-35b-a3b",
+            "provider": "DeepInfra",
+            "generation_id": "gen-1793978526-2KdPwVfCIm2T52IVs4Uk",
+            "elapsed_seconds": 3.448,
+            "usage": {
+              "prompt_tokens": 534,
+              "completion_tokens": 190,
+              "total_tokens": 724,
+              "cost": 0.00026476,
+              "is_byok": false,
+              "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "cache_write_tokens": 0,
+                "audio_tokens": 0,
+                "video_tokens": 0
+              },
+              "cost_details": {
+                "upstream_inference_cost": 0.00026476,
+                "upstream_inference_prompt_cost": 7.476e-05,
+                "upstream_inference_completions_cost": 0.00019
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0,
+                "image_tokens": 0,
+                "audio_tokens": 0
+              }
+            },
+            "cost_status": "provider reported",
+            "prompt_sha256": "61c8f60e788290c3963b5a05e797b627dcec73ca18d1cc2667ece9ea6bc994dd",
+            "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+            "finish_reason": "stop"
+          }
+        ],
+        "trace": [
+          {
+            "predicate": {
+              "id": "p1",
+              "question": "Does the :mod:`keyword` module test Python keywords?",
+              "evidence_requirement": "Documentation stating the module's purpose is to test if a string is a keyword",
+              "positive_claim": "The :mod:`keyword` module tests Python keywords.",
+              "negative_claim": "The :mod:`keyword` module does not test Python keywords."
+            },
+            "outcome": "true",
+            "quote": "",
+            "evidence_spans": [
+              {
+                "start": 97,
+                "end": 176,
+                "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+                "score": 9.302772,
+                "matched_terms": [
+                  "keyword",
+                  "module",
+                  "python",
+                  "test"
+                ],
+                "source_ref": {
+                  "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                  "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                  "source_title": "Python 3.12.10 keyword documentation",
+                  "observed_at": "",
+                  "source_start": 97,
+                  "source_end": 176
+                }
+              },
+              {
+                "start": 237,
+                "end": 368,
+                "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+                "score": 8.050009,
+                "matched_terms": [
+                  "keyword",
+                  "keywords",
+                  "module",
+                  "python"
+                ],
+                "source_ref": {
+                  "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                  "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                  "source_title": "Python 3.12.10 keyword documentation",
+                  "observed_at": "",
+                  "source_start": 237,
+                  "source_end": 368
+                }
+              },
+              {
+                "start": 0,
+                "end": 95,
+                "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+                "score": 7.762327,
+                "matched_terms": [
+                  "keyword",
+                  "keywords",
+                  "mod",
+                  "python"
+                ],
+                "source_ref": {
+                  "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+                  "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+                  "source_title": "Python 3.12.10 keyword documentation",
+                  "observed_at": "",
+                  "source_start": 0,
+                  "source_end": 95
+                }
+              }
+            ],
+            "retrieval_rounds": [
+              {
+                "query": "Does the :mod:`keyword` module test Python keywords?",
+                "hits": 3
+              }
+            ],
+            "followup_status": "not_needed",
+            "positive_support": {
+              "choice": "true",
+              "probabilities": {
+                "true": 0.8438,
+                "false": 0.1562
+              },
+              "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+              "input_tokens": 248,
+              "elapsed_seconds": 0.437
+            },
+            "negative_support": {
+              "choice": "true",
+              "probabilities": {
+                "true": 0.5101,
+                "false": 0.4899
+              },
+              "interpretation": "Raw model scores; false may mean unsupported or contradicted. No calibrated threshold is applied.",
+              "input_tokens": 250,
+              "elapsed_seconds": 0.355
+            },
+            "reason": "Lexically retrieved excerpts are incomplete; no match is not evidence of absence."
+          }
+        ],
+        "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+        "requested_model": "qwen/qwen3.5-35b-a3b",
+        "evidence_mode": "lexical",
+        "answer_check_backend": "local",
+        "extra_search": false,
+        "execution_policy": "batch_no_extra_search",
+        "local_support_threshold": 0.8,
+        "planning_evidence": [
+          {
+            "start": 237,
+            "end": 368,
+            "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+            "score": 6.287869,
+            "matched_terms": [
+              "keywords",
+              "module",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 237,
+              "source_end": 368
+            }
+          },
+          {
+            "start": 97,
+            "end": 176,
+            "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+            "score": 4.525729,
+            "matched_terms": [
+              "module",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 97,
+              "source_end": 176
+            }
+          },
+          {
+            "start": 0,
+            "end": 95,
+            "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+            "score": 3.678431,
+            "matched_terms": [
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 0,
+              "source_end": 95
+            }
+          },
+          {
+            "start": 402,
+            "end": 463,
+            "text": "Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+            "score": 3.678431,
+            "matched_terms": [
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 402,
+              "source_end": 463
+            }
+          },
+          {
+            "start": 753,
+            "end": 824,
+            "text": "Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+            "score": 3.678431,
+            "matched_terms": [
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 753,
+              "source_end": 824
+            }
+          }
+        ],
+        "planner_output": "{\n  \"predicates\": [\n    {\n      \"id\": \"p1\",\n      \"question\": \"Does the :mod:`keyword` module test Python keywords?\",\n      \"evidence_requirement\": \"Documentation stating the module's purpose is to test if a string is a keyword\",\n      \"positive_claim\": \"The :mod:`keyword` module tests Python keywords.\",\n      \"negative_claim\": \"The :mod:`keyword` module does not test Python keywords.\"\n    }\n  ],\n  \"expression\": {\n    \"ref\": \"p1\"\n  },\n  \"true_answer\": \"The :mod:`keyword` module tests Python keywords.\",\n  \"false_answer\": \"The :mod:`keyword` module does not test Python keywords; it tests soft keywords only.\",\n  \"false_status\": \"decided\",\n  \"ambiguity\": \"\"\n}",
+        "plan": {
+          "predicates": [
+            {
+              "id": "p1",
+              "question": "Does the :mod:`keyword` module test Python keywords?",
+              "evidence_requirement": "Documentation stating the module's purpose is to test if a string is a keyword",
+              "positive_claim": "The :mod:`keyword` module tests Python keywords.",
+              "negative_claim": "The :mod:`keyword` module does not test Python keywords."
+            }
+          ],
+          "expression": {
+            "ref": "p1"
+          },
+          "true_answer": "The :mod:`keyword` module tests Python keywords.",
+          "false_answer": "The :mod:`keyword` module does not test Python keywords; it tests soft keywords only.",
+          "false_status": "decided",
+          "ambiguity": ""
+        },
+        "local_predicate_batches": [
+          {
+            "backend": "local Unsloth MLX",
+            "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+            "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+            "max_tokens": 4096,
+            "worker_wall_seconds": 9.705,
+            "inference_count": 2,
+            "usage_status": "local resource cost unobserved"
+          }
+        ],
+        "candidate_result": {
+          "status": "decided",
+          "answer": "The :mod:`keyword` module tests Python keywords.",
+          "reason": "Composed from predicate results"
+        },
+        "answer_check_evidence": [
+          {
+            "start": 237,
+            "end": 368,
+            "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+            "score": 8.050009,
+            "matched_terms": [
+              "keyword",
+              "keywords",
+              "module",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 237,
+              "source_end": 368
+            }
+          },
+          {
+            "start": 0,
+            "end": 95,
+            "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+            "score": 7.762327,
+            "matched_terms": [
+              "keyword",
+              "keywords",
+              "mod",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 0,
+              "source_end": 95
+            }
+          },
+          {
+            "start": 97,
+            "end": 176,
+            "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+            "score": 6.287869,
+            "matched_terms": [
+              "keyword",
+              "module",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 97,
+              "source_end": 176
+            }
+          },
+          {
+            "start": 402,
+            "end": 463,
+            "text": "Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+            "score": 5.440571,
+            "matched_terms": [
+              "keyword",
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 402,
+              "source_end": 463
+            }
+          },
+          {
+            "start": 753,
+            "end": 824,
+            "text": "Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+            "score": 5.440571,
+            "matched_terms": [
+              "keyword",
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 753,
+              "source_end": 824
+            }
+          }
+        ],
+        "answer_check": {
+          "choice": "true",
+          "probabilities": {
+            "true": 0.8251,
+            "false": 0.1749
+          },
+          "interpretation": "User-selected exploratory support threshold applied; not calibrated or independently validated. False and low scores remain unknown.",
+          "backend": "local Unsloth MLX",
+          "model": "MaziyarPanahi/Qwen3.5-4B-Jev-Judge",
+          "revision": "da378185714efec50fb4393fb88b2198b8de072b",
+          "input_tokens": 293,
+          "max_tokens": 4096,
+          "elapsed_seconds": 0.517,
+          "worker_wall_seconds": 7.948,
+          "usage_status": "local resource cost unobserved",
+          "support_threshold": 0.8,
+          "verdict": "supported"
+        },
+        "result": {
+          "status": "decided",
+          "answer": "The :mod:`keyword` module tests Python keywords.",
+          "reason": "Composed from predicate results"
+        },
+        "elapsed_seconds": 21.105
+      },
+      {
+        "id": "5ddea7eb9ae44720bd90f0b8aec7342e",
+        "schema_version": 1,
+        "created_at": "2026-11-06T15:22:27.087379+00:00",
+        "mode": "direct",
+        "request": {
+          "question": "What module tests Python keywords?",
+          "scope": "Python 3.12.10",
+          "as_of": "",
+          "snapshot_id": "ecbe060d52e44f428e8016ab42064fa4"
+        },
+        "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+        "source_metadata_sha256": "5c8bcfba92096df38099b8777f6984643ec8b4eb298b712f99ae0e5d2a8aad79",
+        "calls": [
+          {
+            "model": "qwen/qwen3.5-35b-a3b",
+            "provider": "Parasail",
+            "generation_id": "gen-1793978547-wNSfB0qgk4igOYUz9Igi",
+            "elapsed_seconds": 1.305,
+            "usage": {
+              "prompt_tokens": 233,
+              "completion_tokens": 86,
+              "total_tokens": 319,
+              "cost": 0.00012095,
+              "is_byok": false,
+              "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "cache_write_tokens": 0,
+                "audio_tokens": 0,
+                "video_tokens": 0
+              },
+              "cost_details": {
+                "upstream_inference_cost": 0.00012095,
+                "upstream_inference_prompt_cost": 3.495e-05,
+                "upstream_inference_completions_cost": 8.6e-05
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0,
+                "image_tokens": 0,
+                "audio_tokens": 0
+              }
+            },
+            "cost_status": "provider reported",
+            "prompt_sha256": "3e354cbfc4d36584017fe8d259855b79a0c85711aea9d86aa4efffffdb481b3a",
+            "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+            "finish_reason": "stop"
+          }
+        ],
+        "trace": [],
+        "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+        "requested_model": "qwen/qwen3.5-35b-a3b",
+        "evidence_mode": "lexical",
+        "answer_check_backend": "remote",
+        "extra_search": false,
+        "execution_policy": "not_applicable",
+        "planning_evidence": [
+          {
+            "start": 237,
+            "end": 368,
+            "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+            "score": 6.287869,
+            "matched_terms": [
+              "keywords",
+              "module",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 237,
+              "source_end": 368
+            }
+          },
+          {
+            "start": 97,
+            "end": 176,
+            "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+            "score": 4.525729,
+            "matched_terms": [
+              "module",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 97,
+              "source_end": 176
+            }
+          },
+          {
+            "start": 0,
+            "end": 95,
+            "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+            "score": 3.678431,
+            "matched_terms": [
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 0,
+              "source_end": 95
+            }
+          },
+          {
+            "start": 402,
+            "end": 463,
+            "text": "Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+            "score": 3.678431,
+            "matched_terms": [
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 402,
+              "source_end": 463
+            }
+          },
+          {
+            "start": 753,
+            "end": 824,
+            "text": "Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+            "score": 3.678431,
+            "matched_terms": [
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 753,
+              "source_end": 824
+            }
+          }
+        ],
+        "result": {
+          "status": "decided",
+          "answer": "The keyword module tests Python keywords.",
+          "quote": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "reason": "The source text explicitly states that the :mod:`keyword` module's synopsis is to 'Test whether a string is a keyword in Python'.",
+          "source_ref": {
+            "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        },
+        "elapsed_seconds": 1.306
+      },
+      {
+        "id": "ce2b0757c7224d358111c488e574c8ee",
+        "schema_version": 1,
+        "created_at": "2026-11-06T15:22:28.394113+00:00",
+        "mode": "frontier",
+        "request": {
+          "question": "What module tests Python keywords?",
+          "scope": "Python 3.12.10",
+          "as_of": "",
+          "snapshot_id": "ecbe060d52e44f428e8016ab42064fa4"
+        },
+        "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+        "source_metadata_sha256": "5c8bcfba92096df38099b8777f6984643ec8b4eb298b712f99ae0e5d2a8aad79",
+        "calls": [
+          {
+            "model": "tencent/hy4",
+            "provider": "Tencent",
+            "generation_id": "gen-1793978548-CgLrkhKfePvwJbiSkf28",
+            "elapsed_seconds": 1.781,
+            "usage": {
+              "prompt_tokens": 242,
+              "completion_tokens": 64,
+              "total_tokens": 306,
+              "cost": 0.000180946,
+              "is_byok": false,
+              "prompt_tokens_details": {
+                "cached_tokens": 0,
+                "cache_write_tokens": 0,
+                "audio_tokens": 0,
+                "video_tokens": 0
+              },
+              "cost_details": {
+                "upstream_inference_cost": 0.000180946,
+                "upstream_inference_prompt_cost": 0.000100914,
+                "upstream_inference_completions_cost": 8.0032e-05
+              },
+              "completion_tokens_details": {
+                "reasoning_tokens": 0,
+                "image_tokens": 0,
+                "audio_tokens": 0
+              }
+            },
+            "cost_status": "provider reported",
+            "prompt_sha256": "3e354cbfc4d36584017fe8d259855b79a0c85711aea9d86aa4efffffdb481b3a",
+            "source_access": "web plugin disabled in request; provider enforcement not independently verified",
+            "finish_reason": "stop"
+          }
+        ],
+        "trace": [],
+        "assurance": "Unverified model output; source quotation and plan syntax do not establish correctness.",
+        "requested_model": "tencent/hy4",
+        "evidence_mode": "lexical",
+        "answer_check_backend": "remote",
+        "extra_search": false,
+        "execution_policy": "not_applicable",
+        "planning_evidence": [
+          {
+            "start": 237,
+            "end": 368,
+            "text": "This module allows a Python program to determine if a string is a\n:ref:`keyword <keywords>` or :ref:`soft keyword <soft-keywords>`.",
+            "score": 6.287869,
+            "matched_terms": [
+              "keywords",
+              "module",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 237,
+              "source_end": 368
+            }
+          },
+          {
+            "start": 97,
+            "end": 176,
+            "text": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+            "score": 4.525729,
+            "matched_terms": [
+              "module",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 97,
+              "source_end": 176
+            }
+          },
+          {
+            "start": 0,
+            "end": 95,
+            "text": ":mod:`!keyword` --- Testing for Python keywords\n===============================================",
+            "score": 3.678431,
+            "matched_terms": [
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 0,
+              "source_end": 95
+            }
+          },
+          {
+            "start": 402,
+            "end": 463,
+            "text": "Return ``True`` if *s* is a Python :ref:`keyword <keywords>`.",
+            "score": 3.678431,
+            "matched_terms": [
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 402,
+              "source_end": 463
+            }
+          },
+          {
+            "start": 753,
+            "end": 824,
+            "text": "Return ``True`` if *s* is a Python :ref:`soft keyword <soft-keywords>`.",
+            "score": 3.678431,
+            "matched_terms": [
+              "keywords",
+              "python"
+            ],
+            "source_ref": {
+              "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+              "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+              "source_title": "Python 3.12.10 keyword documentation",
+              "observed_at": "",
+              "source_start": 753,
+              "source_end": 824
+            }
+          }
+        ],
+        "result": {
+          "status": "decided",
+          "answer": "keyword",
+          "quote": ".. module:: keyword\n   :synopsis: Test whether a string is a keyword in Python.",
+          "reason": "The supplied source identifies the module as `keyword` and states its synopsis is to test whether a string is a keyword in Python.",
+          "source_ref": {
+            "source_id": "ecbe060d52e44f428e8016ab42064fa4",
+            "source_sha256": "096fa0f3c1e8f4f0038552f064de99c2bafd558db74d9eb7907c20103ccc8a61",
+            "source_title": "Python 3.12.10 keyword documentation",
+            "observed_at": "",
+            "source_start": 97,
+            "source_end": 176
+          }
+        },
+        "elapsed_seconds": 1.782
+      }
+    ],
+    "adjudications": [
+      {
+        "id": "417c27134491f309adcffde78c40606e",
+        "created_at": "2026-11-06T15:22:54.463649+00:00",
+        "comparison_id": "12e3719e5992a55e6546e74dbcbc64dd",
+        "review_id": "bc3ff503c88f401f9b529abdf4b590bd",
+        "reviewer": "Developer smoke - not independent",
+        "verdict": "correct",
+        "evidence_support": "supported",
+        "notes": "The answer names keyword; the pinned module synopsis or predicate evidence identifies it."
+      },
+      {
+        "id": "1d01d80ed0175217a7c8a15152715b6f",
+        "created_at": "2026-11-06T15:22:54.464183+00:00",
+        "comparison_id": "12e3719e5992a55e6546e74dbcbc64dd",
+        "review_id": "ee4522a27499402f8e6cfbe51f9bb38a",
+        "reviewer": "Developer smoke - not independent",
+        "verdict": "correct",
+        "evidence_support": "supported",
+        "notes": "The answer names keyword; the pinned module synopsis or predicate evidence identifies it."
+      },
+      {
+        "id": "18c17622c455f3ccad275e9dfa9e62ea",
+        "created_at": "2026-11-06T15:22:54.463102+00:00",
+        "comparison_id": "12e3719e5992a55e6546e74dbcbc64dd",
+        "review_id": "27ac3badb42847529862d7b167f6a024",
+        "reviewer": "Developer smoke - not independent",
+        "verdict": "correct",
+        "evidence_support": "supported",
+        "notes": "The answer names keyword; the pinned module synopsis or predicate evidence identifies it."
+      }
+    ],
+    "case_assessments": [
+      {
+        "id": "65a21f955de03981fbaf0827d1904a0b",
+        "comparison_id": "12e3719e5992a55e6546e74dbcbc64dd",
+        "created_at": "2026-11-06T15:22:54.461464+00:00",
+        "reviewer": "Developer smoke - not independent",
+        "answerability": "answerable",
+        "rationale": "The pinned documentation states the module synopsis.",
+        "references": "Pinned CPython 3.12.10 keyword.rst module synopsis",
+        "note": "Human-provided assessment; independence and reference validity are not automatically verified."
+      }
+    ]
+  },
+  "score": {
+    "dataset_run_id": "e05af1a18465494b89e760d2c2e18357",
+    "dataset_id": "fc1da9c6a9df45848b67cd5b6b15f293",
+    "dataset_sha256": "9e8db1bab2e21f6ed422cdaeebabb73050c70eae9954ea062cb78cf05f47d315",
+    "stage": "shared-corpus",
+    "targeted": true,
+    "extra_search": false,
+    "answer_check_backend": "local",
+    "local_support_threshold": 0.8,
+    "model_config": {
+      "small_model": "qwen/qwen3.5-35b-a3b",
+      "frontier_model": "tencent/hy4",
+      "prompt_hashes": {
+        "planner": "61c8f60e788290c3963b5a05e797b627dcec73ca18d1cc2667ece9ea6bc994dd",
+        "predicate_judge": "e6b54112a8a9035c8a7a599b5a9f4e923a0593b599ef21e77996814463edb55c",
+        "repair": "7625903745c86c3bd8f65e7e560522d02d6c36f5061a6db37f7ddf62ef93e8a2",
+        "answer_check": "d96ba651b7282dd844fb63b44ad22bd7993d7a69062cb9a1e3e35aaa2abe2267",
+        "direct": "3e354cbfc4d36584017fe8d259855b79a0c85711aea9d86aa4efffffdb481b3a",
+        "search": "426399e1c89319c0d7283de28a0263bf76afc5d53f23d1d11c47ba30a1a5adbc"
+      },
+      "web_plugin": "explicitly disabled for bounded calls",
+      "provider_revision": "resolved model and provider are recorded per call when returned"
+    },
+    "interpretation": "Exploratory adjudication summary; unresolved cases remain unresolved. Not a confirmatory accuracy or non-inferiority claim.",
+    "arms": {
+      "fresh": {
+        "assigned": 1,
+        "correct_supported_or_justified": 1,
+        "incorrect": 0,
+        "unresolved": 0,
+        "decided": 1,
+        "deferred": 0,
+        "failed": 0,
+        "provider_cost_usd": 0.00026476,
+        "cost_complete": true,
+        "elapsed_seconds": 21.105,
+        "answerable_cases_assessed": 1,
+        "decisions_on_answerable": 1,
+        "unknown_or_legacy_answerability": 0,
+        "provider_calls": 1,
+        "source_searches": 3,
+        "predicates_evaluated": 1,
+        "predicates_skipped": 0,
+        "predicates_unresolved_without_evaluation": 0,
+        "observed_provider_cost_usd": 0.00026476,
+        "correct_fraction_all_assigned": 1.0,
+        "decision_rate_all_assigned": 1.0,
+        "coverage_on_assessed_answerable": 1.0,
+        "latency_median_seconds": 21.105,
+        "latency_p95_seconds": 21.105
+      },
+      "direct": {
+        "assigned": 1,
+        "correct_supported_or_justified": 1,
+        "incorrect": 0,
+        "unresolved": 0,
+        "decided": 1,
+        "deferred": 0,
+        "failed": 0,
+        "provider_cost_usd": 0.00012095,
+        "cost_complete": true,
+        "elapsed_seconds": 1.306,
+        "answerable_cases_assessed": 1,
+        "decisions_on_answerable": 1,
+        "unknown_or_legacy_answerability": 0,
+        "provider_calls": 1,
+        "source_searches": 1,
+        "predicates_evaluated": 0,
+        "predicates_skipped": 0,
+        "predicates_unresolved_without_evaluation": 0,
+        "observed_provider_cost_usd": 0.00012095,
+        "correct_fraction_all_assigned": 1.0,
+        "decision_rate_all_assigned": 1.0,
+        "coverage_on_assessed_answerable": 1.0,
+        "latency_median_seconds": 1.306,
+        "latency_p95_seconds": 1.306
+      },
+      "frontier": {
+        "assigned": 1,
+        "correct_supported_or_justified": 1,
+        "incorrect": 0,
+        "unresolved": 0,
+        "decided": 1,
+        "deferred": 0,
+        "failed": 0,
+        "provider_cost_usd": 0.000180946,
+        "cost_complete": true,
+        "elapsed_seconds": 1.782,
+        "answerable_cases_assessed": 1,
+        "decisions_on_answerable": 1,
+        "unknown_or_legacy_answerability": 0,
+        "provider_calls": 1,
+        "source_searches": 1,
+        "predicates_evaluated": 0,
+        "predicates_skipped": 0,
+        "predicates_unresolved_without_evaluation": 0,
+        "observed_provider_cost_usd": 0.000180946,
+        "correct_fraction_all_assigned": 1.0,
+        "decision_rate_all_assigned": 1.0,
+        "coverage_on_assessed_answerable": 1.0,
+        "latency_median_seconds": 1.782,
+        "latency_p95_seconds": 1.782
+      }
+    },
+    "paired": [
+      {
+        "left": "fresh",
+        "right": "frontier",
+        "left_correct_right_incorrect": 0,
+        "left_incorrect_right_correct": 0,
+        "both_correct": 1,
+        "both_incorrect": 0,
+        "unresolved_pairs": 0
+      },
+      {
+        "left": "fresh",
+        "right": "direct",
+        "left_correct_right_incorrect": 0,
+        "left_incorrect_right_correct": 0,
+        "both_correct": 1,
+        "both_incorrect": 0,
+        "unresolved_pairs": 0
+      }
+    ],
+    "cases": [
+      {
+        "case_id": "keyword",
+        "comparison_id": "12e3719e5992a55e6546e74dbcbc64dd",
+        "case_assessment": {
+          "id": "65a21f955de03981fbaf0827d1904a0b",
+          "comparison_id": "12e3719e5992a55e6546e74dbcbc64dd",
+          "created_at": "2026-11-06T15:22:54.461464+00:00",
+          "reviewer": "Developer smoke - not independent",
+          "answerability": "answerable",
+          "rationale": "The pinned documentation states the module synopsis.",
+          "references": "Pinned CPython 3.12.10 keyword.rst module synopsis",
+          "note": "Human-provided assessment; independence and reference validity are not automatically verified."
+        },
+        "rows": [
+          {
+            "arm": "fresh",
+            "run_id": "483c747005754b4eabd8753ad96e28fd",
+            "status": "decided",
+            "verdict": "correct",
+            "evidence_support": "supported",
+            "reviewer": "Developer smoke - not independent",
+            "notes": "The answer names keyword; the pinned module synopsis or predicate evidence identifies it.",
+            "elapsed_seconds": 21.105,
+            "calls": 1,
+            "provider_calls": 1,
+            "predicate_work": {
+              "evaluated": 1,
+              "skipped": 0,
+              "unresolved_without_evaluation": 0
+            },
+            "execution_policy": "batch_no_extra_search",
+            "evidence_mode": "lexical",
+            "source_searches": 3,
+            "web_search_requests": null,
+            "observed_web_search_requests": null,
+            "web_search_usage_status": "incomplete",
+            "local_inferences": 3,
+            "local_resource_cost_status": "unobserved",
+            "observed_provider_cost_usd": 0.00026476,
+            "cost_usd": 0.00026476,
+            "cost_status": "provider reported"
+          },
+          {
+            "arm": "direct",
+            "run_id": "5ddea7eb9ae44720bd90f0b8aec7342e",
+            "status": "decided",
+            "verdict": "correct",
+            "evidence_support": "supported",
+            "reviewer": "Developer smoke - not independent",
+            "notes": "The answer names keyword; the pinned module synopsis or predicate evidence identifies it.",
+            "elapsed_seconds": 1.306,
+            "calls": 1,
+            "provider_calls": 1,
+            "predicate_work": {
+              "evaluated": 0,
+              "skipped": 0,
+              "unresolved_without_evaluation": 0
+            },
+            "execution_policy": "not_applicable",
+            "evidence_mode": "lexical",
+            "source_searches": 1,
+            "web_search_requests": null,
+            "observed_web_search_requests": null,
+            "web_search_usage_status": "incomplete",
+            "local_inferences": 0,
+            "local_resource_cost_status": "not applicable",
+            "observed_provider_cost_usd": 0.00012095,
+            "cost_usd": 0.00012095,
+            "cost_status": "provider reported"
+          },
+          {
+            "arm": "frontier",
+            "run_id": "ce2b0757c7224d358111c488e574c8ee",
+            "status": "decided",
+            "verdict": "correct",
+            "evidence_support": "supported",
+            "reviewer": "Developer smoke - not independent",
+            "notes": "The answer names keyword; the pinned module synopsis or predicate evidence identifies it.",
+            "elapsed_seconds": 1.782,
+            "calls": 1,
+            "provider_calls": 1,
+            "predicate_work": {
+              "evaluated": 0,
+              "skipped": 0,
+              "unresolved_without_evaluation": 0
+            },
+            "execution_policy": "not_applicable",
+            "evidence_mode": "lexical",
+            "source_searches": 1,
+            "web_search_requests": null,
+            "observed_web_search_requests": null,
+            "web_search_usage_status": "incomplete",
+            "local_inferences": 0,
+            "local_resource_cost_status": "not applicable",
+            "observed_provider_cost_usd": 0.000180946,
+            "cost_usd": 0.000180946,
+            "cost_status": "provider reported"
+          }
+        ]
+      }
+    ]
+  }
+}

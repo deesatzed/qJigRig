@@ -1,0 +1,169 @@
+{
+  "schema": "quix-repair-pilot-v1",
+  "date": "2026-11-04",
+  "status": "exploratory; AI-reviewed, no independent ground truth",
+  "source_mode": "previously explored isolated copies",
+  "new_questions": 4,
+  "task_splits_note": "new questions on shared previously observed sources; not independently held out",
+  "planner_model": "openai/gpt-4o-mini",
+  "retrieval_decision_provider": {
+    "adapter": "OpenRouterDecision",
+    "configured_model": "baseten/joey-1",
+    "thresholds": null,
+    "prompt_version": "quix-openrouter-noul-v1",
+    "stability_trials": null
+  },
+  "retrieval_decision": {
+    "decision": {
+      "calls": 12,
+      "cost": {
+        "known_usd": 3.655e-05,
+        "unknown_count": 0
+      },
+      "result_fallback_reasons": {
+        "decision_unclear": 12
+      }
+    },
+    "role": {
+      "calls": 12,
+      "cost": {
+        "known_usd": 3.655e-05,
+        "unknown_count": 0
+      },
+      "result_fallback_reasons": {
+        "decision_unclear": 12
+      }
+    }
+  },
+  "switch": {
+    "configuration": {
+      "view_characters": 5000,
+      "max_steps": 5,
+      "max_model_calls": 10,
+      "fallback": "baseline",
+      "packet_budget_matches": true,
+      "full_model_prompt_budget_matches": false,
+      "choice_mode": "bounded-v1"
+    },
+    "status_reasons": {
+      "('insufficient_evidence', 'decision_failed', 'unstable_choice')": 4
+    },
+    "physical_calls": 12,
+    "cost": {
+      "known_usd": 0.00010248,
+      "unknown_count": 0
+    },
+    "all_fell_back": true,
+    "post_pilot_configuration_note": "New runner now uses max_steps=20 and max_model_calls=20; pilot recorded 5 and 10. Pilot results were not rerun under the later limits."
+  },
+  "agent": {
+    "statuses": {
+      "completed": 16
+    },
+    "cost": {
+      "known_usd": 0.00496305,
+      "unknown_count": 0
+    },
+    "prompt_tokens_by_condition": {
+      "none": [
+        268,
+        268,
+        265,
+        266
+      ],
+      "baseline": [
+        709,
+        703,
+        711,
+        701
+      ],
+      "role": [
+        709,
+        703,
+        711,
+        701
+      ],
+      "switch": [
+        709,
+        703,
+        711,
+        701
+      ]
+    },
+    "purpose_included": true,
+    "full_model_prompt_budgets_matched": false
+  },
+  "ai_review": {
+    "reviewed_retrieval_tasks": 4,
+    "reviewed_plans": 15,
+    "unknown_plans": 1,
+    "physical_calls": 23,
+    "cost": {
+      "known_usd": 0.01749147484,
+      "unknown_count": 0
+    },
+    "mean_essential_id_recall": {
+      "baseline": 0.425,
+      "topic": 0.425,
+      "decision": 0.425,
+      "role": 0.425,
+      "switch": 0.425
+    }
+  },
+  "limitations": [
+    "Results are against AI essential labels, not human-validated ground truth.",
+    "Four tasks share an already explored source corpus; no statistical or independent held-out inference.",
+    "Four switch fallbacks are evidence the instability remains; bounded menus alone did not resolve it.",
+    "Uncalibrated relevance judgments remain unclear and fall back; no operational threshold was inferred.",
+    "Retrieval packet limits match, but total model input budgets do not.",
+    "Agent calls propose plans only; no live swarm or MindStore integration.",
+    "Prior role annotation costs are not included in this pilot accounting."
+  ],
+  "first_choice_model_ablation": {
+    "tasks": 4,
+    "trials": "same first bounded menu, original and reversed order; separately rerun after pilot",
+    "models": {
+      "1": {
+        "model": "cloudflare/clairic",
+        "stable": 0,
+        "unstable": 0,
+        "other_error": 4,
+        "physical_requests": 4,
+        "known_cost_usd": 0.0,
+        "unknown_cost_count": 4
+      },
+      "2": {
+        "model": "baseten/joey-1",
+        "stable": 1,
+        "unstable": 3,
+        "other_error": 0,
+        "physical_requests": 8,
+        "known_cost_usd": 6.404e-05,
+        "unknown_cost_count": 0
+      },
+      "3": {
+        "model": "liquid/d1.1",
+        "stable": 2,
+        "unstable": 2,
+        "other_error": 0,
+        "physical_requests": 8,
+        "known_cost_usd": 9.688e-05,
+        "unknown_cost_count": 0
+      },
+      "4": {
+        "model": "perplexity/pplx-decider-v1.2",
+        "stable": 1,
+        "unstable": 3,
+        "other_error": 0,
+        "physical_requests": 8,
+        "known_cost_usd": 0.00012488,
+        "unknown_cost_count": 0
+      }
+    },
+    "limitations": [
+      "Observed tasks, no relevance labels, and no full navigation or planner comparison.",
+      "Stable choice agreement is not calibrated correctness.",
+      "Provider errors do not establish model availability or cause; costs without usage remain unknown."
+    ]
+  }
+}

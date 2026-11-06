@@ -1,0 +1,54 @@
+{
+  "created_at": "2026-10-30T14:30:59.422482+00:00",
+  "source": "docs/plans/2026-10-29-shared-knowledge-design.md",
+  "source_revision": "fd4a2787c8f13b669f634f23808beb8b6e09522bce4d49de42fbd3e938046d92",
+  "section_title": "Evaluation",
+  "role": "reviewer",
+  "role_version": "1",
+  "role_purpose": "Evaluate software changes and evidence for correctness.",
+  "label_status": "unlabeled; no correctness or quality comparison",
+  "observations": [
+    {
+      "slot": 2,
+      "configured_model": "baseten/joey-1",
+      "resolved_model": "baseten/joey-1-20261029",
+      "outcome": "unclear",
+      "probability": 0.9343121612023296,
+      "reason": null,
+      "elapsed_seconds": 0.273,
+      "usage": {
+        "input_tokens": 334,
+        "output_tokens": 1,
+        "cost": 3.34e-06
+      }
+    },
+    {
+      "slot": 3,
+      "configured_model": "liquid/d1.1",
+      "resolved_model": "liquid/d1.1-20261027",
+      "outcome": "unclear",
+      "probability": 0.7429654280858591,
+      "reason": null,
+      "elapsed_seconds": 0.2344,
+      "usage": {
+        "input_tokens": 276,
+        "output_tokens": 0,
+        "cost": 5.52e-06
+      }
+    },
+    {
+      "slot": 4,
+      "configured_model": "perplexity/pplx-decider-v1.2",
+      "resolved_model": "perplexity/pplx-decider-v1.2-20261016",
+      "outcome": "unclear",
+      "probability": 0.7752708470529411,
+      "reason": null,
+      "elapsed_seconds": 0.2264,
+      "usage": {
+        "input_tokens": 313,
+        "output_tokens": 1,
+        "cost": 6.26e-06
+      }
+    }
+  ]
+}
