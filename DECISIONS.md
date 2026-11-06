@@ -1,0 +1,15 @@
+# Decisions
+
+Status: recommended technical design for review; no combined runtime implemented yet.
+
+- D001: Use qJig as the new repository root and keep both source checkpoints with provenance. QUIXER stays at a named remote checkpoint; source application results are not pooled.
+- D002: Build a small modular core behind contracts. Adapt QUIXER's catalog/retrieval and JIG's bounded decision methods through explicit adapters before selective extraction. Avoid merging the two monolithic entry points or giving both stores ownership of the same fact.
+- D003: Use one SQLite authority for versioned source metadata and append-only run/event records, plus content-addressed immutable source blobs. Original files are origins; decision runs bind immutable snapshots. A watcher/refresh records new revisions rather than rewriting a running request.
+- D004: Store raw-byte hash, decoded-text hash, normalization version and span coordinates separately. Translate legacy QUIXER normalized lines and JIG raw offsets explicitly; never reinterpret a legacy hash as the new canonical hash.
+- D005: Preserve true/false/unknown/conflict as predicate states with separate reasons. Missing evidence and budget exhaustion do not become false. Conflict maps to unresolved for reachable-outcome enumeration and remains explicit in the trace.
+- D006: Role usefulness changes ordering within evidence acquisition; it cannot eliminate unresolved prerequisites, exceptions, contradictory sources or authority requirements. Task-specific need and applicability take precedence over a role prior.
+- D007: Bound graphs initially to six unique predicates, validated depth <=12, AND/OR/NOT only. Exact completion enumeration is feasible at <=64 assignments. A proof of stability applies to the supplied graph only. Structural plan completeness remains an open semantic question.
+- D008: First implement deterministic fixture execution and a direct-retrieval control; fresh generative decomposition and local/hosted judges follow behind explicit providers. Keep Hy4 as configured escalation model. Reflex remains optional experimental ordering with fallback while its instability is unresolved.
+- D009: Test with the same case/context/role/scope/date and actual resource ledgers. Separate authored programs, fresh plans, reused programs and escalation arms. AI review can guide development but cannot be relabeled independent adjudication.
+- D010: Initially use a software-project corpus with authored release rules to test the shared knowledge purpose. This is a reversible starting family, not a promise of a deployment agent or policy authority. Broader task families require their own applicability contracts and evidence.
+- D011: Source snapshots are local reference material. No LICENSE was located in the inspected top-level source packages; preserve provenance and clarify distribution rights before publishing substantial copied source. The new core should adapt interfaces and small algorithms with attribution rather than wholesale vendoring into execution.

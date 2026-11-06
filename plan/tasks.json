@@ -1,0 +1,1225 @@
+{
+  "schema": "qjig-build-queue-v1",
+  "status": "proposed implementation queue; none of these runtime tasks is complete",
+  "tasks": [
+    {
+      "id": "T001",
+      "phase": "P1",
+      "depends_on": [],
+      "status": "pending",
+      "files": [
+        "pyproject.toml",
+        "src/qjig/__init__.py"
+      ],
+      "test_file": "tests/test_bootstrap.py",
+      "test_name": "test_import_has_no_io",
+      "action": "Establish the isolated qjig package and pytest configuration",
+      "acceptance": "Import succeeds without opening config, connecting or creating data",
+      "command": "python -m pytest tests/test_bootstrap.py::test_import_has_no_io -q"
+    },
+    {
+      "id": "T002",
+      "phase": "P1",
+      "depends_on": [
+        "T001"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/contracts.py"
+      ],
+      "test_file": "tests/test_contracts.py",
+      "test_name": "test_roundtrip_request",
+      "action": "Round-trip a minimal versioned Request with exact role and scope",
+      "acceptance": "The parsed request equals the serialized request and rejects unknown schema version",
+      "command": "python -m pytest tests/test_contracts.py::test_roundtrip_request -q"
+    },
+    {
+      "id": "T003",
+      "phase": "P1",
+      "depends_on": [
+        "T002"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/contracts.py"
+      ],
+      "test_file": "tests/test_contracts.py",
+      "test_name": "test_reject_invalid_budget",
+      "action": "Validate budgets without coercing booleans or negative numbers",
+      "acceptance": "True and negative limits are rejected before external work",
+      "command": "python -m pytest tests/test_contracts.py::test_reject_invalid_budget -q"
+    },
+    {
+      "id": "T004",
+      "phase": "P1",
+      "depends_on": [
+        "T002"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/sources.py"
+      ],
+      "test_file": "tests/test_sources.py",
+      "test_name": "test_preserve_raw_bytes",
+      "action": "Store original source bytes and separate decoded text hash",
+      "acceptance": "CRLF bytes retain original raw hash while text decoding is explicit",
+      "command": "python -m pytest tests/test_sources.py::test_preserve_raw_bytes -q"
+    },
+    {
+      "id": "T005",
+      "phase": "P1",
+      "depends_on": [
+        "T004"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/sources.py"
+      ],
+      "test_file": "tests/test_sources.py",
+      "test_name": "test_portable_source_identity",
+      "action": "Separate source identity from workstation path",
+      "acceptance": "Relocating an origin does not silently change a pinned revision identity",
+      "command": "python -m pytest tests/test_sources.py::test_portable_source_identity -q"
+    },
+    {
+      "id": "T006",
+      "phase": "P1",
+      "depends_on": [
+        "T004"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/spans.py"
+      ],
+      "test_file": "tests/test_spans.py",
+      "test_name": "test_verify_unicode_span",
+      "action": "Verify end-exclusive Unicode text offsets and reject forged body",
+      "acceptance": "A multibyte string slice matches exactly and an altered quote fails",
+      "command": "python -m pytest tests/test_spans.py::test_verify_unicode_span -q"
+    },
+    {
+      "id": "T007",
+      "phase": "P1",
+      "depends_on": [
+        "T006"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/legacy_quix.py"
+      ],
+      "test_file": "tests/test_legacy_quix.py",
+      "test_name": "test_translate_normalized_lines",
+      "action": "Translate one CRLF QUIXER line span into canonical offsets",
+      "acceptance": "Legacy normalized hash and canonical raw/text identities stay distinct",
+      "command": "python -m pytest tests/test_legacy_quix.py::test_translate_normalized_lines -q"
+    },
+    {
+      "id": "T008",
+      "phase": "P1",
+      "depends_on": [
+        "T006"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/legacy_jig.py"
+      ],
+      "test_file": "tests/test_legacy_jig.py",
+      "test_name": "test_translate_raw_offsets",
+      "action": "Translate a JIG snapshot quote into canonical span",
+      "acceptance": "The same text cannot bind to another revision with changed content",
+      "command": "python -m pytest tests/test_legacy_jig.py::test_translate_raw_offsets -q"
+    },
+    {
+      "id": "T009",
+      "phase": "P1",
+      "depends_on": [
+        "T004"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/store.py"
+      ],
+      "test_file": "tests/test_store.py",
+      "test_name": "test_reopen_revision",
+      "action": "Persist immutable source revisions and reopen the catalog",
+      "acceptance": "Two revisions survive close/reopen and cannot overwrite one another",
+      "command": "python -m pytest tests/test_store.py::test_reopen_revision -q"
+    },
+    {
+      "id": "T010",
+      "phase": "P1",
+      "depends_on": [
+        "T009"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/applicability.py"
+      ],
+      "test_file": "tests/test_applicability.py",
+      "test_name": "test_per_member_dates",
+      "action": "Represent independently dated collection members",
+      "acceptance": "Old and new policy coexist without a shared effective interval",
+      "command": "python -m pytest tests/test_applicability.py::test_per_member_dates -q"
+    },
+    {
+      "id": "T011",
+      "phase": "P1",
+      "depends_on": [
+        "T010"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/applicability.py"
+      ],
+      "test_file": "tests/test_applicability.py",
+      "test_name": "test_missing_entity_unknown",
+      "action": "Return unknown for missing entity binding",
+      "acceptance": "An absent required subject never passes as inapplicable",
+      "command": "python -m pytest tests/test_applicability.py::test_missing_entity_unknown -q"
+    },
+    {
+      "id": "T012",
+      "phase": "P1",
+      "depends_on": [
+        "T010"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/applicability.py"
+      ],
+      "test_file": "tests/test_applicability.py",
+      "test_name": "test_historical_observation",
+      "action": "Apply effective and observation dates independently",
+      "acceptance": "A review observed after the historical request cannot settle it",
+      "command": "python -m pytest tests/test_applicability.py::test_historical_observation -q"
+    },
+    {
+      "id": "T013",
+      "phase": "P2",
+      "depends_on": [
+        "T009"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/indexing.py"
+      ],
+      "test_file": "tests/test_indexing.py",
+      "test_name": "test_heading_span",
+      "action": "Index one Markdown heading as a source-derived view",
+      "acceptance": "The stored heading section resolves to exact pinned text",
+      "command": "python -m pytest tests/test_indexing.py::test_heading_span -q"
+    },
+    {
+      "id": "T014",
+      "phase": "P2",
+      "depends_on": [
+        "T013"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/indexing.py"
+      ],
+      "test_file": "tests/test_indexing.py",
+      "test_name": "test_missing_heading_fallback",
+      "action": "Create an explicitly generated extractive fallback span",
+      "acceptance": "Unheaded text stays searchable without invented authoritative headings",
+      "command": "python -m pytest tests/test_indexing.py::test_missing_heading_fallback -q"
+    },
+    {
+      "id": "T015",
+      "phase": "P2",
+      "depends_on": [
+        "T014"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/indexing.py"
+      ],
+      "test_file": "tests/test_indexing.py",
+      "test_name": "test_broad_heading_paragraphs",
+      "action": "Split a broad section into proposed paragraph entries",
+      "acceptance": "Each child is an exact source slice with proposed status",
+      "command": "python -m pytest tests/test_indexing.py::test_broad_heading_paragraphs -q"
+    },
+    {
+      "id": "T016",
+      "phase": "P2",
+      "depends_on": [
+        "T015"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/indexing.py"
+      ],
+      "test_file": "tests/test_indexing.py",
+      "test_name": "test_revision_stales_indexes",
+      "action": "Invalidate derived indexes after an origin revision",
+      "acceptance": "Old entries are inspectable but cannot appear current for the new source",
+      "command": "python -m pytest tests/test_indexing.py::test_revision_stales_indexes -q"
+    },
+    {
+      "id": "T017",
+      "phase": "P2",
+      "depends_on": [
+        "T013"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/retrieval.py"
+      ],
+      "test_file": "tests/test_retrieval.py",
+      "test_name": "test_deterministic_bm25",
+      "action": "Return deterministic lexical candidates and score provenance",
+      "acceptance": "Equal scores have stable ID ordering on repeated runs",
+      "command": "python -m pytest tests/test_retrieval.py::test_deterministic_bm25 -q"
+    },
+    {
+      "id": "T018",
+      "phase": "P2",
+      "depends_on": [
+        "T017"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/topics.py"
+      ],
+      "test_file": "tests/test_topics.py",
+      "test_name": "test_multi_topic_links",
+      "action": "Attach multiple topic views without copying evidence",
+      "acceptance": "Two topics reference the same immutable span identity",
+      "command": "python -m pytest tests/test_topics.py::test_multi_topic_links -q"
+    },
+    {
+      "id": "T019",
+      "phase": "P2",
+      "depends_on": [
+        "T017"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/roles.py"
+      ],
+      "test_file": "tests/test_roles.py",
+      "test_name": "test_role_version_binding",
+      "action": "Store an estimated role score against role and revision",
+      "acceptance": "Changing role version makes the old estimate unavailable as a current prior",
+      "command": "python -m pytest tests/test_roles.py::test_role_version_binding -q"
+    },
+    {
+      "id": "T020",
+      "phase": "P2",
+      "depends_on": [
+        "T019"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/retrieval.py"
+      ],
+      "test_file": "tests/test_retrieval.py",
+      "test_name": "test_role_cannot_hide_exception",
+      "action": "Order candidates without removing a mandatory exception channel",
+      "acceptance": "A low role score cannot eliminate the task's required exception source",
+      "command": "python -m pytest tests/test_retrieval.py::test_role_cannot_hide_exception -q"
+    },
+    {
+      "id": "T021",
+      "phase": "P2",
+      "depends_on": [
+        "T017",
+        "T006"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/packets.py"
+      ],
+      "test_file": "tests/test_packets.py",
+      "test_name": "test_serialized_budget",
+      "action": "Budget the complete evidence packet and mark truncation",
+      "acceptance": "Included packet is within named limit and every omission has a reason",
+      "command": "python -m pytest tests/test_packets.py::test_serialized_budget -q"
+    },
+    {
+      "id": "T022",
+      "phase": "P2",
+      "depends_on": [
+        "T021"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/recovery.py"
+      ],
+      "test_file": "tests/test_recovery.py",
+      "test_name": "test_missing_source_alternative",
+      "action": "Exclude an unavailable candidate and return a verified alternative",
+      "acceptance": "Packet records missing-source reason and alternative exact span",
+      "command": "python -m pytest tests/test_recovery.py::test_missing_source_alternative -q"
+    },
+    {
+      "id": "T023",
+      "phase": "P2",
+      "depends_on": [
+        "T022"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/recovery.py"
+      ],
+      "test_file": "tests/test_recovery.py",
+      "test_name": "test_no_suitable_alternative",
+      "action": "Keep insufficient evidence when only wrong-subject candidates remain",
+      "acceptance": "Unrelated or inapplicable text does not fill a decisive evidence slot",
+      "command": "python -m pytest tests/test_recovery.py::test_no_suitable_alternative -q"
+    },
+    {
+      "id": "T024",
+      "phase": "P2",
+      "depends_on": [
+        "T021",
+        "T011",
+        "T012"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/obligations.py"
+      ],
+      "test_file": "tests/test_obligations.py",
+      "test_name": "test_no_hit_is_unknown",
+      "action": "Track unresolved evidence obligations after no retrieval hit",
+      "acceptance": "No hit cannot become a negative fact or proof that no exception exists",
+      "command": "python -m pytest tests/test_obligations.py::test_no_hit_is_unknown -q"
+    },
+    {
+      "id": "T025",
+      "phase": "P3",
+      "depends_on": [
+        "T002"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/logic.py"
+      ],
+      "test_file": "tests/test_logic.py",
+      "test_name": "test_support_state_table",
+      "action": "Implement the four explicit paired-support states",
+      "acceptance": "The four distinct support combinations yield true false unknown conflict",
+      "command": "python -m pytest tests/test_logic.py::test_support_state_table -q"
+    },
+    {
+      "id": "T026",
+      "phase": "P3",
+      "depends_on": [
+        "T025"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/plans.py"
+      ],
+      "test_file": "tests/test_plans.py",
+      "test_name": "test_validate_ast",
+      "action": "Validate unique refs operators depth and predicate cap",
+      "acceptance": "Dangling refs cycles unknown operators and more than six predicates fail",
+      "command": "python -m pytest tests/test_plans.py::test_validate_ast -q"
+    },
+    {
+      "id": "T027",
+      "phase": "P3",
+      "depends_on": [
+        "T026"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/logic.py"
+      ],
+      "test_file": "tests/test_logic.py",
+      "test_name": "test_compose_truth_table",
+      "action": "Evaluate bounded AND OR NOT with unresolved states",
+      "acceptance": "Exact truth-table cases preserve unknown and conflict reasons",
+      "command": "python -m pytest tests/test_logic.py::test_compose_truth_table -q"
+    },
+    {
+      "id": "T028",
+      "phase": "P3",
+      "depends_on": [
+        "T027"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/logic.py"
+      ],
+      "test_file": "tests/test_logic.py",
+      "test_name": "test_reachable_outcomes",
+      "action": "Enumerate consistent completions by unique predicate ID",
+      "acceptance": "Repeated references share one assignment across the expression",
+      "command": "python -m pytest tests/test_logic.py::test_reachable_outcomes -q"
+    },
+    {
+      "id": "T029",
+      "phase": "P3",
+      "depends_on": [
+        "T028"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/logic.py"
+      ],
+      "test_file": "tests/test_logic.py",
+      "test_name": "test_material_predicate",
+      "action": "Determine whether one unresolved fact can change the result",
+      "acceptance": "Unknown exception stays material after ordinary=false under OR",
+      "command": "python -m pytest tests/test_logic.py::test_material_predicate -q"
+    },
+    {
+      "id": "T030",
+      "phase": "P3",
+      "depends_on": [
+        "T029",
+        "T024"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/stopping.py"
+      ],
+      "test_file": "tests/test_stopping.py",
+      "test_name": "test_coverage_blocks_stop",
+      "action": "Check evidence obligations before accepting graph stability",
+      "acceptance": "A stable expression cannot bypass an unresolved material applicability obligation",
+      "command": "python -m pytest tests/test_stopping.py::test_coverage_blocks_stop -q"
+    },
+    {
+      "id": "T031",
+      "phase": "P3",
+      "depends_on": [
+        "T012",
+        "T025"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/exact.py"
+      ],
+      "test_file": "tests/test_exact.py",
+      "test_name": "test_dated_numeric_rule",
+      "action": "Evaluate one exact numeric rule under the applicable policy",
+      "acceptance": "Same observation passes old threshold and fails new threshold",
+      "command": "python -m pytest tests/test_exact.py::test_dated_numeric_rule -q"
+    },
+    {
+      "id": "T032",
+      "phase": "P3",
+      "depends_on": [
+        "T030"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/scheduler.py"
+      ],
+      "test_file": "tests/test_scheduler.py",
+      "test_name": "test_deterministic_next_need",
+      "action": "Choose next material need by dependencies then planner order then ID",
+      "acceptance": "Same state schedules the same need and never skips a prerequisite",
+      "command": "python -m pytest tests/test_scheduler.py::test_deterministic_next_need -q"
+    },
+    {
+      "id": "T033",
+      "phase": "P3",
+      "depends_on": [
+        "T032",
+        "T022",
+        "T031"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/acquisition.py"
+      ],
+      "test_file": "tests/test_acquisition.py",
+      "test_name": "test_one_round_trace",
+      "action": "Run one acquisition and exact-evaluation round",
+      "acceptance": "Trace binds request predicate source span and observation",
+      "command": "python -m pytest tests/test_acquisition.py::test_one_round_trace -q"
+    },
+    {
+      "id": "T034",
+      "phase": "P3",
+      "depends_on": [
+        "T033",
+        "T024"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/acquisition.py"
+      ],
+      "test_file": "tests/test_acquisition.py",
+      "test_name": "test_bounded_followup",
+      "action": "Allow one targeted followup for a material unresolved need",
+      "acceptance": "A third round is refused and remains an explicit unknown",
+      "command": "python -m pytest tests/test_acquisition.py::test_bounded_followup -q"
+    },
+    {
+      "id": "T035",
+      "phase": "P3",
+      "depends_on": [
+        "T034",
+        "T030"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/acquisition.py"
+      ],
+      "test_file": "tests/test_acquisition.py",
+      "test_name": "test_stop_after_blocker",
+      "action": "Skip immaterial facts only with a recorded stopping witness",
+      "acceptance": "A conclusive AND blocker skips unrelated work with preserved reason",
+      "command": "python -m pytest tests/test_acquisition.py::test_stop_after_blocker -q"
+    },
+    {
+      "id": "T036",
+      "phase": "P3",
+      "depends_on": [
+        "T034"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/acquisition.py"
+      ],
+      "test_file": "tests/test_acquisition.py",
+      "test_name": "test_material_conflict_defers",
+      "action": "Retain conflicting applicable observations",
+      "acceptance": "A material contradiction cannot be chosen away by score or latest file time",
+      "command": "python -m pytest tests/test_acquisition.py::test_material_conflict_defers -q"
+    },
+    {
+      "id": "T037",
+      "phase": "P3",
+      "depends_on": [
+        "T033",
+        "T009"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/finalize.py"
+      ],
+      "test_file": "tests/test_finalize.py",
+      "test_name": "test_source_change_policy",
+      "action": "Handle origin updates according to pinned/current-required policy",
+      "acceptance": "A current-required run restarts once or defers and never mixes revisions",
+      "command": "python -m pytest tests/test_finalize.py::test_source_change_policy -q"
+    },
+    {
+      "id": "T038",
+      "phase": "P3",
+      "depends_on": [
+        "T035",
+        "T036",
+        "T037"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/cli.py"
+      ],
+      "test_file": "tests/test_cli.py",
+      "test_name": "test_fixture_end_to_end",
+      "action": "Expose the deterministic vertical slice through a real subprocess",
+      "acceptance": "Import ask trace and missing-exception deferral work with no provider calls",
+      "command": "python -m pytest tests/test_cli.py::test_fixture_end_to_end -q"
+    },
+    {
+      "id": "T039",
+      "phase": "P4",
+      "depends_on": [
+        "T038"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/journal.py"
+      ],
+      "test_file": "tests/test_journal.py",
+      "test_name": "test_intent_before_call",
+      "action": "Record call intent before a provider side effect",
+      "acceptance": "A crash point retains pending intent with request/input identity",
+      "command": "python -m pytest tests/test_journal.py::test_intent_before_call -q"
+    },
+    {
+      "id": "T040",
+      "phase": "P4",
+      "depends_on": [
+        "T039"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/journal.py"
+      ],
+      "test_file": "tests/test_journal.py",
+      "test_name": "test_uncertain_resume",
+      "action": "Refuse blind retry of an uncertain paid call",
+      "acceptance": "Resume reports reconciliation required without a second invocation",
+      "command": "python -m pytest tests/test_journal.py::test_uncertain_resume -q"
+    },
+    {
+      "id": "T041",
+      "phase": "P4",
+      "depends_on": [
+        "T003",
+        "T039"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/budgets.py"
+      ],
+      "test_file": "tests/test_budgets.py",
+      "test_name": "test_physical_call_cap",
+      "action": "Enforce request-wide physical call reservations",
+      "acceptance": "Planner repair stability probes final checks and fallback share the cap",
+      "command": "python -m pytest tests/test_budgets.py::test_physical_call_cap -q"
+    },
+    {
+      "id": "T042",
+      "phase": "P4",
+      "depends_on": [
+        "T041"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_malformed_is_unknown",
+      "action": "Validate typed responses and preserve invalid HTTP-success output",
+      "acceptance": "Malformed output creates failure/unknown with a retained receipt",
+      "command": "python -m pytest tests/test_providers.py::test_malformed_is_unknown -q"
+    },
+    {
+      "id": "T043",
+      "phase": "P4",
+      "depends_on": [
+        "T042",
+        "T026"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/planner.py"
+      ],
+      "test_file": "tests/test_planner.py",
+      "test_name": "test_fresh_plan_binding",
+      "action": "Bind a fresh bounded planner response to request corpus and model",
+      "acceptance": "Plan stores its origin and unresolved completeness caveat",
+      "command": "python -m pytest tests/test_planner.py::test_fresh_plan_binding -q"
+    },
+    {
+      "id": "T044",
+      "phase": "P4",
+      "depends_on": [
+        "T042",
+        "T025"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/judge.py"
+      ],
+      "test_file": "tests/test_judge.py",
+      "test_name": "test_false_support_unknown",
+      "action": "Translate semantic support with explicit unknown/conflict",
+      "acceptance": "A false support score never alone proves the negative proposition",
+      "command": "python -m pytest tests/test_judge.py::test_false_support_unknown -q"
+    },
+    {
+      "id": "T045",
+      "phase": "P4",
+      "depends_on": [
+        "T044",
+        "T006"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/judge.py"
+      ],
+      "test_file": "tests/test_judge.py",
+      "test_name": "test_quote_not_semantic_proof",
+      "action": "Retain separate span-integrity and semantic-support assurance",
+      "acceptance": "An exact wrong-entity quote cannot be marked independently supported",
+      "command": "python -m pytest tests/test_judge.py::test_quote_not_semantic_proof -q"
+    },
+    {
+      "id": "T046",
+      "phase": "P4",
+      "depends_on": [
+        "T043",
+        "T044"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_real_adapter_smoke_contract",
+      "action": "Add opt-in real planner/judge smoke entrypoint and receipts",
+      "acceptance": "Successful real path and unavailable path are explicitly labeled with usage",
+      "command": "python -m pytest tests/test_providers.py::test_real_adapter_smoke_contract -q"
+    },
+    {
+      "id": "T047",
+      "phase": "P4",
+      "depends_on": [
+        "T041",
+        "T044"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/local_judge.py"
+      ],
+      "test_file": "tests/test_local_judge.py",
+      "test_name": "test_oversize_no_truncation",
+      "action": "Validate optional local judge environment and input envelope",
+      "acceptance": "Oversize input is rejected before inference and no automatic environment copy occurs",
+      "command": "python -m pytest tests/test_local_judge.py::test_oversize_no_truncation -q"
+    },
+    {
+      "id": "T048",
+      "phase": "P4",
+      "depends_on": [
+        "T046",
+        "T033"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/acquisition.py"
+      ],
+      "test_file": "tests/test_acquisition.py",
+      "test_name": "test_fresh_pipeline",
+      "action": "Connect fresh decomposition to canonical retrieval and observation",
+      "acceptance": "Fresh run preserves each decisive evidence binding and unresolved gap",
+      "command": "python -m pytest tests/test_acquisition.py::test_fresh_pipeline -q"
+    },
+    {
+      "id": "T049",
+      "phase": "P4",
+      "depends_on": [
+        "T048",
+        "T041"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/escalation.py"
+      ],
+      "test_file": "tests/test_escalation.py",
+      "test_name": "test_hy4_separate_outcome",
+      "action": "Add the selected Hy4 escalation path with explicit reason",
+      "acceptance": "Standalone failure/deferral remains saved and escalation is separately costed",
+      "command": "python -m pytest tests/test_escalation.py::test_hy4_separate_outcome -q"
+    },
+    {
+      "id": "T050",
+      "phase": "P4",
+      "depends_on": [
+        "T048"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/assurance.py"
+      ],
+      "test_file": "tests/test_assurance.py",
+      "test_name": "test_instruction_contamination_case",
+      "action": "Exercise source instructions and omitted-condition counterexamples",
+      "acceptance": "Known attacks are classified and no generic semantic-security claim is emitted",
+      "command": "python -m pytest tests/test_assurance.py::test_instruction_contamination_case -q"
+    },
+    {
+      "id": "T051",
+      "phase": "P4",
+      "depends_on": [
+        "T039",
+        "T048"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/replay.py"
+      ],
+      "test_file": "tests/test_replay.py",
+      "test_name": "test_verify_saved_structure",
+      "action": "Verify recorded composition and evidence without new inference",
+      "acceptance": "Replay changes no outcomes and cannot certify model semantics",
+      "command": "python -m pytest tests/test_replay.py::test_verify_saved_structure -q"
+    },
+    {
+      "id": "T052",
+      "phase": "P4",
+      "depends_on": [
+        "T041",
+        "T049"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/costs.py"
+      ],
+      "test_file": "tests/test_costs.py",
+      "test_name": "test_unknown_not_zero",
+      "action": "Aggregate all actual work with explicit unobserved cost",
+      "acceptance": "Missing cost stays unknown and failed/escalated calls remain included",
+      "command": "python -m pytest tests/test_costs.py::test_unknown_not_zero -q"
+    },
+    {
+      "id": "T053",
+      "phase": "P5",
+      "depends_on": [
+        "T038",
+        "T051"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/service.py"
+      ],
+      "test_file": "tests/test_service.py",
+      "test_name": "test_loopback_routes",
+      "action": "Expose a thin local source/request/run API",
+      "acceptance": "Valid requests have stable envelopes and malformed requests fail explicitly",
+      "command": "python -m pytest tests/test_service.py::test_loopback_routes -q"
+    },
+    {
+      "id": "T054",
+      "phase": "P5",
+      "depends_on": [
+        "T053"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_web.py",
+      "test_name": "test_source_to_decision",
+      "action": "Build import and question views over the actual service",
+      "acceptance": "Browser smoke imports a source and opens a real run result",
+      "command": "python -m pytest tests/test_web.py::test_source_to_decision -q"
+    },
+    {
+      "id": "T055",
+      "phase": "P5",
+      "depends_on": [
+        "T054"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_web.py",
+      "test_name": "test_inspect_unknowns",
+      "action": "Render decisive spans exclusions unknowns conflicts and caveats",
+      "acceptance": "An unknown reason and its source need are visible without reading JSON",
+      "command": "python -m pytest tests/test_web.py::test_inspect_unknowns -q"
+    },
+    {
+      "id": "T056",
+      "phase": "P5",
+      "depends_on": [
+        "T055",
+        "T037"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/interventions.py"
+      ],
+      "test_file": "tests/test_interventions.py",
+      "test_name": "test_decisive_and_irrelevant_changes",
+      "action": "Create derived source interventions with exact parent links",
+      "acceptance": "Decisive change alters outcome or uncertainty while irrelevant change does not",
+      "command": "python -m pytest tests/test_interventions.py::test_decisive_and_irrelevant_changes -q"
+    },
+    {
+      "id": "T057",
+      "phase": "P5",
+      "depends_on": [
+        "T051",
+        "T056"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/programs.py"
+      ],
+      "test_file": "tests/test_programs.py",
+      "test_name": "test_reviewed_exact_binding",
+      "action": "Implement draft/reviewed program lifecycle under exact binding",
+      "acceptance": "A different request or source cannot inherit reviewed applicability",
+      "command": "python -m pytest tests/test_programs.py::test_reviewed_exact_binding -q"
+    },
+    {
+      "id": "T058",
+      "phase": "P5",
+      "depends_on": [
+        "T053",
+        "T019"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/agents.py"
+      ],
+      "test_file": "tests/test_agents.py",
+      "test_name": "test_two_roles_shared_evidence",
+      "action": "Add two role-defined client adapters sharing canonical evidence",
+      "acceptance": "Both clients retain source identities while ranking/context may differ",
+      "command": "python -m pytest tests/test_agents.py::test_two_roles_shared_evidence -q"
+    },
+    {
+      "id": "T059",
+      "phase": "P5",
+      "depends_on": [
+        "T058",
+        "T009"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/writer.py"
+      ],
+      "test_file": "tests/test_writer.py",
+      "test_name": "test_serialized_idempotent_writes",
+      "action": "Serialize catalog/claim writes with idempotency",
+      "acceptance": "Concurrent identical client writes create one record and no lost revision",
+      "command": "python -m pytest tests/test_writer.py::test_serialized_idempotent_writes -q"
+    },
+    {
+      "id": "T060",
+      "phase": "P5",
+      "depends_on": [
+        "T058"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/claims.py"
+      ],
+      "test_file": "tests/test_claims.py",
+      "test_name": "test_claim_is_not_source",
+      "action": "Share an agent finding as an interpretation with evidence links",
+      "acceptance": "A second client cannot receive that finding as original source text",
+      "command": "python -m pytest tests/test_claims.py::test_claim_is_not_source -q"
+    },
+    {
+      "id": "T061",
+      "phase": "P5",
+      "depends_on": [
+        "T055",
+        "T052"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/export.py"
+      ],
+      "test_file": "tests/test_export.py",
+      "test_name": "test_trace_export_roundtrip",
+      "action": "Export trace provenance configuration and resource records",
+      "acceptance": "Reimported export retains unknowns costs source bindings and role version",
+      "command": "python -m pytest tests/test_export.py::test_trace_export_roundtrip -q"
+    },
+    {
+      "id": "T062",
+      "phase": "P5",
+      "depends_on": [
+        "T056",
+        "T057",
+        "T059",
+        "T060",
+        "T061"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/acceptance.py"
+      ],
+      "test_file": "tests/test_acceptance.py",
+      "test_name": "test_complete_local_workflow",
+      "action": "Verify full CLI/browser/two-client workflow and interruption",
+      "acceptance": "Actual walkthrough receipt distinguishes real models from deterministic providers",
+      "command": "python -m pytest tests/test_acceptance.py::test_complete_local_workflow -q"
+    },
+    {
+      "id": "T063",
+      "phase": "P6",
+      "depends_on": [
+        "T061"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_exclude_gold_from_index",
+      "action": "Keep reference labels and arm mappings outside retrievable sources",
+      "acceptance": "Index/provider input rejects evaluation-only files",
+      "command": "python -m pytest tests/test_evaluation.py::test_exclude_gold_from_index -q"
+    },
+    {
+      "id": "T064",
+      "phase": "P6",
+      "depends_on": [
+        "T063"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_grouped_frozen_cases",
+      "action": "Freeze development/pilot/holdout by related source families",
+      "acceptance": "Near duplicates and paired interventions cannot cross splits",
+      "command": "python -m pytest tests/test_evaluation.py::test_grouped_frozen_cases -q"
+    },
+    {
+      "id": "T065",
+      "phase": "P6",
+      "depends_on": [
+        "T064",
+        "T048"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_competent_direct_arm",
+      "action": "Add direct small-model retrieval baseline with matched access",
+      "acceptance": "Direct arm gets the same corpus and opportunity for bounded followup",
+      "command": "python -m pytest tests/test_evaluation.py::test_competent_direct_arm -q"
+    },
+    {
+      "id": "T066",
+      "phase": "P6",
+      "depends_on": [
+        "T065"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_factorial_arms",
+      "action": "Define direct full evidence retrieval-only decomposition-only and combined arms",
+      "acceptance": "Exactly named arms isolate catalog and decomposition contributions",
+      "command": "python -m pytest tests/test_evaluation.py::test_factorial_arms -q"
+    },
+    {
+      "id": "T067",
+      "phase": "P6",
+      "depends_on": [
+        "T066",
+        "T049"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_separate_reuse_escalation",
+      "action": "Keep authored reuse and Hy4 fallback arms out of standalone result",
+      "acceptance": "A fallback success cannot overwrite the original arm outcome",
+      "command": "python -m pytest tests/test_evaluation.py::test_separate_reuse_escalation -q"
+    },
+    {
+      "id": "T068",
+      "phase": "P6",
+      "depends_on": [
+        "T066",
+        "T052"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_all_assigned_denominator",
+      "action": "Score every assigned case and complete cost/latency ledger",
+      "acceptance": "Timeout invalid output unjustified deferral and unknown review stay visible",
+      "command": "python -m pytest tests/test_evaluation.py::test_all_assigned_denominator -q"
+    },
+    {
+      "id": "T069",
+      "phase": "P6",
+      "depends_on": [
+        "T068"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_review_provenance",
+      "action": "Support separate AI review and independently adjudicated references",
+      "acceptance": "AI labels are explicitly unvalidated and reviewer provenance is retained",
+      "command": "python -m pytest tests/test_evaluation.py::test_review_provenance -q"
+    },
+    {
+      "id": "T070",
+      "phase": "P6",
+      "depends_on": [
+        "T069"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_intervention_pair_report",
+      "action": "Report decisive missing and irrelevant changes as grouped pairs",
+      "acceptance": "Both answer and decisive evidence are checked with expectations",
+      "command": "python -m pytest tests/test_evaluation.py::test_intervention_pair_report -q"
+    },
+    {
+      "id": "T071",
+      "phase": "P6",
+      "depends_on": [
+        "T070"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_locked_pilot",
+      "action": "Run a bounded predeclared real-agent development pilot",
+      "acceptance": "No model or retrieval improvement claim exceeds measured outcomes",
+      "command": "python -m pytest tests/test_evaluation.py::test_locked_pilot -q"
+    },
+    {
+      "id": "T072",
+      "phase": "P6",
+      "depends_on": [
+        "T071"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_benefit_decision",
+      "action": "Generate retain revise or remove recommendation from prespecified criteria",
+      "acceptance": "No-gain result can remove complexity and all negative results remain",
+      "command": "python -m pytest tests/test_evaluation.py::test_benefit_decision -q"
+    },
+    {
+      "id": "T073",
+      "phase": "P6",
+      "depends_on": [
+        "T062",
+        "T072"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/release.py"
+      ],
+      "test_file": "tests/test_release.py",
+      "test_name": "test_clean_install_smoke",
+      "action": "Verify clean install startup tests and documented commands",
+      "acceptance": "Fresh environment works without legacy data envs or absolute imports",
+      "command": "python -m pytest tests/test_release.py::test_clean_install_smoke -q"
+    },
+    {
+      "id": "T074",
+      "phase": "P6",
+      "depends_on": [
+        "T073"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/documentation.py"
+      ],
+      "test_file": "tests/test_documentation.py",
+      "test_name": "test_evidence_audit",
+      "action": "Reconcile goal queue implementation docs and receipts",
+      "acceptance": "Every completion claim links actual evidence and every open gate remains visible",
+      "command": "python -m pytest tests/test_documentation.py::test_evidence_audit -q"
+    }
+  ]
+}

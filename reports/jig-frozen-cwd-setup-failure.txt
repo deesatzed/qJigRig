@@ -1,0 +1,67 @@
+................EF.......................................................................................................127.0.0.1 - - [06/Nov/2026 16:23:39] "GET /api/export-comparison/df2bc3f447614efdbc89b9658869e905 HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:23:39] "GET /api/export-comparison/df2bc3f447614efdbc89b9658869e905 HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:40] "GET /api/comparison-journal HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:40] "POST /api/snapshots HTTP/1.1" 403 -
+127.0.0.1 - - [06/Nov/2026 16:23:40] "POST /api/snapshots HTTP/1.1" 415 -
+127.0.0.1 - - [06/Nov/2026 16:23:40] "POST /api/snapshots HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:41] "POST /api/dataset-resume-background HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:23:41] "POST /api/dataset-resume-background HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:23:41] "POST /api/dataset-resume-background HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:23:41] "POST /api/dataset-run HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:42] "GET /api/preflight HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:42] "GET /review?comparison=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:43] "GET /api/run-journal HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:43] "GET /api/run-journal HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:44] "GET /api/run-options HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:23:44] "GET /api/run/c8d7493df13542e894cda2f44410af72 HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:44] "GET /api/snapshot/d1202e490dd84e2dacdfdaa242783e62 HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:23:44] "GET /api/snapshot/not-valid HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:23:45] "POST /api/snapshots HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:23:45] "POST /api/snapshots HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:23:45] "GET /api/source-options HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:23:46] "POST /api/compare HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:23:46] "POST /api/dataset-run HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:23:46] "POST /api/compare HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:23:46] "POST /api/dataset-run HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:23:46] "POST /api/compare HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:23:46] "POST /api/dataset-run HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:23:46] "GET /api/snapshots HTTP/1.1" 403 -
+127.0.0.1 - - [06/Nov/2026 16:23:46] "GET /api/snapshots HTTP/1.1" 200 -
+............................................................................................F......................
+======================================================================
+ERROR: test_import_and_derive_preserve_utf8_line_endings (test_cli_errors.CliErrorTests.test_import_and_derive_preserve_utf8_line_endings)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/qjig-synthesis-20261106/jig-audit/tests/test_cli_errors.py", line 18, in test_import_and_derive_preserve_utf8_line_endings
+    imported=json.loads(run('import',str(source)).stdout)
+                        ~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/qjig-synthesis-20261106/jig-audit/tests/test_cli_errors.py", line 17, in run
+    return subprocess.run([sys.executable,'-m','workbench',*args],env=env,capture_output=True,text=True,check=True)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/o2satz/miniforge3/envs/py313/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/Users/o2satz/miniforge3/envs/py313/bin/python', '-m', 'workbench', 'import', '/var/folders/w6/bt1vjqpn7v5dynzljb0jk_300000gn/T/tmpxyttqxf_/source.txt']' returned non-zero exit status 1.
+
+======================================================================
+FAIL: test_missing_run_reports_expected_error_without_traceback (test_cli_errors.CliErrorTests.test_missing_run_reports_expected_error_without_traceback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/qjig-synthesis-20261106/jig-audit/tests/test_cli_errors.py", line 30, in test_missing_run_reports_expected_error_without_traceback
+    self.assertIn('error:',result.stderr.lower())
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'error:' not found in '/users/o2satz/miniforge3/envs/py313/bin/python: no module named workbench\n'
+
+======================================================================
+FAIL: test_cli_returns_nonzero_on_failed_verification (test_verify_run.VerifyRunTests.test_cli_returns_nonzero_on_failed_verification)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/qjig-synthesis-20261106/jig-audit/tests/test_verify_run.py", line 94, in test_cli_returns_nonzero_on_failed_verification
+    self.assertEqual(valid.returncode,0)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 250 tests in 9.577s
+
+FAILED (failures=2, errors=1)

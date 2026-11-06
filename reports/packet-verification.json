@@ -1,0 +1,18 @@
+{
+  "schema": "qjig-review-packet-verification-v1",
+  "status": "passed",
+  "required_documents": 17,
+  "pending_tasks": 74,
+  "dependency_graph": "acyclic/topologically ordered",
+  "checked_sources": [
+    {
+      "source": "Decision_Program_Codex_Handoff",
+      "files": 149
+    },
+    {
+      "source": "sources/quixer",
+      "files": 156
+    }
+  ],
+  "scope": "review packet only; no qJig runtime acceptance"
+}

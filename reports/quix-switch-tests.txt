@@ -1,0 +1,43 @@
+$ node --test tests/*.test.ts
+✔ one-shot fixture runner returns source-bound evidence without a model (200.731667ms)
+✔ one-shot runner returns a structured failure for malformed input (194.174917ms)
+✔ repeated headings remain distinct selectable passages (12.374417ms)
+✔ inspects a source-bound section, stops, and replays without a model (4.19875ms)
+✔ withholds inspected evidence if its source changes before stop (1.887708ms)
+✔ inspecting a topic reveals its candidate IDs to the next decision (0.763458ms)
+✔ provider exceptions yield an explicit insufficient-evidence result (0.35ms)
+✔ an agent record cannot substitute unrelated evidence sources (1.135625ms)
+✔ an agent record cannot duplicate one source to hide another missing source (0.807083ms)
+✔ step exhaustion is reported even after gathering evidence (1.48075ms)
+✔ navigates a real Python catalog snapshot without mutating it (62.292083ms)
+✔ verifies a generated passage using the source section offsets (51.141584ms)
+✔ keeps a supported agent finding distinct from its source evidence (48.844ms)
+✔ rejects snapshot text that does not match the cited source span (1.120125ms)
+✔ verifies a UTF-8 source containing a byte-order mark (1.184708ms)
+✔ model view truncates evidence to its budget and labels truncation (1.657ms)
+✔ model-call cap includes switch retries (0.390959ms)
+✔ stale agent evidence is explicitly rejected without invalidating the snapshot (0.29325ms)
+✔ visited passages are not offered again (1.400625ms)
+✔ invalid model choice cannot cause an arbitrary action (0.13975ms)
+✔ role estimates are labeled in choices without filtering other candidates (0.547ms)
+✔ a bounded initial set retains all other candidates for broadening (0.837208ms)
+✔ project snapshot refuses a missing source rather than silently narrowing the corpus (57.539625ms)
+✔ bounded choices page through all candidates and distinguish duplicate titles (7.099083ms)
+✔ bounded pages expose the final candidate within the maximum step budget (7.559875ms)
+✔ maps stable choice answers and records actual usage without credentials (2.448458ms)
+✔ abstains on inconsistent option order or malformed response (0.370416ms)
+✔ bounds physical requests and times out a stalled transport (21.636625ms)
+✔ physical request cap holds under concurrent calls (12.130791ms)
+✔ default transport stops reading an oversized response (16.140791ms)
+✔ one-shot replay uses recorded decisions and rejects changed source bytes (593.953916ms)
+✔ one-shot replay rejects malformed input (161.237375ms)
+✔ replaying an insufficient-evidence trace keeps the failure explicit (334.730459ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1241.111583
+$ tsc --noEmit

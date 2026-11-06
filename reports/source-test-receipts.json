@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-06",
+  "runtime": "Python 3.13.9",
+  "quixer": {
+    "commit": "1790086a5d3b178957ce80324c0f283dbcf78c97",
+    "command": "python -m pytest -q",
+    "exit_code": 0,
+    "passed": 263,
+    "seconds": 6.44,
+    "warning": "existing SWIG deprecation warning"
+  },
+  "switch": {
+    "commands": [
+      "pnpm test",
+      "pnpm typecheck"
+    ],
+    "exit_code": 0,
+    "passed": 33
+  },
+  "jig_moved": {
+    "command": "python scripts/offline_tests.py",
+    "exit_code": 0,
+    "tests": 250,
+    "seconds": 10.105
+  },
+  "jig_frozen": {
+    "command": "python scripts/offline_tests.py",
+    "exit_code": 0,
+    "tests": 250,
+    "seconds": 9.797,
+    "earlier_harness_errors": [
+      "initial copy omitted rst fixtures",
+      "second run used incorrect cwd for child CLI processes"
+    ]
+  },
+  "scope": "source suites and compatibility; no combined runtime or paid calls"
+}

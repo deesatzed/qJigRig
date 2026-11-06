@@ -1,0 +1,34 @@
+.........................................................................................................................127.0.0.1 - - [06/Nov/2026 16:24:11] "GET /api/export-comparison/e98eb21bfbca4aab80cb25ec3ab6a103 HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:24:11] "GET /api/export-comparison/e98eb21bfbca4aab80cb25ec3ab6a103 HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:12] "GET /api/comparison-journal HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:12] "POST /api/snapshots HTTP/1.1" 403 -
+127.0.0.1 - - [06/Nov/2026 16:24:12] "POST /api/snapshots HTTP/1.1" 415 -
+127.0.0.1 - - [06/Nov/2026 16:24:12] "POST /api/snapshots HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:13] "POST /api/dataset-resume-background HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:24:13] "POST /api/dataset-resume-background HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:24:13] "POST /api/dataset-resume-background HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:24:13] "POST /api/dataset-run HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:14] "GET /api/preflight HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:14] "GET /review?comparison=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:15] "GET /api/run-journal HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:15] "GET /api/run-journal HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:16] "GET /api/run-options HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:24:16] "GET /api/run/ef2c38b4f3604f52aacda05d20785d72 HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:16] "GET /api/snapshot/6f7fa68f84094930a928f8d6fdaffc51 HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:24:16] "GET /api/snapshot/not-valid HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:24:17] "POST /api/snapshots HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:24:17] "POST /api/snapshots HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:24:17] "GET /api/source-options HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:24:18] "POST /api/compare HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:24:18] "POST /api/dataset-run HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:24:18] "POST /api/compare HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:24:18] "POST /api/dataset-run HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:24:18] "POST /api/compare HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:24:18] "POST /api/dataset-run HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:24:18] "GET /api/snapshots HTTP/1.1" 403 -
+127.0.0.1 - - [06/Nov/2026 16:24:18] "GET /api/snapshots HTTP/1.1" 200 -
+...................................................................................................................
+----------------------------------------------------------------------
+Ran 250 tests in 9.797s
+
+OK

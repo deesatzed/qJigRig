@@ -1,0 +1,85 @@
+.........................................................................................................................127.0.0.1 - - [06/Nov/2026 16:22:52] "GET /api/export-comparison/cea3fa92e349403aab53f4d358a2531f HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:22:52] "GET /api/export-comparison/cea3fa92e349403aab53f4d358a2531f HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:53] "GET /api/comparison-journal HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:53] "POST /api/snapshots HTTP/1.1" 403 -
+127.0.0.1 - - [06/Nov/2026 16:22:53] "POST /api/snapshots HTTP/1.1" 415 -
+127.0.0.1 - - [06/Nov/2026 16:22:53] "POST /api/snapshots HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:54] "POST /api/dataset-resume-background HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:22:54] "POST /api/dataset-resume-background HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:22:54] "POST /api/dataset-resume-background HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:22:54] "POST /api/dataset-run HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:55] "GET /api/preflight HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:55] "GET /review?comparison=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:56] "GET /api/run-journal HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:56] "GET /api/run-journal HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:57] "GET /api/run-options HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:22:57] "GET /api/run/c7e5a34599c24829bb044010a41678a9 HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:57] "GET /api/snapshot/972ff3b03b604054ab1d38af89f14d72 HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:22:57] "GET /api/snapshot/not-valid HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:22:58] "POST /api/snapshots HTTP/1.1" 200 -
+127.0.0.1 - - [06/Nov/2026 16:22:58] "POST /api/snapshots HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:22:58] "GET /api/source-options HTTP/1.1" 200 -
+.127.0.0.1 - - [06/Nov/2026 16:22:59] "POST /api/compare HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:22:59] "POST /api/dataset-run HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:22:59] "POST /api/compare HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:22:59] "POST /api/dataset-run HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:22:59] "POST /api/compare HTTP/1.1" 400 -
+127.0.0.1 - - [06/Nov/2026 16:22:59] "POST /api/dataset-run HTTP/1.1" 400 -
+.127.0.0.1 - - [06/Nov/2026 16:22:59] "GET /api/snapshots HTTP/1.1" 403 -
+127.0.0.1 - - [06/Nov/2026 16:22:59] "GET /api/snapshots HTTP/1.1" 200 -
+............................................................................EEE....................................
+======================================================================
+ERROR: test_development_references_are_exact_spans_and_match_question_ids (test_starter.StarterTests.test_development_references_are_exact_spans_and_match_question_ids)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/qjig-synthesis-20261106/jig-audit/tests/test_starter.py", line 15, in test_development_references_are_exact_spans_and_match_question_ids
+    self.assertIn(item['quote'],(folder/item['source']).read_text())
+                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/o2satz/miniforge3/envs/py313/lib/python3.13/pathlib/_local.py", line 546, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/o2satz/miniforge3/envs/py313/lib/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/o2satz/miniforge3/envs/py313/lib/python3.13/pathlib/_local.py", line 537, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/private/tmp/qjig-synthesis-20261106/jig-audit/starter_corpus/python-3.12.10-keyword.rst'
+
+======================================================================
+ERROR: test_initialization_freezes_sources_and_questions_without_reference_labels (test_starter.StarterTests.test_initialization_freezes_sources_and_questions_without_reference_labels)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/qjig-synthesis-20261106/jig-audit/tests/test_starter.py", line 36, in test_initialization_freezes_sources_and_questions_without_reference_labels
+    result=starter.initialize_development()
+  File "/private/tmp/qjig-synthesis-20261106/jig-audit/workbench/starter.py", line 14, in initialize_development
+    raw=(folder/source_name).read_bytes()
+  File "/Users/o2satz/miniforge3/envs/py313/lib/python3.13/pathlib/_abc.py", line 625, in read_bytes
+    with self.open(mode='rb') as f:
+         ~~~~~~~~~^^^^^^^^^^^
+  File "/Users/o2satz/miniforge3/envs/py313/lib/python3.13/pathlib/_local.py", line 537, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/private/tmp/qjig-synthesis-20261106/jig-audit/starter_corpus/python-3.12.10-keyword.rst'
+
+======================================================================
+ERROR: test_source_hash_failure_does_not_create_records (test_starter.StarterTests.test_source_hash_failure_does_not_create_records)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/qjig-synthesis-20261106/jig-audit/tests/test_starter.py", line 27, in test_source_hash_failure_does_not_create_records
+    with self.assertRaisesRegex(ValueError,'hash mismatch'): starter.initialize_development()
+                                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/private/tmp/qjig-synthesis-20261106/jig-audit/workbench/starter.py", line 14, in initialize_development
+    raw=(folder/source_name).read_bytes()
+  File "/Users/o2satz/miniforge3/envs/py313/lib/python3.13/pathlib/_abc.py", line 625, in read_bytes
+    with self.open(mode='rb') as f:
+         ~~~~~~~~~^^^^^^^^^^^
+  File "/Users/o2satz/miniforge3/envs/py313/lib/python3.13/pathlib/_local.py", line 537, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/var/folders/w6/bt1vjqpn7v5dynzljb0jk_300000gn/T/tmpsf5qwasx/starter_corpus/python-3.12.10-keyword.rst'
+
+----------------------------------------------------------------------
+Ran 250 tests in 10.056s
+
+FAILED (errors=3)

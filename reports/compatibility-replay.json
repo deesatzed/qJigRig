@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "observations": {
+    "hash_contract": {
+      "quix_hash": "2fcfb7830c3bb1c40b0a64f0549acc4c661f7f9f8c39d3b8ecaaf51313670f68",
+      "jig_hash": "6a3b3844470e683f7a512580fadff3a56d3f793f7339eef7cecddaf7a7d82b8e",
+      "same_raw_file_different_hashes": true,
+      "quix_universal_newlines": true
+    },
+    "mixed_date_collection": {
+      "rejected": "Collection sources must share exact scope and effective dates"
+    },
+    "unknown_exception": {
+      "ordinary_false_exception_missing": null,
+      "exception_material": true
+    },
+    "conflict_preserved": "conflict"
+  }
+}
