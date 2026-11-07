@@ -54,9 +54,11 @@ def upper_cost(model: dict, *, input_tokens: int, output_tokens: int) -> Decimal
         raise ContractError("invalid pricing overrides")
     rates = {}
     for index, item in enumerate([pricing, *overrides]):
-        allowed = _INPUT_RATES | _OUTPUT_RATES | ({"overrides"} if index == 0 else _CONDITIONS)
+        allowed = _INPUT_RATES | _OUTPUT_RATES | ({"overrides", "discount"} if index == 0 else _CONDITIONS)
         if set(item) - allowed:
             raise ContractError("unsupported pricing category")
+        if index == 0 and "discount" in item and (type(item["discount"]) not in (int, float) or item["discount"] != 0):
+            raise ContractError("unsupported pricing discount")
         for name in (_INPUT_RATES | _OUTPUT_RATES) & item.keys():
             rates[name] = max(rates.get(name, Decimal(0)), _rate(item[name]))
     with localcontext() as ctx:

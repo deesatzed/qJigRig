@@ -1399,7 +1399,8 @@
         "R08A",
         "R08B",
         "R08C",
-        "R08D"
+        "R08D",
+        "R08E"
       ],
       "status": "pending",
       "files": [],
@@ -3000,6 +3001,24 @@
       "acceptance": "Journal-linked provider errors, HTTP errors and pending timeouts remain distinct and cannot produce a conditional answer; mismatched reconciliation or receipts refuse.",
       "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
       "evidence": "Red: incomplete fresh judge HTTP failures, provider unavailability and timeouts were rejected instead of retained. Scoring now checks every call identity and receipt or failure terminal against its journal, preserves per-call failures, and distinguishes malformed, HTTP/provider failure and pending uncertain outcomes for synthetic judge and reviewer attempts. Mixed malformed plus HTTP failures remain individually recorded. Changed journal data and stale reconciliation reject. Focused evaluation/replay/acquisition 70 passed; full offline suite 539 passed. Reconciled-call recovery, unrecorded budget refusals and unknown validator failures remain unscored; no provider calls were made."
+    },
+    {
+      "id": "R08E",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/pricing.py"
+      ],
+      "test_file": "tests/test_pricing.py",
+      "test_name": "test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse",
+      "action": "Recognize neutral zero-discount metadata in endpoint pricing",
+      "acceptance": "Numeric zero discount is accepted without reducing prices; nonzero, malformed discounts and unknown charges refuse.",
+      "command": "python -m pytest tests/test_pricing.py::test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse -q",
+      "evidence": "Red: synthetic current-shape endpoint pricing with numeric zero discount was rejected as an unknown category. Zero is now accepted without price reduction; nonzero, malformed discounts and unrecognized charges still refuse. Focused pricing/goal/evaluation suite 89 passed; full offline suite 540 passed. Public endpoint catalog read found configured model IDs and discount metadata; availability, token bounds, provider enforcement and complete billing remain unverified and hosted dispatch stays disabled."
     }
   ]
 }

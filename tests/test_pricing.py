@@ -60,3 +60,14 @@ def test_capped_routing_reservation_covers_ceiling_and_snapshot():
     ceiling_cost = Decimal('10') * 100 / 1000000 + Decimal('20') * 50 / 1000000
     reservation = make_call_reservation(request, model, input_tokens=100, input_bound_provenance='fixture')
     assert Decimal(str(reservation.cost_usd)) >= snapshot_cost + ceiling_cost
+
+
+def test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse():
+    model = {'id':'synthetic/model','context_length':1000,'top_provider':{'max_completion_tokens':100},
+             'pricing':{'prompt':'0.000001','completion':'0.000002','input_cache_read':'0.0000001','discount':0}}
+    assert upper_cost(model,input_tokens=100,output_tokens=50) == Decimal('0.0002100')
+    for value in (0.1, -1, True, '0', None, float('nan')):
+        with pytest.raises(ContractError):
+            upper_cost({**model,'pricing':{**model['pricing'],'discount':value}},input_tokens=100,output_tokens=50)
+    with pytest.raises(ContractError):
+        upper_cost({**model,'pricing':{**model['pricing'],'web_search':'0.01'}},input_tokens=100,output_tokens=50)
