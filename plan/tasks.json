@@ -576,7 +576,7 @@
         "T033",
         "T024"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/acquisition.py"
       ],
@@ -584,7 +584,8 @@
       "test_name": "test_bounded_followup",
       "action": "Allow one targeted followup for a material unresolved need",
       "acceptance": "A third round is refused and remains an explicit unknown",
-      "command": "python -m pytest tests/test_acquisition.py::test_bounded_followup -q"
+      "command": "python -m pytest tests/test_acquisition.py::test_bounded_followup -q",
+      "evidence": "Red: ImportError Refusal (initial contract). Green: focused 1 passed in 0.05s; tests/test_acquisition.py 5 passed in 0.06s; full suite 183 passed in 0.23s. 2026-11-06."
     },
     {
       "id": "T035",

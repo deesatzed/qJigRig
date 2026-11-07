@@ -88,3 +88,73 @@ def test_nothing_to_do_returns_none(tmp_path):
         assert run_round(state, ctx) is not None
         assert run_round(state, ctx) is None  # resolved: no material need remains
         assert len(state.trace) == 1
+
+
+from dataclasses import replace
+
+from qjig.acquisition import Refusal
+
+
+WAIVER = rev("# Waivers\nA manager may grant a waiver of the refund limit.\n", "policy/waiver.md")
+
+
+def waiver_run(tmp_path, first_query, followup_query, can_find=True):
+    cat = Catalog.open(tmp_path / "w.sqlite")
+    cat.add_revision(WAIVER)
+    save_entries(cat, index_entries(WAIVER))
+    entries = current_entries(cat, WAIVER.source_id, WAIVER.revision_id)
+
+    def evaluate(packet, recovery):
+        hit = [i.entry_id for i in packet.items if "manager" in i.span.text]
+        return EvalResult(Outcome.TRUE if hit else Outcome.UNKNOWN, "waiver_found" if hit else "no_waiver_text", tuple(hit))
+
+    follow = NeedSpec(followup_query, 1, 3000, evaluate) if followup_query else None
+    spec = NeedSpec(first_query, 1, 3000, evaluate, followup=follow)
+    plan = parse_plan({"origin": "authored", "predicates": [{"id": "waiver", "question": "Is a waiver available?"}], "expression": {"ref": "waiver"}})
+    ledger = ObligationLedger()
+    ledger.open(Obligation("ob-waiver", "exception", "waiver", "waiver evidence", material=True))
+    state = RunState(Request("req-2", "q", "reviewer", "1", "project"), plan, ledger)
+    return cat, state, Context(cat, entries, None, {"waiver": spec})
+
+
+def test_bounded_followup(tmp_path):
+    # first query finds nothing; one targeted followup is allowed and resolves it
+    cat, state, ctx = waiver_run(tmp_path, "exception", "manager waiver")
+    with cat:
+        r1, r2 = run_round(state, ctx), run_round(state, ctx)
+        assert (r1.round_number, r1.query, r1.observation.outcome, r1.observation.reason) == (1, "exception", Outcome.UNKNOWN, "no_retrieval_hit")
+        assert (r2.round_number, r2.query, r2.observation.outcome) == (2, "manager waiver", Outcome.TRUE)
+        assert run_round(state, ctx) is None and state.refusals == []
+
+    # the followup also fails: a third round is refused and the predicate stays an explicit unknown
+    cat, state, ctx = waiver_run(tmp_path, "exception", "carbon")
+    with cat:
+        assert run_round(state, ctx).round_number == 1
+        assert run_round(state, ctx).round_number == 2
+        assert run_round(state, ctx) is None
+        assert run_round(state, ctx) is None
+        assert [r.round_number for r in state.trace] == [1, 2]  # no third physical round
+        assert state.observations["waiver"].outcome is Outcome.UNKNOWN
+        assert state.refusals == [Refusal("waiver", "round_limit")]  # recorded once
+        assert state.ledger.get("ob-waiver").status == "unresolved"
+
+
+def test_no_followup_without_a_targeted_query(tmp_path):
+    cat, state, ctx = waiver_run(tmp_path, "exception", None)
+    with cat:
+        assert run_round(state, ctx).round_number == 1
+        assert run_round(state, ctx) is None  # repeating the same query would find the same thing
+        assert state.refusals == [Refusal("waiver", "no_targeted_followup")]
+        assert state.observations["waiver"].outcome is Outcome.UNKNOWN
+
+
+def test_max_rounds_is_configurable_but_never_above_two(tmp_path):
+    import pytest as _pytest
+
+    cat, state, ctx = waiver_run(tmp_path, "exception", "carbon")
+    with cat:
+        with _pytest.raises(ValueError):
+            replace(ctx, max_rounds=3)
+        one = replace(ctx, max_rounds=1)
+        assert run_round(state, one).round_number == 1
+        assert run_round(state, one) is None and state.refusals == [Refusal("waiver", "round_limit")]

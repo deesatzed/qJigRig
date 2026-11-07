@@ -6,7 +6,8 @@ from typing import Callable
 
 from .applicability import Applicability
 from .indexing import IndexEntry
-from .logic import Observation, Outcome
+from .contracts import ContractError
+from .logic import Observation, Outcome, is_material
 from .obligations import ObligationLedger
 from .packets import EvidencePacket
 from .plans import Plan
@@ -32,6 +33,9 @@ class NeedSpec:
     want: int
     max_bytes: int
     evaluate: Callable[[EvidencePacket, RecoveryResult], EvalResult]
+    followup: "NeedSpec | None" = None  # the single targeted second attempt, if any
+
+MAX_ROUNDS = 2  # baseline cap per predicate: the first attempt plus one targeted followup
 
 
 @dataclass(frozen=True)
@@ -40,6 +44,17 @@ class Context:
     entries: list[IndexEntry]  # current entries to search
     applicability: Callable[[Candidate], Applicability] | None
     specs: dict[str, NeedSpec]
+    max_rounds: int = MAX_ROUNDS
+
+    def __post_init__(self) -> None:
+        if type(self.max_rounds) is not int or not 1 <= self.max_rounds <= MAX_ROUNDS:
+            raise ContractError(f"max_rounds must be an integer from 1 to {MAX_ROUNDS}")
+
+
+@dataclass(frozen=True)
+class Refusal:
+    predicate_id: str
+    reason: str  # round_limit | no_targeted_followup
 
 
 @dataclass
@@ -50,6 +65,7 @@ class RunState:
     observations: dict[str, Observation] = field(default_factory=dict)
     attempts: dict[str, int] = field(default_factory=dict)
     trace: list["TraceRecord"] = field(default_factory=list)
+    refusals: list[Refusal] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -78,10 +94,25 @@ class TraceRecord:
 
 def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
     """Work on the next material need once. Returns the trace record, or None if none remains."""
-    pid = next_need(state.plan, state.observations)
+    exhausted: dict[str, str] = {}
+    for p in state.plan.predicates:
+        done = state.attempts.get(p.id, 0)
+        base = ctx.specs[p.id]
+        available = min(ctx.max_rounds, 1 + (1 if base.followup else 0))
+        if done >= available:
+            exhausted[p.id] = "round_limit" if done >= ctx.max_rounds else "no_targeted_followup"
+    pid = next_need(state.plan, state.observations, exhausted=frozenset(exhausted))
     if pid is None:
+        for p_id, reason in exhausted.items():  # material needs left unresolved: say so, once
+            o = state.observations.get(p_id)
+            unresolved = o is None or o.outcome not in (Outcome.TRUE, Outcome.FALSE)
+            if unresolved and is_material(p_id, state.plan.expression, state.observations):
+                refusal = Refusal(p_id, reason)
+                if refusal not in state.refusals:
+                    state.refusals.append(refusal)
         return None
-    spec = ctx.specs[pid]
+    base = ctx.specs[pid]
+    spec = base if state.attempts.get(pid, 0) == 0 else base.followup
     candidates = bm25_candidates(ctx.entries, spec.query)
     recovery = recover_packet(
         ctx.catalog, candidates, want=spec.want, max_bytes=spec.max_bytes, applicability=ctx.applicability
