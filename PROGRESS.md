@@ -126,3 +126,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `bm25_candidates` and `tokenize` in `src/qjig/retrieval.py`: Okapi BM25 (k1=1.2, b=0.75) over entry span text, unicode lowercase \\w+ tokens, no stemming or stopwords. Each candidate carries per-term frequency/document frequency/contribution, corpus size and average length. Identical documents tie exactly and order by entry_id; repeated runs and reversed input give identical results; non-matching entries are omitted; empty/punctuation queries give none. Limits: parameters are standard defaults, not tuned; scores are uncalibrated and only meaningful within one corpus; one test expectation was initially wrong (my miscount of 'Refunds' vs 'refund') and was corrected, not the code.
 - Red: ModuleNotFoundError qjig.retrieval (initial contract). Green: focused 1 passed in 0.05s; tests/test_retrieval.py 3 passed in 0.03s; full suite 70 passed in 0.15s. 2026-11-06.
+
+## 2026-11-06: T018 complete
+
+- `TopicIndex.attach` creates proposed `TopicLink`s holding a `SpanRef` (revision, offsets, text hash) and no text; two topics on one entry share an identical span reference; attach is idempotent; blank topics rejected. Limits: in-memory only, not persisted in the catalog and lost on exit; topics are exact strings; method name is a placeholder for manual attachment.
+- Red: ModuleNotFoundError qjig.topics (initial contract). Green: focused 1 passed in 0.04s; tests/test_topics.py 2 passed in 0.03s; full suite 72 passed in 0.16s. 2026-11-06.
