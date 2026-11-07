@@ -7,7 +7,7 @@ from pathlib import Path
 from .contracts import ContractError
 from .sources import SourceRevision, decode_source
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _SCHEMA = """
 CREATE TABLE revisions(
@@ -60,6 +60,14 @@ CREATE TRIGGER agent_interpretations_no_delete BEFORE DELETE ON agent_interpreta
   BEGIN SELECT RAISE(ABORT, 'interpretations are immutable'); END;
 """
 
+_INTERVENTION_SCHEMA = """
+CREATE TABLE interventions(intervention_id TEXT PRIMARY KEY, parent_revision_id TEXT NOT NULL, child_revision_id TEXT NOT NULL, payload TEXT NOT NULL);
+CREATE TRIGGER interventions_no_update BEFORE UPDATE ON interventions
+  BEGIN SELECT RAISE(ABORT, 'interventions are immutable'); END;
+CREATE TRIGGER interventions_no_delete BEFORE DELETE ON interventions
+  BEGIN SELECT RAISE(ABORT, 'interventions are immutable'); END;
+"""
+
 
 def _execute_schema(con: sqlite3.Connection, script: str) -> None:
     """Execute schema statements inside the caller's transaction, including triggers."""
@@ -85,9 +93,10 @@ class Catalog:
             if version != SCHEMA_VERSION:
                 con.execute("BEGIN IMMEDIATE")
                 version = con.execute("PRAGMA user_version").fetchone()[0]
-                scripts = {0: _SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA,
-                           1: _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA,
-                           2: _METADATA_SCHEMA + _CLAIM_SCHEMA, 3: _CLAIM_SCHEMA}
+                scripts = {0: _SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA,
+                           1: _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA,
+                           2: _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA,
+                           3: _CLAIM_SCHEMA + _INTERVENTION_SCHEMA, 4: _INTERVENTION_SCHEMA}
                 if version == SCHEMA_VERSION:
                     pass  # another opener completed the migration while we waited
                 elif version in scripts:
@@ -126,7 +135,7 @@ class Catalog:
                 ),
             )
 
-    def import_snapshot(self, revision: SourceRevision, entries: list, metadata: tuple) -> bool:
+    def import_snapshot(self, revision: SourceRevision, entries: list, metadata: tuple, *, parent_link: tuple | None = None) -> bool:
         """Atomically add one service snapshot, including indexes and supersession."""
         from .spans import verify_span
         if not isinstance(revision, SourceRevision) or len(metadata) != 7 or metadata[0] != revision.revision_id:
@@ -140,8 +149,23 @@ class Catalog:
                          e.span.start, e.span.end, e.span.text_sha256, e.parent_entry_id))
         self._con.execute("BEGIN IMMEDIATE")
         try:
+            if parent_link is not None:
+                ident, parent, child, payload = parent_link
+                if child != revision.revision_id or self.get_revision(parent).source_id != revision.source_id:
+                    raise ContractError("invalid intervention linkage")
+                saved = self._con.execute("SELECT intervention_id,parent_revision_id,child_revision_id,payload FROM interventions WHERE intervention_id=?", (ident,)).fetchone()
+                if saved is not None:
+                    if saved != parent_link:
+                        raise ContractError("intervention identity conflict")
+                    self._con.commit()
+                    return False
+                active = self._con.execute("SELECT DISTINCT revision_id FROM index_entries WHERE state IN ('proposed','accepted') AND revision_id IN (SELECT revision_id FROM revisions WHERE source_id=?)", (revision.source_id,)).fetchall()
+                if active != [(parent,)]:
+                    raise ContractError("intervention parent is not current")
             existing = self._con.execute("SELECT * FROM member_metadata WHERE revision_id=?", (revision.revision_id,)).fetchone()
             if existing is not None:
+                if parent_link is not None:
+                    raise ContractError("intervention child already exists")
                 if existing != metadata:
                     raise ContractError("revision metadata conflict")
                 self.get_revision(revision.revision_id)
@@ -157,6 +181,8 @@ class Catalog:
                 self._con.execute(f"INSERT OR IGNORE INTO index_entries({self._ENTRY_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?)", row)
             self._con.execute("UPDATE index_entries SET state='stale' WHERE state IN ('proposed','accepted') AND revision_id != ? AND revision_id IN (SELECT revision_id FROM revisions WHERE source_id=?)", (revision.revision_id, revision.source_id))
             self._con.execute("INSERT INTO member_metadata VALUES (?,?,?,?,?,?,?)", metadata)
+            if parent_link is not None:
+                self._con.execute("INSERT INTO interventions VALUES (?,?,?,?)", parent_link)
             self._con.commit()
             return True
         except BaseException:
@@ -248,3 +274,6 @@ class Catalog:
 
     def interpretation_rows(self) -> list[tuple[str, str]]:
         return self._con.execute("SELECT claim_id,payload FROM agent_interpretations ORDER BY claim_id").fetchall()
+
+    def intervention_rows(self) -> list[tuple[str, str, str, str]]:
+        return self._con.execute("SELECT intervention_id,parent_revision_id,child_revision_id,payload FROM interventions ORDER BY intervention_id").fetchall()

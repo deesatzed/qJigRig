@@ -968,7 +968,8 @@
       "phase": "P5",
       "depends_on": [
         "T055",
-        "T037"
+        "T037",
+        "T056A"
       ],
       "status": "pending",
       "files": [
@@ -2004,6 +2005,28 @@
       "acceptance": "A real browser can add and inspect an attributed interpretation linked to an exact source passage without treating it as source text.",
       "command": "python -m pytest tests/test_web.py::test_browser_serves_source_linked_interpretation_controls -q",
       "evidence": "Red: browser had no interpretation controls. Green: source selection, unique exact-passage input and attributed interpretation use actual local API; headless Chromium rejected duplicate passage, saved and displayed Unicode-offset evidence, and reloaded at 390px without horizontal overflow. Focused web/service/claim suite 9 passed; full suite 405 passed. Evidence: docs/verification/2026-11-07-browser-interpretation.md. Not full accessibility, two-browser, hosted or workflow acceptance; full T060 remains pending."
+    },
+    {
+      "id": "T056A",
+      "phase": "P5",
+      "depends_on": [
+        "T053B",
+        "T059A",
+        "T059B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/interventions.py",
+        "src/qjig/store.py",
+        "src/qjig/service.py",
+        "src/qjig/agents.py"
+      ],
+      "test_file": "tests/test_interventions.py",
+      "test_name": "test_controlled_changes_preserve_parent_and_affect_authored_decision",
+      "action": "Add source-linked controlled interventions to the local service",
+      "acceptance": "A local client makes irrelevant and decisive changes with exact parent links; original revisions remain available and the authored decision changes only for the decisive edit.",
+      "command": "python -m pytest tests/test_interventions.py::test_controlled_changes_preserve_parent_and_affect_authored_decision -q",
+      "evidence": "Red: local clients could not create linked interventions. Green: schema v5 stores immutable intervention records with exact parent/child revisions; same-source derived child becomes current atomically with link and inherited metadata. Synthetic authored decision remains false after irrelevant edit and changes true after threshold edit; old revision retained, stale-parent conflicts refuse, exact retries do not reactivate older children, concurrent edits serialize, injected link failure rolls back. Focused 26 passed before added v4 migration test; full suite 409 passed. Full browser intervention, replay and independent evaluation remain open."
     }
   ]
 }

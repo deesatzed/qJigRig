@@ -82,6 +82,17 @@ class RoleClient:
             raise ClientError('local service returned invalid interpretation list')
         return result['interpretations']
 
+    def intervene(self, parent_revision_id: str, text_sha256: str, start: int, end: int, replacement: str) -> dict:
+        return self._request('POST', '/api/interventions', {'parent_revision_id': parent_revision_id,
+                             'text_sha256': text_sha256, 'start': start, 'end': end, 'replacement': replacement,
+                             'role_id': self.role.role_id, 'role_version': self.role.version})
+
+    def list_interventions(self) -> list[dict]:
+        result = self._request('GET', '/api/interventions')
+        if not isinstance(result.get('interventions'), list):
+            raise ClientError('local service returned invalid intervention list')
+        return result['interventions']
+
     def ask(self, request_id: str, question: str, scope: str, policy: dict) -> dict:
         if any(not isinstance(value, str) or not value.strip() for value in (request_id, question, scope)) or not isinstance(policy, dict):
             raise ContractError('request identity, question, scope and policy are required')

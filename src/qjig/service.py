@@ -12,6 +12,7 @@ from .applicability import MemberMetadata, Interval
 from .cli import _dec, _member_from_row, _member_row, run_authored
 from .contracts import ContractError, Request
 from .claims import add_interpretation, list_interpretations
+from .interventions import apply_intervention, list_interventions
 from .indexing import index_entries
 from .sources import SourceRevision, decode_source
 from .store import Catalog
@@ -77,6 +78,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(200, {"interpretations": interpretations})
             except ContractError:
                 self._reply(500, {"error": "stored interpretation invalid"})
+        elif self.path == "/api/interventions":
+            try:
+                with Catalog.open(self.server.catalog) as catalog:
+                    interventions = list_interventions(catalog)
+                self._reply(200, {"interventions": interventions})
+            except ContractError:
+                self._reply(500, {"error": "stored intervention invalid"})
         elif self.path == "/api/sources":
             with Catalog.open(self.server.catalog) as catalog:
                 sources = []
@@ -109,7 +117,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._trusted_host() or not self._trusted_origin():
             self._reply(403, {"error": "untrusted host or origin"})
             return
-        if self.path not in ("/api/sources", "/api/ask", "/api/interpretations"):
+        if self.path not in ("/api/sources", "/api/ask", "/api/interpretations", "/api/interventions"):
             self._reply(404, {"error": "not found"})
             return
         lengths = self.headers.get_all("Content-Length", [])
@@ -131,6 +139,10 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/api/interpretations":
                 with self.server.writer_lock, Catalog.open(self.server.catalog) as catalog:
                     result, created = add_interpretation(catalog, body)
+                self._reply(201 if created else 200, result)
+            elif self.path == "/api/interventions":
+                with self.server.writer_lock, Catalog.open(self.server.catalog) as catalog:
+                    result, created = apply_intervention(catalog, body)
                 self._reply(201 if created else 200, result)
             else:
                 if not isinstance(body, dict) or set(body) != {"request", "policy"}:
