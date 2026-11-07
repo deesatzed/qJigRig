@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from .budgets import BudgetLedger
 from .journal import UncertainOutcome
@@ -95,7 +95,10 @@ def _validate(text: str, schema: dict[str, FieldSpec]) -> tuple[dict | None, str
     return data, None
 
 
-def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequest, schema: dict[str, FieldSpec]) -> TypedCall:
+Validator = Callable[[str], tuple[dict | None, str | None]]
+
+
+def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequest, schema: "dict[str, FieldSpec] | Validator") -> TypedCall:
     """One budgeted, journaled provider attempt returning a validated value or an explicit failure."""
 
     def attempt():
@@ -107,7 +110,7 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
         if not 200 <= raw.http_status < 300:
             value, failure = None, "http_error"
         else:
-            value, failure = _validate(raw.body, schema)
+            value, failure = schema(raw.body) if callable(schema) else _validate(raw.body, schema)
         extra = {"http_status": raw.http_status, "raw_sha256": digest, "transport": transport.label}
         if failure:
             extra.update(validation=failure, raw_response=raw.body)

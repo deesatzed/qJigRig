@@ -735,7 +735,7 @@
         "T042",
         "T026"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/planner.py"
       ],
@@ -743,7 +743,8 @@
       "test_name": "test_fresh_plan_binding",
       "action": "Bind a fresh bounded planner response to request corpus and model",
       "acceptance": "Plan stores its origin and unresolved completeness caveat",
-      "command": "python -m pytest tests/test_planner.py::test_fresh_plan_binding -q"
+      "command": "python -m pytest tests/test_planner.py::test_fresh_plan_binding -q",
+      "evidence": "Red: ModuleNotFoundError qjig.planner (initial contract). Green: focused 1 passed in 0.04s; tests/test_planner.py 8 passed in 0.06s; full suite 219 passed in 1.21s. 2026-11-06."
     },
     {
       "id": "T044",
