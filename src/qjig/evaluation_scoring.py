@@ -6,6 +6,7 @@ import hmac
 import json
 import re
 from datetime import date
+from dataclasses import asdict
 
 from .contracts import ContractError
 from .evaluation_replay import verify_direct_archive
@@ -220,7 +221,7 @@ def summarize_intervention_pairs(design: dict, records: list[dict], *, expected_
 
 
 def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha256: str,
-                        expected_reference_sha256: str) -> dict:
+                        expected_reference_sha256: str, expected_journal_sha256: str | None = None) -> dict:
     """Score a replayed fresh graph separately from its mandatory request deferral.
 
     Exact reference quotes seen in model support statements are mechanical
@@ -251,10 +252,11 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
     if any(item['quote'] not in revisions[item['revision_id']].decoded.text for item in reference['evidence']):
         raise ContractError('reference quote not in source')
     if replay.status == 'incomplete':
+        recorded, reconciliations = _fresh_journal_for_scoring(journal, request['request_id'], expected_journal_sha256)
         results = [event['data'] for event in events if event['kind'] == 'run_result']
         if len(results) == 1 and results[0].get('schema') == 'qjig.fresh-result.v1':
-            return _score_fresh_receipt_failure(context, events, journal, reference, expected_run_sha256, ref_hash)
-        return _score_fresh_planner_failure(context, events, journal, reference, expected_run_sha256, ref_hash)
+            return _score_fresh_receipt_failure(context, events, journal, reference, expected_run_sha256, ref_hash, recorded, reconciliations)
+        return _score_fresh_planner_failure(context, events, journal, reference, expected_run_sha256, ref_hash, recorded, reconciliations)
     requests = [e for e in events if e['kind'] == 'request']
     recorded = journal.events(request['request_id'])
     if len(recorded) != 2 * len(requests):
@@ -308,12 +310,47 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
 
 
 
-def _score_fresh_receipt_failure(context, events, journal, reference, run_hash, ref_hash):
+def fresh_journal_digest(journal, request_id: str) -> str:
+    """Hash one complete journal snapshot; the caller must retain the anchor independently."""
+    from .journal import Journal
+    if not isinstance(journal, Journal) or not isinstance(request_id, str) or not request_id.strip():
+        raise ContractError('journal and request identity required')
+    encoded = json.dumps([asdict(e) for e in journal.events(request_id)], sort_keys=True,
+                         separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf-8')
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _fresh_journal_for_scoring(journal, request_id, expected_digest):
+    recorded = journal.events(request_id)
+    resolutions = [event for event in recorded if event.kind == 'reconciled']
+    if resolutions or expected_digest is not None:
+        if (not isinstance(expected_digest, str) or not _SHA.fullmatch(expected_digest)
+                or not hmac.compare_digest(fresh_journal_digest(journal, request_id), expected_digest)):
+            raise ContractError('fresh reconciliation journal anchor differs')
+    base = [event for event in recorded if event.kind != 'reconciled']
+    uncertain = {e.call_id:e for e in base if e.kind == 'uncertain'}
+    seen, result = set(), []
+    for event in resolutions:
+        prior = uncertain.get(event.call_id)
+        payload = event.payload
+        if (prior is None or event.call_id in seen or event.request_seq <= prior.request_seq
+                or (event.stage,event.provider,event.model,event.input_sha256) !=
+                   (prior.stage,prior.provider,prior.model,prior.input_sha256)
+                or not isinstance(payload, dict) or set(payload) != {'resolution','detail'}
+                or payload['resolution'] not in ('executed','not_executed')
+                or not isinstance(payload['detail'], str) or not payload['detail'].strip()):
+            raise ContractError('invalid fresh reconciliation binding')
+        seen.add(event.call_id)
+        result.append({'call_id':event.call_id, 'resolution':payload['resolution'],
+                       'detail':payload['detail'], 'provenance':'operator_assertion'})
+    return base, result
+
+
+def _score_fresh_receipt_failure(context, events, journal, reference, run_hash, ref_hash, recorded, reconciliations):
     """Retain verified post-planning failures without inferring a graph result."""
     request_id = context['request']['request_id']
     pending = {event.call_id for event in journal.pending(request_id)}
     sent = [event for event in events if event['kind'] == 'request']
-    recorded = journal.events(request_id)
     if not sent or len(recorded) != 2 * len(sent):
         raise ContractError('incomplete fresh journal call count or reconciliation differs')
     responses = {e['call_id']:e['data'] for e in events if e['kind'] == 'response'}
@@ -365,7 +402,7 @@ def _score_fresh_receipt_failure(context, events, journal, reference, run_hash, 
         else:
             raise ContractError('unsupported incomplete fresh terminal')
         outcomes.append({'call_id':call_id, 'stage':data['stage'], 'classification':outcome})
-    if not outcomes or pending != uncertain:
+    if not outcomes or pending != uncertain - {r['call_id'] for r in reconciliations}:
         raise ContractError('fresh failure reconciliation state differs')
     classes = {item['classification'] for item in outcomes}
     classification = ('uncertain_outcome' if 'uncertain_outcome' in classes else
@@ -375,10 +412,11 @@ def _score_fresh_receipt_failure(context, events, journal, reference, run_hash, 
             'request_status':'deferred', 'request_answer':None, 'conditional_answer':None,
             'conditional_comparison':'unknown_review', 'reference_expected_answer':reference['expected_answer'],
             'required_evidence_covered':None, 'failures':outcomes, 'failure_verified':True,
-            'reconciliation_required':bool(pending), 'semantic_assurance':'not_assessed'}
+            'reconciliation_required':bool(pending), 'reconciliations':reconciliations,
+            'semantic_assurance':'not_assessed'}
 
 
-def _score_fresh_planner_failure(context, events, journal, reference, run_hash, ref_hash):
+def _score_fresh_planner_failure(context, events, journal, reference, run_hash, ref_hash, recorded, reconciliations):
     """Check a planner-failure archive against its journal; never infer a result."""
     results = [e for e in events if e['kind'] == 'run_result']
     if len(results) != 1 or results[0]['data'].get('schema') != 'qjig.fresh-failure.v1':
@@ -386,11 +424,10 @@ def _score_fresh_planner_failure(context, events, journal, reference, run_hash, 
     result = results[0]['data']
     request_id, calls, failure = context['request']['request_id'], result['call_ids'], result['failure']
     pending = bool(journal.pending(request_id))
-    if result['reconciliation_required'] != pending:
+    if result['reconciliation_required'] != (pending or bool(reconciliations)):
         raise ContractError('fresh failure reconciliation state changed')
     classification, verified = 'unknown_review', False
     if calls:
-        recorded = journal.events(request_id)
         # This bounded check refuses prior or reconciled calls rather than merging them.
         if len(calls) != 1 or len(recorded) != 2:
             raise ContractError('fresh failure journal has unexpected work')
@@ -405,7 +442,7 @@ def _score_fresh_planner_failure(context, events, journal, reference, run_hash, 
                 or intent.payload.get('request_max_price') != data.get('max_price')):
             raise ContractError('fresh failure journal binding differs')
         if failure in ('uncertain_outcome', 'provider_unavailable'):
-            if (failure == 'uncertain_outcome' and terminal.kind == 'uncertain' and pending):
+            if (failure == 'uncertain_outcome' and terminal.kind == 'uncertain' and (pending or any(r['call_id'] == terminal.call_id for r in reconciliations))):
                 classification, verified = 'uncertain_outcome', True
             elif (failure == 'provider_unavailable' and terminal.kind == 'failure'
                   and terminal.payload.get('error') == 'ProviderUnavailable' and not pending):
@@ -434,7 +471,8 @@ def _score_fresh_planner_failure(context, events, journal, reference, run_hash, 
             'request_status': 'deferred', 'request_answer': None, 'conditional_answer': None,
             'conditional_comparison': 'unknown_review', 'reference_expected_answer': reference['expected_answer'],
             'required_evidence_covered': None,
-            'failure_verified': verified, 'reconciliation_required': pending, 'semantic_assurance': 'not_assessed'}
+            'failure_verified': verified, 'reconciliation_required': pending, 'reconciliations':reconciliations,
+            'semantic_assurance': 'not_assessed'}
 
 
 def summarize_fresh_intervention_pairs(design: dict, records: list[dict], *, expected_design_sha256: str) -> dict:
@@ -488,7 +526,7 @@ def summarize_fresh_intervention_pairs(design: dict, records: list[dict], *, exp
 
 def score_reserved_assignment(goal, archive, journal, reference: dict, *, partition: str,
                               expected_plan_sha256: str, expected_run_sha256: str,
-                              expected_reference_sha256: str) -> dict:
+                              expected_reference_sha256: str, expected_journal_sha256: str | None = None) -> dict:
     """Score an archived assignment against an externally anchored reserved plan.
 
     This verifies structural bindings and ledger consistency, not source authority,
@@ -530,6 +568,9 @@ def score_reserved_assignment(goal, archive, journal, reference: dict, *, partit
         raise ContractError('incomplete reserved evaluation context') from exc
     if goal.audit_journal(journal)['status'] != 'verified':
         raise ContractError('goal and journal accounting differ')
+    if expected_journal_sha256 is not None and scorer is score_direct_archive:
+        raise ContractError('direct scoring binds the journal in its run digest')
+    options = {'expected_journal_sha256':expected_journal_sha256} if scorer is score_fresh_archive else {}
     score = scorer(archive, journal, reference, expected_run_sha256=expected_run_sha256,
-                   expected_reference_sha256=expected_reference_sha256)
+                   expected_reference_sha256=expected_reference_sha256, **options)
     return {'arm':assignment['arm'], 'repeat':assignment['repeat'], 'score':score}

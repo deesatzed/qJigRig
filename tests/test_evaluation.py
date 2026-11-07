@@ -815,9 +815,26 @@ def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expec
         if mode == 'judge_mixed':
             assert [f['classification'] for f in score['failures']] == ['malformed','provider_failure']
         if mode in ('timeout','judge_timeout','review_timeout'):
-            journal.reconcile(journal.pending('r')[0].call_id, resolution='not_executed', detail='synthetic verification')
+            resolution = 'not_executed' if mode == 'judge_timeout' else 'executed'
+            journal.reconcile(journal.pending('r')[0].call_id, resolution=resolution, detail='synthetic verification')
             with pytest.raises(ContractError, match='reconciliation'):
                 score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
+            from qjig.evaluation_scoring import fresh_journal_digest
+            anchor = fresh_journal_digest(journal,'r')
+            recovered = score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
+                expected_reference_sha256=reference_digest(ref),expected_journal_sha256=anchor)
+            assert recovered['classification']=='uncertain_outcome' and recovered['reconciliation_required'] is False
+            assert recovered['reconciliations'][0]['resolution']==resolution
+            assert recovered['request_answer'] is None and recovered['conditional_answer'] is None
+            with pytest.raises(ContractError):
+                score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
+                    expected_reference_sha256=reference_digest(ref),expected_journal_sha256='0'*64)
+            journal._con.execute('DROP TRIGGER events_no_update')
+            journal._con.execute("UPDATE events SET payload=? WHERE kind='reconciled'",
+                                 (json.dumps({'resolution':'executed','detail':'altered'}),))
+            with pytest.raises(ContractError):
+                score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
+                    expected_reference_sha256=reference_digest(ref),expected_journal_sha256=anchor)
         if mode in ('malformed', 'judge_malformed', 'judge_http'):
             saved = journal._con.execute("SELECT payload FROM events WHERE kind='receipt'").fetchone()[0]
             tampered = json.loads(saved); tampered['usage']['cost_usd']=0

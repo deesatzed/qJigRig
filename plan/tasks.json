@@ -1217,7 +1217,8 @@
         "T068E",
         "T068F",
         "T068G",
-        "T068H"
+        "T068H",
+        "T068I"
       ],
       "status": "pending",
       "files": [
@@ -3019,6 +3020,23 @@
       "acceptance": "Numeric zero discount is accepted without reducing prices; nonzero, malformed discounts and unknown charges refuse.",
       "command": "python -m pytest tests/test_pricing.py::test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse -q",
       "evidence": "Red: synthetic current-shape endpoint pricing with numeric zero discount was rejected as an unknown category. Zero is now accepted without price reduction; nonzero, malformed discounts and unrecognized charges still refuse. Focused pricing/goal/evaluation suite 89 passed; full offline suite 540 passed. Public endpoint catalog read found configured model IDs and discount metadata; availability, token bounds, provider enforcement and complete billing remain unverified and hosted dispatch stays disabled."
+    },
+    {
+      "id": "T068I",
+      "phase": "evaluation",
+      "depends_on": [
+        "T068H"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_fresh_planner_failure_scoring_retains_uncertainty",
+      "action": "Score anchored reconciliation of uncertain fresh calls",
+      "acceptance": "Record a pinned journal reconciliation without inventing a response or usage; altered journal anchors and invalid event binding reject.",
+      "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
+      "evidence": "Red: reconciled planner, judge and reviewer timeout records could not be scored. A caller-pinned journal digest now permits validated matching reconciliation events to be retained as operator assertions while the outcome stays uncertain, without inventing provider response or usage. Missing/wrong anchors and changed reconciliation records refuse. Focused evaluation/journal/replay/goal 105 passed before final tamper checks; final failure cases 14 passed and full offline suite 540 passed. The digest is not authentication; reconciliation truth and executed-call usage remain unverified, and further retries or unrelated calls are refused rather than merged."
     }
   ]
 }
