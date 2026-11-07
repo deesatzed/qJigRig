@@ -753,7 +753,7 @@
         "T042",
         "T025"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/judge.py"
       ],
@@ -761,7 +761,8 @@
       "test_name": "test_false_support_unknown",
       "action": "Translate semantic support with explicit unknown/conflict",
       "acceptance": "A false support score never alone proves the negative proposition",
-      "command": "python -m pytest tests/test_judge.py::test_false_support_unknown -q"
+      "command": "python -m pytest tests/test_judge.py::test_false_support_unknown -q",
+      "evidence": "Red: ModuleNotFoundError qjig.judge (initial contract); three failures in my own test helper first (shared journal leaking call caps, a closed-database read) fixed in the tests. Green: focused 1 passed in 0.05s; tests/test_judge.py 4 passed in 0.07s; full suite 223 passed in 1.24s. 2026-11-06."
     },
     {
       "id": "T045",
