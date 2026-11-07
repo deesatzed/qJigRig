@@ -1151,7 +1151,8 @@
         "T064",
         "T048",
         "T065A",
-        "T065B"
+        "T065B",
+        "T065C"
       ],
       "status": "pending",
       "files": [
@@ -2558,6 +2559,24 @@
       "acceptance": "A direct agent can use one search followup and return source-bound unvalidated responses with journaled attempts and archived sources; provider failures remain explicit.",
       "command": "python -m pytest tests/test_evaluation.py::test_direct_agent_searches_and_answers_with_auditable_synthetic_calls -q",
       "evidence": "Red: no budgeted direct retrieval agent existed. Green: synthetic two-call direct run searches pinned sources, accepts one model-directed followup, verifies quoted text is present in returned spans, and archives context, source snapshots, search traces, calls and result. Malformed, unsupported, timeout and budget failure tests retain explicit unavailable status and attempted call IDs. Focused 50 passed before final trace assertions; full offline 496 passed. Citation presence is not relevance or semantic validity; full experiment matching, preflight, replay verification and hosted execution remain open."
+    },
+    {
+      "id": "T065C",
+      "phase": "P6",
+      "depends_on": [
+        "T065B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_direct.py",
+        "src/qjig/evaluation_replay.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_direct_replay_checks_search_and_source_tampering",
+      "action": "Replay direct evaluation searches and recorded model responses",
+      "acceptance": "Rebuild source identities, search packets and prompts, validate quotations and journal receipt bindings without inference; changed data is invalid and incomplete work stays incomplete.",
+      "command": "python -m pytest tests/test_evaluation.py::test_direct_replay_checks_search_and_source_tampering -q",
+      "evidence": "Red: direct run had no structural replay. Green: rebuilds source revisions, searches, packets, prompts and validated quotations, compares journal intents/receipts and records optional external digest. Synthetic one- and two-call tests pass; tampered source, trace and journal usage reject; failed and uncertain runs remain incomplete. Focused replay/provider suite 60 passed before added tamper case; full offline 497 passed. Replay shares retrieval/prompt code, does not authenticate source or receipt, prove label isolation, validate semantics or account for unrecorded external calls."
     }
   ]
 }

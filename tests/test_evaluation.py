@@ -232,6 +232,8 @@ def test_direct_agent_searches_and_answers_with_auditable_synthetic_calls(tmp_pa
         assert len(requests) == 2 and all(secret.decode() not in e['prompt'] for e in requests)
         assert all('untrusted' in e['prompt'].lower() for e in requests)
         assert all('2026-11-07' in e['prompt'] and 'admin' in e['prompt'] for e in requests)
+        from qjig.evaluation_replay import verify_direct_archive
+        assert verify_direct_archive(archive, journal)['status'] == 'unanchored'
 
 
 @pytest.mark.parametrize('mode', ['malformed', 'unsupported', 'timeout', 'budget'])
@@ -262,3 +264,47 @@ def test_direct_agent_preserves_failures_without_inventing_an_answer(tmp_path, m
         assert len(result['call_ids']) == (0 if mode == 'budget' else 1)
         assert archive.events()[-1]['data'] == result
         assert bool(journal.pending('r')) == (mode == 'timeout')
+        from qjig.evaluation_replay import verify_direct_archive
+        assert verify_direct_archive(archive, journal)['status'] == 'incomplete'
+
+
+def test_direct_replay_checks_search_and_source_tampering(tmp_path):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_direct import run_direct
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    code, secret = b'Checks must pass.', b'PRIVATE_REFERENCE_ANSWER'
+    (tmp_path / 'code').write_bytes(code); (tmp_path / 'label').write_bytes(secret)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    search = DirectRetrieval(tmp_path, [item('code', code)], [item('label', secret)], want=1, max_bytes=3000, followups=1)
+    ident = search._entries[0].entry_id
+    body = json.dumps({'action': 'answer', 'query': None, 'answer': 'yes',
+                       'citations': [{'entry_id': ident, 'quote': 'Checks must pass.'}]})
+    with Journal.open(tmp_path / 'j.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
+        ledger = BudgetLedger(Budget(2, 10000, 1), journal, 'r')
+        run_direct(search, Request('r', 'Checks?', 'reviewer', '1', 'project'), ledger,
+                   StandInTransport([RawResponse(200, body, {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01})]),
+                   archive=archive, provider='stand-in', model='test', max_tokens=100, as_of='2026-11-07', entities=[])
+        report = verify_direct_archive(archive, journal)
+        assert report['status'] == 'unanchored' and report['semantic_assurance'] == 'not_assessed'
+        assert verify_direct_archive(archive, journal, expected_digest=report['sha256'])['status'] == 'structurally_verified'
+        original_trace = archive._con.execute("SELECT data FROM events WHERE kind='trace'").fetchone()[0]
+        altered = json.loads(original_trace); altered['query'] = 'different'
+        archive._con.execute('DROP TRIGGER event_no_update')
+        archive._con.execute("UPDATE events SET data=? WHERE kind='trace'", (json.dumps(altered),))
+        assert verify_direct_archive(archive, journal)['status'] == 'invalid'
+        archive._con.execute("UPDATE events SET data=? WHERE kind='trace'", (original_trace,))
+        original_receipt = journal._con.execute("SELECT payload FROM events WHERE kind='receipt'").fetchone()[0]
+        changed_receipt = json.loads(original_receipt); changed_receipt['usage']['cost_usd'] = 0
+        journal._con.execute('DROP TRIGGER events_no_update')
+        journal._con.execute("UPDATE events SET payload=? WHERE kind='receipt'", (json.dumps(changed_receipt),))
+        assert verify_direct_archive(archive, journal)['status'] == 'invalid'
+        journal._con.execute("UPDATE events SET payload=? WHERE kind='receipt'", (original_receipt,))
+        archive._con.execute('DROP TRIGGER revision_no_update')
+        archive._con.execute("UPDATE revisions SET raw=?", (b'Checks can fail.',))
+        assert verify_direct_archive(archive, journal, expected_digest=report['sha256'])['status'] == 'invalid'
