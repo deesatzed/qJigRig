@@ -4155,6 +4155,23 @@
       "acceptance": "Download a portable receipt and check archived requests, responses, journal bindings and recorded costs offline; missing or pending accounting remains unknown or incomplete.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: receipt route returned 404. Synthetic service and Chrome round trips retain one request journal and archive; verifier detects altered receipt, rehashed changed cost and changed token reservation, and keeps missing or pending usage unknown/incomplete. This does not authenticate provider billing, establish atomic snapshots, or verify the goal-wide ledger."
+    },
+    {
+      "id": "T061F",
+      "phase": "P5",
+      "depends_on": [
+        "T061E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_receipt.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Reject portable receipt reservations below recorded routing ceilings",
+      "acceptance": "Check each declared price ceiling against the corresponding retained token reservation; insufficient reservation is invalid and missing ceiling remains incomplete.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: a rehashed synthetic receipt with cost reserve below its own routing ceiling was labeled unanchored. It is now invalid despite actual cost fitting; fresh/replay/budget checks 64 passed and 1 skipped; Chrome fresh checks 4 passed. This only checks retained assertions, not current pricing, complete input bounds, provider authenticity or aggregate budget."
     }
   ]
 }

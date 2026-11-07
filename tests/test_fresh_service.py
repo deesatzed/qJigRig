@@ -206,6 +206,12 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         altered['payload']['journal'][0]['stage'] = 'other'
         assert verify_fresh_receipt(altered)['status'] == 'invalid'
         altered = json.loads(json.dumps(receipt))
+        intent = next(event for event in altered['payload']['journal'] if event['kind'] == 'intent')
+        intent['payload']['reserve_cost_usd'] = 0.0001  # covers actual usage, but not the declared routing ceiling
+        canonical = json.dumps(altered['payload'], sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode()
+        altered['sha256'] = hashlib.sha256(canonical).hexdigest()
+        assert verify_fresh_receipt(altered)['status'] == 'invalid'
+        altered = json.loads(json.dumps(receipt))
         terminal = next(event for event in altered['payload']['journal'] if event['kind'] == 'receipt')
         terminal['payload']['usage']['cost_usd'] = 0
         canonical = json.dumps(altered['payload'], sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode()

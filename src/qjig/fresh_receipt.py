@@ -10,11 +10,13 @@ import re
 import sqlite3
 from contextlib import closing
 from dataclasses import asdict
+from decimal import Decimal
 
 from .budgets import BudgetLedger, _valid_cost, _valid_tokens
 from .contracts import ContractError, Request
 from .journal import Journal, _SCHEMA
 from .money import sum_costs
+from .providers import ProviderRequest, _ceiling_token_cost
 from .replay import verify_archive
 from .run_archive import RunArchive
 
@@ -114,6 +116,13 @@ def verify_fresh_receipt(receipt: object, *, expected_digest: str | None = None)
                     or out != data['max_tokens'] or reservation.get('request_max_price') != data.get('max_price')
                     or type(cost) not in (int,float) or not math.isfinite(cost) or cost < 0):
                     raise ContractError('invalid or mismatched reservation')
+                if data.get('max_price') is None:
+                    incomplete = True
+                else:
+                    request = ProviderRequest(data['stage'], data['provider'], data['model'], data['prompt'],
+                                              data['max_tokens'], max_price=data['max_price'])
+                    if Decimal(str(cost)) < _ceiling_token_cost(request, inp):
+                        raise ContractError('reservation below declared routing ceiling')
             archived_calls = {event['call_id'] for event in archived if event['kind']=='request'}
             if set(intents) != archived_calls or journal.pending(rid):
                 incomplete = True
