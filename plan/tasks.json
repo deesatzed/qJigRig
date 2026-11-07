@@ -1360,7 +1360,8 @@
         "R07B",
         "R07C",
         "R07D",
-        "R07E"
+        "R07E",
+        "R07F"
       ],
       "status": "pending",
       "files": [],
@@ -1556,6 +1557,26 @@
       "acceptance": "Archive exact entity, effective/observation date, scope and authority inputs and refuse conflicting verdicts before dispatch.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_archive_retains_applicability_inputs -q",
       "evidence": "Red: no reconstructable applicability input record existed. Green: synthetic fresh archive records entities, as-of date, historical mode, effective/observation dates, scope and authority; records round-trip and conflicting verdicts refuse before dispatch. Full offline suite 319 passed. Explicit inputs remain optional for compatibility; legacy verdict-only archives and scope/authority assurance stay labeled; R07 remains pending."
+    },
+    {
+      "id": "R07F",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R07E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py",
+        "src/qjig/run_archive.py",
+        "tests/test_providers.py"
+      ],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_response_metadata_is_retained_without_credentials",
+      "action": "Retain sanitized provider response identifiers and finish metadata",
+      "acceptance": "Fake HTTP and archive preserve available response id, returned model, provider and finish reason without credentials.",
+      "command": "python -m pytest tests/test_providers.py::test_response_metadata_is_retained_without_credentials -q",
+      "evidence": "Red: RawResponse had no metadata. Green: fake HTTP captures response id, model, provider, finish reason, including no-content output; escaped dummy credential is redacted from content, errors and metadata. Full offline suite 322 passed. The JSON id is labeled response_id, not asserted to be an HTTP request id; full R07 and live tests remain pending."
     }
   ]
 }

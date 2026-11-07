@@ -146,7 +146,7 @@ class RunArchive:
             raise ContractError("response has no recorded request")
         self._event("response", call_id, {"http_status": response.http_status, "body": response.body,
                                            "body_sha256": hashlib.sha256(response.body.encode("utf-8")).hexdigest(),
-                                           "usage": response.usage, "note": response.note})
+                                           "usage": response.usage, "note": response.note, "metadata": response.metadata})
 
     def record_validation(self, call_id: str, value: dict | None, failure: str | None) -> None:
         if not self._con.execute("SELECT 1 FROM events WHERE kind='response' AND call_id=?", (call_id,)).fetchone():

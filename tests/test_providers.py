@@ -284,3 +284,44 @@ def test_bound_reservation_rejects_changed_request_and_reaches_goal_ledger(tmp_p
         intent = journal.events("r")[0]
         assert intent.payload["reservation_binding"]["request_sha256"] == REQ.input_sha256()
         assert intent.payload["reservation_binding"]["pricing_sha256"] == bound.pricing_sha256
+
+
+def test_response_metadata_is_retained_without_credentials(tmp_path):
+    """Fake HTTP envelope and dummy secret only; no hosted call."""
+    from qjig.run_archive import RunArchive
+
+    secret = "sk-test-SECRET"
+    envelope = json.dumps({"id": "generation-123", "model": "vendor/model", "provider": "Example",
+                           "choices": [{"finish_reason": "stop", "message": {"content": GOOD}}],
+                           "usage": {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.01}})
+    adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))
+    response = adapter.send(REQ)
+    assert response.metadata == {"response_id": "generation-123", "model": "vendor/model", "provider": "Example", "finish_reason": "stop"}
+    with RunArchive.open(tmp_path / "run") as archive:
+        archive.record_request("r#1", REQ)
+        archive.record_response("r#1", response)
+        saved = archive.events()[-1]["data"]
+        assert saved["metadata"] == response.metadata
+        assert secret not in repr(archive.events())
+
+
+def test_escaped_dummy_key_is_redacted_from_response_and_metadata(tmp_path):
+    """Fake HTTP JSON encodes the first byte of a dummy key as a Unicode escape."""
+    secret = "sk-test-SECRET"
+    escaped = r'\u0073k-test-SECRET'
+    envelope = ('{"id":"' + escaped + '","model":"vendor/model",'
+                '"choices":[{"finish_reason":"stop","message":{"content":"' + escaped + '"}}]}')
+    adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))
+    response = adapter.send(REQ)
+    assert secret not in repr(response)
+    assert response.body == "[REDACTED]" and response.metadata["response_id"] == "[REDACTED]"
+    error = OpenRouterTransport(_env(tmp_path), post=lambda *args: (429, envelope)).send(REQ)
+    assert secret not in error.body and secret not in repr(error.metadata)
+
+
+def test_no_content_keeps_finish_reason_and_request_id(tmp_path):
+    envelope = json.dumps({"id": "generation-length", "model": "vendor/model",
+                           "choices": [{"finish_reason": "length", "message": {"content": None}}]})
+    response = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope)).send(REQ)
+    assert response.body == "" and response.metadata["response_id"] == "generation-length"
+    assert response.metadata["finish_reason"] == "length"

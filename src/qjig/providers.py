@@ -84,6 +84,7 @@ class RawResponse:
     body: str
     usage: dict[str, Any] | None  # as reported by the provider; None = not reported
     note: str | None = None  # transport-observed cause, e.g. finish_reason
+    metadata: dict[str, str] | None = None  # sanitized, selectively extracted provider fields
 
 
 class Transport(Protocol):
@@ -181,8 +182,14 @@ class OpenRouterTransport:
             # or classify it as a definite failure. Reconciliation remains mandatory.
             raise TimeoutError("provider outcome unknown") from None
         body = body.replace(key, "[REDACTED]")
+        try:
+            parsed_body = self._redact_json(json.loads(body), key)
+            body = json.dumps(parsed_body, ensure_ascii=False)
+        except (ValueError, TypeError):
+            parsed_body = None
+        metadata = self._response_metadata(parsed_body)
         if not 200 <= status < 300:
-            return RawResponse(status, body, None)
+            return RawResponse(status, body, None, metadata=metadata)
         try:
             data = json.loads(body)
             content = data["choices"][0]["message"]["content"]
@@ -190,8 +197,30 @@ class OpenRouterTransport:
                 raise TypeError
         except (ValueError, KeyError, IndexError, TypeError):
             note = self._no_content_note(body)
-            return RawResponse(status, "", self._usage(body), note)
-        return RawResponse(status, content, self._usage(body))
+            return RawResponse(status, "", self._usage(body), note, metadata)
+        return RawResponse(status, content, self._usage(body), metadata=metadata)
+
+    @staticmethod
+    def _redact_json(value: Any, secret: str) -> Any:
+        if isinstance(value, str):
+            return value.replace(secret, "[REDACTED]")
+        if isinstance(value, list):
+            return [OpenRouterTransport._redact_json(item, secret) for item in value]
+        if isinstance(value, dict):
+            return {OpenRouterTransport._redact_json(key, secret): OpenRouterTransport._redact_json(item, secret)
+                    for key, item in value.items()}
+        return value
+
+    @staticmethod
+    def _response_metadata(data: Any) -> dict[str, str] | None:
+        if not isinstance(data, dict):
+            return None
+        candidates = {"response_id": data.get("id"), "model": data.get("model"), "provider": data.get("provider")}
+        choices = data.get("choices")
+        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+            candidates["finish_reason"] = choices[0].get("finish_reason")
+        result = {key: value for key, value in candidates.items() if isinstance(value, str) and 0 < len(value) <= 512}
+        return result or None
 
     @staticmethod
     def _no_content_note(body: str) -> str:
@@ -292,7 +321,7 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
                 archive.record_validation(call_id, value, failure)
             except Exception:
                 raise UncertainOutcome("validation archive failed after dispatch") from None
-        extra = {"http_status": raw.http_status, "raw_sha256": digest, "transport": transport.label}
+        extra = {"http_status": raw.http_status, "raw_sha256": digest, "transport": transport.label, "metadata": raw.metadata}
         if raw.note:
             extra["note"] = raw.note
         if failure:
