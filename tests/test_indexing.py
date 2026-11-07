@@ -1,7 +1,7 @@
 import pytest
 
 from qjig.contracts import ContractError
-from qjig.indexing import index_entries, index_markdown_headings, load_entries, resolve_entry, save_entries
+from qjig.indexing import index_entries, split_broad_section, index_markdown_headings, load_entries, resolve_entry, save_entries
 from qjig.sources import SourceRevision, decode_source
 from qjig.spans import verify_span
 from qjig.store import Catalog
@@ -79,3 +79,39 @@ def test_text_before_first_heading_is_covered_and_headed_docs_are_unchanged():
 
 def test_blank_document_has_no_entries():
     assert index_entries(rev("  \r\n\n")) == []
+
+
+BROAD = "# Rules\r\nFirst paragraph.\r\n\r\nSecond paragraph\r\nspans two lines.\r\n\r\nThird one.\r\n"
+
+
+def test_broad_heading_paragraphs():
+    revision = rev(BROAD)
+    (section,) = index_markdown_headings(revision)
+    children = split_broad_section(revision, section, max_chars=20)
+    assert [c.span.text for c in children] == [
+        "# Rules\r\nFirst paragraph.",
+        "Second paragraph\r\nspans two lines.",
+        "Third one.",
+    ]
+    for c in children:
+        assert c.kind == "paragraph" and c.state == "proposed"
+        assert c.parent_entry_id == section.entry_id
+        assert c.revision_id == revision.revision_id
+        assert section.span.start <= c.span.start and c.span.end <= section.span.end
+        verify_span(revision, c.span)  # exact source slice
+        assert c.entry_id != section.entry_id
+    assert [c.span.start for c in children] == sorted(c.span.start for c in children)
+    assert all(a.span.end <= b.span.start for a, b in zip(children, children[1:]))  # no overlap
+
+
+def test_narrow_or_single_paragraph_sections_are_not_split():
+    revision = rev(BROAD)
+    (section,) = index_markdown_headings(revision)
+    assert split_broad_section(revision, section, max_chars=10_000) == []
+    single = rev("# One\nonly paragraph here\n")
+    (s1,) = index_markdown_headings(single)
+    assert split_broad_section(single, s1, max_chars=5) == []
+    with pytest.raises(ContractError):
+        split_broad_section(revision, section, max_chars=0)
+    with pytest.raises(ContractError):
+        split_broad_section(revision, section, max_chars=True)

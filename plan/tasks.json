@@ -245,7 +245,7 @@
       "depends_on": [
         "T014"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/indexing.py"
       ],
@@ -253,7 +253,8 @@
       "test_name": "test_broad_heading_paragraphs",
       "action": "Split a broad section into proposed paragraph entries",
       "acceptance": "Each child is an exact source slice with proposed status",
-      "command": "python -m pytest tests/test_indexing.py::test_broad_heading_paragraphs -q"
+      "command": "python -m pytest tests/test_indexing.py::test_broad_heading_paragraphs -q",
+      "evidence": "Red: ImportError split_broad_section (initial contract). Green: focused 1 passed in 0.04s; tests/test_indexing.py 9 passed in 0.06s; full suite 65 passed in 0.15s. 2026-11-06."
     },
     {
       "id": "T016",

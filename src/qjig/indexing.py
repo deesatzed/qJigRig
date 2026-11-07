@@ -15,6 +15,7 @@ from .store import Catalog
 
 HEADING_METHOD = "markdown_atx_heading_v1"
 FALLBACK_METHOD = "extractive_unheaded_v1"
+PARAGRAPH_METHOD = "blank_line_paragraph_v1"
 
 _HEADING = re.compile(r" {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*\r?\n?$")
 _FENCE = re.compile(r" {0,3}(```|~~~)")
@@ -133,3 +134,42 @@ def index_entries(revision: SourceRevision) -> list[IndexEntry]:
             )
         )
     return entries + headings
+
+
+_BLANK_RUN = re.compile(r"(?:\r?\n[ \t]*){2,}")
+
+
+def split_broad_section(
+    revision: SourceRevision, section: IndexEntry, *, max_chars: int
+) -> list[IndexEntry]:
+    """Propose paragraph children for a section longer than max_chars with 2+ paragraphs.
+
+    Each child is an exact slice of the parent's span; the parent is unchanged.
+    """
+    if type(max_chars) is not int or max_chars < 1:
+        raise ContractError("max_chars must be a positive integer")
+    if section.revision_id != revision.revision_id:
+        raise ContractError("section belongs to a different revision")
+    verify_span(revision, section.span)
+    body = section.span.text
+    if len(body) <= max_chars:
+        return []
+    pieces, pos = [], 0
+    for m in _BLANK_RUN.finditer(body):
+        pieces.append((pos, m.start()))
+        pos = m.end()
+    pieces.append((pos, len(body)))
+    pieces = [(a, b) for a, b in pieces if body[a:b].strip()]
+    if len(pieces) < 2:
+        return []
+    out = []
+    for a, b in pieces:
+        start, end = section.span.start + a, section.span.start + b
+        out.append(
+            IndexEntry(
+                make_entry_id(revision.revision_id, "paragraph", PARAGRAPH_METHOD, start, end),
+                revision.revision_id, make_span(revision, start, end), "paragraph", None,
+                PARAGRAPH_METHOD, "proposed", section.entry_id,
+            )
+        )
+    return out

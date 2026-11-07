@@ -111,3 +111,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `index_entries` adds a proposed, title-less `extractive_fallback` entry for unheaded text (whole doc, or text before the first heading); documents whose text is all under headings are unchanged; blank documents give none. Limit: text between or after sections is already inside heading sections, so only leading text is a fallback case; fallback method name is a provisional label.
 - Red: ImportError index_entries (initial contract). Green: focused 1 passed in 0.04s; tests/test_indexing.py 7 passed in 0.05s; full suite 63 passed in 0.13s. 2026-11-06.
+
+## 2026-11-06: T015 complete
+
+- `split_broad_section(revision, section, max_chars=...)` proposes paragraph children (blank-line separated) as exact, non-overlapping slices inside the parent span with `parent_entry_id` and state `proposed`; sections within the limit or with one paragraph return nothing; invalid max_chars rejected. Limit: the heading line stays attached to the first paragraph; what counts as 'broad' is a caller-supplied character limit, not a tuned value.
+- Red: ImportError split_broad_section (initial contract). Green: focused 1 passed in 0.04s; tests/test_indexing.py 9 passed in 0.06s; full suite 65 passed in 0.15s. 2026-11-06.
