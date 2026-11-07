@@ -173,6 +173,7 @@ def test_failed_question_does_not_present_previous_result(tmp_path):
                 page.locator('#question-form button[type="submit"]').click()
                 page.get_by_text('Decided · no').wait_for()
                 assert '14 days' in page.locator('#result').inner_text()
+                page.locator('#saved-runs button').first.wait_for()
                 page.route('**/api/ask', lambda route: route.fulfill(status=503, body='unavailable'))
                 page.locator('#question-form [name="question"]').fill('A different question?')
                 page.locator('#question-form button[type="submit"]').click()
