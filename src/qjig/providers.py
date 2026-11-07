@@ -75,6 +75,9 @@ def make_call_reservation(request: ProviderRequest, model: dict, *, input_tokens
                            input_bound_provenance, hold_back_calls, hold_back_tokens, hold_back_cost_usd)
 
 
+ReservationFactory = Callable[[ProviderRequest], CallReservation]
+
+
 @dataclass(frozen=True)
 class RawResponse:
     http_status: int

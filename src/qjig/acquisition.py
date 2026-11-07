@@ -20,7 +20,7 @@ from .budgets import BudgetExceeded, BudgetLedger
 from .judge import JudgeResult, QuoteRef, judge_predicate
 from .obligations import Obligation
 from .planner import PlanBinding, request_fresh_plan
-from .providers import ProviderUnavailable, Transport
+from .providers import ProviderUnavailable, ReservationFactory, Transport
 from .journal import ReconciliationRequired, UncertainOutcome
 from .plans import Plan as _Plan  # noqa: F401
 from .store import Catalog
@@ -243,6 +243,7 @@ def run_fresh(
     revision_applicability: Callable[[str], Applicability],
     planner_max_tokens: int | None = None,
     judge_max_tokens: int | None = None,
+    reservation_factory: ReservationFactory | None = None,
     want: int = 3,
     max_bytes: int = 3000,
 ) -> FreshRun:
@@ -256,7 +257,7 @@ def run_fresh(
     try:
         outcome = request_fresh_plan(
             ledger, transport, request, corpus_revision_ids=sorted({e.span.revision_id for e in entries}),
-            provider=planner[0], model=planner[1], **kw,
+            provider=planner[0], model=planner[1], reservation_factory=reservation_factory, **kw,
         )
     except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
         failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
@@ -279,7 +280,7 @@ def run_fresh(
                 return EvalResult(Outcome.UNKNOWN, "reconciliation_required")
             result = judge_predicate(
                 ledger, transport, question, packet, provider=judge[0], model=judge[1],
-                applicability=revision_applicability, **jkw,
+                applicability=revision_applicability, reservation_factory=reservation_factory, **jkw,
             )
             halted = any(side.failure in ("uncertain_outcome", "reconciliation_required")
                          for side in (result.positive, result.negative))

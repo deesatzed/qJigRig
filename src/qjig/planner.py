@@ -9,7 +9,7 @@ from typing import Iterable
 from .budgets import BudgetLedger
 from .contracts import Request
 from .plans import Plan, PlanError, parse_plan
-from .providers import ProviderRequest, Transport, call_typed
+from .providers import ProviderRequest, ReservationFactory, Transport, call_typed
 
 CAVEATS = ("completeness_not_established", "model_generated_untrusted")
 PLANNER_MAX_TOKENS = 1500
@@ -69,11 +69,12 @@ def _plan_validator(text: str) -> tuple[dict | None, str | None]:
 
 def request_fresh_plan(
     ledger: BudgetLedger, transport: Transport, request: Request, *, corpus_revision_ids: Iterable[str], provider: str, model: str,
-    max_tokens: int = PLANNER_MAX_TOKENS,
+    max_tokens: int = PLANNER_MAX_TOKENS, reservation_factory: ReservationFactory | None = None,
 ) -> PlannerOutcome:
     corpus_sha = corpus_manifest_sha256(corpus_revision_ids)
     pr = ProviderRequest("planner", provider, model, _planner_prompt(request, corpus_sha), max_tokens)
-    call = call_typed(ledger, transport, pr, _plan_validator)
+    reservation = reservation_factory(pr) if reservation_factory else None
+    call = call_typed(ledger, transport, pr, _plan_validator, reservation=reservation)
     if not call.ok:
         return PlannerOutcome(False, None, None, call.failure, CAVEATS)
     plan = parse_plan({**call.value, "origin": "fresh"})

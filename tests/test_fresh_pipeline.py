@@ -125,3 +125,53 @@ def test_judge_timeout_preserves_first_side_and_stops_later_predicates(tmp_path)
         assert run.state.observations["p2"].reason == "reconciliation_required"
         assert transport.calls_made == 3
         assert len(journal.pending("req-f")) == 1
+
+
+def test_fresh_pipeline_uses_per_call_goal_reservations(tmp_path):
+    """Synthetic bound and stand-in responses: accounting integration, not model quality."""
+    from qjig.goal_budget import GoalBudget
+    from qjig.providers import make_call_reservation
+
+    cat, entries, journal, _, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE)])
+    limit = Budget(6, 50000, 1)
+    seen = []
+    def reserve(request):
+        seen.append(request)
+        model = {"id": request.model, "context_length": 10000,
+                 "top_provider": {"max_completion_tokens": 6000},
+                 "pricing": {"prompt": "0.0000001", "completion": "0.0000001"}}
+        return make_call_reservation(request, model, input_tokens=1000, input_bound_provenance="synthetic fixture")
+    with cat, journal, GoalBudget.open(tmp_path / "goal.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal:
+        ledger = BudgetLedger(limit, journal, REQUEST.request_id, goal_budget=goal, partition="smoke")
+        run = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                        planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                        revision_applicability=lambda rid: Applicability.MATCH, reservation_factory=reserve)
+        assert run.status == "deferred" and run.state.observations["p1"].outcome is Outcome.FALSE
+        assert len(seen) == 3 and goal.totals().max_calls == 3 and goal.actual_usage()["unknown_calls"] == 0
+        intents = [event for event in journal.events(REQUEST.request_id) if event.kind == "intent"]
+        assert [event.payload["reservation_binding"]["request_sha256"] for event in intents] == [r.input_sha256() for r in seen]
+        assert len({event.payload["goal_attempt_id"] for event in intents}) == 3
+
+
+def test_reservation_refusal_defers_without_extra_provider_call(tmp_path):
+    from qjig.budgets import BudgetExceeded
+    from qjig.goal_budget import GoalBudget
+    from qjig.providers import make_call_reservation
+
+    cat, entries, journal, _, transport = build(tmp_path, [raw(PLAN)])
+    limit = Budget(6, 50000, 1)
+    def reserve(request):
+        if request.stage != "planner":
+            raise BudgetExceeded("tokens", "synthetic mandatory reserve")
+        model = {"id": request.model, "context_length": 10000,
+                 "top_provider": {"max_completion_tokens": 6000},
+                 "pricing": {"prompt": "0.0000001", "completion": "0.0000001"}}
+        return make_call_reservation(request, model, input_tokens=1000, input_bound_provenance="synthetic fixture")
+    with cat, journal, GoalBudget.open(tmp_path / "goal.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal:
+        ledger = BudgetLedger(limit, journal, REQUEST.request_id, goal_budget=goal, partition="smoke")
+        run = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                        planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                        revision_applicability=lambda rid: Applicability.MATCH, reservation_factory=reserve)
+        assert run.status == "deferred" and run.state.observations["p1"].outcome is Outcome.UNKNOWN
+        assert transport.calls_made == 1 and goal.totals().max_calls == 1
+        assert run.judgments["p1"].positive.failure == "budget_exceeded"
