@@ -331,7 +331,8 @@ def test_response_metadata_is_retained_without_credentials(tmp_path):
                            "usage": {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.01}})
     adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))
     response = adapter._send_unchecked(REQ)
-    assert response.metadata == {"response_id": "generation-123", "model": "vendor/model", "provider": "Example", "finish_reason": "stop"}
+    assert {k: response.metadata[k] for k in ('response_id', 'model', 'provider', 'finish_reason')} == {
+        "response_id": "generation-123", "model": "vendor/model", "provider": "Example", "finish_reason": "stop"}
     with RunArchive.open(tmp_path / "run") as archive:
         archive.record_request("r#1", REQ)
         archive.record_response("r#1", response)
@@ -419,6 +420,20 @@ def test_routing_price_ceiling_is_bound_sent_and_archived(tmp_path):
     assert seen['provider']['max_price'] == ceiling
     ceiling['prompt'] = 999
     assert request.input_sha256() == stored['input_sha256']
+
+
+def test_openrouter_receipt_binds_exact_sent_payload_without_credentials(tmp_path):
+    import hashlib
+    observed = {}
+    def post(url, headers, payload, timeout):
+        observed['payload'] = payload
+        return 200, LIVE_BODY
+    request = ProviderRequest('judge', 'openrouter', 'vendor/model-x', 'Unicode: α', 50,
+                              max_price={'prompt': 0.5, 'completion': 2.0})
+    raw = OpenRouterTransport(_env(tmp_path), post=post)._send_unchecked(request)
+    assert raw.metadata['wire_payload_sha256'] == hashlib.sha256(observed['payload'].encode('utf-8')).hexdigest()
+    assert 'SECRET' not in repr(raw.metadata)
+    assert json.loads(observed['payload'])['usage'] == {'include': True}
 
 
 @pytest.mark.parametrize('ceiling', [None, {}, {'prompt': -1, 'completion': 2}, {'prompt': True, 'completion': 2},

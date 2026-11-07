@@ -1426,7 +1426,8 @@
         "R08K",
         "R08L",
         "R08M",
-        "R08N"
+        "R08N",
+        "R08O"
       ],
       "status": "pending",
       "files": [],
@@ -3534,6 +3535,24 @@
       "acceptance": "Reopen an existing bound ledger without the original raw snapshot while preserving usage and restrictions, refusing missing, unbound, malformed or policy-mismatched stores.",
       "command": "python -m pytest tests/test_goal_budget.py::test_resume_account_bound_policy_from_persisted_constraints -q",
       "evidence": "Red: account-bound policy required the original snapshot to reopen. Resume now reads existing derived constraints through a read-only connection, reconstructs only the equivalent sanitized binding, and reuses transactional immutable-policy comparison. Tests preserve decimal precision, prior usage and lower restrictions and reject missing, unbound, invalid and mismatched policies. The ledger is not authenticated, and stored observations are historical rather than proof of current balance or authorization."
+    },
+    {
+      "id": "R08O",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08N"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_openrouter_receipt_binds_exact_sent_payload_without_credentials",
+      "action": "Record exact HTTP request-body digest in provider receipts",
+      "acceptance": "Hash the exact UTF-8 payload handed to the HTTP adapter, preserve its digest in receipt metadata and archive without including authorization headers.",
+      "command": "python -m pytest tests/test_providers.py::test_openrouter_receipt_binds_exact_sent_payload_without_credentials -q",
+      "evidence": "Red: fake-HTTP response metadata had no digest binding the sent request body. Receipt metadata now records the SHA-256 of the exact UTF-8 JSON payload passed to the adapter; existing archive tests verify metadata retention and credential exclusion. This is post-dispatch evidence, not a pre-dispatch verified wire configuration or authorization. In a separate read-only check, configured account initialization, refresh and restart succeeded using a temporary zero-spend ledger; BYOK assurance remained unknown. No model call occurred."
     }
   ]
 }

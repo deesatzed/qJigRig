@@ -235,7 +235,9 @@ class OpenRouterTransport:
             body = json.dumps(parsed_body, ensure_ascii=False)
         except (ValueError, TypeError):
             parsed_body = None
-        metadata = self._response_metadata(parsed_body)
+        metadata = self._response_metadata(parsed_body) or {}
+        # Hash the exact UTF-8 request body passed to the HTTP adapter, excluding headers.
+        metadata['wire_payload_sha256'] = hashlib.sha256(payload.encode('utf-8')).hexdigest()
         if not 200 <= status < 300:
             return RawResponse(status, body, self._usage(body), metadata=metadata)
         try:
