@@ -993,7 +993,8 @@
         "T056",
         "R01",
         "T057A",
-        "T057B"
+        "T057B",
+        "T057C"
       ],
       "status": "pending",
       "files": [
@@ -2244,6 +2245,23 @@
       "acceptance": "A review record round-trips across restart only with intact referenced revisions and matching stored applicability metadata.",
       "command": "python -m pytest tests/test_programs.py::test_review_record_persistence_and_source_binding -q",
       "evidence": "Red: no durable review storage existed. Green: catalog schema v7 persists immutable content-addressed records after transactional source-state, pinned-revision and per-source metadata checks; restart, idempotency, wrong metadata, stale catalog and modified stored record are tested. Prior schema migration fixtures repaired and v6 migration tested. Full offline suite 454 passed. No provider review, program activation, source authority, independent authenticity or full T057/R01B established."
+    },
+    {
+      "id": "T057C",
+      "phase": "P5",
+      "depends_on": [
+        "T057B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/program_review.py"
+      ],
+      "test_file": "tests/test_program_review.py",
+      "test_name": "test_budgeted_synthetic_review_is_recorded_without_activation",
+      "action": "Run an isolated, budgeted plan-review stage",
+      "acceptance": "A synthetic reviewer sees verified bounded source evidence, and its separately journaled output creates a labeled non-activating record; failures remain explicit.",
+      "command": "python -m pytest tests/test_program_review.py::test_budgeted_synthetic_review_is_recorded_without_activation -q",
+      "evidence": "Red: no separately budgeted plan-review stage existed. Green: synthetic reviewer gets bounded exact-span, applicable source packet and untrusted-data instructions, with journal/archive and source-state-checked review storage. Malformed output, budget refusal, changed scope/span and source change do not activate/store a review. Full offline 460 passed. This is an explicit standalone entrypoint, not fresh-pipeline automatic integration, hosted inference, model-quality proof or full T057/R01B."
     }
   ]
 }
