@@ -1,8 +1,8 @@
 # qJig
 
-qJig is a proposed shared evidence and decision workbench for agents. It combines QUIXER's versioned document catalog and role-aware retrieval with JIG's explicit decision questions, bounded reasoning, unknown states and controlled interventions.
+qJig is a local evidence and decision workbench under development for agents. It combines QUIXER's versioned document catalog and role-aware retrieval with JIG's explicit decision questions, bounded reasoning, unknown states and controlled interventions.
 
-**Current status:** source checkpoint, code review, compatibility probes and granular build plan. A combined qJig runtime has not been implemented. Passing either source project's tests does not prove a combined application or a quality improvement.
+**Current status:** the Python/SQLite deterministic core, authored CLI, provider boundaries and a fresh-plan pipeline exist. The browser, shared-client workflow, resource controls and evaluation are incomplete. Fresh generated plans remain deferred when coverage is unestablished. Passing tests or source-project probes does not establish a quality improvement.
 
 Start with [the synthesis](SYNTHESIS.md), [source audit](SOURCE_AUDIT.md), [algorithm](docs/ALGORITHM.md), and [build queue](TASK_QUEUE.md). The [full implementation plan](docs/plans/2026-11-06-qjig-build.md) gives a focused test and commit procedure for every task. [GOAL.md](GOAL.md) defines completion and [VALIDATION_REPORT.md](VALIDATION_REPORT.md) records what was actually run.
 
@@ -12,7 +12,7 @@ Start with [the synthesis](SYNTHESIS.md), [source audit](SOURCE_AUDIT.md), [algo
 - `Decision_Program_Codex_Handoff/`: the user's moved JIG workbench. Selected code/docs/fixtures are fingerprinted in `plan/jig-source-hashes.json`. Local credentials, datasets, environments and generated records are excluded from Git.
 - The separate HITMCockpit adapter is recorded at `08a49cce014453afdb7be5e4a9909c2416454cf9`; it remains in its own local worktree. The first qJig milestones do not require Swift.
 
-The source folders are review inputs, not the location for new qJig implementation. New code belongs in `src/qjig/` after the design is reviewed. The JIG source AGENTS.md describes an older pre-implementation state; consult its actual code and current audit for capabilities. No upstream source file was rewritten to fit this design.
+The source folders are review inputs, not the location for new qJig implementation. New runtime code belongs in `src/qjig/`; follow the active queue and GOAL.md. The JIG source AGENTS.md describes an older pre-implementation state; consult its actual code and current audit for capabilities. No upstream source file was rewritten to fit this design.
 
 ## Verified source commands
 
@@ -22,4 +22,6 @@ From `Decision_Program_Codex_Handoff`: `PYTHONDONTWRITEBYTECODE=1 python scripts
 
 From `Decision_Program_Codex_Handoff/Private_KB_Decision_Pilot`: `python pilot.py compare` (authored deterministic fixture; zero live model calls).
 
-These commands run the source applications. The future qJig test/start commands are specified in the plan and become verified only after those tasks exist. No new hosted calls, local model loading, live swarm dispatch or deployment occurred in this review. The new repository is local; it has no GitHub remote configured.
+These commands run the source applications, not the qJig suite. From the repository root, run `python -m pytest -q` for the offline qJig tests and `python scripts/verify_repo.py` for the current queue audit. The audit checks queue structure, completed dependencies, named test definitions and recorded evidence; it does not prove the recorded results, inspect runtime behavior or certify completion. `reports/verify_packet.py` is the historical pre-implementation review verifier and is not an active runtime gate.
+
+The authored CLI supports `python -m qjig import`, `ask`, and `trace` after installing the package (or with `PYTHONPATH=src` from this checkout). Provider tests are opt-in; do not make live calls until the unfinished input, cost and aggregate budget controls are enforced. The service/browser and clean-install verification commands described in GOAL.md are not yet available.
