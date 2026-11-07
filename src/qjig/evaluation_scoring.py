@@ -251,6 +251,9 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
     if any(item['quote'] not in revisions[item['revision_id']].decoded.text for item in reference['evidence']):
         raise ContractError('reference quote not in source')
     if replay.status == 'incomplete':
+        results = [event['data'] for event in events if event['kind'] == 'run_result']
+        if len(results) == 1 and results[0].get('schema') == 'qjig.fresh-result.v1':
+            return _score_fresh_receipt_failure(context, events, journal, reference, expected_run_sha256, ref_hash)
         return _score_fresh_planner_failure(context, events, journal, reference, expected_run_sha256, ref_hash)
     requests = [e for e in events if e['kind'] == 'request']
     recorded = journal.events(request['request_id'])
@@ -302,6 +305,52 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
             'conditional_answer': answer, 'conditional_comparison': comparison, 'reference_expected_answer': reference['expected_answer'],
             'required_evidence_covered': covered,
             'semantic_assurance': 'not_assessed'}
+
+
+
+def _score_fresh_receipt_failure(context, events, journal, reference, run_hash, ref_hash):
+    """Retain malformed post-planning receipts without inferring a graph result."""
+    request_id = context['request']['request_id']
+    if journal.pending(request_id):
+        raise ContractError('pending fresh failure requires reconciliation')
+    sent = [event for event in events if event['kind'] == 'request']
+    recorded = journal.events(request_id)
+    if not sent or len(recorded) != 2 * len(sent):
+        raise ContractError('incomplete fresh journal call count differs')
+    responses = {e['call_id']:e['data'] for e in events if e['kind'] == 'response'}
+    validations = {e['call_id']:e['data'] for e in events if e['kind'] == 'validation'}
+    malformed = False
+    for i, event in enumerate(sent):
+        data, call_id = event['data'], event['call_id']
+        intent, terminal = recorded[2*i:2*i+2]
+        response, validation = responses.get(call_id), validations.get(call_id)
+        identity = (data['stage'], data['provider'], data['model'], data['input_sha256'])
+        if (not isinstance(response, dict) or not isinstance(validation, dict)
+                or intent.kind != 'intent' or terminal.kind != 'receipt'
+                or intent.call_id != call_id or terminal.call_id != call_id
+                or (intent.stage, intent.provider, intent.model, intent.input_sha256) != identity
+                or (terminal.stage, terminal.provider, terminal.model, terminal.input_sha256) != identity
+                or intent.payload.get('request_max_price') != data.get('max_price')
+                or terminal.payload.get('raw_sha256') != response['body_sha256']
+                or terminal.payload.get('usage') != (response['usage'] or {})
+                or terminal.payload.get('http_status') != response['http_status']
+                or terminal.payload.get('metadata') != response['metadata']
+                or terminal.payload.get('note') != response['note']
+                or terminal.payload.get('validation') != (validation.get('failure') or 'ok')):
+            raise ContractError('incomplete fresh receipt differs')
+        failure = validation.get('failure')
+        if data['stage'] in ('judge_positive', 'judge_negative') and failure in ('malformed_output', 'schema_violation'):
+            malformed = True
+        elif failure is not None:
+            raise ContractError('unsupported incomplete fresh failure')
+    if not malformed:
+        raise ContractError('verified malformed judge receipt required')
+    return {'case_id':reference['case_id'], 'run_sha256':run_hash, 'reference_sha256':ref_hash,
+            'reference_provenance':reference['provenance'], 'classification':'malformed',
+            'request_status':'deferred', 'request_answer':None, 'conditional_answer':None,
+            'conditional_comparison':'unknown_review', 'reference_expected_answer':reference['expected_answer'],
+            'required_evidence_covered':None, 'failure_verified':True, 'reconciliation_required':False,
+            'semantic_assurance':'not_assessed'}
 
 
 def _score_fresh_planner_failure(context, events, journal, reference, run_hash, ref_hash):

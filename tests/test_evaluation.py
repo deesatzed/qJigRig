@@ -745,7 +745,7 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
 
 
 @pytest.mark.parametrize(('mode','expected'), [('malformed','malformed'),('http_error','provider_failure'),('unavailable','provider_failure'),
-                                              ('timeout','uncertain_outcome'),('budget','unknown_review')])
+                                              ('timeout','uncertain_outcome'),('budget','unknown_review'),('judge_malformed','malformed')])
 def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expected):
     import json
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
@@ -776,11 +776,16 @@ def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expec
                                  frozenset(),'2026-11-07',False)
     response = {'malformed':RawResponse(200,'not json',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
                 'http_error':RawResponse(502,'upstream error',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
-                'unavailable':ProviderUnavailable('synthetic'), 'timeout':TimeoutError('synthetic'), 'budget':None}[mode]
+                'unavailable':ProviderUnavailable('synthetic'), 'timeout':TimeoutError('synthetic'), 'budget':None,
+                'judge_malformed':RawResponse(200,'not json',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01})}[mode]
+    responses = ([RawResponse(200,json.dumps({'predicates':[{'id':'p','question':'Do tests pass?'}],'expression':{'ref':'p'}}),
+                              {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}), response,
+                  RawResponse(200,json.dumps({'supported':False,'quote':'','reason':'synthetic'}),
+                              {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01})] if mode=='judge_malformed' else [response])
     with Journal.open(tmp_path/'j.sqlite') as journal, RunArchive.open(tmp_path/'archive') as archive:
         result = run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=case_lock_digest(lock),
                                   applicability_inputs=inputs,ledger=BudgetLedger(Budget(0 if mode=='budget' else 8,50000,1),journal,'r'),
-                                  transport=StandInTransport([response]),archive=archive,planner=('stand-in','planner'),judge=('stand-in','judge'))
+                                  transport=StandInTransport(responses),archive=archive,planner=('stand-in','planner'),judge=('stand-in','judge'))
         replay=verify_archive(archive); assert replay.status=='incomplete'
         score=score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
         assert score['classification']==expected and score['request_status']=='deferred' and score['request_answer'] is None
@@ -791,7 +796,7 @@ def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expec
             journal.reconcile(journal.pending('r')[0].call_id, resolution='not_executed', detail='synthetic verification')
             with pytest.raises(ContractError, match='reconciliation'):
                 score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
-        if mode=='malformed':
+        if mode in ('malformed', 'judge_malformed'):
             saved = journal._con.execute("SELECT payload FROM events WHERE kind='receipt'").fetchone()[0]
             tampered = json.loads(saved); tampered['usage']['cost_usd']=0
             journal._con.execute('DROP TRIGGER events_no_update')

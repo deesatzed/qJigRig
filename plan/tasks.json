@@ -1215,7 +1215,8 @@
         "T068C",
         "T068D",
         "T068E",
-        "T068F"
+        "T068F",
+        "T068G"
       ],
       "status": "pending",
       "files": [
@@ -2964,6 +2965,23 @@
       "acceptance": "Derive arm and repeat from the archive and verify the anchored plan, case, request, partition, replay and journal before returning a scored assignment.",
       "command": "python -m pytest tests/test_evaluation.py::test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping -q",
       "evidence": "Red: no scorer linked archived assignment to the reserved plan. Direct and combined synthetic runs now derive their arm/repeat from the archived context, verify the externally supplied plan digest, persisted case/request/partition assignment and quiescent goal/journal accounting, then run structural scoring. Wrong plan or partition and a rehashed changed repeat refuse. Focused evaluation/goal/replay suite 89 passed before final tamper test; final tamper test passed; full offline suite 530 passed. An initial synthetic direct receipt exceeded its reserved cost and was correctly rejected by the accounting audit; fixture was corrected. Existing free-form summary helpers remain assertion-based, and this is not proof of source authority, semantic correctness or external ledger authenticity."
+    },
+    {
+      "id": "T068G",
+      "phase": "evaluation",
+      "depends_on": [
+        "T068E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_fresh_planner_failure_scoring_retains_uncertainty",
+      "action": "Retain verified malformed judge outcomes in evaluation scoring",
+      "acceptance": "An incomplete fresh run with a malformed judge receipt is scored as failed without fabricating an answer; altered journal receipts reject.",
+      "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
+      "evidence": "Red: incomplete fresh results containing malformed judge receipts were incorrectly treated as planner failures and rejected. A replayed result with a malformed judge receipt is now retained as malformed with no request or conditional answer, after all recorded receipts match the journal; changed journal usage refuses. Focused evaluation/replay/acquisition suite 62 passed; full offline suite 531 passed. Other judge/reviewer provider failures and uncertain outcomes remain unsupported and are not inferred; no real provider called."
     }
   ]
 }
