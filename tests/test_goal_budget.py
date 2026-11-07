@@ -442,3 +442,64 @@ def test_recover_rejects_receipt_with_different_request_binding(tmp_path):
         with pytest.raises(ContractError, match='binding'):
             goal.recover_receipt('attempt', journal)
         assert goal.actual_usage()['unknown_calls'] == 1
+
+
+def test_audit_journal_detects_orphans_and_usage_mismatch_without_mutating(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+
+    limit = Budget(4, 1000, 1)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='smoke')
+        ledger.run('judge', lambda: ('ok', {'prompt_tokens': 20, 'completion_tokens': 10, 'cost_usd': 0.1}),
+                   provider='stand-in', model='m', input_sha256='a'*64,
+                   reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.2)
+        assert goal.audit_journal(journal) == {'status': 'verified', 'checked_attempts': 1, 'issues': []}
+        goal.reserve('orphan', 'r2', 'smoke', tokens=100, cost_usd=0.2)
+        report = goal.audit_journal(journal)
+        assert report['status'] == 'incomplete' and 'missing_intent:orphan' in report['issues']
+        journal.record_intent(request_id='untracked', stage='judge', provider='stand-in', model='m', input_sha256='b'*64)
+        report = goal.audit_journal(journal)
+        assert report['status'] == 'invalid' and 'untracked_intent:untracked#1' in report['issues']
+        goal._con.execute("UPDATE usage SET cost='0.11' WHERE attempt_id != 'orphan'")
+        report = goal.audit_journal(journal)
+        assert report['status'] == 'invalid' and any(x.startswith('usage_mismatch:') for x in report['issues'])
+        assert goal.actual_usage()['unknown_calls'] == 1
+
+
+def test_audit_journal_rejects_orphan_and_duplicate_terminal_events(tmp_path):
+    from qjig.journal import Event, Journal
+
+    limit = Budget(2, 500, 0.5)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        fake = Event('r', 1, 'r#missing', 'intent', 'judge', 'stand-in', 'm', 'a'*64, {}, 0)
+        journal.record_terminal(fake, 'receipt', {'usage': {}})
+        report = goal.audit_journal(journal)
+        assert report['status'] == 'invalid' and 'orphan_terminal:r#missing' in report['issues']
+
+
+def test_audit_journal_marks_duplicate_receipts_invalid(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+
+    limit = Budget(2, 500, 0.5)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='smoke')
+        usage = {'prompt_tokens': 20, 'completion_tokens': 10, 'cost_usd': 0.1}
+        ledger.run('judge', lambda: ('ok', usage), provider='stand-in', model='m', input_sha256='a'*64,
+                   reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.2)
+        intent = journal.events('r')[0]
+        journal.record_terminal(intent, 'receipt', {'usage': usage})
+        report = goal.audit_journal(journal)
+        assert report['status'] == 'invalid'
+        assert any(x.startswith('duplicate_terminal:') for x in report['issues'])
+
+
+def test_audit_journal_treats_malformed_attempt_identity_as_invalid(tmp_path):
+    from qjig.journal import Journal
+    limit = Budget(1, 100, 0.1)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        journal.record_intent(request_id='r', stage='judge', provider='stand-in', model='m', input_sha256='a'*64,
+                              payload={'goal_attempt_id': ['not-a-string']})
+        report = goal.audit_journal(journal)
+        assert report['status'] == 'invalid' and 'untracked_intent:r#1' in report['issues']

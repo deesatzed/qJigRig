@@ -187,6 +187,69 @@ class GoalBudget:
                 "known_cost_usd": known_cost,
                 "unknown_calls": sum(any(v is None for v in row) for row in rows)}
 
+    def audit_journal(self, journal) -> dict:
+        """Compare a quiescent complete journal with this ledger; never repairs either.
+
+        This check does not authenticate the stores, prove that all calls were
+        journaled, or make a snapshot atomic across their separate databases.
+        """
+        rows = self._con.execute("SELECT r.attempt_id,r.request_id,r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id ORDER BY r.attempt_id").fetchall()
+        reservations = {r[0]: r for r in rows}
+        events = journal.all_events()
+        intents = [e for e in events if e.kind == "intent"]
+        invalid, incomplete = [], []
+        seen = set()
+        for event in events:
+            if event.kind == "intent":
+                if event.call_id in seen:
+                    invalid.append(f"duplicate_call_id:{event.call_id}")
+                seen.add(event.call_id)
+            elif event.call_id not in seen:
+                invalid.append(f"orphan_terminal:{event.call_id}")
+        for intent in intents:
+            identity = intent.payload.get("goal_attempt_id")
+            if not isinstance(identity, str) or identity not in reservations:
+                invalid.append(f"untracked_intent:{intent.call_id}")
+        for attempt, request_id, bound_tokens, bound_cost, inp, out, cost in rows:
+            matches = [e for e in intents if e.payload.get("goal_attempt_id") == attempt]
+            if not matches:
+                incomplete.append(f"missing_intent:{attempt}")
+                continue
+            if len(matches) != 1:
+                invalid.append(f"duplicate_intent:{attempt}")
+                continue
+            intent = matches[0]
+            token_bound, cost_bound = intent.payload.get("reserve_tokens"), intent.payload.get("reserve_cost_usd")
+            if (intent.request_id != request_id or not _valid_tokens(token_bound) or not _valid_cost(cost_bound)
+                    or token_bound != bound_tokens or _cost(cost_bound) != Decimal(bound_cost)):
+                invalid.append(f"reservation_mismatch:{attempt}")
+            required = self._con.execute("SELECT work_id,stage,provider,model FROM required_work WHERE attempt_id=?", (attempt,)).fetchone()
+            if required is not None and (intent.payload.get("required_id"), intent.stage, intent.provider, intent.model) != required:
+                invalid.append(f"required_binding_mismatch:{attempt}")
+            terminals = [e for e in events if e.call_id == intent.call_id and e.kind != "intent"]
+            if len(terminals) > 1 and [e.kind for e in terminals] != ["uncertain", "reconciled"]:
+                invalid.append(f"duplicate_terminal:{attempt}")
+            if len(terminals) != 1 or terminals[0].kind != "receipt":
+                incomplete.append(f"receipt_unavailable:{attempt}")
+                continue
+            receipt = terminals[0]
+            if (receipt.request_id, receipt.stage, receipt.provider, receipt.model, receipt.input_sha256) != (intent.request_id, intent.stage, intent.provider, intent.model, intent.input_sha256):
+                invalid.append(f"receipt_binding_mismatch:{attempt}")
+            usage = receipt.payload.get("usage")
+            if not isinstance(usage, dict):
+                incomplete.append(f"usage_unavailable:{attempt}")
+                continue
+            a, b, c = usage.get("prompt_tokens"), usage.get("completion_tokens"), usage.get("cost_usd")
+            if not _valid_tokens(a) or not _valid_tokens(b) or not _valid_cost(c) or inp is None or out is None or cost is None:
+                incomplete.append(f"usage_unavailable:{attempt}")
+            elif (a, b, _cost(c)) != (inp, out, Decimal(cost)):
+                invalid.append(f"usage_mismatch:{attempt}")
+            elif a + b > bound_tokens or _cost(c) > Decimal(bound_cost):
+                invalid.append(f"reservation_exceeded:{attempt}")
+        issues = sorted(invalid) + sorted(incomplete)
+        return {"status": "invalid" if invalid else "incomplete" if incomplete else "verified",
+                "checked_attempts": len(rows), "issues": issues}
+
     def _check_capacity(self, request_id: str, partition: str, calls: int, tokens: int, cost: Decimal,
                         exclude_required: str | None = None) -> None:
         for label, condition, args, limit in (

@@ -120,6 +120,13 @@ class Journal:
         ).fetchall()
         return [Event(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], json.loads(r[8]), r[9]) for r in rows]
 
+    def all_events(self) -> list[Event]:
+        """Read every event in journal append order for cross-request accounting."""
+        rows = self._con.execute(
+            "SELECT request_id,request_seq,call_id,kind,stage,provider,model,input_sha256,payload,recorded_at FROM events ORDER BY seq"
+        ).fetchall()
+        return [Event(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], json.loads(r[8]), r[9]) for r in rows]
+
     def reconcile(self, call_id: str, *, resolution: str, detail: str) -> Event:
         """Record an operator's verified finding about an unresolved call: executed or not_executed."""
         if resolution not in ("executed", "not_executed"):
