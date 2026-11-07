@@ -539,7 +539,7 @@
       "depends_on": [
         "T030"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/scheduler.py"
       ],
@@ -547,7 +547,8 @@
       "test_name": "test_deterministic_next_need",
       "action": "Choose next material need by dependencies then planner order then ID",
       "acceptance": "Same state schedules the same need and never skips a prerequisite",
-      "command": "python -m pytest tests/test_scheduler.py::test_deterministic_next_need -q"
+      "command": "python -m pytest tests/test_scheduler.py::test_deterministic_next_need -q",
+      "evidence": "Red: ModuleNotFoundError qjig.scheduler (initial contract). Green: focused 1 passed in 0.03s; tests/test_scheduler.py 4 passed in 0.03s; full suite 178 passed in 0.20s. 2026-11-06."
     },
     {
       "id": "T033",
