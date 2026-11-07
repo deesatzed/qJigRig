@@ -1,119 +1,82 @@
-# qJig handoff — 2026-11-06
+# qJig handoff — 2026-11-07 (for the next AI session)
 
-## 1. Open items
+Read this file first. It supersedes `HANDOFF_2026-11-06.md`, which describes the pre-implementation review state and is now stale (it says "no runtime exists"; that is no longer true).
 
-The user is restarting Codex in `/Volumes/WS4TB/qJig`. They referred to it as the “qRig folder”; the actual repository folder is `qJig`, and the GitHub repository is `qJigRig`.
+## 0. What qJig is, in plain words
 
-The current deliverable is a source checkpoint, review, combined design and granular implementation plan. **No new qJig runtime exists. All 74 runtime tasks T001–T074 are pending.** There is no root `pyproject.toml`, `src/qjig` or new qJig test suite yet. The two source apps remain incomplete, though their recorded offline suites pass.
+qJig is a Python tool that takes a question (for example "Can customer 42 get a refund 20 days after purchase?"), breaks it into specific yes/no sub-questions, retrieves the exact passages of versioned source documents needed for each, judges each with deterministic code or a model, combines the answers with three-valued logic, and returns either a decision with traceable evidence or an explicit **deferral** that names what is missing. It never treats "not found" as "does not exist", and never treats "model said so" as independent proof.
 
-The detailed combined design is proposed for review. The user approved combining the ideas and requested algorithmic steps, small unit tests and a granular build queue; they have not subsequently instructed this session to implement the new runtime. If they say to proceed with the plan in the next session, treat that as authorization to implement the recommended design; do not repeatedly seek approval for routine steps.
+Repo: `/Volumes/WS4TB/qJig` (GitHub `deesatzed/qJigRig`, branch `main`). Python ≥3.11 (3.13.9 in use), standard library + pytest. Source: `src/qjig`, tests: `tests/`, queue: `plan/tasks.json` (74 tasks), exact per-task steps: `docs/plans/2026-11-06-qjig-build.md`.
 
-No technical blocker prevents T001–T005. Later open work includes semantic plan completeness, trustworthy applicability/evidence support, optional model environment verification, actual role-defined agent use, browser workflow and benefit evaluation. Missing model credentials or local weights must not block the deterministic foundation.
+## 1. OPEN ITEMS (read these first)
 
-Known baseline caveats:
+1. **Retrieval often finds nothing in live runs (unfixed, needs owner approval).** In two live runs through `run_fresh` (reports/t048-fresh-live.json), 3 of 8 predicates got `no_retrieval_hit` and 2 more got `judge_no_support`, so most predicates stayed UNKNOWN. Probable cause, NOT yet confirmed: `retrieval.tokenize`/BM25 does not stem ("refund" does not match "Refunds"), and the query is the whole predicate sentence. Fixing it changes the T017 retrieval contract, so propose it as its own small task (failing test first) and get the owner's OK. Confirm the cause first with a one-line check of `tokenize` and `bm25_candidates` on those strings before changing anything.
+2. **Hy4 is unreliable as planner; fine as judge.** `tencent/hy4` is a reasoning model: it can spend its whole `max_tokens` on hidden reasoning and return no content (`finish_reason=length`). At 1500/800 tokens it failed planner and judge. At 6000 the judge worked (both sides) but the planner still exhausted 6000. A Hy4 judge call in `t048-fresh-live.json` (p4, run 1) also returned malformed output; not diagnosed.
+3. **Fresh (model-planned) runs always defer — by design.** `run_fresh` opens a material obligation `ob-plan-coverage`; retrieval can list exception passages for review but never closes it. There is no reviewer mechanism to close it yet. Do not "fix" this by auto-closing.
+4. **All quality evidence is one synthetic corpus and one question.** The refund sample document is authored by us. Live runs prove the provider path works; they say nothing about decision quality, reproducibility, or which model is better.
+5. **14 commits are local only (origin/main is 14 behind).** Pushing needs fresh owner approval each time. An earlier approval covered only an earlier push.
+6. **Stand-ins and synthetic data remain** (owner rule: label them and keep removal on the open list): `StandInTransport` ("STAND_IN: authored responses, not a model") in offline tests; authored plans; synthetic fixtures. No local model / `.venv-judge` was ever run (T047 only checks environment/size guards with a stand-in runner).
+7. **`reports/verify_packet.py` fails by design** (it asserts all 74 tasks pending — a review baseline). No implementation-aware replacement exists. Do not mark tasks pending to make it pass.
+8. Remaining pending tasks: **T049–T074** (26 tasks). See §6.
 
-- Legacy QUIXER and JIG use different hashing/newline/span contracts. Explicit translation is required.
-- JIG's source collection builder requires identical scope/effective dates across members. qJig needs independent member validity.
-- Hashes and exact quotes do not establish semantic support or source authority. Unknown/conflict and missing exceptions must remain explicit.
-- JIG's nested AGENTS.md/TASK_QUEUE.md describe an older pre-implementation state. Do not use them as the current qJig status.
-- Two inherited whitespace warnings are preserved in the source checkpoint: JIG docs/03_BENCHMARK_PROTOCOL.md:20 and reference/jigfiles.txt:5026. New review files passed staged whitespace checks.
-- The moved `.venv-judge` was not verified after relocation. Do not assume its executable paths still work.
+## 2. Verified status (all re-run this session)
 
-## 2. How to resume
+- Full suite: **236 passed** (`python -m pytest -q`, ~2 s, offline, no network, no keys).
+- Tasks complete: **48 of 74** (T001–T048). Pending: T049–T074.
+- Phases: P1 (T001–T012 identity/spans/revisions/applicability), P2 (indexing/retrieval/packets/recovery/obligations), P3 (logic, plans, stopping, scheduler, acquisition, finalize, CLI `python -m qjig import|ask|trace` end to end via real subprocess, T038), P4 through T048 (journal, budgets, typed provider layer, planner, judge, local judge guards, real OpenRouter adapter, fresh pipeline).
+- Live (real model) evidence, all with a SYNTHETIC refund corpus: `reports/t046-smoke-receipts.json`, `reports/t046-smoke-receipts-hy4-6000.json`, `reports/t048-fresh-live.json`. Key never appears in them (checked by exact-match grep: 0). Costs are the provider-reported figures (all small, well under $0.1 total).
 
-Start the new session with `/Volumes/WS4TB/qJig` as its workspace. This places the new app inside the session's writable root; the previous session needed filesystem escalation because it began in QUIX.
+## 3. Architecture (module map, `src/qjig/`)
 
-Read this file, then root `AGENTS.md`, `GOAL.md`, `STANDARDS.md`, `IMPLEMENT.md`, `DECISIONS.md`, `PROGRESS.md` and `TASK_QUEUE.md`. Read `SYNTHESIS.md`, `docs/CONTRACTS.md`, `docs/ALGORITHM.md` and the detailed build plan before app-code changes.
+contracts (Request, Budget) · sources (raw/text hashes, `SourceRevision`, id `rev1:`+sha256) · spans (code-point, end-exclusive) · legacy_quix / legacy_jig (explicit translation of two legacy contracts) · store (SQLite catalog v3; revisions immutable via triggers; reads re-verify) · applicability (per-source date and entity; unknown never = compatible) · indexing · retrieval (BM25; mandatory exception channels) · packets · recovery · obligations (open/evidence_found/unresolved/satisfied/skipped; `absence_established` always False) · logic (SUPPORTED/UNKNOWN support; TRUE/FALSE/UNKNOWN/CONFLICT outcome; CONFLICT outranks UNKNOWN, D016) · plans (parse/validate, origin authored|fresh) · stopping · exact (dated numeric rules) · scheduler · acquisition (`run_round`, `run_until_done`, **`run_fresh`**, `FreshRun`) · finalize (snapshot vs current_required) · cli · journal (append-only, intent before call, UncertainOutcome/reconcile) · budgets (journal-derived call/token/cost caps; unknown cost stays unknown) · providers (`call_typed`, `StandInTransport`, **`OpenRouterTransport`**, `load_env_value`, `RawResponse.note`) · planner (`request_fresh_plan`, `PlanBinding`; prompt now demands an exception predicate) · judge (paired YES/NO judging, quote must be an exact slice of an applicable retrieved span; assurance is never "independent") · local_judge.
+
+Key invariants: unknown/conflict/provider-failure are distinct; a "not supported" judge answer is never a "no"; HTTP-200 malformed output is a failure with a kept receipt; every attempted provider call counts against the budget; a model-written plan is never known complete.
+
+## 4. Models and credentials (owner decisions)
+
+- Owner-chosen (2026-11-07), IDs given by the owner, all verified listed on OpenRouter's public `/models`: **planner** `deepseek/deepseek-v4.1-flash-1017` (valid plan 6/6 + later runs); **judge / escalation** `tencent/hy4` (needs ≥6000 `max_tokens`); further planner fallbacks in the owner's stated order if deepseek proves insufficient: `meta/muse-spark-open`, then `openai/gpt-6.1-terra` (not called yet). Do not substitute model IDs from memory; look up and ask the owner.
+- Key: owner approved reading `Decision_Program_Codex_Handoff/.env` (`OPENROUTER_API_KEY`, `BASE_URL`). The key is capped upstream so the owner set no qJig spend budget; scripts still set their own ceilings. Never print the key; after any live run grep the receipts for it. `.env` files are git-ignored.
+- AGENTS.md: live runs never belong in the offline suite; live scripts are opt-in under `scripts/`.
+
+## 5. Prior troubleshooting (what went wrong and what was done)
+
+| Problem | Cause | Resolution |
+|---|---|---|
+| Hy4 "failed" at T046 | HTTP 200 with `content: null`, `finish_reason=length`: reasoning used the whole token cap | Added `max_tokens` override to `request_fresh_plan` / `judge_predicate`; raised to 6000 (owner approved). Judge fixed; planner still exhausts 6000 (cause of runaway reasoning unknown, one prompt). |
+| That failure was labeled `plan_invalid:executable_code_field` | Adapter passed the whole JSON envelope when content was null | Adapter now returns empty body + `RawResponse.note="no_message_content; finish_reason=..."`; typed layer reports `malformed_output`. |
+| Plans never asked about exceptions | Planner sees only the question + corpus hash, not documents | Prompt now requires an exception/waiver predicate (2/2 live plans complied); plus the always-open `ob-plan-coverage` obligation. |
+| My test helpers read the journal after it closed (`sqlite3.ProgrammingError: closed database`) | Reading `ledger.used_calls()` outside the `with journal` block | Capture counts inside the `with`. Happened in T044 and T048 tests; check for this first if you see that error. |
+| A skipped predicate's open obligation blocked stopping (T035) | Stop check ran before skips were recorded | Added ledger status `skipped` (refused for entity/applicability kinds) and compute stop after skips. |
+| T031 silent resolution of ambiguous applicable policy | — | Added `applicable_policy_ambiguous`. |
+| Wrong expectations in my own tests (T017 "Refunds" vs "refund", T020, T041, T044) | My errors, fixed in tests not code | — Note T017 is the same stemming behavior behind open item 1. |
+| A Bash command probing `.env` variable names was denied (before the owner approved `.env` access) | Permission classifier | Not retried; owner later approved reading the key. |
+| `reports/verify_packet.py` fails | Asserts all tasks pending | By design; see open item 7. |
+
+Owner rule: if the same failure survives two fix attempts, stop patching, list plausible causes, add logging, and record in `ERROR_LOG.md` (none created yet; nothing has hit that threshold).
+
+## 6. Next steps (in order)
+
+1. **Ask the owner** whether to (a) fix retrieval (stemming and/or a shorter keyword query than the full sentence) as a new small task, and (b) push the 14 local commits. Do neither without a yes.
+2. If approved, retrieval fix: failing test first (the `no_retrieval_hit` strings from `reports/t048-fresh-live.json` p1/p3/p4 are the real counterexamples), minimal change, rerun full suite (236 must stay green or be consciously updated), then rerun `scripts/smoke_t048.py` (live, ~2 min for 2 runs; run in background) and record before/after.
+3. **T049** Hy4 escalation path (`src/qjig/escalation.py`, test `test_hy4_separate_outcome`): standalone failure/deferral stays saved; escalation costed separately. Then **T050** assurance/attack cases (instruction contamination in sources, omitted-condition counterexamples; never emit a generic "semantically secure" claim), **T051** replay (verify recorded structure without new inference), **T052** cost aggregation (unknown stays unknown, failed/escalated calls included).
+4. P5 (T053–T062, browser/two-client use) and P6 (T063–T074, isolated benefit comparisons) per `plan/tasks.json`. Starting them out of order needs a recorded plan change.
+5. Build an implementation-aware replacement for `verify_packet.py` when convenient.
+
+## 7. How to work here (rules that apply)
+
+- Read `AGENTS.md`, `GOAL.md`, `STANDARDS.md`, `DECISIONS.md` (D012–D020 are the implementation decisions), `PROGRESS.md`, `TASK_QUEUE.md` before coding. Owner global rules: lead reports with open items, give exact test counts, no time/cost estimates, no mocks/synthetic data without approval and labeling, owner chooses model versions, pause only for irreversible/outward actions or input only the owner can give.
+- Per task: smallest failing test → observe the intended failure → minimal implementation → focused + nearest + full suite → one scoped commit → record evidence in `plan/tasks.json` and `PROGRESS.md`, decisions in `DECISIONS.md`. Commit messages end with the Co-Authored-By line for the model in use.
+- Helper used previously (session scratchpad, may be gone): a script that runs focused/file/full tests, writes the evidence string into `plan/tasks.json` and `PROGRESS.md`, and commits. Recreate it if needed; do not skip the evidence.
+- Tests that call a provider must use `StandInTransport` or the injected fake HTTP layer and say so in the docstring. Live scripts: `scripts/smoke_t046.py`, `scripts/smoke_t048.py` (usage in each docstring; both take the env file path; long runs go to background).
+- Nested `sources/quixer` and `Decision_Program_Codex_Handoff` are checkpointed review inputs; do not edit them, and do not run root pytest expecting those suites (pytest is scoped to `tests/`).
+
+## 8. Orientation commands
 
 ```sh
 cd /Volumes/WS4TB/qJig
-git status --short
-git log -4 --oneline
-git remote -v
-PYTHONDONTWRITEBYTECODE=1 python reports/verify_packet.py
-PYTHONDONTWRITEBYTECODE=1 python reports/probe_source_contracts.py
+git status --short; git log --oneline -8; git rev-list --count origin/main..HEAD   # expect clean, 14
+python -m pytest -q                                                               # expect 236 passed
+python - <<'P'
+import json,collections;d=json.load(open('plan/tasks.json'))['tasks'];print(collections.Counter(t['status'] for t in d))
+P
 ```
-
-At handoff preparation the status was clean, there were no stashes, and both scripts passed. Packet verification reports 17 required documents, 74 pending tasks, an acyclic dependency graph, 149 JIG source hashes and 156 QUIXER source hashes. The probe script reports four reproduced source-contract observations. Python used for the audit was 3.13.9.
-
-`verify_packet.py` is a **review-baseline verifier**: it deliberately asserts that all tasks are pending. Once implementation begins and statuses change, preserve its original baseline evidence and add/update the implementation-aware validation deliberately. Do not treat that baseline assertion as evidence the app is broken, or mark tasks pending merely to make it pass.
-
-Do not run root `pytest` as if it were a qJig runtime suite before T001 establishes discovery boundaries; the repository contains two nested source suites. Their separate commands are documented in README.md. The future `python -m qjig ...` commands in the plan are not implemented.
-
-A suitable next-session instruction is: “Read HANDOFF_LATEST.md and the project controls, then proceed with the recommended plan starting at T001, one focused failing test and one verified behavior per commit.”
-
-## 3. Where things stand
-
-qJig is intended to let agents break a task into specific evidence needs, retrieve the right versioned passages from shared knowledge, evaluate exact or model-dependent claims, and return a traceable answer or explicit deferral. QUIXER contributes document indexing, role metadata, provenance and recovery; JIG contributes explicit subquestions, bounded logic, unknown/conflict states and stopping tests. Whether the combination improves actual agent work remains unproven.
-
-The recommended design is a small new shared core with explicit adapters. A wholesale merge of the two runtimes was rejected because they have different identities, stores, applicability rules and accounting boundaries.
-
-## 4. Verified working
-
-Rechecked during handoff preparation:
-
-- `python reports/verify_packet.py`: passed, source fingerprints and build DAG match.
-- `python reports/probe_source_contracts.py`: passed, reproducing different CRLF hashes, rejected mixed-date legacy collection, unresolved material exception and retained conflict.
-- GitHub `main` matched local review commit `d471390b413aa106b4e1ffb35795d0f512c062b3` before this handoff commit.
-- Root working tree was clean and `git stash list` was empty.
-
-Full source suites were run in the immediately preceding review, not rerun merely to write this document:
-
-- QUIXER: 263 Python tests passed; existing SWIG deprecation warning.
-- Switch experiment: 33 tests and TypeScript typecheck passed.
-- Moved JIG: 250 offline tests passed; frozen copy also passed 250 after correcting audit copy/cwd setup errors. Prior failed audit-harness logs are retained separately.
-- JIG private-KB fixture: 18/18 authored reference decisions across three modes; evidence payload reduction is measured, inference accuracy/cost/latency is not.
-
-Evidence: `VALIDATION_REPORT.md`, `reports/source-test-receipts.json`, source logs, `reports/packet-verification.json` and `reports/compatibility-replay.json`. These are source/review evidence, not completed qJig runtime tasks.
-
-## 5. Unverified or partial
-
-No combined app, fresh qJig planner/judge run, new browser walkthrough, local model installation, actual live swarm use or independent outcome study has been demonstrated. Existing source model smokes and exploratory AI review cannot be pooled into a new qJig result.
-
-Hy4 (`tencent/hy4`) remains the user-selected escalation model. Reflex remains optional and experimental because prior QUIXER decisions changed with option order. No automatic model promotion or calibrated threshold is justified by these observations.
-
-Source licenses/provenance were not fully established for distribution; preserve attribution and review substantial imported code before further publication/reuse. The user explicitly requested and authorized publishing the local source checkpoints and planning packet to qJigRig; that initial push is complete.
-
-## 6. Placeholder, mock, or synthetic data still present
-
-The source suites contain deterministic/fake provider responses. JIG `workbench/fixture.py`, `Private_KB_Decision_Pilot/`, its evaluation/gold.json and `reports/jig-private-fixture.json` contain authored synthetic exercises. QUIXER source experiments include synthetic conflict/stale/unsupported findings. These were retained as approved regression/research inputs, not real-world outcomes.
-
-No new qJig fixture runtime has been implemented. Planned authored graphs are diagnostic controls; fresh model-generated decomposition will be a distinct later path. Keep reference labels and arm mappings outside all indexed/model-visible corpora.
-
-Credentials, virtual environments, generated source-app data and caches remain ignored. A local `.env` exists in the moved JIG folder; the old QUIX configuration is `/Volumes/WS4TB/QUIX/.env`. Their contents were not printed and their current model access was not revalidated. Use configured loaders and presence checks when later authorized live work requires them.
-
-## 7. Recent changes
-
-Repository: `/Volumes/WS4TB/qJig`, branch `main`, origin `https://github.com/deesatzed/qJigRig.git`.
-
-- `da1397b`: checkpointed both source inputs plus provenance so integration can be traced and rolled back.
-- `d471390`: committed the audit, recommended shared-core design, contracts, algorithm, risks, verification receipts and 74-task test-first build queue. Both commits were pushed to origin/main.
-- This dated handoff and HANDOFF_LATEST.md are the only files added by the handoff operation. The handoff is committed locally according to the handoff workflow; it is not pushed by that operation. Thus local main will be one documentation commit ahead of origin until the next authorized push.
-
-Additional source checkpoints:
-
-- QUIXER commit `1790086a5d3b178957ce80324c0f283dbcf78c97`, archived under `sources/quixer/`, and GitHub tag `checkpoint/quixer-before-qjig-2026-11-06`.
-- JIG moved source tree fingerprint and 149 per-file hashes in `plan/source-checkpoints.json` and `plan/jig-source-hashes.json`.
-- HITMCockpit integration commit `08a49cce014453afdb7be5e4a9909c2416454cf9` remains in `/Volumes/WS4TB/QUIX/hitm-quix-worktree`; it is not copied into qJig and has no configured remote. qJig's early milestones do not require Swift.
-
-## 8. Next steps
-
-1. Resume from the reviewed/proposed design. If the user directs implementation, begin T001 rather than another broad audit. Done: isolated package, explicit test discovery and import-with-no-IO test pass.
-2. T002–T005: request round-trip, malformed-budget rejection, exact byte/text identities and portable source identity. Done: each behavior has a named observed-red then passing focused test, scoped commit and queue receipt.
-3. Complete P1 (through T012): canonical spans and legacy translation, immutable revisions, entity/date applicability. Done: tiny counterexamples prove shared contract agreement.
-4. P2–P3: indexing/acquisition followed by pure logic/stopping and the deterministic CLI at **T038**. Done: a real subprocess produces a trace and defers for a missing material exception without provider calls. IMPLEMENT.md has a minor later-command reference to T039; the detailed queue correctly places the CLI slice at T038.
-5. Only then add P4 provider/journal/budget paths, P5 actual browser/two-client use and P6 isolated benefit comparisons. Every task has files, dependencies, test name and acceptance behavior in the plan.
-
-Use one observable behavior per task: write focused failing test, run and inspect failure, implement minimal behavior, run focused/nearest regressions, commit and record actual evidence. Never close a task because a source project's tests pass. Avoid broad rewrites, unrequested multi-agent delegation, inherited absolute runtime dependencies or live calls in offline tests.
-
-## 9. Key files
-
-- `AGENTS.md`: root working rules and source boundaries.
-- `GOAL.md`: intended product and completion gates; overall goal remains incomplete.
-- `SYNTHESIS.md` / `SOURCE_AUDIT.md`: approach selection, implemented source mechanisms and gaps.
-- `docs/CONTRACTS.md` / `docs/ALGORITHM.md`: canonical records and deterministic acquisition/reasoning procedure.
-- `docs/TEST_STRATEGY.md`: mandatory small counterexamples and evidence levels.
-- `TASK_QUEUE.md` / `plan/tasks.json`: next tasks and machine-readable dependencies/status.
-- `docs/plans/2026-11-06-qjig-build.md`: exact per-task test/implementation/commit steps.
-- `VALIDATION_REPORT.md` / `reports/`: actual source/review evidence and limits.
-- `DECISIONS.md` / `PROGRESS.md`: rationale, safe assumptions and completed review work.
