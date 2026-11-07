@@ -15,6 +15,14 @@ from .plans import MAX_PREDICATES
 from .providers import ProviderRequest, make_call_reservation
 
 
+def _slot_id(request_id, partition, request, input_tokens, pricing_sha256, index):
+    identity = ['qjig.fresh-slot.v2', request_id, partition, request.stage, index,
+                request.provider, request.model, input_tokens, request.max_tokens,
+                dict(request.max_price), pricing_sha256]
+    encoded = json.dumps(identity, ensure_ascii=False, separators=(',', ':'), sort_keys=True, allow_nan=False).encode('utf-8')
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
                           planner_model: dict, judge_model: dict,
                           planner_input: int, planner_output: int,
@@ -40,9 +48,8 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
         request = ProviderRequest(stage, provider, model['id'], '', output_tokens, max_price=price)
         bound = make_call_reservation(request, model, input_tokens=input_tokens,
                                       input_bound_provenance='declared allocation bound; not verified')
-        identity = json.dumps(['qjig.fresh-slot.v1', request_id, stage, index],
-                              ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-        result.append({'work_id': hashlib.sha256(identity).hexdigest(), 'request_id': request_id,
+        ident = _slot_id(request_id, partition, request, input_tokens, bound.pricing_sha256, index)
+        result.append({'work_id': ident, 'request_id': request_id,
                        'partition': partition, 'tokens': input_tokens + output_tokens,
                        'cost_usd': bound.cost_usd, 'stage': stage, 'provider': provider, 'model': model['id']})
     return result
@@ -61,7 +68,11 @@ def fresh_slot_reservation(goal, set_id: str, *, request_id: str, partition: str
         raise ContractError('unsupported fresh request stage')
     bound = make_call_reservation(request, model, input_tokens=input_tokens,
                                   input_bound_provenance=input_bound_provenance)
+    count = 1 if request.stage == 'planner' else MAX_PREDICATES * MAX_ROUNDS
+    allowed = {_slot_id(request_id, partition, request, input_tokens, bound.pricing_sha256, index)
+               for index in range(count)}
     ident = goal.select_required_work(set_id, request_id=request_id, partition=partition,
                                       stage=request.stage, provider=request.provider, model=request.model,
-                                      tokens=input_tokens + request.max_tokens, cost_usd=bound.cost_usd)
+                                      tokens=input_tokens + request.max_tokens, cost_usd=bound.cost_usd,
+                                      allowed_work_ids=allowed)
     return replace(bound, required_id=ident)

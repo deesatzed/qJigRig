@@ -68,3 +68,30 @@ def test_frozen_slot_selection_survives_restart_and_rejects_mismatch(tmp_path):
             goal.select_required_work('pilot-set', **{**args, 'model': 'wrong'})
         with pytest.raises(ContractError):
             goal.select_required_work('pilot-set', **{**args, 'tokens': 151})
+
+
+def test_fresh_slot_rejects_changed_configuration_even_when_cheaper(tmp_path):
+    from qjig.fresh_preflight import fresh_run_allocations, fresh_slot_reservation
+    from qjig.providers import ProviderRequest
+    model = {'id': 'synthetic/model', 'context_length': 10000,
+             'top_provider': {'max_completion_tokens': 1000},
+             'pricing': {'prompt': '0.000001', 'completion': '0.000002'}}
+    cap = {'prompt': 2, 'completion': 3}
+    slots = fresh_run_allocations(request_id='r', partition='pilot', provider='stand-in',
+                                  planner_model=model, judge_model=model, planner_input=100, planner_output=50,
+                                  judge_input=100, judge_output=50, planner_price=cap, judge_price=cap)
+    limit = Budget(30, 10000, 1)
+    with GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'pilot': limit}) as goal:
+        goal.reserve_run_set('frozen', slots)
+        request = ProviderRequest('planner', 'stand-in', model['id'], 'question', 50, max_price=cap)
+        assert fresh_slot_reservation(goal, 'frozen', request_id='r', partition='pilot', request=request,
+                                      model=model, input_tokens=100, input_bound_provenance='fixture').required_id
+        cheaper = ProviderRequest('planner', 'stand-in', model['id'], 'question', 50,
+                                  max_price={'prompt': 1, 'completion': 1})
+        with pytest.raises(ContractError):
+            fresh_slot_reservation(goal, 'frozen', request_id='r', partition='pilot', request=cheaper,
+                                   model=model, input_tokens=100, input_bound_provenance='fixture')
+        changed_model = {**model, 'pricing': {'prompt': '0.0000005', 'completion': '0.000001'}}
+        with pytest.raises(ContractError):
+            fresh_slot_reservation(goal, 'frozen', request_id='r', partition='pilot', request=request,
+                                   model=changed_model, input_tokens=100, input_bound_provenance='fixture')
