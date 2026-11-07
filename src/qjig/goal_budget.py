@@ -52,6 +52,10 @@ class GoalBudget:
             con.execute("CREATE TABLE IF NOT EXISTS holds (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), calls INTEGER NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS recoveries (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), call_id TEXT NOT NULL, receipt_sha256 TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS required_work (work_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, partition TEXT NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL, attempt_id TEXT UNIQUE)")
+            columns = {row[1] for row in con.execute("PRAGMA table_info(required_work)")}
+            for column in ("stage", "provider", "model"):
+                if column not in columns:
+                    con.execute(f"ALTER TABLE required_work ADD COLUMN {column} TEXT")
             row = con.execute("SELECT value FROM policy WHERE id=1").fetchone()
             if row is None:
                 con.execute("INSERT INTO policy VALUES(1, ?)", (policy,))
@@ -186,7 +190,7 @@ class GoalBudget:
             if not _fits((n + pn + calls, t + pt + tokens, c + pc + cost), limit):
                 raise BudgetExceeded(label, "reservation exceeds persistent limit")
 
-    def reserve_required(self, request_id: str, partition: str, work: list[tuple[str, int, float]]) -> None:
+    def reserve_required(self, request_id: str, partition: str, work: list[tuple[str, int, float, str, str, str]]) -> None:
         """Atomically reserve named future calls; consumed only by their matching request."""
         if any(not isinstance(v, str) or not v.strip() for v in (request_id, partition)) or partition not in self._allocations:
             raise ContractError("invalid required work identity")
@@ -194,22 +198,24 @@ class GoalBudget:
             raise ContractError("required work must be nonempty")
         normalized = []
         for item in work:
-            if not isinstance(item, (tuple, list)) or len(item) != 3:
+            if not isinstance(item, (tuple, list)) or len(item) != 6:
                 raise ContractError("invalid required work")
-            ident, tokens, cost = item
-            if not isinstance(ident, str) or not ident.strip() or not _valid_tokens(tokens) or not _valid_cost(cost):
+            ident, tokens, cost, stage, provider, model = item
+            if (any(not isinstance(v, str) or not v.strip() for v in (ident, stage, provider, model))
+                    or not _valid_tokens(tokens) or not _valid_cost(cost)):
                 raise ContractError("invalid required work")
-            normalized.append((ident, tokens, _cost(cost)))
+            normalized.append((ident, tokens, _cost(cost), stage, provider, model))
         if len({item[0] for item in normalized}) != len(normalized):
             raise ContractError("duplicate required work")
         self._con.execute("BEGIN IMMEDIATE")
         try:
-            if any(self._con.execute("SELECT 1 FROM required_work WHERE work_id=?", (ident,)).fetchone() for ident, _, _ in normalized):
+            if any(self._con.execute("SELECT 1 FROM required_work WHERE work_id=?", (item[0],)).fetchone() for item in normalized):
                 raise ContractError("required work already exists")
-            self._check_capacity(request_id, partition, len(normalized), sum(t for _, t, _ in normalized),
-                                 sum((c for _, _, c in normalized), Decimal(0)))
-            self._con.executemany("INSERT INTO required_work VALUES(?,?,?,?,?,NULL)",
-                                  [(ident, request_id, partition, tokens, str(cost)) for ident, tokens, cost in normalized])
+            self._check_capacity(request_id, partition, len(normalized), sum(item[1] for item in normalized),
+                                 sum((item[2] for item in normalized), Decimal(0)))
+            self._con.executemany("INSERT INTO required_work (work_id,request_id,partition,tokens,cost,stage,provider,model) VALUES(?,?,?,?,?,?,?,?)",
+                                  [(ident, request_id, partition, tokens, str(cost), stage, provider, model)
+                                   for ident, tokens, cost, stage, provider, model in normalized])
             self._con.execute("COMMIT")
         except BaseException:
             self._con.execute("ROLLBACK")
@@ -217,7 +223,8 @@ class GoalBudget:
 
     def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float,
                 hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0,
-                required_id: str | None = None) -> None:
+                required_id: str | None = None, stage: str | None = None, provider: str | None = None,
+                model: str | None = None) -> None:
         if any(not isinstance(v, str) or not v.strip() for v in (attempt_id, request_id, partition)):
             raise ContractError("reservation identities must be non-empty")
         if (partition not in self._allocations or not _valid_tokens(tokens) or not _valid_cost(cost_usd)
@@ -230,8 +237,10 @@ class GoalBudget:
             if required_id is not None:
                 if not isinstance(required_id, str) or not required_id.strip():
                     raise ContractError("invalid required work identity")
-                required = self._con.execute("SELECT request_id,partition,tokens,cost,attempt_id FROM required_work WHERE work_id=?", (required_id,)).fetchone()
+                required = self._con.execute("SELECT request_id,partition,tokens,cost,attempt_id,stage,provider,model FROM required_work WHERE work_id=?", (required_id,)).fetchone()
                 if (required is None or required[0] != request_id or required[1] != partition or required[4] is not None
+                        or any(not isinstance(v, str) or not v.strip() for v in (stage, provider, model))
+                        or (stage, provider, model) != required[5:8]
                         or tokens > required[2] or _cost(cost_usd) > Decimal(required[3])):
                     raise ContractError("required work does not match reservation")
             previous = self._con.execute("SELECT r.tokens, r.cost, u.input_tokens, u.output_tokens, u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()

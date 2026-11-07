@@ -134,7 +134,8 @@ class BudgetLedger:
             self._goal_budget.reserve(goal_attempt_id, self._request_id, self._partition,
                                       tokens=reserve_input_tokens + reserve_tokens, cost_usd=reserve_cost_usd,
                                       hold_back_calls=hold_back_calls, hold_back_tokens=hold_back_tokens,
-                                      hold_back_cost_usd=hold_back_cost_usd, required_id=required_id)
+                                      hold_back_cost_usd=hold_back_cost_usd, required_id=required_id,
+                                      stage=stage, provider=provider, model=model)
         result = run_journaled(
             self._journal, call=call, request_id=self._request_id, stage=stage, provider=provider, model=model,
             input_sha256=input_sha256, intent_payload={"reserve_tokens": reserve_input_tokens + reserve_tokens,

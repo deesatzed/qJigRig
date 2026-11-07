@@ -252,21 +252,21 @@ def test_required_work_reservations_survive_restart_and_cannot_be_spent_by_other
     path = tmp_path / 'goal.sqlite'
     limit = Budget(3, 300, 0.3)
     with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
-        goal.reserve_required('r', 'smoke', [('judge-a', 100, 0.1), ('judge-b', 100, 0.1)])
+        goal.reserve_required('r', 'smoke', [('judge-a', 100, 0.1, 'judge', 'stand-in', 'm'), ('judge-b', 100, 0.1, 'judge', 'stand-in', 'm')])
         goal.reserve('planner', 'r', 'smoke', tokens=100, cost_usd=0.1)
         goal.record_usage('planner', input_tokens=40, output_tokens=10, cost_usd=0.05)
     with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
         with pytest.raises(BudgetExceeded):
             goal.reserve('discretionary', 'other', 'smoke', tokens=1, cost_usd=0.01)
         with pytest.raises(ContractError):
-            goal.reserve('wrong-request', 'other', 'smoke', tokens=100, cost_usd=0.1, required_id='judge-a')
+            goal.reserve('wrong-request', 'other', 'smoke', tokens=100, cost_usd=0.1, required_id='judge-a', stage='judge', provider='stand-in', model='m')
         with pytest.raises(ContractError):
-            goal.reserve('too-large', 'r', 'smoke', tokens=101, cost_usd=0.1, required_id='judge-a')
-        goal.reserve('attempt-a', 'r', 'smoke', tokens=100, cost_usd=0.1, required_id='judge-a')
+            goal.reserve('too-large', 'r', 'smoke', tokens=101, cost_usd=0.1, required_id='judge-a', stage='judge', provider='stand-in', model='m')
+        goal.reserve('attempt-a', 'r', 'smoke', tokens=100, cost_usd=0.1, required_id='judge-a', stage='judge', provider='stand-in', model='m')
         goal.record_usage('attempt-a', input_tokens=30, output_tokens=20, cost_usd=0.05)
         with pytest.raises(ContractError):
-            goal.reserve('duplicate', 'r', 'smoke', tokens=100, cost_usd=0.1, required_id='judge-a')
-        goal.reserve('attempt-b', 'r', 'smoke', tokens=100, cost_usd=0.1, required_id='judge-b')
+            goal.reserve('duplicate', 'r', 'smoke', tokens=100, cost_usd=0.1, required_id='judge-a', stage='judge', provider='stand-in', model='m')
+        goal.reserve('attempt-b', 'r', 'smoke', tokens=100, cost_usd=0.1, required_id='judge-b', stage='judge', provider='stand-in', model='m')
         assert goal.totals().max_calls == 3
 
 
@@ -276,7 +276,7 @@ def test_request_ledger_consumes_only_its_reserved_required_call(tmp_path):
 
     limit = Budget(1, 100, 0.1)
     with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
-        goal.reserve_required('r', 'smoke', [('judge', 100, 0.1)])
+        goal.reserve_required('r', 'smoke', [('judge', 100, 0.1, 'judge', 'stand-in', 'm')])
         ledger = BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='smoke')
         assert ledger.run('judge', lambda: ('ok', {'prompt_tokens': 40, 'completion_tokens': 10, 'cost_usd': 0.05}),
                           provider='stand-in', model='m', input_sha256='a' * 64,
@@ -294,15 +294,15 @@ def test_required_work_batch_is_atomic_and_concurrent_plans_cannot_overbook(tmp_
     limit = Budget(2, 200, 0.2)
     with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
         with pytest.raises(ContractError):
-            goal.reserve_required('r', 'smoke', [('valid', 100, 0.1), ('bad', -1, 0.1)])
+            goal.reserve_required('r', 'smoke', [('valid', 100, 0.1, 'judge', 'stand-in', 'm'), ('bad', -1, 0.1, 'judge', 'stand-in', 'm')])
         with pytest.raises(BudgetExceeded):
-            goal.reserve_required('r', 'smoke', [('valid', 100, 0.1), ('other', 101, 0.1)])
+            goal.reserve_required('r', 'smoke', [('valid', 100, 0.1, 'judge', 'stand-in', 'm'), ('other', 101, 0.1, 'judge', 'stand-in', 'm')])
     barrier = Barrier(2)
     def plan(ident):
         with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
             barrier.wait(timeout=5)
             try:
-                goal.reserve_required(ident, 'smoke', [(ident, 150, 0.15)])
+                goal.reserve_required(ident, 'smoke', [(ident, 150, 0.15, 'judge', 'stand-in', 'm')])
                 return 'reserved'
             except BudgetExceeded:
                 return 'refused'
@@ -310,4 +310,45 @@ def test_required_work_batch_is_atomic_and_concurrent_plans_cannot_overbook(tmp_
         assert sorted(pool.map(plan, ('one', 'two'))) == ['refused', 'reserved']
     with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
         with pytest.raises(BudgetExceeded):
-            goal.reserve_required('third', 'smoke', [('valid', 100, 0.1)])
+            goal.reserve_required('third', 'smoke', [('valid', 100, 0.1, 'judge', 'stand-in', 'm')])
+
+
+def test_required_allocation_rejects_wrong_stage_provider_or_model_before_dispatch(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+
+    limit = Budget(1, 100, 0.1)
+    path = tmp_path / 'goal.sqlite'
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
+        goal.reserve_required('r', 'smoke', [('judge', 100, 0.1, 'judge', 'stand-in', 'judge-model')])
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='smoke')
+        seen = []
+        for stage, provider, model in [('planner', 'stand-in', 'judge-model'),
+                                       ('judge', 'other', 'judge-model'),
+                                       ('judge', 'stand-in', 'other')]:
+            with pytest.raises(ContractError):
+                ledger.run(stage, lambda: seen.append('called'), provider=provider, model=model, input_sha256='a'*64,
+                           reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.1, required_id='judge')
+        assert not seen and journal.events('r') == [] and goal.totals().max_calls == 0
+        assert ledger.run('judge', lambda: ('ok', {'prompt_tokens': 1, 'completion_tokens': 1, 'cost_usd': 0.01}),
+                          provider='stand-in', model='judge-model', input_sha256='a'*64,
+                          reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.1, required_id='judge') == 'ok'
+
+
+def test_legacy_unbound_required_allocation_stays_reserved_but_cannot_be_consumed(tmp_path):
+    import sqlite3
+
+    path = tmp_path / 'goal.sqlite'
+    limit = Budget(1, 100, 0.1)
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}):
+        pass
+    with sqlite3.connect(path) as con:
+        con.execute('DROP TABLE required_work')
+        con.execute('CREATE TABLE required_work (work_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, partition TEXT NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL, attempt_id TEXT UNIQUE)')
+        con.execute("INSERT INTO required_work VALUES ('old', 'r', 'smoke', 100, '0.1', NULL)")
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
+        with pytest.raises(ContractError):
+            goal.reserve('a', 'r', 'smoke', tokens=100, cost_usd=0.1, required_id='old', stage='judge', provider='stand-in', model='m')
+        with pytest.raises(BudgetExceeded):
+            goal.reserve('b', 'r', 'smoke', tokens=1, cost_usd=0.01)
