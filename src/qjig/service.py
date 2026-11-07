@@ -92,6 +92,26 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(200, {'runs': runs})
             except (ContractError, OSError, sqlite3.Error):
                 self._reply(409, {'error': 'fresh archives unavailable'})
+        elif re.fullmatch(r"/api/fresh-runs/[0-9a-f]{64}/export", self.path):
+            ident = self.path.split('/')[3]
+            if self.server.fresh_backend is None:
+                self._reply(404, {'error': 'not found'})
+                return
+            try:
+                with self.server.writer_lock:
+                    data = self.server.fresh_backend.export(ident)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/vnd.sqlite3')
+                self.send_header('Content-Disposition', f'attachment; filename="qjig-fresh-{ident}.sqlite"')
+                self.send_header('Content-Length', str(len(data)))
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('X-Content-Type-Options', 'nosniff')
+                self.end_headers()
+                self.wfile.write(data)
+            except FileNotFoundError:
+                self._reply(404, {'error': 'not found'})
+            except (ContractError, ValueError, KeyError, TypeError, AttributeError, sqlite3.Error, OSError):
+                self._reply(409, {'error': 'fresh archive unavailable or invalid'})
         elif self.path.startswith("/api/fresh-runs/"):
             ident = self.path.removeprefix("/api/fresh-runs/")
             if not re.fullmatch(r"[0-9a-f]{64}", ident) or self.server.fresh_backend is None:

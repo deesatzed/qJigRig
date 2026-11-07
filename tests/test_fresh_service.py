@@ -3,6 +3,7 @@ import json
 import threading
 import os
 import sqlite3
+import urllib.request
 
 import pytest
 
@@ -98,6 +99,19 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert replay['result']['status'] == 'deferred'
         assert any(quote in item['text'] for trace in replay['traces'] for item in trace['evidence'])
         assert transport.calls_made == 4
+        with urllib.request.urlopen(f'http://127.0.0.1:{server.server_address[1]}/api/fresh-runs/{result["run_id"]}/export') as response:
+            exported = response.read()
+            assert response.headers.get_content_type() == 'application/vnd.sqlite3'
+        path = tmp_path / 'export.sqlite'; path.write_bytes(exported)
+        from qjig.run_archive import RunArchive
+        from qjig.replay import verify_archive
+        with sqlite3.connect(path) as con:
+            report = verify_archive(RunArchive(con))
+            assert report.status == 'unanchored' and report.digest == replay['verification']['digest']
+            con.execute('DROP TRIGGER event_no_update')
+            con.execute("UPDATE events SET data='{}' WHERE kind='run_result'")
+            assert verify_archive(RunArchive(con)).status == 'invalid'
+        assert transport.calls_made == 4
         if os.environ.get('QJIG_CHROMIUM_PATH'):
             with playwright.sync_playwright() as p:
                 browser = p.chromium.launch(headless=True, executable_path=os.environ['QJIG_CHROMIUM_PATH'])
@@ -108,6 +122,13 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     page.get_by_text('Saved fresh run · unanchored structural replay').wait_for()
                     assert quote in page.locator('#fresh-replay').inner_text()
                     assert 'Decision correctness not assessed' in page.locator('#fresh-replay').inner_text()
+                    with page.expect_download() as info:
+                        page.get_by_role('link', name='Download fresh archive').click()
+                    assert info.value.suggested_filename.endswith('.sqlite')
+                    download_path = tmp_path / 'browser-export.sqlite'
+                    info.value.save_as(download_path)
+                    with sqlite3.connect(download_path) as con:
+                        assert verify_archive(RunArchive(con)).status == 'unanchored'
                 finally:
                     browser.close()
         with sqlite3.connect(tmp_path / 'fresh' / 'runs' / result['run_id'] / 'run.sqlite') as con:
@@ -115,6 +136,9 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
             con.execute("UPDATE events SET data='{}' WHERE kind='run_result'")
         with pytest.raises(ClientError, match='409'):
             client._request('GET', '/api/fresh-runs/' + result['run_id'])
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            urllib.request.urlopen(f'http://127.0.0.1:{server.server_address[1]}/api/fresh-runs/{result["run_id"]}/export')
+        assert exc.value.code == 409
         saved = client._request('GET', '/api/fresh-runs')
         assert any(item['run_id'] == result['run_id'] and item['replay_status'] == 'unavailable_or_invalid'
                    for item in saved['runs'])

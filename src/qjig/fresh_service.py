@@ -77,6 +77,28 @@ class FreshWorkbench:
                     'traces': traces, 'verification': asdict(report),
                     'source_freshness': 'not_assessed'}
 
+    def export(self, run_id: str) -> bytes:
+        """Copy and structurally check a consistent SQLite snapshot, without inference."""
+        from .replay import verify_archive
+        if not isinstance(run_id, str) or not re.fullmatch(r'[0-9a-f]{64}', run_id):
+            raise ContractError('invalid fresh run identity')
+        runs = self.state_dir / 'runs'
+        directory = runs / run_id
+        database = directory / 'run.sqlite'
+        if runs.is_symlink() or directory.is_symlink() or database.is_symlink() or not database.is_file():
+            raise FileNotFoundError('fresh run unavailable')
+        with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as source:
+            with closing(sqlite3.connect(':memory:')) as snapshot:
+                source.backup(snapshot)
+                archive = RunArchive(snapshot)
+                report = verify_archive(archive)
+                if report.status == 'invalid':
+                    raise ContractError('fresh run failed structural replay')
+                request = Request.from_dict(archive.context()['request'])
+                if hashlib.sha256(request.request_id.encode('utf-8')).hexdigest() != run_id:
+                    raise ContractError('fresh run identity mismatch')
+                return snapshot.serialize()
+
     def list_runs(self) -> list[dict]:
         runs = self.state_dir / 'runs'
         if runs.is_symlink():
