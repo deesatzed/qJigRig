@@ -1801,17 +1801,21 @@
       "depends_on": [
         "R04A"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/applicability.py",
-        "src/qjig/acquisition.py"
+        "src/qjig/acquisition.py",
+        "src/qjig/cli.py",
+        "src/qjig/replay.py",
+        "tests/test_fresh_pipeline.py",
+        "tests/test_replay.py"
       ],
       "test_file": "tests/test_fresh_pipeline.py",
       "test_name": "test_fresh_scope_mismatch_never_reaches_planner",
       "action": "Enforce request scope for fresh source acquisition",
       "acceptance": "A scope mismatch or unknown scope cannot be presented as applicable planner or judge evidence; exact scope behavior and provenance remain explicit.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_scope_mismatch_never_reaches_planner -q",
-      "evidence": ""
+      "evidence": "Red: wrong-scope and missing-scope synthetic passages reached fresh planner despite callback MATCH. Green: exact non-empty catalog scope is combined with entity/date applicability before planner/judge acquisition; mismatch is no_match, missing scope unknown. Archive records separate scope verdicts; replay detects altered scope even with a rewritten context hash. Focused fresh/replay/CLI/service 48 passed; full offline suite 361 passed. Scope metadata is recorded provenance, not authenticated authority; full R04 remains pending."
     }
   ]
 }

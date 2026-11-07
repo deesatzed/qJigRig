@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 
 from .acquisition import COVERAGE_ID
-from .applicability import Applicability, ApplicabilityInputs
+from .applicability import Applicability, ApplicabilityInputs, combine_applicability, scope_applicability
 from .contracts import ContractError, Request
 from .judge import SIDE_SCHEMA, _PROMPT, _combine_sides, _side_from_value
 from .packets import EvidencePacket, PacketItem
@@ -53,8 +53,29 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
             incomplete.append("applicability_inputs_unavailable")
         else:
             reconstructed = ApplicabilityInputs.from_dict(inputs)
-            if any(reconstructed.verdict(key).value != value for key, value in context["corpus"].items()):
-                raise ContractError("applicability verdict mismatch")
+            recorded_entity_date = context.get("entity_date_verdicts", context["corpus"])
+            if set(recorded_entity_date) != set(context["corpus"]) or any(
+                reconstructed.verdict(key).value != value for key, value in recorded_entity_date.items()
+            ):
+                raise ContractError("entity/date applicability verdict mismatch")
+        if context.get("scope_policy") == "exact_nonempty_v1":
+            source_scopes = context["source_scopes"]
+            scope_verdicts = context["scope_verdicts"]
+            entity_date = context["entity_date_verdicts"]
+            ids = set(context["corpus"])
+            if any(not isinstance(mapping, dict) or set(mapping) != ids for mapping in (source_scopes, scope_verdicts, entity_date)):
+                raise ContractError("scope binding set mismatch")
+            request_scope = Request.from_dict(context["request"]).scope
+            for key in ids:
+                scope = scope_applicability(request_scope, source_scopes[key])
+                if scope.value != scope_verdicts[key] or combine_applicability(scope, Applicability(entity_date[key])).value != context["corpus"][key]:
+                    raise ContractError("scope applicability mismatch")
+            if inputs is not None:
+                for member in reconstructed.collection.members:
+                    if member.revision_id in ids and source_scopes[member.revision_id] is not None and source_scopes[member.revision_id] != member.scope:
+                        raise ContractError("source scope contradicts applicability inputs")
+        else:
+            incomplete.append("scope_provenance_unavailable")
         planning = context.get("planning_evidence")
         if not isinstance(planning, dict) or planning.get("schema") != "qjig.planning-evidence.v1":
             incomplete.append("planning_evidence_unavailable")

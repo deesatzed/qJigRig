@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .acquisition import Context, EvalResult, NeedSpec, RunState, run_until_done
-from .applicability import OPEN, UNKNOWN_BOUND, Applicability, Collection, Interval, MemberMetadata
+from .applicability import OPEN, UNKNOWN_BOUND, Applicability, Collection, Interval, MemberMetadata, combine_applicability, scope_applicability
 from .contracts import ContractError, Request
 from .exact import FieldValue, NumericRule, PolicyRule, evaluate_dated_numeric
 from .finalize import MODES, finalize
@@ -174,11 +174,8 @@ def run_authored(catalog: str | Path, request: Request, policy: dict) -> tuple[d
         entity_date_filter = applicability_filter(Collection(tuple(members.values())), entities, as_of, historical_as_known=historical)
         def scoped_filter(candidate):
             member = members.get(candidate.revision_id)
-            if member is None or not request.scope or not member.scope:
-                return Applicability.UNKNOWN
-            if member.scope != request.scope:
-                return Applicability.NO_MATCH
-            return entity_date_filter(candidate)
+            scope = scope_applicability(request.scope, member.scope if member else None)
+            return combine_applicability(scope, entity_date_filter(candidate))
         ctx = Context(cat, load_live_entries(cat), scoped_filter, specs)
         state = RunState(request, plan, ledger)
         summary = run_until_done(state, ctx)

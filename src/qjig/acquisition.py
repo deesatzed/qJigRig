@@ -6,7 +6,7 @@ import math
 import json
 from typing import Callable
 
-from .applicability import Applicability, ApplicabilityInputs
+from .applicability import Applicability, ApplicabilityInputs, combine_applicability, scope_applicability
 from .indexing import IndexEntry
 from .contracts import ContractError
 from .logic import Observation, Outcome, evaluate, expression_ids, is_material
@@ -369,14 +369,21 @@ def run_fresh(
     """
     _check_role_priors({} if role_priors is None else role_priors)
     revision_ids = sorted({entry.span.revision_id for entry in entries})
-    applicability = {revision_id: revision_applicability(revision_id) for revision_id in revision_ids}
-    if any(not isinstance(value, Applicability) for value in applicability.values()):
+    entity_date = {revision_id: revision_applicability(revision_id) for revision_id in revision_ids}
+    if any(not isinstance(value, Applicability) for value in entity_date.values()):
         raise ContractError("revision applicability must be an Applicability verdict")
+    scopes_by_revision = {row[0]: row[1] for row in catalog.metadata_rows()}
+    scopes = {revision_id: scopes_by_revision.get(revision_id) for revision_id in revision_ids}
+    scope_verdicts = {key: scope_applicability(request.scope, value) for key, value in scopes.items()}
     if applicability_inputs is not None:
         if not isinstance(applicability_inputs, ApplicabilityInputs):
             raise ContractError("invalid applicability inputs")
-        if any(applicability_inputs.verdict(key) is not value for key, value in applicability.items()):
+        if any(applicability_inputs.verdict(key) is not value for key, value in entity_date.items()):
             raise ContractError("applicability inputs do not match recorded verdicts")
+        for member in applicability_inputs.collection.members:
+            if member.revision_id in scopes and scopes[member.revision_id] is not None and scopes[member.revision_id] != member.scope:
+                raise ContractError("applicability scope differs from catalog metadata")
+    applicability = {key: combine_applicability(entity_date[key], scope_verdicts[key]) for key in revision_ids}
     def bound_applicability(revision_id: str) -> Applicability:
         return applicability.get(revision_id, Applicability.UNKNOWN)
     planning_evidence = _planning_packet(catalog, entries, request.question, bound_applicability,
@@ -391,6 +398,9 @@ def run_fresh(
             "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": EXPANDED_BM25_METHOD,
             "reservation_factory_configured": reservation_factory is not None, "role_priors": role_priors or {},
             "corpus": {key: value.value for key, value in applicability.items()},
+            "scope_policy": "exact_nonempty_v1", "source_scopes": scopes,
+            "scope_verdicts": {key: value.value for key, value in scope_verdicts.items()},
+            "entity_date_verdicts": {key: value.value for key, value in entity_date.items()},
             "applicability_provenance": "recorded_inputs" if applicability_inputs is not None else "verdict_only",
             "applicability_inputs": applicability_inputs.to_dict() if applicability_inputs is not None else None,
             "planning_evidence": planning_evidence,

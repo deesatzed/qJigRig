@@ -24,6 +24,7 @@ def make_archive(tmp_path, positive=None, negative=None):
     directory = tmp_path / "run"
     with Catalog.open(tmp_path / "c.sqlite") as catalog, Journal.open(tmp_path / "j.sqlite") as journal, RunArchive.open(directory) as archive:
         catalog.add_revision(source)
+        catalog.put_metadata_row((source.revision_id, "project", None, "[]", "2026-01-01", "open", None))
         save_entries(catalog, index_entries(source))
         ledger = BudgetLedger(Budget(5, 50000, 1), journal, "r")
         inputs = ApplicabilityInputs(Collection((MemberMetadata(source.revision_id, "project", Interval("2026-01-01", OPEN)),)), frozenset(), "2026-11-15", False)
@@ -192,3 +193,21 @@ def test_replay_recomputes_quoted_judge_outcomes(tmp_path, positive, negative, e
         trace = next(e["data"] for e in archive.events() if e["kind"] == "trace")
         assert trace["observation"]["outcome"] == expected
         assert report.semantic_assurance == "not_assessed"
+
+
+def test_replay_rejects_tampered_source_scope_even_if_context_hash_rewritten(tmp_path):
+    import hashlib
+    import json
+
+    directory, _ = make_archive(tmp_path)
+    with sqlite3.connect(directory / "run.sqlite") as con:
+        con.execute("DROP TRIGGER context_no_update")
+        (raw,) = con.execute("SELECT data FROM run_context WHERE id=1").fetchone()
+        context = json.loads(raw)
+        revision_id = next(iter(context["source_scopes"]))
+        context["source_scopes"][revision_id] = "different-project"
+        encoded = json.dumps(context, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+        con.execute("UPDATE run_context SET data=?, sha256=? WHERE id=1", (encoded, hashlib.sha256(encoded.encode()).hexdigest()))
+    with RunArchive.open(directory) as archive:
+        report = verify_archive(archive)
+        assert report.status == "invalid" and "invalid_planning_or_applicability" in report.issues

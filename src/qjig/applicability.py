@@ -231,3 +231,18 @@ class ApplicabilityInputs:
                                           Interval(parse_bound(row["effective_start"]), parse_bound(row["effective_end"])),
                                           authority_id=row["authority_id"], entity_keys=frozenset(keys), observed_at=row["observed_at"]))
         return cls(Collection(tuple(members)), frozenset(entities), data["as_of"], data["historical_as_known"])
+
+
+def scope_applicability(request_scope: str | None, source_scope: str | None) -> Applicability:
+    """Exact scope match; missing or unrecorded scope is unknown, not global."""
+    if not isinstance(request_scope, str) or not request_scope or not isinstance(source_scope, str) or not source_scope:
+        return Applicability.UNKNOWN
+    return Applicability.MATCH if request_scope == source_scope else Applicability.NO_MATCH
+
+
+def combine_applicability(*verdicts: Applicability) -> Applicability:
+    if not verdicts or any(not isinstance(value, Applicability) for value in verdicts):
+        raise ContractError("applicability verdicts required")
+    if Applicability.NO_MATCH in verdicts:
+        return Applicability.NO_MATCH
+    return Applicability.UNKNOWN if Applicability.UNKNOWN in verdicts else Applicability.MATCH
