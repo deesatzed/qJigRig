@@ -410,3 +410,52 @@ def summarize_fresh_intervention_pairs(design: dict, records: list[dict], *, exp
         pair['intervention_request_answer'] = None
     report['comparison_scope'] = 'conditional_graph_only'
     return report
+
+
+def score_reserved_assignment(goal, archive, journal, reference: dict, *, partition: str,
+                              expected_plan_sha256: str, expected_run_sha256: str,
+                              expected_reference_sha256: str) -> dict:
+    """Score an archived assignment against an externally anchored reserved plan.
+
+    This verifies structural bindings and ledger consistency, not source authority,
+    independent labels, provider authenticity, or correctness of plan assumptions.
+    """
+    from .evaluation_budget import validate_assignment_binding, verify_evaluation_assignment
+    from .goal_budget import GoalBudget
+    from .journal import Journal
+    from .run_archive import RunArchive
+    if not isinstance(goal, GoalBudget) or not isinstance(journal, Journal) or not isinstance(archive, RunArchive):
+        raise ContractError('goal ledger, journal and archive required')
+    context = archive.context()
+    if not isinstance(context, dict):
+        raise ContractError('archive context required')
+    assignment = context.get('evaluation_assignment')
+    validate_assignment_binding(assignment)
+    if (not isinstance(expected_plan_sha256, str) or not _SHA.fullmatch(expected_plan_sha256)
+            or not hmac.compare_digest(assignment['plan_sha256'], expected_plan_sha256)):
+        raise ContractError('evaluation plan anchor differs')
+    schema = context.get('schema')
+    if schema in ('qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6'):
+        case = context.get('case_binding')
+        expected_arm = 'direct_retrieval' if schema.endswith('.v5') else 'direct_full_evidence'
+        scorer = score_direct_archive
+    elif schema == 'qjig.fresh-context.v1':
+        case = context.get('evaluation_case_binding')
+        expected_arm = 'combined'
+        scorer = score_fresh_archive
+    else:
+        raise ContractError('unsupported reserved evaluation archive')
+    request = context.get('request')
+    if (not isinstance(case, dict) or not isinstance(request, dict) or assignment['arm'] != expected_arm
+            or not isinstance(partition, str) or not partition.strip()):
+        raise ContractError('reserved evaluation context differs')
+    try:
+        verify_evaluation_assignment(goal, assignment, case_id=case['case_id'], case_sha256=case['case_sha256'],
+                                     design_sha256=case['design_sha256'], request_id=request['request_id'], partition=partition)
+    except KeyError as exc:
+        raise ContractError('incomplete reserved evaluation context') from exc
+    if goal.audit_journal(journal)['status'] != 'verified':
+        raise ContractError('goal and journal accounting differ')
+    score = scorer(archive, journal, reference, expected_run_sha256=expected_run_sha256,
+                   expected_reference_sha256=expected_reference_sha256)
+    return {'arm':assignment['arm'], 'repeat':assignment['repeat'], 'score':score}

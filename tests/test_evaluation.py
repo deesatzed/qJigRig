@@ -1015,7 +1015,7 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
     plan=make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=d)
     target=next(x for x in assignments if x['case_id']=='dev' and x['arm']=='direct_full_evidence');rid=target['request_id']
     total=Budget(60,12000,1);per=Budget(1,200,0.1);alloc={'development':Budget(15,3000,0.2),'pilot':Budget(15,3000,0.2),'holdout':Budget(30,6000,0.2)}
-    response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),{'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.001})
+    response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),{'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.0001})
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=alloc) as goal,Journal.open(tmp_path/'j.sqlite') as journal,RunArchive.open(tmp_path/'archive') as archive:
         reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])
         ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='development');transport=StandInTransport([response])
@@ -1033,7 +1033,14 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
         assert result['status']=='recorded_unvalidated' and transport.calls_made==1
         assert archive.context()['evaluation_assignment']==binding
         from qjig.evaluation_replay import verify_direct_archive
-        assert verify_direct_archive(archive,journal)['status']=='unanchored'
+        replay = verify_direct_archive(archive,journal)
+        from qjig.evaluation_scoring import score_reserved_assignment
+        scored = score_reserved_assignment(goal,archive,journal,ref,partition='development',
+            expected_plan_sha256=plan['sha256'],expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
+        assert scored['arm']=='direct_full_evidence' and scored['repeat']==1 and scored['score']['case_id']=='dev'
+        with pytest.raises(ContractError):
+            score_reserved_assignment(goal,archive,journal,ref,partition='development',expected_plan_sha256='0'*64,
+                expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
         prompt=next(e['data']['prompt'] for e in archive.events() if e['kind']=='request')
         assert plan['sha256'] not in prompt and rid not in prompt and 'direct_full_evidence' not in prompt
 
@@ -1126,4 +1133,22 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
         score = score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
                                     expected_reference_sha256=reference_digest(ref))
         assert score['request_status'] == 'deferred' and score['request_answer'] is None
+        from qjig.evaluation_scoring import score_reserved_assignment
+        record = score_reserved_assignment(goal,archive,journal,ref,partition='development',
+            expected_plan_sha256=plan['sha256'],expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
+        assert record['arm']=='combined' and record['repeat']==1 and record['score']==score
+        with pytest.raises(ContractError):
+            score_reserved_assignment(goal,archive,journal,ref,partition='pilot',expected_plan_sha256=plan['sha256'],
+                expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
         assert goal.audit_journal(journal)['status'] == 'verified'
+        # Even if the context and replay are rehashed, another assignment cannot be relabeled.
+        changed = archive.context(); changed['evaluation_assignment']['repeat'] = 2
+        encoded = json.dumps(changed,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+        archive._con.execute('DROP TRIGGER context_no_update')
+        archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',
+                             (encoded,hashlib.sha256(encoded.encode()).hexdigest()))
+        tampered = verify_archive(archive)
+        assert tampered.status == 'unanchored'
+        with pytest.raises(ContractError):
+            score_reserved_assignment(goal,archive,journal,ref,partition='development',expected_plan_sha256=plan['sha256'],
+                expected_run_sha256=tampered.digest,expected_reference_sha256=reference_digest(ref))

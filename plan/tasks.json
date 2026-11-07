@@ -1214,7 +1214,8 @@
         "T068B",
         "T068C",
         "T068D",
-        "T068E"
+        "T068E",
+        "T068F"
       ],
       "status": "pending",
       "files": [
@@ -2945,6 +2946,24 @@
       "acceptance": "The checked case, private arm/repeat, opaque request identity and required call set must match the persisted complete evaluation plan before execution.",
       "command": "python -m pytest tests/test_evaluation.py::test_goal_budgeted_case_requires_matching_reserved_assignment -q",
       "evidence": "Red: a checked goal-budgeted direct case executed without any assignment binding. Green: direct and combined fresh wrappers check the persisted plan digest, case, arm, repeat, request and partition before execution and require their actual reserved stages to use that plan set. Synthetic direct success and missing/wrong binding refusals pass; a fresh missing-binding refusal passes. Direct replay validates the private assignment; fresh replay validates optional assignment structure. Focused evaluation/acquisition/replay 60 passed; full offline suite 529 passed. The fresh success path has not been exercised with a complete reserved plan. Stage templates, prices, input bounds and caller-supplied plan digest remain assertions, and hosted transport remains gated. Subsequent integration test exercised a fully reserved combined assignment through synthetic planner and paired judges, replay, scoring and ledger audit: focused 84 passed, full offline 530 passed. Other arms used placeholder slots; bounds and costs were synthetic."
+    },
+    {
+      "id": "T068F",
+      "phase": "evaluation",
+      "depends_on": [
+        "T068D",
+        "R08D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping",
+      "action": "Bind scored runs to their reserved private assignment",
+      "acceptance": "Derive arm and repeat from the archive and verify the anchored plan, case, request, partition, replay and journal before returning a scored assignment.",
+      "command": "python -m pytest tests/test_evaluation.py::test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping -q",
+      "evidence": "Red: no scorer linked archived assignment to the reserved plan. Direct and combined synthetic runs now derive their arm/repeat from the archived context, verify the externally supplied plan digest, persisted case/request/partition assignment and quiescent goal/journal accounting, then run structural scoring. Wrong plan or partition and a rehashed changed repeat refuse. Focused evaluation/goal/replay suite 89 passed before final tamper test; final tamper test passed; full offline suite 530 passed. An initial synthetic direct receipt exceeded its reserved cost and was correctly rejected by the accounting audit; fixture was corrected. Existing free-form summary helpers remain assertion-based, and this is not proof of source authority, semantic correctness or external ledger authenticity."
     }
   ]
 }
