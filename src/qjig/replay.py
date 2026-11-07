@@ -276,12 +276,21 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
                     if data["observation"].get("reason") == "no_retrieval_hit" and data["hit_count"] != 0:
                         raise ContractError("no-hit observation has hits")
                     if data['hit_count'] == 0 and pending_judges:
+                        from .acquisition import CONTRADICTION_QUERY, EXCEPTION_QUERY
+                        from .retrieval import expand_query_v1, tokenize
                         channels = data.get('channels')
                         final_attempt = round_number == 2 or context['request']['question'].strip() == plan_questions[pid].strip()
                         if (policy != 'request_question_on_no_primary_hit_v2' or not final_attempt
                                 or not isinstance(channels, dict) or channels.get('omitted')
                                 or not set(channels.get('delivered', [])) & {'exception', 'contradiction'}):
                             raise ContractError('judgment without primary hit lacks final mandatory evidence')
+                        for name, query in (('exception', EXCEPTION_QUERY), ('contradiction', CONTRADICTION_QUERY)):
+                            if name not in channels['delivered']:
+                                continue
+                            terms = set(tokenize(expand_query_v1(query)))
+                            if not any(not item['truncated'] and context['corpus'].get(item['revision_id']) == 'match'
+                                       and terms.intersection(tokenize(item['text'])) for item in data['evidence']):
+                                raise ContractError('delivered mandatory channel lacks matching applicable passage')
                     trace_rounds[pid] = round_number
                 elif policy == 'none_full_source_v1':
                     from .evaluation import _full_source_entries

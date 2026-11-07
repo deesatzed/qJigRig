@@ -4245,6 +4245,24 @@
       "acceptance": "Retain a conflict and both cited sides through service and replay, and defer without judging a truncated mandatory-only packet.",
       "command": "python -m pytest tests/test_fresh_service.py::test_mandatory_only_contradiction_remains_conflict_in_service_and_replay -q",
       "evidence": "Synthetic actual-service and Chrome walkthrough retained both cited sides as CONFLICT with coverage open after primary/fallback misses; replay and receipt remained structural only. A separate truncated mandatory-only packet remained UNKNOWN with no judge call. Browser/fresh/replay regression: 71 passed. Stand-in responses do not establish semantic or hosted model quality."
+    },
+    {
+      "id": "R04G",
+      "phase": "repair",
+      "depends_on": [
+        "R04D",
+        "R04F"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/replay.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_mandatory_exception_is_judged_after_primary_and_followup_miss",
+      "action": "Bind mandatory-only replay claims to retained passages",
+      "acceptance": "For a no-primary-hit final judgment, reject a claimed delivered mandatory channel unless an applicable untruncated retained passage lexically matches that channel.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_mandatory_exception_is_judged_after_primary_and_followup_miss -q",
+      "evidence": "Red: changing an exception-only trace to claim contradiction delivery still passed unanchored replay. Replay now rejects it; synthetic Chrome/fresh/replay/evaluation checks: 132 passed. This necessary lexical binding does not replay complete retrieval ranking, authenticate sources or establish semantic relevance."
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "06b304728a2dd9f465a4089d0e79d9f4d505a302db5d6d62f5b5cd54f491a905",
-  "queue_sha256": "963f794dcc142b72e3874373f7fbd70ad92e2d0889810390e6a33dbb25dee829",
+  "queue_sha256": "095d33e768e89ff4d9e0190a9dba9589c3b3d97ffdebebb36224ec34f316a557",
   "gates": [
     {
       "id": "F01",
@@ -40,7 +40,8 @@
         "R04C",
         "R04D",
         "R04E",
-        "R04F"
+        "R04F",
+        "R04G"
       ],
       "evidence": []
     },
@@ -256,6 +257,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_fresh_service.py::test_mandatory_only_contradiction_remains_conflict_in_service_and_replay -q",
       "queue_evidence_assertion": "Synthetic actual-service and Chrome walkthrough retained both cited sides as CONFLICT with coverage open after primary/fallback misses; replay and receipt remained structural only. A separate truncated mandatory-only packet remained UNKNOWN with no judge call. Browser/fresh/replay regression: 71 passed. Stand-in responses do not establish semantic or hosted model quality."
+    },
+    {
+      "id": "R04G",
+      "status": "unverified",
+      "task_ids": [
+        "R04G"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_mandatory_exception_is_judged_after_primary_and_followup_miss -q",
+      "queue_evidence_assertion": "Red: changing an exception-only trace to claim contradiction delivery still passed unanchored replay. Replay now rejects it; synthetic Chrome/fresh/replay/evaluation checks: 132 passed. This necessary lexical binding does not replay complete retrieval ranking, authenticate sources or establish semantic relevance."
     },
     {
       "id": "R05",

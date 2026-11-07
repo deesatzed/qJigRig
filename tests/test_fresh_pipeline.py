@@ -913,6 +913,21 @@ def test_mandatory_exception_is_judged_after_primary_and_followup_miss(tmp_path,
         assert result.status == 'deferred' and 'ob-plan-coverage' in result.summary.stop.blocking_obligations
         assert archive.context()['followup_policy'] == 'request_question_on_no_primary_hit_v2'
         assert verify_archive(archive).status == 'unanchored'
+        # Claim that the exception-only packet came from the contradiction channel.
+        # The archive remains internally rehashed/unanchored, but the passage has
+        # no contradiction-channel term and must not validate this binding.
+        event = [event for event in archive.events() if event['kind']=='trace'][-1]
+        original = json.dumps(event['data'], sort_keys=True, ensure_ascii=False, allow_nan=False)
+        falsified = json.loads(original)
+        falsified['channels']['delivered'] = ['contradiction']
+        falsified['channels']['selected'] = ['contradiction']
+        falsified['channels']['hits']['contradiction'] = 1
+        falsified['channels']['missing'] = [name for name in falsified['channels']['missing'] if name != 'contradiction']
+        archive._con.execute('DROP TRIGGER event_no_update')
+        archive._con.execute('UPDATE events SET data=? WHERE seq=?', (json.dumps(falsified),event['seq']))
+        assert verify_archive(archive).status == 'invalid'
+        archive._con.execute('UPDATE events SET data=? WHERE seq=?', (original,event['seq']))
+        assert verify_archive(archive).status == 'unanchored'
         import hashlib
         context = archive.context(); context['followup_policy'] = 'request_question_on_no_primary_hit_v1'
         encoded = json.dumps(context, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
