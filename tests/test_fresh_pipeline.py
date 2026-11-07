@@ -80,3 +80,48 @@ def test_unresolved_predicate_stays_a_visible_gap(tmp_path):
     assert run.state.ledger.get("ob-p1").status != "satisfied"
     assert "p1" in run.summary.stop.unresolved_ids and run.status == "deferred"
     assert run.quote_refs["p1"] == ()
+
+
+def test_operational_failures_return_partial_deferral(tmp_path):
+    from qjig.providers import ProviderUnavailable
+
+    scenarios = [
+        ("budget", [], 0, "budget_exceeded", 0, False),
+        ("unavailable", [ProviderUnavailable("offline")], 6, "provider_unavailable", 1, False),
+        ("timeout", [TimeoutError("timeout")], 6, "uncertain_outcome", 1, True),
+        ("judge_timeout", [raw(PLAN), TimeoutError("timeout")], 6, None, 2, True),
+    ]
+    for name, responses, cap, failure, calls, pending in scenarios:
+        directory = tmp_path / name
+        directory.mkdir()
+        cat, entries, journal, ledger, transport = build(directory, responses, calls=cap)
+        with cat, journal:
+            run = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                            planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                            revision_applicability=lambda rid: Applicability.MATCH)
+            assert run.status == "deferred"
+            assert run.plan_failure == failure
+            assert ledger.used_calls() == calls
+            assert bool(journal.pending("req-f")) is pending
+            if name == "judge_timeout":
+                assert run.state is not None
+                assert run.state.observations["p1"].outcome is Outcome.UNKNOWN
+                assert run.judgments["p1"].positive.failure == "uncertain_outcome"
+                assert transport.calls_made == 2
+
+
+def test_judge_timeout_preserves_first_side_and_stops_later_predicates(tmp_path):
+    plan = {"predicates": [{"id": "p1", "question": "Refund purchase window?"},
+                           {"id": "p2", "question": "Refund purchase limit?"}],
+            "expression": {"op": "and", "args": [{"ref": "p1"}, {"ref": "p2"}]}}
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(plan), side(True, QUOTE), TimeoutError("uncertain")])
+    with cat, journal:
+        run = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                        planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                        revision_applicability=lambda rid: Applicability.MATCH)
+        assert run.status == "deferred"
+        assert run.judgments["p1"].positive.quote_ref is not None
+        assert run.judgments["p1"].negative.failure == "uncertain_outcome"
+        assert run.state.observations["p2"].reason == "reconciliation_required"
+        assert transport.calls_made == 3
+        assert len(journal.pending("req-f")) == 1

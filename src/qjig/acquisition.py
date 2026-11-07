@@ -16,11 +16,12 @@ from .recovery import Exclusion, RecoveryResult, recover_packet
 from .retrieval import Candidate, bm25_candidates
 from .scheduler import next_need
 from .stopping import StopDecision, check_stop
-from .budgets import BudgetLedger
+from .budgets import BudgetExceeded, BudgetLedger
 from .judge import JudgeResult, QuoteRef, judge_predicate
 from .obligations import Obligation
 from .planner import PlanBinding, request_fresh_plan
-from .providers import Transport
+from .providers import ProviderUnavailable, Transport
+from .journal import ReconciliationRequired, UncertainOutcome
 from .plans import Plan as _Plan  # noqa: F401
 from .store import Catalog
 
@@ -252,10 +253,15 @@ def run_fresh(
     passages for review but can never close it, so the result is a deferral that names the gap.
     """
     kw = {} if planner_max_tokens is None else {"max_tokens": planner_max_tokens}
-    outcome = request_fresh_plan(
-        ledger, transport, request, corpus_revision_ids=sorted({e.span.revision_id for e in entries}),
-        provider=planner[0], model=planner[1], **kw,
-    )
+    try:
+        outcome = request_fresh_plan(
+            ledger, transport, request, corpus_revision_ids=sorted({e.span.revision_id for e in entries}),
+            provider=planner[0], model=planner[1], **kw,
+        )
+    except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
+        failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
+                   UncertainOutcome: "uncertain_outcome", ReconciliationRequired: "reconciliation_required"}[type(exc)]
+        return FreshRun("deferred", (f"plan_unavailable:{failure}",), failure, None, None, None, {}, {}, ())
     if not outcome.ok:
         return FreshRun("deferred", (f"plan_unavailable:{outcome.failure}",), outcome.failure, None, None, None, {}, {}, ())
 
@@ -264,12 +270,19 @@ def run_fresh(
     refs: dict[str, tuple[QuoteRef, ...]] = {}
     jkw = {} if judge_max_tokens is None else {"max_tokens": judge_max_tokens}
 
+    halted = False
+
     def make_evaluator(question: str, pid: str):
         def evaluate(packet: EvidencePacket, recovery: RecoveryResult) -> EvalResult:
+            nonlocal halted
+            if halted:
+                return EvalResult(Outcome.UNKNOWN, "reconciliation_required")
             result = judge_predicate(
                 ledger, transport, question, packet, provider=judge[0], model=judge[1],
                 applicability=revision_applicability, **jkw,
             )
+            halted = any(side.failure in ("uncertain_outcome", "reconciliation_required")
+                         for side in (result.positive, result.negative))
             judgments[pid] = result
             used = tuple(r for r in (result.positive.quote_ref, result.negative.quote_ref) if r is not None)
             refs[pid] = used

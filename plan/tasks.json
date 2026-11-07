@@ -1321,14 +1321,18 @@
       "depends_on": [
         "R02"
       ],
-      "status": "pending",
-      "files": [],
+      "status": "complete",
+      "files": [
+        "src/qjig/acquisition.py",
+        "src/qjig/judge.py",
+        "tests/test_fresh_pipeline.py"
+      ],
       "test_file": "tests/test_fresh_pipeline.py",
       "test_name": "test_operational_failures_return_partial_deferral",
       "action": "Return inspectable partial operational deferrals",
       "acceptance": "Budget, unavailable and uncertain calls preserve outcomes and reconciliation.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_operational_failures_return_partial_deferral -q",
-      "evidence": ""
+      "evidence": "Red: zero-budget planner raised BudgetExceeded rather than partial result. Green: stand-in tests cover zero budget, unavailable planner, uncertain planner, uncertain first and second judge sides, retained positive quote, no further calls and pending reconciliation. Focused fresh/judge/planner/journal 29 passed; offline suite 255 passed. Journal remains source of attempted-call records."
     },
     {
       "id": "R08",

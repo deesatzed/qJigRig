@@ -8,7 +8,8 @@ from .applicability import Applicability
 from .budgets import BudgetExceeded, BudgetLedger
 from .logic import Observation, Outcome, Support, combine_support
 from .packets import EvidencePacket
-from .providers import FieldSpec, ProviderRequest, Transport, call_typed
+from .providers import FieldSpec, ProviderRequest, ProviderUnavailable, Transport, call_typed
+from .journal import ReconciliationRequired, UncertainOutcome
 
 SIDE_SCHEMA = {"supported": FieldSpec(bool), "quote": FieldSpec(str), "reason": FieldSpec(str)}
 JUDGE_MAX_TOKENS = 800
@@ -89,8 +90,10 @@ def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str,
     req = ProviderRequest(f"judge_{side}", provider, model, _PROMPT.format(claim=claim, evidence=evidence), max_tokens)
     try:
         call = call_typed(ledger, transport, req, SIDE_SCHEMA)
-    except BudgetExceeded:
-        return SideResult(Support.UNKNOWN, "budget_exceeded", "", "budget_exceeded", None)
+    except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
+        failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
+                   UncertainOutcome: "uncertain_outcome", ReconciliationRequired: "reconciliation_required"}[type(exc)]
+        return SideResult(Support.UNKNOWN, failure, "", failure, None)
     if not call.ok:
         return SideResult(Support.UNKNOWN, f"provider_{call.failure}", "", call.failure, call.call_id)
     v = call.value
@@ -117,7 +120,10 @@ def judge_predicate(
     """Ask separately whether the evidence supports YES and whether it supports NO; combine the two."""
     evidence = render_packet(packet)
     pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens)
-    neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens)
+    if pos.failure in ("uncertain_outcome", "reconciliation_required"):
+        neg = SideResult(Support.UNKNOWN, "reconciliation_required", "", "reconciliation_required", None)
+    else:
+        neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens)
     pos = _check_quote(pos, packet, applicability) if pos.support is Support.SUPPORTED else pos
     neg = _check_quote(neg, packet, applicability) if neg.support is Support.SUPPORTED else neg
     outcome = combine_support(pos.support, neg.support)
