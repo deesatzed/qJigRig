@@ -878,7 +878,8 @@
         "T039",
         "T048",
         "R05",
-        "R07H"
+        "R07H",
+        "T051A"
       ],
       "status": "pending",
       "files": [
@@ -1728,6 +1729,25 @@
       "acceptance": "Recorded sources, provider requests/responses and evidence spans can be checked without inference; changed or incomplete records remain explicit.",
       "command": "python -m pytest tests/test_replay.py::test_archive_replay_detects_changed_evidence_without_inference -q",
       "evidence": "Red: no archive replay existed and missing final result was accepted as unanchored complete. Green: synthetic replay checks bound source identities and spans, context/applicability inputs, planner request, response hashes, validated plan and final trace/result binding; missing records remain incomplete, an external digest detects changes, and monkeypatched transport confirms no inference. Full offline suite 349 passed. Judge semantics, journal reconciliation, full cross-store/resource replay and authenticity remain pending under T051/R07."
+    },
+    {
+      "id": "T051A",
+      "phase": "P4",
+      "depends_on": [
+        "R07H"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/replay.py",
+        "src/qjig/judge.py",
+        "tests/test_replay.py"
+      ],
+      "test_file": "tests/test_replay.py",
+      "test_name": "test_replay_rejects_rehashed_judge_prompt_and_changed_validation",
+      "action": "Bind replayed judge requests and validation to trace evidence",
+      "acceptance": "Replay detects judge prompt and typed-validation changes even when internal request hashes are recomputed.",
+      "command": "python -m pytest tests/test_replay.py::test_replay_rejects_rehashed_judge_prompt_and_changed_validation -q",
+      "evidence": "Red: replay accepted a modified judge prompt with recomputed request hash, altered validation, and jointly fabricated trace/result outcome. Green: replay rebuilds judge prompts from plan and verified spans, reruns pure typed validation, and recomputes paired quote-based observations without inference; tests include valid quote, conflict and fabricated quote. Focused replay/judge/fresh 44 passed; full offline suite 354 passed. Semantic quality, partial-failure reconstruction, journal and goal-ledger reconciliation remain open under T051."
     }
   ]
 }

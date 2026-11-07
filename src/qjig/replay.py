@@ -6,11 +6,13 @@ import json
 from dataclasses import dataclass
 
 from .acquisition import COVERAGE_ID
-from .applicability import ApplicabilityInputs
+from .applicability import Applicability, ApplicabilityInputs
 from .contracts import ContractError, Request
-from .planner import _planner_prompt, corpus_manifest_sha256
+from .judge import SIDE_SCHEMA, _PROMPT, _combine_sides, _side_from_value
+from .packets import EvidencePacket, PacketItem
+from .planner import _plan_validator, _planner_prompt, corpus_manifest_sha256
 from .plans import parse_plan
-from .providers import ProviderRequest
+from .providers import ProviderRequest, _validate
 from .run_archive import RunArchive
 from .spans import Span, verify_span
 
@@ -64,6 +66,7 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
         issues.append("invalid_planning_or_applicability")
     requests, responses, validations, failures = {}, {}, {}, {}
     planner_calls, plan_predicates, plan_expression = set(), None, None
+    request_data, response_data, validation_data, pending_judges, plan_questions = {}, {}, {}, [], {}
     trace_observations = {}
     final_result = None
     traces = 0
@@ -75,6 +78,11 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                 if request.input_sha256() != data["input_sha256"]:
                     raise ContractError("request hash mismatch")
                 requests[call_id] = event["seq"]
+                request_data[call_id] = request
+                if data["stage"] in ("judge_positive", "judge_negative"):
+                    pending_judges.append((call_id, request))
+                elif data["stage"] != "planner":
+                    incomplete.append(f"unsupported_stage:{call_id}")
                 if data["stage"] == "planner":
                     planner_calls.add(call_id)
                     if not {"planner", "request", "planning_evidence"} <= context.keys():
@@ -93,13 +101,29 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                 if hashlib.sha256(data["body"].encode("utf-8")).hexdigest() != data["body_sha256"]:
                     raise ContractError("response hash mismatch")
                 responses[call_id] = event["seq"]
+                response_data[call_id] = data
             elif kind == "validation":
                 if call_id not in responses or responses[call_id] >= event["seq"]:
                     raise ContractError("validation without prior response")
                 validations[call_id] = event["seq"]
+                saved_response = response_data[call_id]
+                stage = request_data[call_id].stage
+                if data.get("failure") == "validator_error":
+                    incomplete.append(f"validator_error:{call_id}")
+                elif stage == "planner" or stage in ("judge_positive", "judge_negative"):
+                    if not 200 <= saved_response["http_status"] < 300:
+                        expected_value, expected_failure = None, "http_error"
+                    elif stage == "planner":
+                        expected_value, expected_failure = _plan_validator(saved_response["body"])
+                    else:
+                        expected_value, expected_failure = _validate(saved_response["body"], SIDE_SCHEMA)
+                    if data.get("value") != expected_value or data.get("failure") != expected_failure:
+                        raise ContractError("typed validation differs from recorded response")
+                validation_data[call_id] = data
                 if call_id in planner_calls and data.get("failure") is None:
                     plan = parse_plan({**data["value"], "origin": "fresh"})
                     plan_predicates = {p.id for p in plan.predicates}
+                    plan_questions = {p.id: p.question for p in plan.predicates}
                     plan_expression = plan.expression
                 if data.get("failure") is not None:
                     incomplete.append(f"validation_failure:{call_id}")
@@ -115,6 +139,36 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                 if data["sequence"] != traces:
                     raise ContractError("trace sequence mismatch")
                 trace_observations[data["predicate_id"]] = data["observation"]
+                rendered = "\n".join(f"[{item['entry_id'][:12]}]\n{item['text']}" for item in data["evidence"])
+                seen_sides = set()
+                side_ids = {}
+                for judge_id, judge_request in pending_judges:
+                    side = judge_request.stage.removeprefix("judge_")
+                    expected = _PROMPT.format(claim=f"The answer to '{plan_questions[data['predicate_id']]}' is {'YES' if side == 'positive' else 'NO'}.", evidence=rendered)
+                    settings = context["judge"]
+                    if (side in seen_sides or judge_request.prompt != expected or judge_request.model != settings["model"] or
+                        judge_request.provider != settings["provider"] or judge_request.max_tokens != settings["max_tokens"]):
+                        issues.append(f"invalid_judge_binding:{judge_id}")
+                    seen_sides.add(side)
+                    side_ids[side] = judge_id
+                if set(side_ids) == {"positive", "negative"} and all(
+                    key in validation_data and validation_data[key].get("failure") is None for key in side_ids.values()
+                ):
+                    packet_items = tuple(PacketItem(item["entry_id"], Span(item["revision_id"], item["text_sha256"],
+                                                item["start"], item["end"], item["text"]), item["truncated"])
+                                         for item in data["evidence"])
+                    packet = EvidencePacket(packet_items, (), (), 0, 0)
+                    pos = _side_from_value(validation_data[side_ids["positive"]]["value"], side_ids["positive"])
+                    neg = _side_from_value(validation_data[side_ids["negative"]]["value"], side_ids["negative"])
+                    judgment = _combine_sides(pos, neg, packet, lambda rid: Applicability(context["corpus"].get(rid, "unknown")))
+                    expected_observation = {"outcome": judgment.observation.outcome.value, "reason": judgment.observation.reason}
+                    if data["observation"] != expected_observation:
+                        issues.append(f"invalid_judge_outcome:{data['predicate_id']}")
+                elif pending_judges:
+                    incomplete.append(f"judge_outcome_not_replayed:{data['predicate_id']}")
+                elif str(data["observation"].get("reason", "")).startswith("judge_"):
+                    issues.append(f"invalid_judge_outcome:{data['predicate_id']}")
+                pending_judges.clear()
                 for evidence in data["evidence"]:
                     revision = revisions[evidence["revision_id"]]
                     verify_span(revision, Span(evidence["revision_id"], evidence["text_sha256"], evidence["start"], evidence["end"], evidence["text"]))
@@ -140,6 +194,8 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
             incomplete.append(f"missing_validation:{call_id}")
         if call_id in responses and call_id in failures:
             issues.append(f"conflicting_terminal:{call_id}")
+    if pending_judges:
+        incomplete.append("untraced_judge_calls")
     if not requests or not traces:
         incomplete.append("missing_request_or_trace")
     if final_result is None:

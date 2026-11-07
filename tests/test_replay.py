@@ -1,5 +1,6 @@
 """Synthetic stand-in run; replay makes no provider calls or quality claims."""
 import sqlite3
+import pytest
 from qjig.acquisition import run_fresh
 from qjig.applicability import Applicability, ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
 from qjig.budgets import BudgetLedger
@@ -13,13 +14,13 @@ from qjig.store import Catalog
 from qjig.replay import verify_archive
 
 
-def make_archive(tmp_path):
+def make_archive(tmp_path, positive=None, negative=None):
     source = SourceRevision.create("synthetic/rules.md", "synthetic", decode_source(b"# Rules\nRefunds within fourteen days.\n", encoding="utf-8"))
     request = Request("r", "refund fourteen?", "reviewer", "1", "project")
     usage = {"prompt_tokens": 5, "completion_tokens": 3, "cost_usd": 0.0}
     transport = StandInTransport([RawResponse(200, '{"predicates":[{"id":"p1","question":"refund fourteen?"}],"expression":{"ref":"p1"}}', usage),
-                                  RawResponse(200, '{"supported":false,"quote":"","reason":"none"}', usage),
-                                  RawResponse(200, '{"supported":false,"quote":"","reason":"none"}', usage)])
+                                  RawResponse(200, positive or '{"supported":false,"quote":"","reason":"none"}', usage),
+                                  RawResponse(200, negative or '{"supported":false,"quote":"","reason":"none"}', usage)])
     directory = tmp_path / "run"
     with Catalog.open(tmp_path / "c.sqlite") as catalog, Journal.open(tmp_path / "j.sqlite") as journal, RunArchive.open(directory) as archive:
         catalog.add_revision(source)
@@ -132,3 +133,62 @@ def test_replay_rejects_result_that_disagrees_with_archived_plan(tmp_path):
         report = verify_archive(archive)
         assert report.status == "invalid"
         assert any(item.startswith("invalid_run_result:") for item in report.issues)
+
+
+def test_replay_rejects_rehashed_judge_prompt_and_changed_validation(tmp_path):
+    import json
+    from qjig.providers import ProviderRequest
+
+    directory, _ = make_archive(tmp_path)
+    with sqlite3.connect(directory / "run.sqlite") as con:
+        con.execute("DROP TRIGGER event_no_update")
+        rows = con.execute("SELECT seq,call_id,data FROM events WHERE kind='request'").fetchall()
+        seq, call_id, raw = next(row for row in rows if json.loads(row[2])["stage"] == "judge_positive")
+        request = json.loads(raw)
+        request["prompt"] = request["prompt"].replace("Refunds within fourteen days", "Unrelated altered passage")
+        rebuilt = ProviderRequest(request["stage"], request["provider"], request["model"], request["prompt"], request["max_tokens"])
+        request["input_sha256"] = rebuilt.input_sha256()
+        con.execute("UPDATE events SET data=? WHERE seq=?", (json.dumps(request), seq))
+        seq, raw = con.execute("SELECT seq,data FROM events WHERE kind='validation' AND call_id=?", (call_id,)).fetchone()
+        validation = json.loads(raw)
+        validation["value"]["supported"] = True
+        con.execute("UPDATE events SET data=? WHERE seq=?", (json.dumps(validation), seq))
+    with RunArchive.open(directory) as archive:
+        report = verify_archive(archive)
+        assert report.status == "invalid"
+        assert any(issue.startswith("invalid_judge_binding:") for issue in report.issues)
+        assert any(issue.startswith("invalid_validation:") for issue in report.issues)
+
+
+def test_replay_rejects_jointly_fabricated_judge_outcome(tmp_path):
+    import json
+    directory, _ = make_archive(tmp_path)
+    with sqlite3.connect(directory / "run.sqlite") as con:
+        con.execute("DROP TRIGGER event_no_update")
+        seq, raw = con.execute("SELECT seq,data FROM events WHERE kind='trace'").fetchone()
+        trace = json.loads(raw)
+        trace["observation"] = {"outcome": "true", "reason": "judge_positive_supported"}
+        con.execute("UPDATE events SET data=? WHERE seq=?", (json.dumps(trace), seq))
+        seq, raw = con.execute("SELECT seq,data FROM events WHERE kind='run_result'").fetchone()
+        result = json.loads(raw)
+        result["observations"]["p1"] = trace["observation"]
+        con.execute("UPDATE events SET data=? WHERE seq=?", (json.dumps(result), seq))
+    with RunArchive.open(directory) as archive:
+        report = verify_archive(archive)
+        assert report.status == "invalid"
+        assert any(item.startswith("invalid_judge_outcome:") for item in report.issues)
+
+
+@pytest.mark.parametrize("positive,negative,expected", [
+    ('{"supported":true,"quote":"Refunds within fourteen days.","reason":"source"}', '{"supported":false,"quote":"","reason":"none"}', "true"),
+    ('{"supported":true,"quote":"Refunds within fourteen days.","reason":"source"}', '{"supported":true,"quote":"Refunds within fourteen days.","reason":"source"}', "conflict"),
+    ('{"supported":true,"quote":"not in source","reason":"fabricated"}', '{"supported":false,"quote":"","reason":"none"}', "unknown"),
+])
+def test_replay_recomputes_quoted_judge_outcomes(tmp_path, positive, negative, expected):
+    directory, _ = make_archive(tmp_path, positive, negative)
+    with RunArchive.open(directory) as archive:
+        report = verify_archive(archive)
+        assert report.status == "unanchored" and not report.issues
+        trace = next(e["data"] for e in archive.events() if e["kind"] == "trace")
+        assert trace["observation"]["outcome"] == expected
+        assert report.semantic_assurance == "not_assessed"

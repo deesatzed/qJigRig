@@ -97,11 +97,14 @@ def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str,
         return SideResult(Support.UNKNOWN, failure, "", failure, None)
     if not call.ok:
         return SideResult(Support.UNKNOWN, f"provider_{call.failure}", "", call.failure, call.call_id)
-    v = call.value
-    if v["supported"] and not v["quote"].strip():
-        return SideResult(Support.UNKNOWN, "supported_without_quote", "", None, call.call_id)
-    # A "not supported" answer is only the absence of support for this claim.
-    return SideResult(Support.SUPPORTED if v["supported"] else Support.UNKNOWN, v["reason"], v["quote"], None, call.call_id)
+    return _side_from_value(call.value, call.call_id)
+
+
+def _side_from_value(value: dict, call_id: str | None) -> SideResult:
+    """Map a previously validated side value without invoking a model."""
+    if value["supported"] and not value["quote"].strip():
+        return SideResult(Support.UNKNOWN, "supported_without_quote", "", None, call_id)
+    return SideResult(Support.SUPPORTED if value["supported"] else Support.UNKNOWN, value["reason"], value["quote"], None, call_id)
 
 
 def build_side_prompts(question: str, packet: EvidencePacket) -> tuple[ProviderRequest, ProviderRequest]:
@@ -126,6 +129,12 @@ def judge_predicate(
         neg = SideResult(Support.UNKNOWN, "reconciliation_required", "", "reconciliation_required", None)
     else:
         neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens, reservation_factory, archive)
+    return _combine_sides(pos, neg, packet, applicability)
+
+
+def _combine_sides(pos: SideResult, neg: SideResult, packet: EvidencePacket,
+                   applicability: Callable[[str], Applicability] | None) -> JudgeResult:
+    """Combine recorded sides and verify their cited spans without inference."""
     pos = _check_quote(pos, packet, applicability) if pos.support is Support.SUPPORTED else pos
     neg = _check_quote(neg, packet, applicability) if neg.support is Support.SUPPORTED else neg
     outcome = combine_support(pos.support, neg.support)
