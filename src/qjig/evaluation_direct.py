@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from .budgets import BudgetExceeded, BudgetLedger
 from .contracts import ContractError, Request
@@ -59,7 +60,7 @@ def _prompt(request, context, packets, allow_search, *, legacy_request_id=False)
 def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, transport, *,
                archive: RunArchive, provider: str, model: str, max_tokens: int,
                as_of: str, entities: list[str], historical_as_known: bool = False,
-               reservation_factory=None, max_price=None) -> dict:
+               reservation_factory=None, max_price=None, case_binding=None) -> dict:
     """Run a bounded initial retrieval and optional model-requested followup.
 
     Source text is untrusted, valid quotations do not prove relevance or truth,
@@ -78,7 +79,14 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
     except (ValueError, TypeError) as exc:
         raise ContractError('invalid direct applicability context') from exc
     context = {'as_of': as_of, 'entities': sorted(entities), 'historical_as_known': historical_as_known}
-    archive.record_context({'schema': 'qjig.direct-evaluation.v2', 'request': request.to_dict(),
+    if case_binding is not None:
+        if (not isinstance(case_binding, dict) or set(case_binding) != {'case_id', 'design_sha256', 'case_sha256', 'reference_sha256'}
+                or not isinstance(case_binding['case_id'], str) or not case_binding['case_id'].strip()
+                or any(not isinstance(case_binding[k], str) or not re.fullmatch(r'[0-9a-f]{64}', case_binding[k])
+                       for k in ('design_sha256', 'case_sha256', 'reference_sha256'))):
+            raise ContractError('invalid direct case binding')
+    archive.record_context({'schema': 'qjig.direct-evaluation.v3' if case_binding is not None else 'qjig.direct-evaluation.v2',
+                            **({'case_binding': case_binding} if case_binding is not None else {}), 'request': request.to_dict(),
                             'source_revisions': sorted(r.revision_id for r in search._revisions), 'applicability': context,
                             'want': search._want, 'max_bytes': search._max_bytes,
                             'followups': search._max_rounds - 1, 'expanded': search._expanded,
@@ -128,3 +136,35 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
                            'citations': call.value['citations'], 'call_ids': calls, 'searches': list(search.trace)})
         retrieve(call.value['query'])
     raise ContractError('direct run ended without an answer')
+
+
+def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected: list[dict], *,
+                      expected_design_sha256: str, expected_case_sha256: str, ledger: BudgetLedger, transport,
+                      archive: RunArchive, provider: str, model: str, max_tokens: int,
+                      want: int, max_bytes: int, followups: int, expanded: bool = False,
+                      reservation_factory=None, max_price=None) -> dict:
+    """Run one checked private case; reference data remains outside model input.
+
+    Caller-supplied anchors and protected manifest are not authenticated here.
+    Hosted calls remain subject to the existing complete-preflight refusal.
+    """
+    from .evaluation_cases import prepare_evaluation_case
+    try:
+        lock_copy = json.loads(json.dumps(lock, ensure_ascii=False, allow_nan=False))
+        reference_copy = json.loads(json.dumps(reference, ensure_ascii=False, allow_nan=False))
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise ContractError('invalid private case data') from exc
+    prepared = prepare_evaluation_case(root, design, lock_copy, reference_copy, protected,
+                                       expected_design_sha256=expected_design_sha256,
+                                       expected_case_sha256=expected_case_sha256)
+    if not isinstance(ledger, BudgetLedger):
+        raise ContractError('budget ledger required')
+    manifest = [{'path': source.path, 'sha256': source.sha256} for source in prepared.sources]
+    search = DirectRetrieval(root, manifest, protected, want=want, max_bytes=max_bytes, followups=followups, expanded=expanded)
+    request = Request(ledger._request_id, prepared.question, prepared.role, prepared.role_version, prepared.scope)
+    binding = {'case_id': lock_copy['case_id'], 'design_sha256': expected_design_sha256,
+               'case_sha256': expected_case_sha256, 'reference_sha256': lock_copy['reference_sha256']}
+    return run_direct(search, request, ledger, transport, archive=archive, provider=provider, model=model,
+                      max_tokens=max_tokens, as_of=prepared.as_of, entities=list(prepared.entities),
+                      historical_as_known=prepared.historical_as_known, reservation_factory=reservation_factory,
+                      max_price=max_price, case_binding=binding)

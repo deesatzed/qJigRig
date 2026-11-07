@@ -30,7 +30,17 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
         context, events = archive.context(), archive.events()
         keys = {'schema', 'request', 'source_revisions', 'applicability', 'want', 'max_bytes', 'followups',
                 'expanded', 'provider', 'model', 'max_tokens', 'max_price'}
-        if not isinstance(context, dict) or set(context) != keys or context['schema'] not in ('qjig.direct-evaluation.v1', 'qjig.direct-evaluation.v2'):
+        if not isinstance(context, dict) or context.get('schema') not in ('qjig.direct-evaluation.v1', 'qjig.direct-evaluation.v2', 'qjig.direct-evaluation.v3'):
+            raise ContractError('invalid direct context')
+        if context['schema'] == 'qjig.direct-evaluation.v3':
+            keys.add('case_binding')
+            binding = context.get('case_binding')
+            if (not isinstance(binding, dict) or set(binding) != {'case_id', 'design_sha256', 'case_sha256', 'reference_sha256'}
+                    or not isinstance(binding['case_id'], str) or not binding['case_id'].strip()
+                    or any(not isinstance(binding[k], str) or not re.fullmatch(r'[0-9a-f]{64}', binding[k])
+                           for k in ('design_sha256', 'case_sha256', 'reference_sha256'))):
+                raise ContractError('invalid case binding')
+        if set(context) != keys:
             raise ContractError('invalid direct context')
         request = Request.from_dict(context['request'])
         revisions = [archive.revision(i) for i in archive.revision_ids()]

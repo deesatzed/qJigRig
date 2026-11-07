@@ -63,6 +63,10 @@ def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha2
         raise ContractError('direct run is not structurally verified')
     context = archive.context()
     request, applicability = context['request'], context['applicability']
+    if context.get('schema') == 'qjig.direct-evaluation.v3':
+        binding = context['case_binding']
+        if binding['case_id'] != reference['case_id'] or binding['reference_sha256'] != ref_hash:
+            raise ContractError('reference differs from recorded case binding')
     if (any(reference[k] != request[k] for k in ('question', 'role', 'role_version', 'scope'))
             or any(reference[k] != applicability[k] for k in ('as_of', 'entities', 'historical_as_known'))
             or reference['source_revisions'] != context['source_revisions']):

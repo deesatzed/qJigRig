@@ -605,3 +605,57 @@ def test_case_lock_binds_question_sources_and_private_reference(tmp_path):
     (tmp_path/'code').write_bytes(b'changed')
     with pytest.raises(ContractError):
         prepare_evaluation_case(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=digest)
+
+
+def test_locked_direct_run_binds_case_without_exposing_reference(tmp_path):
+    import copy
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import load_isolated_sources, validate_evaluation_design
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_direct import run_locked_direct
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.evaluation_scoring import make_reference, reference_digest, score_direct_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    code, gold = b'Tests must pass.', b'PRIVATE_REFERENCE_LABEL'
+    (tmp_path/'code').write_bytes(code); (tmp_path/'label').write_bytes(gold)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    sources, protected = [item('code', code)], [item('label', gold)]
+    design = _sample_design(); design['families'][0]['source_hashes'] = [sources[0]['sha256']]
+    design_hash = validate_evaluation_design(design)
+    ref = make_reference(case_id='dev', request=Request('hidden', 'Do tests pass?', 'reviewer', '1', 'project'),
+                         sources=load_isolated_sources(tmp_path,sources,protected), as_of='2026-11-07', entities=[],
+                         historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
+                         evidence=[{'path':'code','quote':'must pass'}])
+    lock = {'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':design_hash,
+            'question':'Do tests pass?','role':'reviewer','role_version':'1','scope':'project',
+            'as_of':'2026-11-07','entities':[],'historical_as_known':False,'sources':sources,
+            'reference_sha256':reference_digest(ref)}
+    lock_hash = case_lock_digest(lock)
+    response = RawResponse(200, json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),
+                           {'prompt_tokens':5,'completion_tokens':3,'cost_usd':0.01})
+    with Journal.open(tmp_path/'j.sqlite') as journal, RunArchive.open(tmp_path/'archive') as archive:
+        ledger = BudgetLedger(Budget(2,10000,1),journal,'PRIVATE_ARM_ID')
+        altered = copy.deepcopy(lock); altered['question'] = 'Different question?'
+        with pytest.raises(ContractError):
+            run_locked_direct(tmp_path,design,altered,ref,protected,expected_design_sha256=design_hash,
+                              expected_case_sha256=lock_hash,ledger=ledger,transport=StandInTransport([response]),
+                              archive=archive,provider='stand-in',model='test',max_tokens=100,want=1,max_bytes=3000,followups=0)
+        assert journal.events('PRIVATE_ARM_ID') == [] and archive.events() == []
+        result = run_locked_direct(tmp_path,design,lock,ref,protected,expected_design_sha256=design_hash,
+                                   expected_case_sha256=lock_hash,ledger=ledger,transport=StandInTransport([response]),
+                                   archive=archive,provider='stand-in',model='test',max_tokens=100,want=1,max_bytes=3000,followups=0)
+        assert result['answer'] == 'unknown'
+        binding = archive.context()['case_binding']
+        assert binding == {'case_id':'dev','design_sha256':design_hash,'case_sha256':lock_hash,'reference_sha256':reference_digest(ref)}
+        prompt = next(e['data']['prompt'] for e in archive.events() if e['kind']=='request')
+        assert 'PRIVATE_ARM_ID' not in prompt and reference_digest(ref) not in prompt and gold.decode() not in prompt
+        replay = verify_direct_archive(archive,journal); assert replay['status']=='unanchored'
+        score = score_direct_archive(archive,journal,ref,expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
+        assert score['classification']=='unknown_review'
+        swapped = dict(ref, case_id='another-case')
+        with pytest.raises(ContractError, match='case binding'):
+            score_direct_archive(archive,journal,swapped,expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(swapped))

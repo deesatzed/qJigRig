@@ -1116,7 +1116,8 @@
       "depends_on": [
         "T061",
         "T063A",
-        "T063B"
+        "T063B",
+        "T063C"
       ],
       "status": "pending",
       "files": [
@@ -2714,6 +2715,27 @@
       "acceptance": "Prepared case exposes only question context and pinned source bytes after checking design, per-case digest, source family and matching private reference.",
       "command": "python -m pytest tests/test_evaluation.py::test_case_lock_binds_question_sources_and_private_reference -q",
       "evidence": "Red: design, question, source hashes and reference could not be checked as one case binding. Green: prepared case checks external digests, declared family source hashes, protected-file loader and exact reference context, revisions and quotations, returning question context and source bytes only. Synthetic evaluation suite 22 passed; full offline 510 passed. Created and checked 16 private local draft bindings. Protected-manifest completeness, transformed labels, authorship, exact criteria and full experiment freeze remain unverified."
+    },
+    {
+      "id": "T063C",
+      "phase": "P6",
+      "depends_on": [
+        "T063B",
+        "T064B",
+        "T065B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_direct.py",
+        "src/qjig/evaluation_replay.py",
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_locked_direct_run_binds_case_without_exposing_reference",
+      "action": "Run a checked evaluation case through the direct baseline",
+      "acceptance": "The direct runner checks the case and reference before dispatch, records the private case binding locally and excludes it from provider input.",
+      "command": "python -m pytest tests/test_evaluation.py::test_locked_direct_run_binds_case_without_exposing_reference -q",
+      "evidence": "Red: checked case preparation was not integrated with direct execution. Green: a version 3 direct run validates the case before dispatch, records design/case/reference bindings in the local archive, excludes them from prompts, and verifies scoring uses the recorded case identity. Prior v1/v2 replay remains. Synthetic draft-case path replayed and produced unknown_review; focused 30 and full offline 511 passed. Anchors and protected manifest remain caller assertions; other entrypoints, transformed labels, matched work and hosted runs remain open."
     }
   ]
 }
