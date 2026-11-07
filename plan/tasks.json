@@ -3985,6 +3985,23 @@
       "acceptance": "Abruptly terminate a synthetic fresh planner attempt, reopen persistent files in a service, retain unknown usage, and prevent a further provider attempt.",
       "command": "python -m pytest tests/test_fresh_process_crash.py::test_process_exit_leaves_incomplete_fresh_run_without_retry -q",
       "evidence": "A subprocess exited with code 72 inside a synthetic planner transport after durable intent and archive request; a newly started service reopened the incomplete archive with reconciliation required. The persisted ledger retained one unknown-cost call; a new request deferred before dispatch. Focused fresh/journal/budget checks: 54 passed, 1 skipped. This does not prove real provider execution or reconciliation, or complete T062."
+    },
+    {
+      "id": "R08Q",
+      "phase": "repair",
+      "depends_on": [
+        "T062E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/budgets.py"
+      ],
+      "test_file": "tests/test_fresh_process_crash.py",
+      "test_name": "test_process_exit_leaves_incomplete_fresh_run_without_retry",
+      "action": "Distinguish unresolved prior provider attempts from budget exhaustion",
+      "acceptance": "When accounting is incomplete because a previous provider attempt is pending, defer a new request as reconciliation required without dispatch; preserve distinct invalid-accounting and exhausted-budget refusals.",
+      "command": "python -m pytest tests/test_fresh_process_crash.py::test_process_exit_leaves_incomplete_fresh_run_without_retry -q",
+      "evidence": "Red: a new request after a synthetic process crash was labeled budget_exceeded. It now returns reconciliation_required and makes no provider call; existing accounting/budget, fresh pipeline and evaluation regressions passed. This does not reconcile the attempt, establish hosted cost bounds or open R08."
     }
   ]
 }

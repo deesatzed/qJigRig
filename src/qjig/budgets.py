@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Any, Callable
 
 from .contracts import Budget, ContractError
-from .journal import Event, Journal, run_journaled
+from .journal import Event, Journal, ReconciliationRequired, run_journaled
 from .money import sum_costs
 
 
@@ -174,6 +174,11 @@ class BudgetLedger:
         if self._goal_budget is not None:
             audit = self._goal_budget.audit_journal(self._journal)
             if audit["status"] != "verified":
+                if audit['status'] == 'incomplete':
+                    events = self._journal.all_events()
+                    closed = {event.call_id for event in events if event.kind in ('receipt', 'failure', 'reconciled')}
+                    if any(event.kind == 'intent' and event.call_id not in closed for event in events):
+                        raise ReconciliationRequired('an earlier provider attempt remains unresolved')
                 raise BudgetExceeded("accounting", f"goal and journal accounting is {audit['status']}; reconcile before dispatch")
             goal_attempt_id = uuid.uuid4().hex
             self._goal_budget.reserve(goal_attempt_id, self._request_id, self._partition,

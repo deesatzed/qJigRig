@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "06b304728a2dd9f465a4089d0e79d9f4d505a302db5d6d62f5b5cd54f491a905",
-  "queue_sha256": "71007e53e09739ada18dfca945cb62fabdecc69329ab41688576301f2083b5b9",
+  "queue_sha256": "79d76794c35fd70f644a9fd6193cb3c4d4a2df422210800a6d73316b6f3602dd",
   "gates": [
     {
       "id": "F01",
@@ -98,7 +98,8 @@
         "R08M",
         "R08N",
         "R08O",
-        "R08P"
+        "R08P",
+        "R08Q"
       ],
       "evidence": []
     },
@@ -582,6 +583,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_replay.py::test_replay_rejects_response_wire_digest_that_differs_from_request -q",
       "queue_evidence_assertion": "Red: replay accepted a changed wire payload digest. A stable v1 serializer now constructs the body sent by the adapter and replay compares its digest with the retained response metadata; unversioned or missing OpenRouter digest is incomplete. A second red exposed price-key ordering differences after archive serialization; v1 now specifies key order. Fake HTTP and tampered synthetic archive only; this does not authenticate evidence, verify pre-dispatch bounds or authorize hosted calls."
+    },
+    {
+      "id": "R08Q",
+      "status": "unverified",
+      "task_ids": [
+        "R08Q"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_process_crash.py::test_process_exit_leaves_incomplete_fresh_run_without_retry -q",
+      "queue_evidence_assertion": "Red: a new request after a synthetic process crash was labeled budget_exceeded. It now returns reconciliation_required and makes no provider call; existing accounting/budget, fresh pipeline and evaluation regressions passed. This does not reconcile the attempt, establish hosted cost bounds or open R08."
     },
     {
       "id": "R09",

@@ -279,7 +279,7 @@ def test_interrupted_fresh_run_exposes_pending_attempt_after_restart(tmp_path):
             moved.rename(journal)
         second = {'request': {**request, 'request_id': 'after-interruption'}, 'as_of':'2026-11-15', 'entities':[]}
         followup = backend.run(path, second)
-        assert followup['status'] == 'deferred' and followup['plan_failure'] == 'budget_exceeded'
+        assert followup['status'] == 'deferred' and followup['plan_failure'] == 'reconciliation_required'
         assert transport.calls_made == 1
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)

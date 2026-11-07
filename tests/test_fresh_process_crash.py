@@ -77,7 +77,8 @@ def test_process_exit_leaves_incomplete_fresh_run_without_retry(tmp_path):
             usage=goal.actual_usage()
             assert usage['calls']==1 and usage['unknown_calls']==1 and usage['cost_usd'] is None
         result=client.ask_fresh('new-id','Refund limit?','project',as_of='2026-11-15',entities=[])
-        assert result['status']=='deferred' and result['plan_failure']=='budget_exceeded'
+        assert result['status']=='deferred' and result['plan_failure']=='reconciliation_required'
+        assert 'plan_unavailable:reconciliation_required' in result['reasons']
         assert transport.calls_made == 0
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)
