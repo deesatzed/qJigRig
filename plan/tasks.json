@@ -3913,6 +3913,25 @@
       "acceptance": "Replay a downloaded archive read-only without inference, distinguish unanchored and digest-matched status, and return failure for invalid or incomplete records.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: verify-fresh command was absent. Synthetic archive round-trip exercises the CLI without a provider, matching and mismatched supplied digests, and a modified archive. A matching caller-supplied digest is not an authenticated source or semantic outcome."
+    },
+    {
+      "id": "T059C",
+      "phase": "P5",
+      "depends_on": [
+        "T053D",
+        "T056G"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/agents.py",
+        "docs/workflows/fresh-configuration.md"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Connect role-defined clients to fresh runs and saved replay",
+      "acceptance": "Two role-defined clients run fresh planning over the same source, retain distinct role-bound reviews and inspect archived runs through the local service.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: RoleClient lacked ask_fresh. Synthetic configured pipeline exercised reviewer and builder requests, shared revision identity, distinct persisted review roles, no automatic decision and replay. A browser walkthrough also exercised a builder intervention, stale reviewer evidence and downloaded replay after restart. No hosted call or independent semantic outcome was established."
     }
   ]
 }

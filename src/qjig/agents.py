@@ -18,8 +18,8 @@ class ClientError(Exception):
 class RoleClient:
     """A distinct role context over one IPv4-loopback qJig service.
 
-    No role authorizes access or certifies evidence. This client supports the
-    existing deterministic API; it does not invoke the fresh hosted pipeline.
+    No role authorizes access or certifies evidence. Fresh requests depend on
+    the service's configured backend and its hosted-call preflight gate.
     """
     def __init__(self, port: int, role: RoleDefinition, *, timeout: float = 5):
         if type(port) is not int or not 1 <= port <= 65535 or not isinstance(role, RoleDefinition):
@@ -103,6 +103,25 @@ class RoleClient:
         if not isinstance(result.get('runs'), list):
             raise ClientError('local service returned invalid run list')
         return result['runs']
+
+    def list_fresh_runs(self) -> list[dict]:
+        result = self._request('GET', '/api/fresh-runs')
+        if not isinstance(result.get('runs'), list):
+            raise ClientError('local service returned invalid fresh run list')
+        return result['runs']
+
+    def get_fresh_run(self, run_id: str) -> dict:
+        if not isinstance(run_id, str) or not re.fullmatch(r'[0-9a-f]{64}', run_id):
+            raise ContractError('invalid fresh run identity')
+        return self._request('GET', '/api/fresh-runs/' + run_id)
+
+    def ask_fresh(self, request_id: str, question: str, scope: str, *, as_of: str, entities: list[str]) -> dict:
+        if (any(not isinstance(value, str) or not value.strip() for value in (request_id, question, scope, as_of))
+                or not isinstance(entities, list)
+                or any(not isinstance(value, str) or not value.strip() for value in entities)):
+            raise ContractError('fresh request identity, question, scope, date and entities are required')
+        request = Request(request_id, question, self.role.role_id, self.role.version, scope)
+        return self._request('POST', '/api/fresh', {'request': request.to_dict(), 'as_of': as_of, 'entities': entities})
 
     def ask(self, request_id: str, question: str, scope: str, policy: dict) -> dict:
         if any(not isinstance(value, str) or not value.strip() for value in (request_id, question, scope)) or not isinstance(policy, dict):

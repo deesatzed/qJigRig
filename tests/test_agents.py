@@ -54,6 +54,12 @@ def test_client_rejects_invalid_inputs_and_service_errors(tmp_path):
             client.get_source('../../etc/passwd')
         with pytest.raises(ContractError):
             client.ask('', 'question', 'project', {})
+        with pytest.raises(ContractError):
+            client.ask_fresh('r', 'question', 'project', as_of='2026-11-15', entities=[''])
+        with pytest.raises(ContractError):
+            client.get_fresh_run('../../etc/passwd')
+        with pytest.raises(ClientError):
+            client.ask_fresh('r', 'question', 'project', as_of='2026-11-15', entities=[])
         with pytest.raises(ClientError):
             client.get_source('rev1:' + 'a' * 64)
         with pytest.raises(ClientError):
