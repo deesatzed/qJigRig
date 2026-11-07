@@ -1721,3 +1721,78 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
         import sqlite3
         with pytest.raises(sqlite3.IntegrityError):
             reopened._con.execute("UPDATE evaluation_campaign_events SET payload='{}' WHERE kind='started'")
+
+
+def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path):
+    import copy,json
+    from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
+    from qjig.contracts import Budget,Request
+    from qjig.evaluation import load_isolated_sources,validate_evaluation_design
+    from qjig.evaluation_budget import build_factorial_allocation,reserve_evaluation_plan
+    from qjig.evaluation_campaign import EvaluationCampaign,applicability_digest,run_campaign_batch
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_scoring import make_reference,reference_digest
+    from qjig.goal_budget import GoalBudget
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse,StandInTransport
+    design=_sample_design();sources={}
+    for family in design['families']:
+        name=family['id'];raw=f'Checks for {name} must pass.'.encode();(tmp_path/name).write_bytes(raw)
+        sources[name]={'path':name,'sha256':hashlib.sha256(raw).hexdigest()};family['source_hashes']=[sources[name]['sha256']]
+    gold=b'PRIVATE_BATCH_LABEL';(tmp_path/'label').write_bytes(gold)
+    protected=[{'path':'label','sha256':hashlib.sha256(gold).hexdigest()}]
+    digest=validate_evaluation_design(design);cases={};hashes={};metadata={}
+    for case in design['cases']:
+        ident,family=case['id'],case['family'];question=f'Do checks for {family} pass?'
+        isolated=load_isolated_sources(tmp_path,[sources[family]],protected)
+        ref=make_reference(case_id=ident,request=Request('hidden',question,'reviewer','1','project'),sources=isolated,
+            as_of='2026-11-07',entities=[],historical_as_known=False,expected_answer='yes',provenance='authored_unvalidated',
+            evidence=[{'path':family,'quote':isolated[0].raw.decode()}])
+        lock={'schema':'qjig.evaluation-case.v1','case_id':ident,'design_sha256':digest,'question':question,
+              'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
+              'historical_as_known':False,'sources':[sources[family]],'reference_sha256':reference_digest(ref)}
+        inputs=ApplicabilityInputs(Collection((MemberMetadata(ref['source_revisions'][0],'project',Interval('2020-01-01',OPEN)),)),
+                                   frozenset(),'2026-11-07',False)
+        cases[ident]={'lock':lock,'reference':ref,'protected':protected,'applicability_inputs':inputs}
+        hashes[ident]=case_lock_digest(lock);metadata[ident]=applicability_digest(inputs)
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
+    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')}
+    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'private-synthetic-batch-secret-32-bytes')
+    total=Budget(800,200000,10);per=Budget(30,6000,1)
+    allocations={'development':Budget(200,50000,2),'pilot':Budget(200,50000,2),'holdout':Budget(400,100000,6)}
+    calls=[];usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
+    def transport_for(assignment):
+        calls.append(assignment['request_id']);raw=lambda data:RawResponse(200,json.dumps(data),usage)
+        if assignment['arm'] in ('combined','decomposition_only'):
+            family=next(c['family'] for c in design['cases'] if c['id']==assignment['case_id'])
+            text=(tmp_path/family).read_text()
+            responses=[raw({'predicates':[{'id':'p','question':'Do checks pass?'}],'expression':{'ref':'p'}}),
+                       raw({'supported':True,'quote':text,'reason':'synthetic'}),
+                       raw({'supported':False,'quote':'','reason':'synthetic'}),raw({'assessment':'uncertain','reason':'synthetic'})]
+        else:responses=[raw({'action':'answer','query':None,'answer':'unknown','citations':[]})]
+        return StandInTransport(responses)
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal,Journal.open(tmp_path/'journal.sqlite') as journal:
+        reserve_evaluation_plan(goal,'batch',plan,expected_plan_sha256=plan['sha256'])
+        campaign=EvaluationCampaign(goal,'batch',expected_plan_sha256=plan['sha256'])
+        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata)
+        broken=copy.deepcopy(cases);broken['holdout']['reference']['expected_answer']='no'
+        with pytest.raises(ContractError):
+            run_campaign_batch(campaign,tmp_path,design,broken,journal=journal,archive_root=tmp_path/'runs',config=config,
+                               want=1,max_bytes=5000,expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
+        assert calls==[] and campaign.status()['scored']==0
+        first=run_campaign_batch(campaign,tmp_path,design,cases,journal=journal,archive_root=tmp_path/'runs',config=config,
+                                 want=1,max_bytes=5000,expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
+        assert first['executed']==2 and first['scored']==2 and first['remaining']==58 and len(calls)==2
+        second=run_campaign_batch(EvaluationCampaign(goal,'batch',expected_plan_sha256=plan['sha256']),tmp_path,design,cases,
+                                  journal=journal,archive_root=tmp_path/'runs',config=config,want=1,max_bytes=5000,
+                                  expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
+        assert second['executed']==2 and second['scored']==4 and second['remaining']==56 and len(set(calls))==4
+        assert all(next(a for a in plan['manifest']['assignments'] if a['request_id']==rid)['case_id'].startswith('dev') for rid in calls)
+        journal._con.execute('DROP TRIGGER events_no_update')
+        journal._con.execute("UPDATE events SET payload='{}' WHERE kind='receipt' AND request_id=?",(calls[0],))
+        with pytest.raises(ContractError):
+            run_campaign_batch(campaign,tmp_path,design,cases,journal=journal,archive_root=tmp_path/'runs',config=config,
+                               want=1,max_bytes=5000,expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
+        assert len(calls)==4

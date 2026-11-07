@@ -387,3 +387,100 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
     receipt=campaign.finish(request_id,archive,journal,reference,expected_run_sha256=run_hash,
         expected_reference_sha256=reference_digest(reference),expected_journal_sha256=journal_hash)
     return {**receipt,'run_sha256':run_hash,'journal_sha256':journal_hash}
+
+
+def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: dict, *, journal,
+                       archive_root, config: dict, want: int, max_bytes: int, expected_config_sha256: str,
+                       transport_factory, max_assignments: int) -> dict:
+    """Run a bounded ordered batch after checking every case and prior receipt.
+
+    A batch is not a completed experiment unless the persisted denominator is
+    fully scored. Bounds, anchors, metadata and the transport factory are caller
+    assertions; hosted transport retains its separate refusal gate.
+    """
+    import re
+    from pathlib import Path
+    from .applicability import Applicability,ApplicabilityInputs,combine_applicability,scope_applicability
+    from .evaluation import _full_source_entries,_full_source_packet
+    from .evaluation_cases import prepare_evaluation_case
+    from .evaluation_scoring import reference_digest
+    from .journal import Journal
+    from .run_archive import RunArchive
+    from .sources import SourceRevision,decode_source
+    if (not isinstance(campaign,EvaluationCampaign) or not isinstance(journal,Journal) or not isinstance(cases,dict)
+            or not callable(transport_factory) or type(max_assignments) is not int or not 1 <= max_assignments <= 100):
+        raise ContractError('invalid campaign batch inputs')
+    frozen=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
+    manifest,assignments,started,scored=campaign._snapshot()
+    if design != manifest['design'] or set(cases) != {case['id'] for case in design['cases']}:
+        raise ContractError('campaign batch case set differs')
+    if started-scored:
+        raise ContractError('campaign recovery required before batch')
+    prepared_by_case={}
+    for ident,data in cases.items():
+        if not isinstance(data,dict) or set(data) != {'lock','reference','protected','applicability_inputs'}:
+            raise ContractError('invalid campaign case inputs')
+        inputs=data['applicability_inputs']
+        if not isinstance(inputs,ApplicabilityInputs) or applicability_digest(inputs) != frozen['case_applicability'][ident]:
+            raise ContractError('campaign case applicability binding differs')
+        prepared=prepare_evaluation_case(root,design,data['lock'],data['reference'],data['protected'],
+            expected_design_sha256=manifest['design_sha256'],expected_case_sha256=manifest['case_hashes'][ident])
+        revisions=[SourceRevision.create(source.path,'evaluation_allowlist',decode_source(source.raw,encoding='utf-8'))
+                   for source in prepared.sources]
+        if (inputs.as_of != prepared.as_of or inputs.request_entities != frozenset(prepared.entities)
+                or inputs.historical_as_known != prepared.historical_as_known
+                or {r.revision_id for r in revisions} != {m.revision_id for m in inputs.collection.members}):
+            raise ContractError('campaign case applicability context differs')
+        if any(combine_applicability(inputs.verdict(r.revision_id),
+                scope_applicability(prepared.scope,inputs.collection.member(r.revision_id).scope)) is not Applicability.MATCH
+               for r in revisions):
+            raise ContractError('campaign full source applicability unavailable')
+        _full_source_packet(_full_source_entries(revisions),max_bytes)
+        prepared_by_case[ident]=data
+    archive_base=Path(archive_root)
+    if archive_base.is_symlink():
+        raise ContractError('campaign archive root must not be a symlink')
+    # Reconstruct each prior score from its pinned archive and journal before resuming.
+    for rid in sorted(scored):
+        if not re.fullmatch(r'qj-[0-9a-f]{64}',rid):
+            raise ContractError('campaign request identity is not path safe')
+        path=archive_base/rid
+        if path.is_symlink() or not path.is_dir() or not (path/'run.sqlite').is_file() or (path/'run.sqlite').is_symlink():
+            raise ContractError('scored campaign archive unavailable')
+        row=campaign._goal._con.execute("SELECT payload FROM evaluation_campaign_events WHERE plan_id=? AND request_id=? AND kind='scored'",
+                                       (campaign._plan_id,rid)).fetchone()
+        if row is None:
+            raise ContractError('scored campaign receipt unavailable')
+        receipt=json.loads(row[0]);assignment=assignments[rid];data=prepared_by_case[assignment['case_id']]
+        if reference_digest(data['reference']) != receipt['reference_sha256']:
+            raise ContractError('campaign reference differs from receipt')
+        with RunArchive.open(path) as archive:
+            score=score_reserved_assignment(campaign._goal,archive,journal,data['reference'],partition=assignment['work'][0]['partition'],
+                expected_plan_sha256=campaign._digest,expected_run_sha256=receipt['run_sha256'],
+                expected_reference_sha256=receipt['reference_sha256'],expected_journal_sha256=receipt['journal_sha256'])
+        encoded=json.dumps(score,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
+        if hashlib.sha256(encoded).hexdigest()!=receipt['score_sha256']:
+            raise ContractError('campaign scored receipt differs')
+    if campaign._goal.audit_journal(journal)['status'] != 'verified':
+        raise ContractError('campaign goal and journal accounting differ')
+    families={family['id']:family['partition'] for family in design['families']}
+    partitions={case['id']:families[case['family']] for case in design['cases']}
+    order={'development':0,'pilot':1,'holdout':2}
+    pending=sorted((a for rid,a in assignments.items() if rid not in started),
+                   key=lambda a:(order[partitions[a['case_id']]],a['case_id'],a['arm'],a['repeat']))
+    for assignment in pending:
+        if not re.fullmatch(r'qj-[0-9a-f]{64}',assignment['request_id']):
+            raise ContractError('campaign request identity is not path safe')
+    archive_base.mkdir(mode=0o700,parents=True,exist_ok=True)
+    executed=0
+    for assignment in pending[:max_assignments]:
+        rid=assignment['request_id'];data=prepared_by_case[assignment['case_id']]
+        with RunArchive.open(archive_base/rid) as archive:
+            run_campaign_assignment(campaign,rid,root,design,data['lock'],data['reference'],data['protected'],
+                applicability_inputs=data['applicability_inputs'],transport=transport_factory(dict(assignment)),
+                archive=archive,journal=journal,config=config,want=want,max_bytes=max_bytes,
+                expected_config_sha256=expected_config_sha256)
+        executed+=1
+    status=campaign.status()
+    return {'executed':executed,'assigned':status['assigned'],'scored':status['scored'],
+            'remaining':status['assigned']-status['scored'],'in_progress':status['in_progress']}

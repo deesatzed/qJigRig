@@ -1281,7 +1281,8 @@
         "T071A",
         "T071B",
         "T071C",
-        "T071D"
+        "T071D",
+        "T071E"
       ],
       "status": "pending",
       "files": [
@@ -3307,6 +3308,23 @@
       "acceptance": "Every case has a frozen applicability-input digest and guarded execution rejects differing metadata before claims and calls.",
       "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
       "evidence": "Red: frozen campaign settings did not bind per-case applicability and the guarded runner accepted changed scope metadata. Version 2 configuration now requires an applicability digest for every case, checks the actual inputs before claim, and checks recorded metadata at completion for catalog and fresh arms. Synthetic five-arm execution rejects missing case bindings and changed scope without calls; focused evaluation/goal/replay/fresh-preflight 115 passed; full offline suite 550 passed. Digests are caller-supplied assertions, direct baselines do not use metadata as a source filter, old v1 configs cannot satisfy the stronger runner gate, and source authority, timeouts, live price/token bounds and hosted work remain open."
+    },
+    {
+      "id": "T071E",
+      "phase": "evaluation",
+      "depends_on": [
+        "T071D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_campaign.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Run resumable bounded batches across the frozen assignment denominator",
+      "acceptance": "All case inputs are checked before dispatch, scored receipts are revalidated on restart, and missing assignments remain visible without blind retry.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Red: no multi-assignment driver existed. The bounded sequential batch validates all declared case locks, references, source snapshots and frozen applicability before dispatch, orders development/pilot/holdout work, preserves the full remaining count, and reconstructs previously scored archive/journal receipts before resuming. Synthetic tests cover a broken holdout reference blocking all calls, two successive batches, development-first ordering and changed receipt refusal. Focused evaluation/goal/replay/fresh-preflight 116 passed; full offline suite 551 passed. Nonmatching applicability currently blocks the entire batch, so required wrong-entity/date scenarios still need an explicit recorded deferral path; token/cost/provider enforcement, authenticated anchors and complete hosted evaluation remain open."
     }
   ]
 }
