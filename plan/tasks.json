@@ -1277,7 +1277,8 @@
       "id": "T071",
       "phase": "P6",
       "depends_on": [
-        "T070"
+        "T070",
+        "T071A"
       ],
       "status": "pending",
       "files": [
@@ -3232,6 +3233,25 @@
       "acceptance": "One checked case executes all five reserved arms; required fresh review, replay, accounting and paired reports retain missing assignments.",
       "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
       "evidence": "Verification-only addition: a single synthetic holdout case exercised all five arms from one generated 60-assignment reservation. The two fresh arms each made planner, paired judge and review calls, remained deferred, replayed and joined the archive-derived holdout report; the other arms replayed, the common goal/journal audit passed, and the other five holdout pairs stayed missing. Private reference, request and arm IDs were absent from prompts. Focused evaluation/fresh-preflight/goal/replay 114 passed; full offline suite 549 passed. One synthetic case is not a complete comparison, real inference, matched-work evidence or provider authorization."
+    },
+    {
+      "id": "T071A",
+      "phase": "evaluation",
+      "depends_on": [
+        "R08F",
+        "T066E",
+        "T068L"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_campaign.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_factorial_allocation_executes_all_arms_with_reserved_review",
+      "action": "Persist resumable assignment execution without blind retries",
+      "acceptance": "A plan-bound assignment is durably claimed once, interrupted work blocks further claims, and completion requires structurally scored archive and journal evidence.",
+      "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
+      "evidence": "Red: no durable assignment claim state existed. Plan-bound append-only events now record a single in-progress assignment and scored receipt; a claim checks frozen slots and refuses previously consumed work, unfinished claims block further claims, and completion reconstructs and scores the bound archive/journal/reference before recording digests. Synthetic five-arm execution, wrong run anchor, duplicate claim, restart via reopened ledger and immutable event trigger were checked. Focused evaluation/goal/replay 107 passed before reopened-ledger extension; final integration test passed; full offline suite 549 passed. The interface is not wired into a complete automatic campaign runner, existing lower-level APIs can bypass it, cross-store quiescence and digest authenticity are assumptions, and interrupted claims without scorable archives remain blocked. No hosted calls."
     }
   ]
 }

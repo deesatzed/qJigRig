@@ -1542,6 +1542,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path):
     from qjig.evaluation import load_isolated_sources,validate_evaluation_design
     from qjig.evaluation_budget import build_factorial_allocation,reserve_evaluation_plan
     from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_campaign import EvaluationCampaign
     from qjig.evaluation_direct import run_locked_direct
     from qjig.evaluation_fresh import run_locked_fresh
     from qjig.evaluation_replay import verify_direct_archive
@@ -1582,9 +1583,12 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path):
         goal=stack.enter_context(GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations))
         journal=stack.enter_context(Journal.open(tmp_path/'journal.sqlite'))
         reserve_evaluation_plan(goal,'factorial',plan,expected_plan_sha256=plan['sha256'])
+        campaign=EvaluationCampaign(goal,'factorial',expected_plan_sha256=plan['sha256'])
         for arm in design['arms']:
             assignment=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==arm and a['repeat']==1)
             rid=assignment['request_id'];ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout')
+            claim=campaign.claim(rid)
+            assert claim['case_id']=='holdout' and claim['arm']==arm and claim['repeat']==1
             archive=stack.enter_context(RunArchive.open(tmp_path/('archive-'+arm)))
             binding={'plan_id':'factorial','plan_sha256':plan['sha256'],'arm':arm,'repeat':1}
             if arm in ('combined','decomposition_only'):
@@ -1619,8 +1623,31 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path):
             assert all(gold.decode() not in p and rid not in p and arm not in p for p in prompts)
             entries[arm]={'archive':archive,'journal':journal,'reference':ref,'run_sha256':run_hash,
                           'reference_sha256':reference_digest(ref),'journal_sha256':journal_hash}
+            with pytest.raises(ContractError):
+                campaign.finish(rid,archive,journal,ref,expected_run_sha256='0'*64,
+                                expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash)
+            assert campaign.status()['in_progress']==[rid]
+            receipt=campaign.finish(rid,archive,journal,ref,expected_run_sha256=run_hash,
+                                    expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash)
+            assert receipt['status']=='scored' and len(receipt['score_sha256'])==64
+            with pytest.raises(ContractError):campaign.claim(rid)
         assert goal.audit_journal(journal)['status']=='verified'
         for arm in ('direct_full_evidence','retrieval_only','decomposition_only','combined'):
             report=build_reserved_holdout_comparison(goal,design,[entries['direct_retrieval'],entries[arm]],plan_id='factorial',
                 expected_plan_sha256=plan['sha256'],expected_design_sha256=digest,baseline_arm='direct_retrieval',candidate_arm=arm)
             assert report['recorded_pairs']==1 and report['missing_pairs']==5 and report['outcome_support'] is None
+        pending=next(a for a in plan['manifest']['assignments'] if a['request_id'] not in {e['archive'].context()['request']['request_id'] for e in entries.values()})
+        campaign.claim(pending['request_id'])
+        restarted=EvaluationCampaign(goal,'factorial',expected_plan_sha256=plan['sha256'])
+        assert restarted.status()['in_progress']==[pending['request_id']]
+        other=next(a for a in plan['manifest']['assignments'] if a['request_id']!=pending['request_id'] and a['request_id'] not in {e['archive'].context()['request']['request_id'] for e in entries.values()})
+        with pytest.raises(ContractError):restarted.claim(other['request_id'])
+        with pytest.raises(ContractError):restarted.claim(pending['request_id'])
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as reopened:
+        recovered=EvaluationCampaign(reopened,'factorial',expected_plan_sha256=plan['sha256'])
+        assert recovered.status()['scored']==5 and recovered.status()['in_progress']==[pending['request_id']]
+        with pytest.raises(ContractError):recovered.claim(other['request_id'])
+        with pytest.raises(ContractError):EvaluationCampaign(reopened,'factorial',expected_plan_sha256='0'*64)
+        import sqlite3
+        with pytest.raises(sqlite3.IntegrityError):
+            reopened._con.execute("UPDATE evaluation_campaign_events SET payload='{}' WHERE kind='started'")
