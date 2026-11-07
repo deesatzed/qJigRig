@@ -4263,6 +4263,26 @@
       "acceptance": "For a no-primary-hit final judgment, reject a claimed delivered mandatory channel unless an applicable untruncated retained passage lexically matches that channel.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_mandatory_exception_is_judged_after_primary_and_followup_miss -q",
       "evidence": "Red: changing an exception-only trace to claim contradiction delivery still passed unanchored replay. Replay now rejects it; synthetic Chrome/fresh/replay/evaluation checks: 132 passed. This necessary lexical binding does not replay complete retrieval ranking, authenticate sources or establish semantic relevance."
+    },
+    {
+      "id": "T055I",
+      "phase": "P5",
+      "depends_on": [
+        "T055G",
+        "R05B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/replay.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_fresh_enabling_graph_is_visible_and_replayed",
+      "action": "Expose the model-generated fresh plan for inspection",
+      "acceptance": "Show predicate questions and Boolean composition in immediate and structurally replayed fresh results, labeled unvalidated and incomplete.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_fresh_enabling_graph_is_visible_and_replayed -q",
+      "evidence": "Red: fresh service omitted the plan. Synthetic actual-pipeline and Chrome replay display an enabling graph eligible AND (ordinary OR exception), retain conditional true and request-level deferral, and suppress plan output for invalid archives. Chrome/fresh/replay/assurance checks: 25 passed. This does not establish that a real model composes exceptions correctly; R05 and hosted checks remain open."
     }
   ]
 }

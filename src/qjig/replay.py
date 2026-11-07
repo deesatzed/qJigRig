@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from .acquisition import COVERAGE_ID
 from .applicability import Applicability, ApplicabilityInputs, combine_applicability, scope_applicability
@@ -70,7 +70,8 @@ def _check_review(record, call_id, request, response, validation, context, plan)
         raise ContractError('review result differs from response')
 
 
-def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, judgments_out: dict | None = None) -> ReplayReport:
+def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, judgments_out: dict | None = None,
+                   plan_out: dict | None = None) -> ReplayReport:
     """Validate saved structure and optionally compare to an externally saved digest.
 
     A digest detects changes relative to the supplied anchor; it does not authenticate
@@ -80,6 +81,10 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
         if not isinstance(judgments_out, dict):
             raise ContractError('judgment output must be a dictionary')
         judgments_out.clear()
+    if plan_out is not None:
+        if not isinstance(plan_out, dict):
+            raise ContractError('plan output must be a dictionary')
+        plan_out.clear()
     checked_judgments = {}
     issues = []
     incomplete = []
@@ -432,4 +437,6 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
     status = "invalid" if issues else "incomplete" if incomplete else "unanchored" if expected_digest is None else "structurally_verified"
     if judgments_out is not None and status in ('unanchored', 'structurally_verified'):
         judgments_out.update(checked_judgments)
+    if plan_out is not None and status in ('unanchored', 'structurally_verified') and plan is not None:
+        plan_out.update(asdict(plan))
     return ReplayReport(status, digest, tuple(issues + incomplete), len(requests), len(responses), traces)

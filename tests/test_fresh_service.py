@@ -50,6 +50,8 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                               'observed_at': None, 'authority': None})
         result = client.ask_fresh('fresh-1', 'Refund limit?', 'project', as_of='2026-11-15', entities=[])
         assert result['kind'] == 'fresh' and result['status'] == 'deferred' and result['answer'] is None
+        assert result['plan']['origin'] == 'fresh' and result['plan']['expression'] == {'ref':'p'}
+        assert result['plan']['predicates'][0]['question'] == 'Refund limit?'
         assert result['conditional_outcome'] == 'true' and 'plan_coverage_unestablished' in result['reasons']
         assert result['review']['status'] == 'recorded' and result['review']['assurance'] == 'synthetic_review_unvalidated'
         assert result['review']['assessment'] == 'uncertain' and result['review']['reason'] == 'fixture review'
@@ -102,6 +104,8 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     assert 'Conditional outcome: true' in page.locator('#fresh-result').inner_text()
                     assert 'synthetic_review_unvalidated' in page.locator('#fresh-result').inner_text()
                     assert 'fixture review' in page.locator('#fresh-result').inner_text()
+                    assert 'Model-generated plan' in page.locator('#fresh-result').inner_text()
+                    assert 'Refund limit?' in page.locator('#fresh-result').inner_text()
                     assert 'Model-cited passage' in page.locator('#fresh-result').inner_text()
                     assert 'Retrieved passages' in page.locator('#fresh-result').inner_text()
                     assert 'No retrieved hits for:' in page.locator('#fresh-result').inner_text()
@@ -151,6 +155,7 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert replay['request']['question'] == 'Refund limit?'
         assert replay['request']['role'] == 'reviewer' and replay['request']['role_version'] == '1'
         assert replay['result']['status'] == 'deferred'
+        assert replay['plan'] == result['plan']
         assert 'ob-plan-coverage' in replay['result']['blocking_obligations']
         assert replay['review']['review_id'] == result['review']['review_id']
         assert replay['review']['assessment'] == 'uncertain' and replay['review']['reason'] == 'fixture review'
@@ -185,8 +190,9 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
             con.execute('DROP TRIGGER event_no_update')
             con.execute("UPDATE events SET data='{}' WHERE kind='run_result'")
             judgments = {'stale': 'must be cleared'}
-            assert verify_archive(RunArchive(con), judgments_out=judgments).status == 'invalid'
-            assert judgments == {}
+            plan_output = {'stale': 'must be cleared'}
+            assert verify_archive(RunArchive(con), judgments_out=judgments, plan_out=plan_output).status == 'invalid'
+            assert judgments == {} and plan_output == {}
         checked = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
         assert checked.returncode != 0 and json.loads(checked.stdout)['status'] == 'invalid'
         assert transport.calls_made == 4
@@ -256,6 +262,7 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     assert quote in page.locator('#fresh-replay').inner_text()
                     assert 'Decision correctness not assessed' in page.locator('#fresh-replay').inner_text()
                     assert 'fixture review' in page.locator('#fresh-replay').inner_text()
+                    assert 'Model-generated plan' in page.locator('#fresh-replay').inner_text()
                     assert 'Recorded calls: 4' in page.locator('#fresh-replay').inner_text()
                     assert 'Model-cited passage' in page.locator('#fresh-replay').inner_text()
                     assert 'No retrieved hits for:' in page.locator('#fresh-replay').inner_text()
@@ -550,6 +557,58 @@ def test_mandatory_only_contradiction_remains_conflict_in_service_and_replay(tmp
                     assert positive in area.inner_text() and negative in area.inner_text()
                     assert 'Material obligations remain open:' in area.inner_text()
                     assert 'ob-plan-coverage' in area.inner_text()
+                finally:
+                    browser.close()
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=5)
+
+
+def test_fresh_enabling_graph_is_visible_and_replayed(tmp_path):
+    from qjig.fresh_service import FreshWorkbench
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    spec={'provider':'stand-in','model':model,'input_tokens':1000,'output_tokens':100,
+          'max_price':{'prompt':2,'completion':3}}
+    limit=Budget(30,100000,1); usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
+    raw=lambda value: RawResponse(200,json.dumps(value),usage)
+    graph={'op':'and','args':[{'ref':'eligible'},{'op':'or','args':[{'ref':'ordinary'},{'ref':'exception'}]}]}
+    plan={'predicates':[{'id':'eligible','question':'Is the customer a member?'},
+                        {'id':'ordinary','question':'Does the ordinary limit cover twenty days?'},
+                        {'id':'exception','question':'Does the exception cover twenty days?'}], 'expression':graph}
+    positive=lambda quote: raw({'supported':True,'quote':quote,'reason':'synthetic'})
+    unknown=raw({'supported':False,'quote':'','reason':'synthetic'})
+    transport=StandInTransport([raw(plan),positive('The customer is a member.'),unknown,
+        unknown,positive('Ordinary returns end after 14 days.'),
+        positive('An exception permits returns for 30 days.'),unknown,
+        raw({'assessment':'uncertain','reason':'synthetic review'})])
+    backend=FreshWorkbench(tmp_path/'fresh',goal_factory=lambda:GoalBudget.open(tmp_path/'goal.sqlite',
+        total=limit,per_request=limit,allocations={'smoke':limit}),transport_factory=lambda:transport,
+        partition='smoke',planner=spec,judge=spec,reviewer=spec,budget=limit)
+    server=create_server(tmp_path/'catalog.sqlite',port=0,fresh_backend=backend)
+    thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+    try:
+        client=RoleClient(server.server_address[1],RoleDefinition('reviewer','1','Review'))
+        client.import_source({'source_id':'rules.md','text':'# Rules and exceptions\nThe customer is a member. '
+            'Ordinary returns end after 14 days. An exception permits returns for 30 days.\n',
+            'scope':'project','entities':[],'effective_from':'2026-01-01','effective_to':'open',
+            'observed_at':None,'authority':None})
+        result=client.ask_fresh('enabling','Can this member return after twenty days?','project',
+                                as_of='2026-11-15',entities=[])
+        assert result['plan']['expression']==graph
+        assert [item['id'] for item in result['plan']['predicates']]==['eligible','ordinary','exception']
+        assert result['conditional_outcome']=='true' and result['status']=='deferred' and result['answer'] is None
+        assert 'ob-plan-coverage' in result['blocking_obligations'] and transport.calls_made==8
+        replay=client.get_fresh_run(result['run_id'])
+        assert replay['plan']==result['plan'] and replay['verification']['status']=='unanchored'
+        if os.environ.get('QJIG_CHROMIUM_PATH'):
+            playwright=pytest.importorskip('playwright.sync_api')
+            with playwright.sync_playwright() as p:
+                browser=p.chromium.launch(headless=True,executable_path=os.environ['QJIG_CHROMIUM_PATH'])
+                try:
+                    page=browser.new_page(); page.goto(f'http://127.0.0.1:{server.server_address[1]}/')
+                    page.locator('#fresh-runs').get_by_role('button',name='Can this member return',exact=False).click()
+                    page.get_by_text('Conditional graph: (eligible AND (ordinary OR exception))').wait_for()
+                    assert 'Plan completeness and correctness are not established.' in page.locator('#fresh-replay').inner_text()
                 finally:
                     browser.close()
     finally:

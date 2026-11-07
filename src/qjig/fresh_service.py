@@ -73,8 +73,8 @@ class FreshWorkbench:
         with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as connection:
             connection.execute('BEGIN')
             archive = RunArchive(connection)
-            judgments = {}
-            report = verify_archive(archive, judgments_out=judgments)
+            judgments, plan = {}, {}
+            report = verify_archive(archive, judgments_out=judgments, plan_out=plan)
             if report.status == 'invalid':
                 raise ContractError('fresh run failed structural replay')
             context, events = archive.context(), archive.events()
@@ -94,6 +94,7 @@ class FreshWorkbench:
                           'assessment': payload['result'].get('assessment'), 'reason': payload['result'].get('reason')}
             reconciliation, resources = self._journal_status(request.request_id, events)
             return {'run_id': run_id, 'request': request.to_dict(),
+                    'plan': plan or None,
                     'result': results[0] if len(results) == 1 else None,
                     'traces': traces, 'review': review, 'verification': asdict(report),
                     'reconciliation': reconciliation, 'resources': resources,
@@ -257,6 +258,7 @@ class FreshWorkbench:
                           'assessment': review_result.get('assessment'), 'reason': review_result.get('reason'),
                           'review_id': review_record['sha256'] if review_record else None}
                 return {'kind': 'fresh', 'status': 'deferred', 'answer': None, 'conditional_outcome': conditional,
+                        'plan': asdict(run.state.plan) if run.state is not None else None,
                         'reasons': list(run.reasons) + (['catalog_changed_during_run'] if before != after else []),
                         'blocking_obligations': list(run.summary.stop.blocking_obligations) if run.summary else None,
                         'plan_failure': run.plan_failure, 'records': records, 'review': review,
