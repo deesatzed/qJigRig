@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 from typing import Any, Callable
 
-from .contracts import Budget
+from .contracts import Budget, ContractError
 from .journal import Event, Journal, run_journaled
 
 
@@ -91,6 +91,9 @@ class BudgetLedger:
         reserve_tokens: int, hold_back_calls: int = 0, hold_back_tokens: int = 0,
     ) -> Any:
         """Check every cap, then journal the intent and make the call. Refusals happen before any intent."""
+        for name, value in (("reserve_tokens", reserve_tokens), ("hold_back_calls", hold_back_calls), ("hold_back_tokens", hold_back_tokens)):
+            if not _valid_tokens(value):
+                raise ContractError(f"{name} must be a non-negative integer")
         if self.budget is None:
             raise BudgetExceeded("calls", "no budget was provided, so no external work is authorized")
         if self.used_calls() + 1 + hold_back_calls > self.budget.max_calls:

@@ -131,3 +131,16 @@ def test_known_spend_at_cap_blocks_call(tmp_path):
         with pytest.raises(BudgetExceeded) as error:
             run(ledger, "judge")
         assert error.value.limit == "cost"
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"tokens": -1}, {"tokens": True}, {"hold_back_calls": -1}, {"hold_back_tokens": -1},
+])
+def test_invalid_reservations_never_dispatch(tmp_path, kwargs):
+    from qjig.contracts import ContractError
+    j, ledger = make(tmp_path)
+    with j:
+        invoked = []
+        with pytest.raises(ContractError):
+            run(ledger, "planner", call=lambda: invoked.append(True), **kwargs)
+        assert invoked == [] and j.events("req-1") == []
