@@ -55,7 +55,7 @@ class NeedSpec:
     followup_reasons: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
-        if self.retrieval_method not in (BM25_METHOD, EXPANDED_BM25_METHOD):
+        if self.retrieval_method not in (BM25_METHOD, EXPANDED_BM25_METHOD, 'full_source_v1'):
             raise ContractError("unknown retrieval method")
         _check_role_priors(self.role_priors)
 
@@ -173,7 +173,12 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
     base = ctx.specs[pid]
     spec = base if state.attempts.get(pid, 0) == 0 else base.followup
     search = bm25_expanded_candidates if spec.retrieval_method == EXPANDED_BM25_METHOD else bm25_candidates
-    candidates = search(ctx.entries, spec.query)
+    if spec.retrieval_method == 'full_source_v1':
+        from .retrieval import ScoreProvenance
+        provenance = ScoreProvenance('full_source_v1',0,0,len(ctx.entries),0,())
+        candidates = [Candidate(e.entry_id,e.revision_id,e.span,0,provenance) for e in ctx.entries]
+    else:
+        candidates = search(ctx.entries, spec.query)
     channel_report = None
     if spec.channel_queries:
         raw_channels = {"primary": candidates, **{name: search(ctx.entries, query) for name, query in spec.channel_queries}}
@@ -375,6 +380,7 @@ def run_fresh(
     role_priors: dict[str, float] | None = None,
     want: int = 3,
     max_bytes: int = 3000,
+    full_source_evidence: bool = False,
 ) -> FreshRun:
     """Plan with a model, then answer each predicate through the canonical retrieval, recovery and judge path.
 
@@ -382,6 +388,8 @@ def run_fresh(
     model-written, a material plan-coverage obligation is always opened; retrieval can offer exception
     passages for review but can never close it, so the result is a deferral that names the gap.
     """
+    if type(full_source_evidence) is not bool or (full_source_evidence and evaluation_case_binding is None):
+        raise ContractError('full source mode requires a checked evaluation case')
     if evaluation_case_binding is not None:
         import re
         b = evaluation_case_binding
@@ -484,8 +492,18 @@ def run_fresh(
     applicability = {key: combine_applicability(entity_date[key], scope_verdicts[key]) for key in revision_ids}
     def bound_applicability(revision_id: str) -> Applicability:
         return applicability.get(revision_id, Applicability.UNKNOWN)
-    planning_evidence = _planning_packet(catalog, entries, request.question, bound_applicability,
-                                         want=want, max_bytes=max_bytes, role_priors=role_priors or {})
+    if full_source_evidence:
+        from .evaluation import _full_source_entries, _full_source_packet
+        if entries != _full_source_entries(catalog.get_revision(key) for key in revision_ids):
+            raise ContractError('full source entries differ from pinned revisions')
+        if any(bound_applicability(key) is not Applicability.MATCH for key in revision_ids):
+            raise ContractError('full source applicability is not established')
+        packet = _full_source_packet(entries,max_bytes)
+        planning_evidence = {'schema':'qjig.planning-evidence.v1','assurance':'untrusted_incomplete',
+                             'packet':json.loads(serialize_packet(packet)),'method':'full_source_v1'}
+    else:
+        planning_evidence = _planning_packet(catalog, entries, request.question, bound_applicability,
+                                             want=want, max_bytes=max_bytes, role_priors=role_priors or {})
     if archive is not None:
         # Bind the exact verdicts, effective settings and corpus before any planner call.
         archive.record_context({
@@ -495,8 +513,8 @@ def run_fresh(
             "budget": ledger.budget.to_dict() if ledger.budget else None,
             "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS, **({"max_price": planner_max_price} if planner_max_price is not None else {})},
             "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS, **({"max_price": judge_max_price} if judge_max_price is not None else {})},
-            "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": EXPANDED_BM25_METHOD,
-            "followup_policy": "request_question_on_no_primary_hit_v1",
+            "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": "full_source_v1" if full_source_evidence else EXPANDED_BM25_METHOD,
+            "followup_policy": "none_full_source_v1" if full_source_evidence else "request_question_on_no_primary_hit_v1",
             "reservation_factory_configured": reservation_factory is not None, "role_priors": role_priors or {},
             "corpus": {key: value.value for key, value in applicability.items()},
             "scope_policy": "exact_nonempty_v1", "source_scopes": scopes,
@@ -564,12 +582,13 @@ def run_fresh(
     specs = {}
     for p in plan.predicates:
         evaluator = make_evaluator(p.question, p.id)
-        common = {"retrieval_method": EXPANDED_BM25_METHOD,
-                  "channel_queries": (("exception", EXCEPTION_QUERY), ("contradiction", CONTRADICTION_QUERY)),
+        common = {"retrieval_method": 'full_source_v1' if full_source_evidence else EXPANDED_BM25_METHOD,
+                  "channel_queries": () if full_source_evidence else (("exception", EXCEPTION_QUERY), ("contradiction", CONTRADICTION_QUERY)),
                   "role_priors": role_priors or {}}
-        followup = (NeedSpec(request.question, want, max_bytes, evaluator, **common)
-                    if request.question.strip() != p.question.strip() else None)
-        specs[p.id] = NeedSpec(p.question, want, max_bytes, evaluator, followup=followup,
+        packet_want = len(entries) if full_source_evidence else want
+        followup = (NeedSpec(request.question, packet_want, max_bytes, evaluator, **common)
+                    if not full_source_evidence and request.question.strip() != p.question.strip() else None)
+        specs[p.id] = NeedSpec(p.question, packet_want, max_bytes, evaluator, followup=followup,
                                followup_reasons=("no_retrieval_hit",), **common)
     obligations = ObligationLedger()
     for p in plan.predicates:

@@ -1112,7 +1112,8 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,
         assert plan['sha256'] not in prompt and rid not in prompt and arm not in prompt
 
 
-def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(tmp_path):
+@pytest.mark.parametrize(('mode','target_arm'), [('catalog','combined'),('full','decomposition_only')])
+def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(tmp_path,mode,target_arm):
     import json
     from collections import Counter
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
@@ -1156,7 +1157,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
         for arm in design['arms']:
             for repeat in range(1,design['repeats'][partition]+1):
                 rid = 'private-'+str(len(assignments))
-                if arm == 'combined':
+                if arm in ('combined','decomposition_only'):
                     work = fresh_run_allocations(request_id=rid,partition=partition,provider='stand-in',
                         planner_model=model,judge_model=model,planner_input=100,planner_output=100,
                         judge_input=100,judge_output=100,planner_price=cap,judge_price=cap)
@@ -1166,7 +1167,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
                 templates[arm] = dict(Counter(x['stage'] for x in work))
                 assignments.append({'case_id':case['id'],'arm':arm,'repeat':repeat,'request_id':rid,'work':work})
     plan = make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=digest)
-    target = next(a for a in assignments if a['case_id']=='holdout' and a['arm']=='combined' and a['repeat']==1)
+    target = next(a for a in assignments if a['case_id']=='holdout' and a['arm']==target_arm and a['repeat']==1)
     rid = target['request_id']; per = Budget(30,6000,1)
     allocations = {p:Budget(500,150000,6) for p in ('development','pilot','holdout')}
     total = Budget(1500,450000,18)
@@ -1184,13 +1185,19 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
         def factory(req):
             return fresh_slot_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',
                 request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
-        binding = {'plan_id':'study','plan_sha256':plan['sha256'],'arm':'combined','repeat':1}
+        binding = {'plan_id':'study','plan_sha256':plan['sha256'],'arm':target_arm,'repeat':1}
         transport = StandInTransport(responses)
+        with pytest.raises(ContractError):
+            run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=digest,
+                expected_case_sha256=case_lock_digest(lock),applicability_inputs=inputs,ledger=ledger,
+                transport=transport,archive=archive,planner=('stand-in',model['id']),judge=('stand-in',model['id']),
+                assignment_binding=binding,evidence_mode='full' if mode=='catalog' else 'catalog')
+        assert transport.calls_made==0 and journal.events(rid)==[] and archive.events()==[]
         result = run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=digest,
             expected_case_sha256=case_lock_digest(lock),applicability_inputs=inputs,ledger=ledger,
             transport=transport,archive=archive,planner=('stand-in',model['id']),judge=('stand-in',model['id']),
             planner_max_tokens=100,judge_max_tokens=100,planner_max_price=cap,judge_max_price=cap,
-            reservation_factory=factory,assignment_binding=binding)
+            reservation_factory=factory,assignment_binding=binding,evidence_mode=mode)
         assert result.status == 'deferred' and transport.calls_made == 3
         assert archive.context()['evaluation_assignment'] == binding
         prompts = [e['data']['prompt'] for e in archive.events() if e['kind']=='request']
@@ -1211,7 +1218,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
         record = score_reserved_assignment(goal,archive,journal,ref,partition='holdout',
             expected_plan_sha256=plan['sha256'],expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref),
             expected_journal_sha256=journal_anchor)
-        assert record['arm']=='combined' and record['repeat']==1
+        assert record['arm']==target_arm and record['repeat']==1
         assert {k:v for k,v in record['score'].items() if k != 'resources'} == score
         resource = record['score']['resources']['total']
         assert resource['calls']==3 and resource['input_tokens']==30 and resource['output_tokens']==15
@@ -1220,7 +1227,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
         entry={'archive':archive,'journal':journal,'reference':ref,'run_sha256':replay.digest,
                'reference_sha256':reference_digest(ref),'journal_sha256':journal_anchor}
         report=build_reserved_holdout_comparison(goal,design,[entry],plan_id='study',expected_plan_sha256=plan['sha256'],
-            expected_design_sha256=digest,baseline_arm='direct_full_evidence',candidate_arm='combined')
+            expected_design_sha256=digest,baseline_arm='direct_full_evidence',candidate_arm=target_arm)
         assert report['candidate_unknown']==1 and report['missing_pairs']==6
         with pytest.raises(ContractError):
             score_reserved_assignment(goal,archive,journal,ref,partition='pilot',expected_plan_sha256=plan['sha256'],
@@ -1415,3 +1422,73 @@ def test_retrieval_only_checked_run_replays_and_refuses_omissions(tmp_path):
                 archive._con.execute('DROP TRIGGER event_no_update')
                 archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),trace['seq']))
                 assert verify_direct_archive(archive,journal)['status']=='invalid'
+
+
+def test_decomposition_only_uses_all_applicable_sources_and_replays(tmp_path):
+    import json
+    from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget,Request
+    from qjig.evaluation import load_isolated_sources,validate_evaluation_design
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_fresh import run_locked_fresh
+    from qjig.evaluation_scoring import make_reference,reference_digest,score_fresh_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse,StandInTransport
+    from qjig.replay import verify_archive
+    from qjig.run_archive import RunArchive
+    texts={'first':b'Checks must pass.','second':b'Unrelated details are also present.'}
+    sources=[]
+    for name,raw in texts.items():
+        (tmp_path/name).write_bytes(raw);sources.append({'path':name,'sha256':hashlib.sha256(raw).hexdigest()})
+    (tmp_path/'label').write_bytes(b'PRIVATE_LABEL')
+    protected=[{'path':'label','sha256':hashlib.sha256(b'PRIVATE_LABEL').hexdigest()}]
+    design=_sample_design();design['families'][0]['source_hashes']=[s['sha256'] for s in sources]
+    digest=validate_evaluation_design(design)
+    ref=make_reference(case_id='dev',request=Request('hidden','Do checks pass?','reviewer','1','project'),
+        sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],historical_as_known=False,
+        expected_answer='yes',provenance='authored_unvalidated',evidence=[{'path':'first','quote':'Checks must pass.'}])
+    lock={'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':digest,'question':'Do checks pass?',
+          'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
+          'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
+    inputs=ApplicabilityInputs(Collection(tuple(MemberMetadata(r,'project',Interval('2020-01-01',OPEN))
+                                              for r in ref['source_revisions'])),frozenset(),'2026-11-07',False)
+    usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}
+    raw=lambda data:RawResponse(200,json.dumps(data),usage)
+    responses=[raw({'predicates':[{'id':'p','question':'Unmatched zyzzword?'}],'expression':{'ref':'p'}}),
+               raw({'supported':True,'quote':'Checks must pass.','reason':'synthetic'}),
+               raw({'supported':False,'quote':'','reason':'synthetic'})]
+    for limit in (5000,100):
+        with Journal.open(tmp_path/f'j{limit}.sqlite') as journal, RunArchive.open(tmp_path/f'a{limit}') as archive:
+            transport=StandInTransport(responses);ledger=BudgetLedger(Budget(8,50000,1),journal,'r')
+            kwargs=dict(expected_design_sha256=digest,expected_case_sha256=case_lock_digest(lock),applicability_inputs=inputs,
+                        ledger=ledger,transport=transport,archive=archive,planner=('stand-in','planner'),judge=('stand-in','judge'),
+                        want=1,max_bytes=limit,evidence_mode='full')
+            if limit==100:
+                with pytest.raises(ContractError):run_locked_fresh(tmp_path,design,lock,ref,protected,**kwargs)
+                assert transport.calls_made==0 and journal.events('r')==[] and archive.events()==[]
+                continue
+            result=run_locked_fresh(tmp_path,design,lock,ref,protected,**kwargs)
+            assert result.status=='deferred' and transport.calls_made==3
+            prompts=[e['data']['prompt'] for e in archive.events() if e['kind']=='request']
+            assert all(all(raw.decode() in prompt for raw in texts.values()) and 'PRIVATE_LABEL' not in prompt for prompt in prompts)
+            assert all(t.retrieval_method=='full_source_v1' and len(t.evidence)==2 for t in result.state.trace)
+            replay=verify_archive(archive);assert replay.status=='unanchored'
+            score=score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
+                                      expected_reference_sha256=reference_digest(ref))
+            assert score['request_status']=='deferred' and score['request_answer'] is None
+            trace=next(e for e in archive.events() if e['kind']=='trace')
+            altered=trace['data'];altered['evidence'].pop()
+            archive._con.execute('DROP TRIGGER event_no_update')
+            archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(altered),trace['seq']))
+            assert verify_archive(archive).status=='invalid'
+    wrong_inputs=ApplicabilityInputs(Collection(tuple(MemberMetadata(r,'other' if i==0 else 'project',Interval('2020-01-01',OPEN))
+                                                    for i,r in enumerate(ref['source_revisions']))),frozenset(),'2026-11-07',False)
+    with Journal.open(tmp_path/'bad.sqlite') as journal,RunArchive.open(tmp_path/'bad') as archive:
+        transport=StandInTransport(responses)
+        with pytest.raises(ContractError):
+            run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=digest,
+                expected_case_sha256=case_lock_digest(lock),applicability_inputs=wrong_inputs,
+                ledger=BudgetLedger(Budget(8,50000,1),journal,'r'),transport=transport,archive=archive,
+                planner=('stand-in','planner'),judge=('stand-in','judge'),evidence_mode='full')
+        assert transport.calls_made==0 and journal.events('r')==[] and archive.events()==[]

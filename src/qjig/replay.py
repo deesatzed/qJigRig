@@ -138,6 +138,16 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
             for evidence in planning["packet"]["items"]:
                 revision = revisions[evidence["revision_id"]]
                 verify_span(revision, Span(evidence["revision_id"], evidence["text_sha256"], evidence["start"], evidence["end"], evidence["text"]))
+            if context.get('retrieval_method') == 'full_source_v1':
+                from .evaluation import _full_source_entries, _full_source_packet
+                from .packets import serialize_packet
+                entries = _full_source_entries(revisions.values())
+                expected_packet = json.loads(serialize_packet(_full_source_packet(entries,context['max_bytes'])))
+                if (planning != {'schema':'qjig.planning-evidence.v1','assurance':'untrusted_incomplete',
+                                  'packet':expected_packet,'method':'full_source_v1'}
+                        or any(value != 'match' for value in context['corpus'].values())
+                        or context.get('followup_policy') != 'none_full_source_v1'):
+                    raise ContractError('full source planning evidence differs')
     except (ContractError, KeyError, TypeError, ValueError):
         issues.append("invalid_planning_or_applicability")
     requests, responses, validations, failures = {}, {}, {}, {}
@@ -251,6 +261,20 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                     if data["observation"].get("reason") == "no_retrieval_hit" and data["hit_count"] != 0:
                         raise ContractError("no-hit observation has hits")
                     trace_rounds[pid] = round_number
+                elif policy == 'none_full_source_v1':
+                    from .evaluation import _full_source_entries
+                    expected_entries = _full_source_entries(revisions.values())
+                    expected_evidence = [{'entry_id':e.entry_id,'revision_id':e.revision_id,'start':e.span.start,
+                                          'end':e.span.end,'text_sha256':e.span.text_sha256,'text':e.span.text,
+                                          'truncated':False} for e in expected_entries]
+                    expected_evidence.sort(key=lambda e:e['entry_id'])
+                    if (data['predicate_id'] in trace_rounds or data['round_number'] != 1
+                            or data['query'] != plan_questions[data['predicate_id']]
+                            or data.get('retrieval_method') != 'full_source_v1' or data.get('channels') is not None
+                            or data['hit_count'] != len(expected_entries) or data['exclusions']
+                            or sorted(data['evidence'],key=lambda e:e['entry_id']) != expected_evidence):
+                        raise ContractError('full source predicate evidence differs')
+                    trace_rounds[data['predicate_id']] = 1
                 elif policy is not None:
                     incomplete.append("followup_policy_unavailable")
                 trace_observations[data["predicate_id"]] = data["observation"]

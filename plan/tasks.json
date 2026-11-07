@@ -1177,7 +1177,8 @@
         "T065",
         "T066A",
         "T066B",
-        "T066C"
+        "T066C",
+        "T066D"
       ],
       "status": "pending",
       "files": [
@@ -3171,6 +3172,27 @@
       "acceptance": "The catalog path binds applicability, refuses omitted mandatory or truncated evidence before provider calls, archives trace, and replays and scores without inference.",
       "command": "python -m pytest tests/test_evaluation.py::test_retrieval_only_checked_run_replays_and_refuses_omissions -q",
       "evidence": "Red: checked direct execution lacked a catalog evidence mode. Catalog retrieval-only now binds checked case, applicability, scope and reserved assignment; traces reconstruct qJig channels and incomplete mandatory selection or packet truncation refuses before the affected provider call. Versioned archives replay successful and refusal paths, score explicit retrieval failure, and support reserved holdout reporting. Synthetic tests cover goal-bound direct/catalog assignments, missing and wrong bindings, no-call omission, replay, private label isolation and changed trace detection. Focused evaluation/acquisition/goal/replay 113 passed before final trace tamper check; final check passed and full offline suite 545 passed. Provider behavior, source authority, complete matched work and hosted comparison remain unverified."
+    },
+    {
+      "id": "T066D",
+      "phase": "evaluation",
+      "depends_on": [
+        "T063E",
+        "T066A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/acquisition.py",
+        "src/qjig/evaluation_fresh.py",
+        "src/qjig/replay.py",
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_decomposition_only_uses_all_applicable_sources_and_replays",
+      "action": "Execute decomposition over full source evidence without catalog retrieval",
+      "acceptance": "Planner and each judge receive all applicable source text or refuse before the first call; recorded full-source work replays and preserves request-level deferral.",
+      "command": "python -m pytest tests/test_evaluation.py::test_decomposition_only_uses_all_applicable_sources_and_replays -q",
+      "evidence": "Red: checked fresh execution lacked full-source mode. Planner and judges now receive every complete applicable source or refuse before dispatch; predicate evaluation uses full-source entries with one round and request remains deferred. Synthetic goal-reserved combined/decomposition assignments, wrong-arm refusal, full-source replay/scoring, insufficient space, inapplicability and altered trace are checked. Focused evaluation/acquisition/replay/goal 115 passed before final binding cases; final 3 focused passed; full offline suite 547 passed. A separate lexical exception scan remains for coverage bookkeeping; model packet selection does not use it. Bounds, price, semantic quality, matched work and hosted comparisons remain unverified."
     }
   ]
 }
