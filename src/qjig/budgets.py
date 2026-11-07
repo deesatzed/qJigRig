@@ -5,10 +5,19 @@ Dollar limits are the requester's cap checked against KNOWN cost only; they are 
 """
 from __future__ import annotations
 
+import math
 from typing import Any, Callable
 
 from .contracts import Budget
 from .journal import Event, Journal, run_journaled
+
+
+def _valid_tokens(value: Any) -> bool:
+    return type(value) is int and value >= 0
+
+
+def _valid_cost(value: Any) -> bool:
+    return type(value) in (int, float) and math.isfinite(value) and value >= 0
 
 
 class BudgetExceeded(Exception):
@@ -44,7 +53,7 @@ class BudgetLedger:
             receipt = next((e for e in rest if e.kind == "receipt"), None)
             usage = receipt.payload.get("usage", {}) if receipt else {}
             p, c = usage.get("prompt_tokens"), usage.get("completion_tokens")
-            if type(p) is int and type(c) is int:
+            if _valid_tokens(p) and _valid_tokens(c):
                 total += p + c
             else:  # failed, uncertain, unresolved or unreported usage: keep the whole reservation
                 total += int(intent.payload.get("reserve_tokens", 0))
@@ -58,7 +67,7 @@ class BudgetLedger:
         for _, rest in calls:
             receipt = next((e for e in rest if e.kind == "receipt"), None)
             c = receipt.payload.get("usage", {}).get("cost_usd") if receipt else None
-            if c is not None:
+            if _valid_cost(c):
                 costs.append(c)
         return round(sum(costs), 10) if costs else None
 
@@ -67,7 +76,7 @@ class BudgetLedger:
         known = 0
         for _, rest in calls:
             receipt = next((e for e in rest if e.kind == "receipt"), None)
-            if receipt and receipt.payload.get("usage", {}).get("cost_usd") is not None:
+            if receipt and _valid_cost(receipt.payload.get("usage", {}).get("cost_usd")):
                 known += 1
         if known == len(calls):
             return "known"

@@ -88,3 +88,21 @@ def test_unknown_cost_is_not_zero_and_missing_or_zero_budget_authorizes_nothing(
             with pytest.raises(BudgetExceeded):
                 BudgetLedger(budget, jz, "req-9").run("planner", lambda: ("x", {}), provider="p", model="m", input_sha256=H, reserve_tokens=1)
             assert jz.events("req-9") == []
+
+
+@pytest.mark.parametrize("usage", [
+    {"prompt_tokens": -1, "completion_tokens": 1, "cost_usd": 0.1},
+    {"prompt_tokens": 1, "completion_tokens": True, "cost_usd": 0.1},
+    {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": float("nan")},
+    {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": -1},
+    {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": float("inf")},
+])
+def test_invalid_usage_stays_unknown_and_reservation_is_preserved(tmp_path, usage):
+    j, ledger = make(tmp_path)
+    with j:
+        run(ledger, "planner", tokens=20, call=lambda: ("ok", usage))
+        if type(usage["prompt_tokens"]) is not int or usage["prompt_tokens"] < 0 or type(usage["completion_tokens"]) is not int:
+            assert ledger.committed_tokens() == 20
+        if not (0 <= usage["cost_usd"] < float("inf")):
+            assert ledger.known_cost_usd() is None
+            assert ledger.cost_status() == "unknown"
