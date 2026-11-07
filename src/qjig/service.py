@@ -82,6 +82,19 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(200, {"source_state": state})
             except sqlite3.Error:
                 self._reply(500, {"error": "local storage failure"})
+        elif self.path.startswith("/api/fresh-runs/"):
+            ident = self.path.removeprefix("/api/fresh-runs/")
+            if not re.fullmatch(r"[0-9a-f]{64}", ident) or self.server.fresh_backend is None:
+                self._reply(404, {'error': 'not found'})
+                return
+            try:
+                with self.server.writer_lock:
+                    result = self.server.fresh_backend.replay(ident)
+                self._reply(200, result)
+            except FileNotFoundError:
+                self._reply(404, {'error': 'not found'})
+            except (ContractError, ValueError, KeyError, TypeError, AttributeError, sqlite3.Error, OSError):
+                self._reply(409, {'error': 'fresh archive unavailable or invalid'})
         elif self.path == "/api/runs":
             try:
                 with Catalog.open(self.server.catalog) as catalog:

@@ -2,10 +2,11 @@
 import json
 import threading
 import os
+import sqlite3
 
 import pytest
 
-from qjig.agents import RoleClient
+from qjig.agents import ClientError, RoleClient
 from qjig.contracts import Budget
 from qjig.goal_budget import GoalBudget
 from qjig.providers import RawResponse, StandInTransport
@@ -84,6 +85,22 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     page.get_by_text('Sources changed since this fresh run. Rerun to inspect the current revision.').wait_for(timeout=7000)
                 finally:
                     browser.close()
+        server.shutdown(); server.server_close(); thread.join(timeout=5)
+        server = create_server(tmp_path / 'catalog.sqlite', host='127.0.0.1', port=0, fresh_backend=backend)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '1', 'Review'))
+        replay = client._request('GET', '/api/fresh-runs/' + result['run_id'])
+        assert replay['verification']['status'] == 'unanchored'
+        assert replay['verification']['semantic_assurance'] == 'not_assessed'
+        assert replay['request']['question'] == 'Refund limit?'
+        assert replay['result']['status'] == 'deferred'
+        assert any(quote in item['text'] for trace in replay['traces'] for item in trace['evidence'])
+        assert transport.calls_made == 4
+        with sqlite3.connect(tmp_path / 'fresh' / 'runs' / result['run_id'] / 'run.sqlite') as con:
+            con.execute('DROP TRIGGER event_no_update')
+            con.execute("UPDATE events SET data='{}' WHERE kind='run_result'")
+        with pytest.raises(ClientError, match='409'):
+            client._request('GET', '/api/fresh-runs/' + result['run_id'])
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)
 

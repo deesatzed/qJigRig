@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import sqlite3
+from dataclasses import asdict
+from contextlib import closing
 from pathlib import Path
 
 from .acquisition import run_fresh
@@ -46,6 +50,32 @@ class FreshWorkbench:
         self.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.goal_factory, self.transport_factory = goal_factory, transport_factory
         self.partition, self.planner, self.judge, self.reviewer, self.budget = partition, *specs, budget
+
+    def replay(self, run_id: str) -> dict:
+        """Inspect an existing archive without creating files or calling a model."""
+        from .replay import verify_archive
+        if not isinstance(run_id, str) or not re.fullmatch(r'[0-9a-f]{64}', run_id):
+            raise ContractError('invalid fresh run identity')
+        runs = self.state_dir / 'runs'
+        directory = runs / run_id
+        database = directory / 'run.sqlite'
+        if runs.is_symlink() or directory.is_symlink() or database.is_symlink() or not database.is_file():
+            raise FileNotFoundError('fresh run unavailable')
+        with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as connection:
+            archive = RunArchive(connection)
+            report = verify_archive(archive)
+            if report.status == 'invalid':
+                raise ContractError('fresh run failed structural replay')
+            context, events = archive.context(), archive.events()
+            request = Request.from_dict(context['request'])
+            if hashlib.sha256(request.request_id.encode('utf-8')).hexdigest() != run_id:
+                raise ContractError('fresh run identity mismatch')
+            results = [event['data'] for event in events if event['kind'] == 'run_result']
+            traces = [event['data'] for event in events if event['kind'] == 'trace']
+            return {'run_id': run_id, 'request': request.to_dict(),
+                    'result': results[0] if len(results) == 1 else None,
+                    'traces': traces, 'verification': asdict(report),
+                    'source_freshness': 'not_assessed'}
 
     def run(self, catalog_path: Path, body: object) -> dict:
         if not isinstance(body, dict) or set(body) != {'request', 'as_of', 'entities'} or not isinstance(body['request'], dict):

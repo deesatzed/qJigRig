@@ -3839,6 +3839,24 @@
       "acceptance": "After an actual synthetic fresh pipeline run, mark external source changes and distinguish inability to check current catalog state while preserving prior evidence.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: Chrome fresh result remained unmarked after another client replaced a source. Green: actual synthetic fresh run displays a stale-source note on external change, distinguishes transient source-status failure and recovers after reconnect. Existing fresh, browser and web regressions passed; this is not hosted or independent outcome evidence."
+    },
+    {
+      "id": "T056D",
+      "phase": "P5",
+      "depends_on": [
+        "T053D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/service.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Expose read-only fresh archive replay after service restart",
+      "acceptance": "Reopen a retained run without provider calls, report replay assurance and refuse structurally invalid archives.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: fresh archive route returned 404 after restart. Synthetic fresh run reopens from SQLite read-only with unanchored structural replay and preserved source evidence; corrupted result is rejected. Focused replay/service checks passed. This is not authenticated provenance, semantic correctness or hosted evaluation."
     }
   ]
 }
