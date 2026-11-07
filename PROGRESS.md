@@ -91,3 +91,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `Interval`, `MemberMetadata`, `Collection`, `Applicability` (match/no_match/unknown) in `src/qjig/applicability.py`. Old [2026-01-01,2026-10-31] and new [2026-11-01, open] policy coexist in one collection with no shared interval; inclusive bounds; unknown boundary gives UNKNOWN unless the other bound already excludes the date; strict ISO dates; duplicate revision in a collection rejected. Limit: metadata is not yet persisted in the catalog.
 - Red: ModuleNotFoundError qjig.applicability (initial contract). Green: focused 1 passed in 0.04s; tests/test_applicability.py 10 passed in 0.03s; full suite 51 passed in 0.11s. 2026-11-06.
+
+## 2026-11-06: T011 complete
+
+- `entity_applicability` returns a `Verdict(value, reason)`: unrecorded source subject or missing request subject -> UNKNOWN (reasons source_entity_unrecorded / request_entity_missing); disjoint recorded subjects -> NO_MATCH; overlap -> MATCH; exact, case-sensitive keys. Limit: a source deliberately written for all subjects also reads as UNKNOWN until a way to declare that is added.
+- Red: ImportError entity_applicability (initial contract). Green: focused 1 passed in 0.04s; tests/test_applicability.py 12 passed in 0.04s; full suite 53 passed in 0.11s. 2026-11-06.

@@ -94,3 +94,27 @@ class Collection:
             if m.revision_id == revision_id:
                 return m
         raise KeyError(revision_id)
+
+
+@dataclass(frozen=True)
+class Verdict:
+    value: Applicability
+    reason: str
+
+
+def entity_applicability(member: MemberMetadata, request_entities: frozenset[str]) -> Verdict:
+    """Does this source's recorded subject match the request's subject?
+
+    Missing data on either side is UNKNOWN. Only two recorded, disjoint subject sets are NO_MATCH.
+    Keys compare exactly.
+    """
+    source = member.entity_keys
+    if not request_entities:
+        if source:
+            return Verdict(Applicability.UNKNOWN, "request_entity_missing")
+        return Verdict(Applicability.MATCH, "no_entity_binding_required")
+    if not source:
+        return Verdict(Applicability.UNKNOWN, "source_entity_unrecorded")
+    if source & request_entities:
+        return Verdict(Applicability.MATCH, "entity_match")
+    return Verdict(Applicability.NO_MATCH, "entity_mismatch")

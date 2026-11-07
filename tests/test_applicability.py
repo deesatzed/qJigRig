@@ -60,3 +60,29 @@ def test_interval_and_collection_validation():
         Interval(OPEN, "2026-01-01")  # an open start is not defined in this contract
     with pytest.raises(ContractError):
         Collection((member("r", "2026-01-01", OPEN), member("r", "2026-02-01", OPEN)))
+
+
+from qjig.applicability import entity_applicability
+
+
+def ent(*keys):
+    return member("r", "2026-01-01", OPEN, entity_keys=frozenset(keys))
+
+
+def test_missing_entity_unknown():
+    # source records no subject, request names one: unknown, never "not applicable"
+    r = entity_applicability(ent(), frozenset({"customer:42"}))
+    assert r.value is Applicability.UNKNOWN and r.reason == "source_entity_unrecorded"
+    # request names no subject but source is about specific ones: unknown
+    r = entity_applicability(ent("customer:42"), frozenset())
+    assert r.value is Applicability.UNKNOWN and r.reason == "request_entity_missing"
+
+
+def test_entity_match_and_explicit_mismatch():
+    assert entity_applicability(ent("customer:42", "customer:7"), frozenset({"customer:7"})).value is Applicability.MATCH
+    r = entity_applicability(ent("customer:42"), frozenset({"customer:7"}))
+    assert r.value is Applicability.NO_MATCH and r.reason == "entity_mismatch"
+    # neither side names a subject: nothing to bind
+    assert entity_applicability(ent(), frozenset()).value is Applicability.MATCH
+    # keys are compared exactly, not case-folded
+    assert entity_applicability(ent("Customer:42"), frozenset({"customer:42"})).value is Applicability.NO_MATCH
