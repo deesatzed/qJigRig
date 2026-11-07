@@ -1394,7 +1394,8 @@
       "depends_on": [
         "R06",
         "R08A",
-        "R08B"
+        "R08B",
+        "R08C"
       ],
       "status": "pending",
       "files": [],
@@ -2897,6 +2898,26 @@
       "acceptance": "Each partition has cases from at least two declared-unrelated, nonidentical source-family groups; shared hashes and transitive relations cannot inflate the count.",
       "command": "python -m pytest tests/test_evaluation.py::test_design_requires_two_case_bearing_unrelated_families_per_partition -q",
       "evidence": "Red: design validation counted unused or declared-related families as independent. Green: each partition must have cases in two connected-component groups after unioning declared relationships and exact duplicate hashes; cross-split duplicates still reject. Tests cover unused, related, exact duplicate and transitive links. Local draft passes with two case-bearing declared groups per partition; focused 33 and full offline 527 passed. Undeclared near-duplicates and genuine independent origin remain unverified."
+    },
+    {
+      "id": "R08C",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08B",
+        "T064C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_budget.py",
+        "src/qjig/goal_budget.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_complete_evaluation_reservation_is_atomic_and_restart_safe",
+      "action": "Bind all declared evaluation assignments to one atomic run-set reservation",
+      "acceptance": "Every case/arm/repeat and its declared physical stages are present in a privately persisted plan before atomic reservation; changed plans and incomplete denominators refuse.",
+      "command": "python -m pytest tests/test_evaluation.py::test_complete_evaluation_reservation_is_atomic_and_restart_safe -q",
+      "evidence": "Red: goal ledger could reserve an incomplete experiment without binding case/arm/repeat coverage. Green: declared plan validates full denominator and stage counts, binds case hashes and unique request/work identities, and persists plan plus physical slots atomically; changed plans, missing assignments, partial capacity and ledger corruption reject. Synthetic 105-assignment draft reservation reopened successfully. Focused 79 before final trigger check and 39 after; full offline 528 passed. Stage templates, case hashes, prices, token bounds and provider enforcement remain caller assertions; real full-run preflight and hosted authorization remain open."
     }
   ]
 }

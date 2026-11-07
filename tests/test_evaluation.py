@@ -903,3 +903,64 @@ def test_design_requires_two_case_bearing_unrelated_families_per_partition():
     transitive['related_families']=[['pilot0','pilot2'],['pilot2','pilot1']]
     with pytest.raises(ContractError):
         validate_evaluation_design(transitive)
+
+
+def test_complete_evaluation_reservation_is_atomic_and_restart_safe(tmp_path):
+    from qjig.contracts import Budget
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_budget import make_evaluation_plan, reserve_evaluation_plan
+    from qjig.goal_budget import GoalBudget
+    design=_sample_design(); digest=validate_evaluation_design(design)
+    families={f['id']:f['partition'] for f in design['families']}
+    cases={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']}
+    templates={arm:{'synthetic_call':1} for arm in design['arms']}
+    assignments=[]
+    for case in design['cases']:
+        partition=families[case['family']]
+        for arm in design['arms']:
+            for repeat in range(1,design['repeats'][partition]+1):
+                rid='opaque-'+str(len(assignments)); work={'work_id':'work-'+rid,'request_id':rid,'partition':partition,
+                    'tokens':10,'cost_usd':0.001,'stage':'synthetic_call','provider':'stand-in','model':'fixture',
+                    'work_binding_sha256':'a'*64}
+                assignments.append({'case_id':case['id'],'arm':arm,'repeat':repeat,'request_id':rid,'work':[work]})
+    with pytest.raises(ContractError):
+        make_evaluation_plan(design,cases,templates,assignments[:-1],expected_design_sha256=digest)
+    broken = list(assignments); broken[0] = {**broken[0], 'work': []}
+    with pytest.raises(ContractError):
+        make_evaluation_plan(design,cases,templates,broken,expected_design_sha256=digest)
+    plan=make_evaluation_plan(design,cases,templates,assignments,expected_design_sha256=digest)
+    assert len(plan['manifest']['assignments'])==60
+    total=Budget(60,600,1); per=Budget(1,10,0.1)
+    allocations={'development':Budget(15,150,0.2),'pilot':Budget(15,150,0.2),'holdout':Budget(30,300,0.2)}
+    from qjig.budgets import BudgetExceeded
+    short_total=Budget(59,590,1)
+    short_alloc={'development':Budget(15,150,0.2),'pilot':Budget(15,150,0.2),'holdout':Budget(29,290,0.2)}
+    with GoalBudget.open(tmp_path/'short.sqlite',total=short_total,per_request=per,allocations=short_alloc) as goal:
+        with pytest.raises(BudgetExceeded):
+            reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])
+        assert goal._con.execute('SELECT COUNT(*) FROM run_sets').fetchone()[0]==0
+        assert goal._con.execute('SELECT COUNT(*) FROM evaluation_plans').fetchone()[0]==0
+        assert goal._con.execute('SELECT COUNT(*) FROM required_work').fetchone()[0]==0
+    path=tmp_path/'goal.sqlite'
+    with GoalBudget.open(path,total=total,per_request=per,allocations=allocations) as goal:
+        receipt=reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])
+        assert receipt['assignments']==60 and receipt['work_items']==60
+    with GoalBudget.open(path,total=total,per_request=per,allocations=allocations) as goal:
+        assert reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])==receipt
+        changed=dict(plan,sha256='0'*64)
+        with pytest.raises(ContractError):
+            reserve_evaluation_plan(goal,'study',changed,expected_plan_sha256=plan['sha256'])
+        altered_cases=dict(cases); altered_cases[next(iter(cases))]='f'*64
+        replaced=make_evaluation_plan(design,altered_cases,templates,assignments,expected_design_sha256=digest)
+        with pytest.raises(ContractError):
+            reserve_evaluation_plan(goal,'study',replaced,expected_plan_sha256=replaced['sha256'])
+        import sqlite3
+        with pytest.raises(sqlite3.IntegrityError):
+            goal._con.execute("UPDATE evaluation_plans SET manifest='{}' WHERE plan_id='study'")
+        goal._con.execute('DROP TRIGGER evaluation_plans_no_update')
+        goal._con.execute("UPDATE evaluation_plans SET manifest='{}' WHERE plan_id='study'")
+        first=assignments[0]['work'][0]
+        with pytest.raises(ContractError, match='evaluation plan digest'):
+            goal.select_required_work('evaluation:study',request_id=first['request_id'],partition=first['partition'],
+                                      stage=first['stage'],provider=first['provider'],model=first['model'],
+                                      tokens=first['tokens'],cost_usd=first['cost_usd'])

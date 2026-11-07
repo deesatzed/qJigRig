@@ -59,6 +59,9 @@ class GoalBudget:
                     con.execute(f"ALTER TABLE required_work ADD COLUMN {column} TEXT")
             con.execute("CREATE TABLE IF NOT EXISTS run_sets (set_id TEXT PRIMARY KEY, manifest TEXT NOT NULL, sha256 TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS run_set_work (set_id TEXT NOT NULL REFERENCES run_sets(set_id), work_id TEXT UNIQUE NOT NULL REFERENCES required_work(work_id), PRIMARY KEY(set_id,work_id))")
+            con.execute("CREATE TABLE IF NOT EXISTS evaluation_plans (plan_id TEXT PRIMARY KEY, set_id TEXT UNIQUE NOT NULL, manifest TEXT NOT NULL, sha256 TEXT NOT NULL)")
+            con.execute("CREATE TRIGGER IF NOT EXISTS evaluation_plans_no_update BEFORE UPDATE ON evaluation_plans BEGIN SELECT RAISE(ABORT, 'evaluation plan immutable'); END")
+            con.execute("CREATE TRIGGER IF NOT EXISTS evaluation_plans_no_delete BEFORE DELETE ON evaluation_plans BEGIN SELECT RAISE(ABORT, 'evaluation plan immutable'); END")
             row = con.execute("SELECT value FROM policy WHERE id=1").fetchone()
             if row is None:
                 con.execute("INSERT INTO policy VALUES(1, ?)", (policy,))
@@ -323,8 +326,22 @@ class GoalBudget:
         rows = self._con.execute("SELECT w.work_id,w.request_id,w.partition,w.tokens,w.cost,w.stage,w.provider,w.model,w.work_binding_sha256 FROM run_set_work s JOIN required_work w ON w.work_id=s.work_id WHERE s.set_id=? ORDER BY w.work_id", (set_id,)).fetchall()
         if rows != expected:
             raise ContractError("run set allocations differ from frozen manifest")
+        bound = self._con.execute("SELECT manifest,sha256 FROM evaluation_plans WHERE set_id=?", (set_id,)).fetchone()
+        if bound is not None:
+            plan, plan_hash = bound
+            if hashlib.sha256(plan.encode('utf-8')).hexdigest() != plan_hash:
+                raise ContractError('evaluation plan digest differs')
+            try:
+                plan_data = json.loads(plan)
+                work = [item for assignment in plan_data['assignments'] for item in assignment['work']]
+                work = [{**item, 'cost_usd': str(_cost(item['cost_usd']))} for item in work]
+                work.sort(key=lambda item: item['work_id'])
+                if json.dumps(work, sort_keys=True, ensure_ascii=False, separators=(',', ':')) != manifest:
+                    raise ContractError('evaluation plan work differs from run set')
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ContractError('evaluation plan is invalid') from exc
 
-    def reserve_run_set(self, set_id: str, assignments: list[dict]) -> str:
+    def reserve_run_set(self, set_id: str, assignments: list[dict], *, _evaluation_binding=None) -> str:
         """Freeze and reserve every declared physical call together, or reserve none.
 
         Call bounds and identities are supplied assertions; this does not verify prices,
@@ -350,9 +367,22 @@ class GoalBudget:
         normalized.sort(key=lambda item: item["work_id"])
         manifest = json.dumps(normalized, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
         digest = hashlib.sha256(manifest.encode("utf-8")).hexdigest()
+        if _evaluation_binding is not None:
+            if (not isinstance(_evaluation_binding, tuple) or len(_evaluation_binding) != 3
+                    or any(not isinstance(x, str) or not x for x in _evaluation_binding)):
+                raise ContractError('invalid evaluation plan binding')
+            plan_id, plan_manifest, plan_hash = _evaluation_binding
+            if hashlib.sha256(plan_manifest.encode('utf-8')).hexdigest() != plan_hash:
+                raise ContractError('evaluation plan digest differs')
         self._con.execute("BEGIN IMMEDIATE")
         try:
             existing = self._con.execute("SELECT manifest,sha256 FROM run_sets WHERE set_id=?", (set_id,)).fetchone()
+            if _evaluation_binding is not None:
+                previous_plan = self._con.execute('SELECT set_id,manifest,sha256 FROM evaluation_plans WHERE plan_id=?', (plan_id,)).fetchone()
+                if previous_plan is not None and previous_plan != (set_id, plan_manifest, plan_hash):
+                    raise ContractError('evaluation plan differs from frozen manifest')
+                if (existing is None) != (previous_plan is None):
+                    raise ContractError('evaluation plan and run set are inconsistent')
             if existing is not None:
                 if existing != (manifest, digest):
                     raise ContractError("run set differs from frozen manifest")
@@ -367,6 +397,9 @@ class GoalBudget:
                 self._con.execute("INSERT INTO required_work (work_id,request_id,partition,tokens,cost,stage,provider,model,work_binding_sha256) VALUES(?,?,?,?,?,?,?,?,?)",
                                   tuple(x[k] for k in ("work_id", "request_id", "partition", "tokens", "cost_usd", "stage", "provider", "model")) + (x.get("work_binding_sha256"),))
                 self._con.execute("INSERT INTO run_set_work VALUES(?,?)", (set_id, x["work_id"]))
+            if _evaluation_binding is not None:
+                self._con.execute('INSERT INTO evaluation_plans VALUES(?,?,?,?)', (plan_id, set_id, plan_manifest, plan_hash))
+                self._verify_run_set(set_id, manifest, digest)
             self._con.execute("COMMIT")
             return digest
         except BaseException:
