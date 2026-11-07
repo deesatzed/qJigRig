@@ -12,7 +12,7 @@ from .judge import SIDE_SCHEMA, _PROMPT, _combine_sides, _side_from_value
 from .packets import EvidencePacket, PacketItem
 from .planner import _plan_validator, _planner_prompt, corpus_manifest_sha256
 from .plans import parse_plan
-from .providers import ProviderRequest, _validate
+from .providers import ProviderRequest, _validate, openrouter_wire_payload_v1
 from .program_review import _REVIEW_SCHEMA, _review_prompt
 from .programs import make_draft, verify_review
 from .run_archive import RunArchive
@@ -196,6 +196,16 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                     raise ContractError("response without prior request")
                 if hashlib.sha256(data["body"].encode("utf-8")).hexdigest() != data["body_sha256"]:
                     raise ContractError("response hash mismatch")
+                metadata = data.get('metadata')
+                if isinstance(metadata, dict) and 'wire_payload_sha256' in metadata:
+                    if metadata.get('wire_payload_format') != 'openrouter.chat.v1':
+                        incomplete.append(f'wire_payload_format_unavailable:{call_id}')
+                    else:
+                        wire = openrouter_wire_payload_v1(request_data[call_id]).encode('utf-8')
+                        if metadata['wire_payload_sha256'] != hashlib.sha256(wire).hexdigest():
+                            raise ContractError('request wire payload mismatch')
+                elif request_data[call_id].provider == 'openrouter':
+                    incomplete.append(f'wire_payload_digest_unavailable:{call_id}')
                 responses[call_id] = event["seq"]
                 response_data[call_id] = data
             elif kind == "validation":

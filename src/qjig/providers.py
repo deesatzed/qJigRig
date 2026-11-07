@@ -53,6 +53,16 @@ class ProviderRequest:
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
+def openrouter_wire_payload_v1(request: ProviderRequest) -> str:
+    """Serialize the v1 OpenRouter request body; headers are deliberately excluded."""
+    body = {"model": request.model, "max_tokens": request.max_tokens,
+            "messages": [{"role": "user", "content": request.prompt}], "usage": {"include": True}}
+    if request.max_price is not None:
+        body["provider"] = {"max_price": {"prompt": request.max_price["prompt"],
+                                          "completion": request.max_price["completion"]}}
+    return json.dumps(body, ensure_ascii=False)
+
+
 @dataclass(frozen=True)
 class CallReservation:
     """A calculated reservation bound to one request; provenance is an assertion, not verification."""
@@ -212,14 +222,7 @@ class OpenRouterTransport:
         if (parsed.scheme != "https" or parsed.netloc != "openrouter.ai"
                 or parsed.path != "/api/v1" or parsed.query or parsed.fragment):
             raise ProviderUnavailable("untrusted provider endpoint; nothing was sent")
-        body = {
-            "model": request.model, "max_tokens": request.max_tokens,
-            "messages": [{"role": "user", "content": request.prompt}],
-            "usage": {"include": True},
-        }
-        if request.max_price is not None:
-            body["provider"] = {"max_price": dict(request.max_price)}
-        payload = json.dumps(body, ensure_ascii=False)
+        payload = openrouter_wire_payload_v1(request)
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         try:
             status, body = self._post(f"{base}/chat/completions", headers, payload, self._timeout)
@@ -238,6 +241,7 @@ class OpenRouterTransport:
         metadata = self._response_metadata(parsed_body) or {}
         # Hash the exact UTF-8 request body passed to the HTTP adapter, excluding headers.
         metadata['wire_payload_sha256'] = hashlib.sha256(payload.encode('utf-8')).hexdigest()
+        metadata['wire_payload_format'] = 'openrouter.chat.v1'
         if not 200 <= status < 300:
             return RawResponse(status, body, self._usage(body), metadata=metadata)
         try:

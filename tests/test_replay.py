@@ -287,3 +287,36 @@ def test_replay_rejects_changed_routing_ceiling(tmp_path):
         report = verify_archive(archive)
         assert report.status == 'invalid'
         assert any(item.startswith('invalid_request:') for item in report.issues)
+
+
+def test_replay_rejects_response_wire_digest_that_differs_from_request(tmp_path):
+    import json
+    from qjig.providers import ProviderRequest, OpenRouterTransport
+    directory=tmp_path/'partial-wire'
+    env=tmp_path/'env'; env.write_text('OPENROUTER_API_KEY=dummy\n')
+    request=ProviderRequest('planner','openrouter','vendor/model','question α',20,
+                            max_price={'prompt':0.5,'completion':2.0})
+    adapter=OpenRouterTransport(env,post=lambda *args:(200,json.dumps({'choices':[{'message':{'content':'{}'}}]})))
+    response=adapter._send_unchecked(request)
+    with RunArchive.open(directory) as archive:
+        archive.record_context({'schema':'qjig.fresh-context.v1','corpus':{}})
+        archive.record_request('r#1',request)
+        archive.record_response('r#1',response)
+        assert verify_archive(archive).status != 'invalid'
+    with sqlite3.connect(directory/'run.sqlite') as con:
+        con.execute('DROP TRIGGER event_no_update')
+        seq,raw=con.execute("SELECT seq,data FROM events WHERE kind='response'").fetchone()
+        changed=json.loads(raw);changed['metadata']['wire_payload_sha256']='0'*64
+        con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),seq))
+    with RunArchive.open(directory) as archive:
+        report=verify_archive(archive)
+        assert report.status=='invalid'
+        assert any(issue.startswith('invalid_response:') for issue in report.issues)
+    with sqlite3.connect(directory/'run.sqlite') as con:
+        con.execute('DROP TRIGGER event_no_update')
+        changed['metadata'].pop('wire_payload_format')
+        con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),seq))
+    with RunArchive.open(directory) as archive:
+        report=verify_archive(archive)
+        assert report.status=='incomplete'
+        assert 'wire_payload_format_unavailable:r#1' in report.issues
