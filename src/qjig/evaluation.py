@@ -290,3 +290,51 @@ def summarize_evaluation_assignments(design: dict, results: list[dict], *, expec
             'missing': [{'case_id': case, 'arm': arm, 'repeat': repeat} for case, arm, repeat in missing],
             'assignments_complete': complete, 'resources_complete': all_known,
             'status_counts': dict(sorted(counts.items())), 'resources': resources}
+
+
+class DirectRetrieval:
+    """One initial lexical search and bounded followup over declared source files.
+
+    Isolation inherits the loader's limits: protected-manifest completeness and
+    transformed labels are not established. This is retrieval, not an answer or
+    a model baseline; callers must provide the same frozen access and budgets.
+    """
+    def __init__(self, root, sources: list[dict], protected: list[dict], *,
+                 want: int, max_bytes: int, followups: int, expanded: bool = False):
+        from .indexing import index_entries
+        from .sources import SourceRevision, decode_source
+        if (type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int
+                or not 1 <= max_bytes <= _MAX_FILE_BYTES or type(followups) is not int
+                or not 0 <= followups <= 1 or type(expanded) is not bool):
+            raise ContractError('invalid direct retrieval bounds')
+        loaded = load_isolated_sources(root, sources, protected)
+        entries = []
+        for source in loaded:
+            revision = SourceRevision.create(source.path, 'evaluation_allowlist', decode_source(source.raw, encoding='utf-8'))
+            entries.extend(index_entries(revision))
+        self._entries = entries
+        self._want = want
+        self._max_bytes = max_bytes
+        self._max_rounds = 1 + followups
+        self._expanded = expanded
+        self._trace = []
+
+    @property
+    def trace(self) -> tuple[dict, ...]:
+        return tuple(dict(row) for row in self._trace)
+
+    def search(self, query: str) -> dict:
+        from .packets import build_packet
+        from .retrieval import bm25_candidates, bm25_expanded_candidates
+        if len(self._trace) >= self._max_rounds:
+            raise ContractError('direct retrieval round limit reached')
+        if not isinstance(query, str) or not query.strip() or len(query.encode('utf-8')) > 4096:
+            raise ContractError('invalid direct retrieval query')
+        candidates = (bm25_expanded_candidates if self._expanded else bm25_candidates)(self._entries, query)
+        packet = build_packet(candidates[:self._want], max_bytes=self._max_bytes)
+        record = {'round': len(self._trace) + 1, 'query': query, 'matches': len(candidates),
+                  'top_k_omitted': len(candidates) - min(len(candidates), self._want),
+                  'method': 'bm25_query_expansion_v1' if self._expanded else 'bm25_okapi_v1',
+                  'interpretation': 'candidates_not_validated' if candidates else 'no_hits_not_evidence_of_absence'}
+        self._trace.append(record)
+        return {**record, 'packet': packet}

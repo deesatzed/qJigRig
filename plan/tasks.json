@@ -1149,7 +1149,8 @@
       "phase": "P6",
       "depends_on": [
         "T064",
-        "T048"
+        "T048",
+        "T065A"
       ],
       "status": "pending",
       "files": [
@@ -2520,6 +2521,24 @@
       "acceptance": "Every declared case, arm and repeat appears in the denominator; duplicate, unexpected and malformed results are rejected and missing usage stays unknown.",
       "command": "python -m pytest tests/test_evaluation.py::test_every_declared_assignment_and_unknown_resource_is_reported -q",
       "evidence": "Red: no complete assignment accounting existed. Green: synthetic frozen design expands case/arm/repeat combinations, exposes missing identities and status counts, rejects duplicates/unassigned/invalid results, and preserves unknown costs and other resources. Focused evaluation/goal-budget/preflight suite 47 passed; full offline 490 passed. Status, provenance and resource values are assertions; no receipt verification, scoring, actual frozen corpus or provider evaluation is established."
+    },
+    {
+      "id": "T065A",
+      "phase": "P6",
+      "depends_on": [
+        "T063A",
+        "T064A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_direct_retrieval_uses_isolated_sources_and_bounded_followup",
+      "action": "Provide bounded retrieval over isolated evaluation source snapshots",
+      "acceptance": "A direct baseline can search allowlisted pinned sources with one bounded followup, explicit no-hit and truncation records, without loading protected artifacts.",
+      "command": "python -m pytest tests/test_evaluation.py::test_direct_retrieval_uses_isolated_sources_and_bounded_followup -q",
+      "evidence": "Red: no direct baseline search over isolated evaluation snapshots existed. Green: real lexical retrieval indexes hash-pinned allowlisted files, bounds hits, packet bytes and one followup, records no-hit and top-k omission counts, and refuses changed source hashes. Synthetic source/label tests and retrieval regressions 28 passed; full offline 491 passed. Protected-manifest completeness, transformed label leakage, provider integration, matched context/work and real comparisons remain unverified."
     }
   ]
 }

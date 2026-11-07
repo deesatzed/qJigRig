@@ -157,3 +157,38 @@ def test_every_declared_assignment_and_unknown_resource_is_reported():
     huge = copy.deepcopy(design); huge['repeats']['holdout'] = 1000000
     with pytest.raises(ContractError, match='exceeds limit'):
         summarize_evaluation_assignments(huge, [], expected_digest=validate_evaluation_design(huge))
+
+
+def test_direct_retrieval_uses_isolated_sources_and_bounded_followup(tmp_path):
+    from qjig.evaluation import DirectRetrieval
+    from qjig.packets import serialize_packet
+    (tmp_path / 'code').mkdir(); (tmp_path / 'private').mkdir()
+    sources = {'code/rule.py': b'def validate(x):\n    return x > 0\n',
+               'code/exception.py': b'def exception(x):\n    return x == -1\n'}
+    secret = b'PRIVATE_REFERENCE_ANSWER'
+    (tmp_path / 'private/labels').write_bytes(secret)
+    for path, data in sources.items():
+        (tmp_path / path).write_bytes(data)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    search = DirectRetrieval(tmp_path, [item(path, raw) for path, raw in sources.items()],
+                             [item('private/labels', secret)], want=1, max_bytes=3000, followups=1)
+    first = search.search('validate')
+    assert first['round'] == 1 and first['matches'] >= 1
+    assert b'def validate' in serialize_packet(first['packet'])
+    assert secret not in serialize_packet(first['packet'])
+    second = search.search('exception')
+    assert second['round'] == 2 and b'def exception' in serialize_packet(second['packet'])
+    assert len(search.trace) == 2 and search.trace[0]['query'] == 'validate'
+    with pytest.raises(ContractError):
+        search.search('another followup')
+    absent = DirectRetrieval(tmp_path, [item(path, raw) for path, raw in sources.items()],
+                             [item('private/labels', secret)], want=1, max_bytes=3000, followups=0).search('nonexistentxyz')
+    assert absent['matches'] == 0 and absent['packet'].items == ()
+    assert absent['interpretation'] == 'no_hits_not_evidence_of_absence'
+    top = DirectRetrieval(tmp_path, [item(path, raw) for path, raw in sources.items()],
+                          [item('private/labels', secret)], want=1, max_bytes=3000, followups=0).search('def')
+    assert top['matches'] == 2 and top['top_k_omitted'] == 1
+    (tmp_path / 'code/rule.py').write_bytes(b'changed')
+    with pytest.raises(ContractError):
+        DirectRetrieval(tmp_path, [item(path, raw) for path, raw in sources.items()],
+                        [item('private/labels', secret)], want=1, max_bytes=3000, followups=0)
