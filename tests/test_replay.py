@@ -14,11 +14,13 @@ from qjig.store import Catalog
 from qjig.replay import verify_archive
 
 
-def make_archive(tmp_path, positive=None, negative=None, **run_options):
+def make_archive(tmp_path, positive=None, negative=None, predicate_question="refund fourteen?", **run_options):
     source = SourceRevision.create("synthetic/rules.md", "synthetic", decode_source(b"# Rules\nRefunds within fourteen days.\n", encoding="utf-8"))
     request = Request("r", "refund fourteen?", "reviewer", "1", "project")
     usage = {"prompt_tokens": 5, "completion_tokens": 3, "cost_usd": 0.0}
-    transport = StandInTransport([RawResponse(200, '{"predicates":[{"id":"p1","question":"refund fourteen?"}],"expression":{"ref":"p1"}}', usage),
+    import json
+    planner = json.dumps({'predicates': [{'id': 'p1', 'question': predicate_question}], 'expression': {'ref': 'p1'}})
+    transport = StandInTransport([RawResponse(200, planner, usage),
                                   RawResponse(200, positive or '{"supported":false,"quote":"","reason":"none"}', usage),
                                   RawResponse(200, negative or '{"supported":false,"quote":"","reason":"none"}', usage)])
     directory = tmp_path / "run"
@@ -33,6 +35,34 @@ def make_archive(tmp_path, positive=None, negative=None, **run_options):
                            revision_applicability=lambda _: Applicability.MATCH, applicability_inputs=inputs, archive=archive, **run_options)
         assert result.status == "deferred"
     return directory, transport.calls_made
+
+
+def test_replay_validates_fresh_retrieval_followup(tmp_path):
+    import json
+    directory, calls = make_archive(tmp_path, predicate_question='zephyr eligibility')
+    assert calls == 3
+    with RunArchive.open(directory) as archive:
+        report = verify_archive(archive)
+        assert report.status == 'unanchored' and report.checked_traces == 2
+        assert verify_archive(archive, expected_digest=report.digest).status == 'structurally_verified'
+    with sqlite3.connect(directory / 'run.sqlite') as con:
+        con.execute('DROP TRIGGER event_no_update')
+        seq, raw = con.execute("SELECT seq,data FROM events WHERE kind='trace' ORDER BY seq DESC LIMIT 1").fetchone()
+        changed = json.loads(raw)
+        changed['query'] = 'unrelated search'
+        con.execute('UPDATE events SET data=? WHERE seq=?', (json.dumps(changed), seq))
+    with RunArchive.open(directory) as archive:
+        assert verify_archive(archive).status == 'invalid'
+    with sqlite3.connect(directory / 'run.sqlite') as con:
+        con.execute('DROP TRIGGER event_no_update')
+        changed['query'] = 'refund fourteen?'
+        con.execute('UPDATE events SET data=? WHERE seq=?', (json.dumps(changed), seq))
+        seq, raw = con.execute("SELECT seq,data FROM events WHERE kind='trace' ORDER BY seq LIMIT 1").fetchone()
+        first = json.loads(raw)
+        first['observation']['reason'] = 'provider_timeout'
+        con.execute('UPDATE events SET data=? WHERE seq=?', (json.dumps(first), seq))
+    with RunArchive.open(directory) as archive:
+        assert verify_archive(archive).status == 'invalid'
 
 
 def test_fresh_run_binds_routing_ceilings_to_requests_and_replay(tmp_path):

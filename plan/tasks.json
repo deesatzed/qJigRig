@@ -1384,7 +1384,8 @@
         "R07D",
         "R07E",
         "R07F",
-        "R07G"
+        "R07G",
+        "R07I"
       ],
       "status": "pending",
       "files": [],
@@ -2189,6 +2190,24 @@
       "acceptance": "After a no-hit predicate, one bounded followup uses the original request question; other failures and conflict do not trigger retries.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_targeted_retrieval_followup -q",
       "evidence": "Red: a no-hit fresh predicate stopped without followup. Green: one versioned original-question followup is allowed only after no_retrieval_hit; earlier trace retained and unknown, conflict, provider failure do not cause a retry. Fresh focused 31 passed; full offline suite 442 passed; repository verifier 119 tasks. This lexical fallback is not semantic relevance proof, fresh coverage remains unestablished, and full R04/live comparison remain pending."
+    },
+    {
+      "id": "R07I",
+      "phase": "repair",
+      "depends_on": [
+        "R07H",
+        "R04C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/replay.py"
+      ],
+      "test_file": "tests/test_replay.py",
+      "test_name": "test_replay_validates_fresh_retrieval_followup",
+      "action": "Bind fresh followup traces to the recorded policy",
+      "acceptance": "Replay accepts a legitimate bounded followup and rejects a changed query or followup without an initial no-hit result.",
+      "command": "python -m pytest tests/test_replay.py::test_replay_validates_fresh_retrieval_followup -q",
+      "evidence": "Red: replay accepted a changed followup query. Green: synthetic two-round archive reopens and verifies; replay checks policy, query, round sequence and no-hit predecessor, rejecting a changed followup or invalid predecessor. Focused 56 passed before a fixture-only extension; full offline suite 443 passed after correcting the test fixture trigger. This checks recorded trace consistency, not retrieval completeness, source authenticity or model semantics; full R07/T051 remain open."
     }
   ]
 }

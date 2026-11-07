@@ -89,6 +89,7 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
     planner_calls, plan_predicates, plan_expression = set(), None, None
     request_data, response_data, validation_data, pending_judges, plan_questions = {}, {}, {}, [], {}
     trace_observations = {}
+    trace_rounds = {}
     final_result = None
     traces = 0
     for event in events:
@@ -160,6 +161,28 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                     raise ContractError("trace predicate absent from validated plan")
                 if data["sequence"] != traces:
                     raise ContractError("trace sequence mismatch")
+                policy = context.get("followup_policy")
+                if policy == "request_question_on_no_primary_hit_v1":
+                    pid = data["predicate_id"]
+                    round_number = trace_rounds.get(pid, 0) + 1
+                    if type(data["round_number"]) is not int or data["round_number"] != round_number or round_number > 2:
+                        raise ContractError("invalid followup round")
+                    if round_number == 1:
+                        expected_query = plan_questions[pid]
+                    else:
+                        prior = trace_observations[pid]
+                        if prior.get("outcome") != "unknown" or prior.get("reason") != "no_retrieval_hit":
+                            raise ContractError("followup lacks no-hit predecessor")
+                        expected_query = context["request"]["question"]
+                        if expected_query.strip() == plan_questions[pid].strip():
+                            raise ContractError("followup repeats first query")
+                    if data["query"] != expected_query:
+                        raise ContractError("trace query differs from followup policy")
+                    if data["observation"].get("reason") == "no_retrieval_hit" and data["hit_count"] != 0:
+                        raise ContractError("no-hit observation has hits")
+                    trace_rounds[pid] = round_number
+                elif policy is not None:
+                    incomplete.append("followup_policy_unavailable")
                 trace_observations[data["predicate_id"]] = data["observation"]
                 rendered = "\n".join(f"[{item['entry_id'][:12]}]\n{item['text']}" for item in data["evidence"])
                 seen_sides = set()
