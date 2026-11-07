@@ -1003,7 +1003,8 @@
       "phase": "P5",
       "depends_on": [
         "T053",
-        "T019"
+        "T019",
+        "T058A"
       ],
       "status": "pending",
       "files": [
@@ -1884,6 +1885,24 @@
       "acceptance": "Synthetic escalation retains standalone failure, records reason, uses selected model identity and shares request budget with separately identifiable calls.",
       "command": "python -m pytest tests/test_escalation.py::test_standalone_and_escalation_remain_separate -q",
       "evidence": "Initial red: escalation module absent. Synthetic paired escalation preserves failed standalone result and reason, records tencent/hy4 identity and distinct escalation stages, shares same request ledger, refuses unrelated ledger or exhausted budget, and reports stage costs. Focused 66 passed; full offline suite 387 passed. Call-ID binding is not exact prompt/corpus binding or authentication; no archive replay, full-run integration or real model evidence. T049 remains pending."
+    },
+    {
+      "id": "T058A",
+      "phase": "P5",
+      "depends_on": [
+        "T053B",
+        "T019"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/agents.py"
+      ],
+      "test_file": "tests/test_agents.py",
+      "test_name": "test_two_role_clients_share_actual_local_service",
+      "action": "Add role-defined clients for the existing local service",
+      "acceptance": "Two actual client instances use one service to inspect identical source revisions and submit authored requests retaining their own role context.",
+      "command": "python -m pytest tests/test_agents.py::test_two_role_clients_share_actual_local_service -q",
+      "evidence": "Initial red: client adapter absent. Two distinct role-defined client objects exercised actual localhost service: import, list, inspect same revision, and authored questions retaining different roles and versions with the same cited evidence. Invalid IDs and service errors refuse. Focused 16 passed; full offline suite 394 passed. Role values are context, not authorization; no role ranking, claims, interruption, hosted models or full workflow acceptance. T058 remains pending."
     }
   ]
 }
