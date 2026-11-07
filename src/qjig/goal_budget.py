@@ -51,6 +51,7 @@ class GoalBudget:
             con.execute("CREATE TABLE IF NOT EXISTS usage (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), input_tokens INTEGER, output_tokens INTEGER, cost TEXT)")
             con.execute("CREATE TABLE IF NOT EXISTS holds (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), calls INTEGER NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS recoveries (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), call_id TEXT NOT NULL, receipt_sha256 TEXT NOT NULL)")
+            con.execute("CREATE TABLE IF NOT EXISTS required_work (work_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, partition TEXT NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL, attempt_id TEXT UNIQUE)")
             row = con.execute("SELECT value FROM policy WHERE id=1").fetchone()
             if row is None:
                 con.execute("INSERT INTO policy VALUES(1, ?)", (policy,))
@@ -171,8 +172,52 @@ class GoalBudget:
                 "known_cost_usd": known_cost,
                 "unknown_calls": sum(any(v is None for v in row) for row in rows)}
 
+    def _check_capacity(self, request_id: str, partition: str, calls: int, tokens: int, cost: Decimal,
+                        exclude_required: str | None = None) -> None:
+        for label, condition, args, limit in (
+            ("goal", "1=1", (), self._total),
+            ("partition", "r.partition=?", (partition,), self._allocations[partition]),
+            ("request", "r.request_id=?", (request_id,), self._per_request),
+        ):
+            rows = self._con.execute("SELECT r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id WHERE " + condition, args).fetchall()
+            n, t, c = self._committed_rows(rows)
+            pending = self._con.execute("SELECT r.tokens,r.cost FROM required_work r WHERE r.attempt_id IS NULL AND " + condition + " AND (? IS NULL OR r.work_id != ?)", (*args, exclude_required, exclude_required)).fetchall()
+            pn, pt, pc = self._sum(pending)
+            if not _fits((n + pn + calls, t + pt + tokens, c + pc + cost), limit):
+                raise BudgetExceeded(label, "reservation exceeds persistent limit")
+
+    def reserve_required(self, request_id: str, partition: str, work: list[tuple[str, int, float]]) -> None:
+        """Atomically reserve named future calls; consumed only by their matching request."""
+        if any(not isinstance(v, str) or not v.strip() for v in (request_id, partition)) or partition not in self._allocations:
+            raise ContractError("invalid required work identity")
+        if not isinstance(work, list) or not work:
+            raise ContractError("required work must be nonempty")
+        normalized = []
+        for item in work:
+            if not isinstance(item, (tuple, list)) or len(item) != 3:
+                raise ContractError("invalid required work")
+            ident, tokens, cost = item
+            if not isinstance(ident, str) or not ident.strip() or not _valid_tokens(tokens) or not _valid_cost(cost):
+                raise ContractError("invalid required work")
+            normalized.append((ident, tokens, _cost(cost)))
+        if len({item[0] for item in normalized}) != len(normalized):
+            raise ContractError("duplicate required work")
+        self._con.execute("BEGIN IMMEDIATE")
+        try:
+            if any(self._con.execute("SELECT 1 FROM required_work WHERE work_id=?", (ident,)).fetchone() for ident, _, _ in normalized):
+                raise ContractError("required work already exists")
+            self._check_capacity(request_id, partition, len(normalized), sum(t for _, t, _ in normalized),
+                                 sum((c for _, _, c in normalized), Decimal(0)))
+            self._con.executemany("INSERT INTO required_work VALUES(?,?,?,?,?,NULL)",
+                                  [(ident, request_id, partition, tokens, str(cost)) for ident, tokens, cost in normalized])
+            self._con.execute("COMMIT")
+        except BaseException:
+            self._con.execute("ROLLBACK")
+            raise
+
     def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float,
-                hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0) -> None:
+                hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0,
+                required_id: str | None = None) -> None:
         if any(not isinstance(v, str) or not v.strip() for v in (attempt_id, request_id, partition)):
             raise ContractError("reservation identities must be non-empty")
         if (partition not in self._allocations or not _valid_tokens(tokens) or not _valid_cost(cost_usd)
@@ -182,22 +227,24 @@ class GoalBudget:
         try:
             if self._con.execute("SELECT 1 FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone():
                 raise ContractError("attempt already reserved")
+            if required_id is not None:
+                if not isinstance(required_id, str) or not required_id.strip():
+                    raise ContractError("invalid required work identity")
+                required = self._con.execute("SELECT request_id,partition,tokens,cost,attempt_id FROM required_work WHERE work_id=?", (required_id,)).fetchone()
+                if (required is None or required[0] != request_id or required[1] != partition or required[4] is not None
+                        or tokens > required[2] or _cost(cost_usd) > Decimal(required[3])):
+                    raise ContractError("required work does not match reservation")
             previous = self._con.execute("SELECT r.tokens, r.cost, u.input_tokens, u.output_tokens, u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()
             if any(i is None or o is None or c is None for _, _, i, o, c in previous):
                 raise BudgetExceeded("usage_unknown", "previous call has unknown or pending usage")
             if any(i + o > bound or Decimal(c) > Decimal(cost) for bound, cost, i, o, c in previous):
                 raise BudgetExceeded("bound_exceeded", "observed usage exceeded its reservation")
-            for label, query, args, limit in (
-                ("goal", "SELECT r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id", (), self._total),
-                ("partition", "SELECT r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id WHERE r.partition=?", (partition,), self._allocations[partition]),
-                ("request", "SELECT r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id WHERE r.request_id=?", (request_id,), self._per_request),
-            ):
-                n, t, c = self._committed_rows(self._con.execute(query, args).fetchall())
-                if not _fits((n + 1 + hold_back_calls, t + tokens + hold_back_tokens,
-                              c + _cost(cost_usd) + _cost(hold_back_cost_usd)), limit):
-                    raise BudgetExceeded(label, "reservation exceeds persistent limit")
+            self._check_capacity(request_id, partition, 1 + hold_back_calls, tokens + hold_back_tokens,
+                                 _cost(cost_usd) + _cost(hold_back_cost_usd), required_id)
             self._con.execute("INSERT INTO reservations VALUES(?,?,?,?,?)", (attempt_id, request_id, partition, tokens, str(_cost(cost_usd))))
             self._con.execute("INSERT INTO holds VALUES(?,?,?,?)", (attempt_id, hold_back_calls, hold_back_tokens, str(_cost(hold_back_cost_usd))))
+            if required_id is not None:
+                self._con.execute("UPDATE required_work SET attempt_id=? WHERE work_id=?", (attempt_id, required_id))
             self._con.execute("COMMIT")
         except BaseException:
             self._con.execute("ROLLBACK")

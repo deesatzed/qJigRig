@@ -95,10 +95,13 @@ class BudgetLedger:
         self, stage: str, call: Callable[[], Any], *, provider: str, model: str, input_sha256: str,
         reserve_tokens: int, reserve_input_tokens: int | None = None, hold_back_calls: int = 0, hold_back_tokens: int = 0,
         reserve_cost_usd: float | None = None, hold_back_cost_usd: float = 0, reservation_binding: dict | None = None,
+        required_id: str | None = None,
     ) -> Any:
         """Check every cap, then journal the intent and make the call. Refusals happen before any intent."""
         if self._goal_budget is not None and (reserve_input_tokens is None or reserve_cost_usd is None):
             raise BudgetExceeded("preflight_unavailable", "goal accounting requires input and cost bounds")
+        if required_id is not None and self._goal_budget is None:
+            raise ContractError("required work requires a goal budget")
         reserve_input_tokens = 0 if reserve_input_tokens is None else reserve_input_tokens
         for name, value in (("reserve_tokens", reserve_tokens), ("reserve_input_tokens", reserve_input_tokens), ("hold_back_calls", hold_back_calls), ("hold_back_tokens", hold_back_tokens)):
             if not _valid_tokens(value):
@@ -131,14 +134,14 @@ class BudgetLedger:
             self._goal_budget.reserve(goal_attempt_id, self._request_id, self._partition,
                                       tokens=reserve_input_tokens + reserve_tokens, cost_usd=reserve_cost_usd,
                                       hold_back_calls=hold_back_calls, hold_back_tokens=hold_back_tokens,
-                                      hold_back_cost_usd=hold_back_cost_usd)
+                                      hold_back_cost_usd=hold_back_cost_usd, required_id=required_id)
         result = run_journaled(
             self._journal, call=call, request_id=self._request_id, stage=stage, provider=provider, model=model,
             input_sha256=input_sha256, intent_payload={"reserve_tokens": reserve_input_tokens + reserve_tokens,
                                                        "reserve_input_tokens": reserve_input_tokens, "reserve_output_tokens": reserve_tokens,
                                                        "reserve_cost_usd": reserve_cost_usd,
                                                        "hold_back_cost_usd": hold_back_cost_usd, "goal_attempt_id": goal_attempt_id,
-                                                       "reservation_binding": reservation_binding},
+                                                       "reservation_binding": reservation_binding, "required_id": required_id},
         )
         if goal_attempt_id is not None:
             receipt = self._journal.events(self._request_id)[-1]

@@ -325,3 +325,18 @@ def test_no_content_keeps_finish_reason_and_request_id(tmp_path):
     response = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope)).send(REQ)
     assert response.body == "" and response.metadata["response_id"] == "generation-length"
     assert response.metadata["finish_reason"] == "length"
+
+
+def test_typed_stand_in_consumes_named_required_budget(tmp_path):
+    from qjig.goal_budget import GoalBudget
+    from qjig.providers import make_call_reservation
+
+    model = {'id': REQ.model, 'context_length': 1000, 'top_provider': {'max_completion_tokens': 100},
+             'pricing': {'prompt': '0.001', 'completion': '0.001'}}
+    bound = make_call_reservation(REQ, model, input_tokens=100, input_bound_provenance='synthetic fixture', required_id='judge')
+    limit = Budget(1, 150, 1)
+    with GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        goal.reserve_required('r', 'smoke', [('judge', 150, bound.cost_usd)])
+        ledger = BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='smoke')
+        result = call_typed(ledger, StandInTransport([RawResponse(200, GOOD, USAGE)]), REQ, SCHEMA, reservation=bound)
+        assert result.ok and journal.events('r')[0].payload['required_id'] == 'judge'

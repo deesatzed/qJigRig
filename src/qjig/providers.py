@@ -54,14 +54,18 @@ class CallReservation:
     hold_back_calls: int = 0
     hold_back_tokens: int = 0
     hold_back_cost_usd: float = 0
+    required_id: str | None = None
 
 
 def make_call_reservation(request: ProviderRequest, model: dict, *, input_tokens: int, input_bound_provenance: str,
-                          hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0) -> CallReservation:
+                          hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0,
+                          required_id: str | None = None) -> CallReservation:
     if not isinstance(input_bound_provenance, str) or not input_bound_provenance.strip():
         raise ContractError("input bound provenance is required")
     if not isinstance(model, dict) or model.get("id") != request.model:
         raise ContractError("pricing model does not match request")
+    if required_id is not None and (not isinstance(required_id, str) or not required_id.strip()):
+        raise ContractError("invalid required work identity")
     cost = upper_cost(model, input_tokens=input_tokens, output_tokens=request.max_tokens)
     as_float = float(cost)
     if not math.isfinite(as_float):
@@ -72,7 +76,7 @@ def make_call_reservation(request: ProviderRequest, model: dict, *, input_tokens
         raise ContractError("price bound is not representable")
     snapshot = json.dumps(model, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     return CallReservation(request.input_sha256(), input_tokens, as_float, hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
-                           input_bound_provenance, hold_back_calls, hold_back_tokens, hold_back_cost_usd)
+                           input_bound_provenance, hold_back_calls, hold_back_tokens, hold_back_cost_usd, required_id)
 
 
 ReservationFactory = Callable[[ProviderRequest], CallReservation]
@@ -334,6 +338,7 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
         "reserve_input_tokens": reservation.input_tokens, "reserve_cost_usd": reservation.cost_usd,
         "hold_back_calls": reservation.hold_back_calls, "hold_back_tokens": reservation.hold_back_tokens,
         "hold_back_cost_usd": reservation.hold_back_cost_usd,
+        "required_id": reservation.required_id,
         "reservation_binding": {"request_sha256": reservation.request_sha256, "pricing_sha256": reservation.pricing_sha256,
                                 "input_bound_provenance": reservation.input_bound_provenance},
     }

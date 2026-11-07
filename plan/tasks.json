@@ -1353,7 +1353,7 @@
       "action": "Reserve complete input and output and preserve unknown costs",
       "acceptance": "Preflight bounds all usage and unknown spend cannot authorize calls.",
       "command": "python -m pytest tests/test_budgets.py::test_full_input_output_reservation -q",
-      "evidence": "Partial: restart test exposed partial known usage reported as complete totals. Goal ledger now reports each incomplete total as unknown and separately labels known subtotals. Focused ledger/budget/fresh suite 72 passed; full offline suite 363 passed. R08 remains pending: verified complete-input bounds, durable mandatory work reservations, pricing and full hosted enforcement are not established; hosted typed calls remain refused."
+      "evidence": "Partial: restart test exposed partial known usage reported as complete totals. Goal ledger now reports each incomplete total as unknown and separately labels known subtotals. Focused ledger/budget/fresh suite 72 passed; full offline suite 363 passed. R08 remains pending: verified complete-input bounds, durable mandatory work reservations, pricing and full hosted enforcement are not established; hosted typed calls remain refused. Further partial: atomic named required-work reservations survive restarts and block unrelated spending; named consumption reaches journaled typed stand-in calls. Concurrent plans and invalid batches are tested. Focused 100 passed; full suite 367 passed. Work IDs are caller assertions, not authenticated prompt/stage bindings; full run-set allocation and paid preflight remain pending."
     },
     {
       "id": "R07",
