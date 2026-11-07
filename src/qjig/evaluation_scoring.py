@@ -634,7 +634,7 @@ def summarize_holdout_comparison(design: dict, records: list[dict], *, expected_
                     or (answer is None and (covered is not None or matched is not None))
                     or (answer is not None and (type(covered) is not bool or matched is not (answer == expected)))):
                 raise ContractError('invalid direct outcome')
-            status = 'unknown' if answer is None or not covered else 'supported' if matched else 'unsupported'
+            status = 'unknown' if answer is None or not covered else 'reference_match' if matched else 'reference_mismatch'
         indexed[key] = status
     pairs = []
     for case in sorted(cases):
@@ -646,14 +646,15 @@ def summarize_holdout_comparison(design: dict, records: list[dict], *, expected_
     recorded = sum(p['baseline_status'] != 'missing' and p['candidate_status'] != 'missing' for p in pairs)
     def count(side,status): return sum(p[side+'_status'] == status for p in pairs)
     def rate(side):
-        return count(side,'supported') / total if total and count(side,'unknown') == 0 and count(side,'missing') == 0 else None
+        return count(side,'reference_match') / total if total and count(side,'unknown') == 0 and count(side,'missing') == 0 else None
     base_rate, candidate_rate = rate('baseline'), rate('candidate')
-    return {'design_sha256':expected_design_sha256,'baseline_arm':baseline_arm,'candidate_arm':candidate_arm,
+    return {'schema':'qjig.holdout-comparison.v2','design_sha256':expected_design_sha256,'baseline_arm':baseline_arm,'candidate_arm':candidate_arm,
             'assigned_pairs':total,'recorded_pairs':recorded,'missing_pairs':total-recorded,
-            'baseline_supported':count('baseline','supported'),'candidate_supported':count('candidate','supported'),
+            'baseline_reference_matches':count('baseline','reference_match'),'candidate_reference_matches':count('candidate','reference_match'),
             'baseline_unknown':count('baseline','unknown'),'candidate_unknown':count('candidate','unknown'),
-            'baseline_support_rate':base_rate,'candidate_support_rate':candidate_rate,
-            'paired_difference':None if base_rate is None or candidate_rate is None else candidate_rate-base_rate,
+            'baseline_mechanical_match_rate':base_rate,'candidate_mechanical_match_rate':candidate_rate,
+            'paired_mechanical_difference':None if base_rate is None or candidate_rate is None else candidate_rate-base_rate,
+            'outcome_support':None,
             'pairs':pairs,'semantic_assurance':'not_assessed'}
 
 
