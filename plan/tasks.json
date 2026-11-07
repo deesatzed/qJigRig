@@ -1062,7 +1062,8 @@
       "phase": "P5",
       "depends_on": [
         "T055",
-        "T052"
+        "T052",
+        "T061A"
       ],
       "status": "pending",
       "files": [
@@ -2069,6 +2070,24 @@
       "acceptance": "A catalog change during a run defers the result, and a browser detects a second client source change and marks the previous result for rerun.",
       "command": "python -m pytest tests/test_service.py::test_catalog_change_during_authored_run_defers -q",
       "evidence": "Red: authored service returned decided after a second service changed the catalog during the run. Green: source-state snapshots before/after force deferral on change; browser polls/focus-checks the catalog, marks an external client update for rerun, and displays unknown if check fails. Actual Chromium plus separate client verified no-to-yes rerun; focused 16 passed; full suite 412 passed. See docs/verification/2026-11-07-cross-client-freshness.md. External files, authenticity, replay and full T056 remain open."
+    },
+    {
+      "id": "T061A",
+      "phase": "P5",
+      "depends_on": [
+        "T053B",
+        "T059A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/export.py"
+      ],
+      "test_file": "tests/test_export.py",
+      "test_name": "test_authored_export_verifies_bound_source_spans_after_change",
+      "action": "Export authored result and cited source bytes for offline structural verification",
+      "acceptance": "A synthetic local authored result exports role, policy, unknowns and cited source bytes; verification detects altered evidence and preserves an externally anchored record after catalog changes.",
+      "command": "python -m pytest tests/test_export.py::test_authored_export_verifies_bound_source_spans_after_change -q",
+      "evidence": "Initial red: authored export module absent. Synthetic local results export policy, request/role, unknown costs and cited raw source bytes; offline structural checks validate digest, source identities, entry/span bindings and trace sequence. Tests preserve a deferred result and verify an externally anchored record after an intervention, reject altered evidence even after rehash, and refuse export from a changed catalog. Focused 30 passed; full suite 414 passed. No semantic correctness, authentication, complete corpus capture, service persistence, browser export or hosted accounting is established; T061 remains pending."
     }
   ]
 }
