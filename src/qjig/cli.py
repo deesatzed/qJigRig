@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .acquisition import Context, EvalResult, NeedSpec, RunState, run_until_done
-from .applicability import OPEN, UNKNOWN_BOUND, Collection, Interval, MemberMetadata
+from .applicability import OPEN, UNKNOWN_BOUND, Applicability, Collection, Interval, MemberMetadata
 from .contracts import ContractError, Request
 from .exact import FieldValue, NumericRule, PolicyRule, evaluate_dated_numeric
 from .finalize import MODES, finalize
@@ -127,12 +127,17 @@ def _need(spec: dict, inherited_evaluator: dict | None = None, **ctx: Any) -> Ne
 
 def _origin_lookup(cat: Catalog):
     def lookup(source_id: str) -> str | None:
-        known = cat.list_revisions(source_id)
-        if not known:
+        active_ids = {entry.revision_id for entry in load_live_entries(cat)
+                      if cat.revision_source_id(entry.revision_id) == source_id}
+        if len(active_ids) != 1:
             return None
+        current = cat.get_revision(next(iter(active_ids)))
+        if current.origin == f"api:{source_id}":
+            # API imports are catalog-owned snapshots, not paths on disk.
+            return current.revision_id
         try:
-            raw = Path(known[0].origin).read_bytes()
-            return SourceRevision.create(source_id, known[0].origin, decode_source(raw, encoding=known[0].decoded.encoding)).revision_id
+            raw = Path(current.origin).read_bytes()
+            return SourceRevision.create(source_id, current.origin, decode_source(raw, encoding=current.decoded.encoding)).revision_id
         except (OSError, ContractError):
             return None
     return lookup
@@ -141,13 +146,23 @@ def _origin_lookup(cat: Catalog):
 def cmd_ask(a: argparse.Namespace) -> tuple[dict[str, Any], int]:
     request = Request.from_dict(json.loads(Path(a.request).read_text(encoding="utf-8")))
     policy = json.loads(Path(a.policy).read_text(encoding="utf-8"))
+    result, code = run_authored(a.catalog, request, policy)
+    if a.trace_out:
+        Path(a.trace_out).write_text(json.dumps(result, indent=2), encoding="utf-8")
+    return result, code
+
+
+def run_authored(catalog: str | Path, request: Request, policy: dict) -> tuple[dict[str, Any], int]:
+    """Run an explicit deterministic plan against the shared catalog."""
+    if not isinstance(request, Request) or not isinstance(policy, dict):
+        raise ContractError("request and policy objects are required")
     mode = policy.get("mode", "snapshot")
     if mode not in MODES:
         raise ContractError(f"unknown mode {mode!r}")
     plan = parse_plan(policy["plan"])
     entities, as_of = frozenset(policy.get("entities", ())), policy["as_of"]
     historical = bool(policy.get("historical_as_known", False))
-    with Catalog.open(a.catalog) as cat:
+    with Catalog.open(catalog) as cat:
         members = {r[0]: _member_from_row(r) for r in cat.metadata_rows()}
         specs, ledger = {}, ObligationLedger()
         for p in plan.predicates:
@@ -156,7 +171,15 @@ def cmd_ask(a: argparse.Namespace) -> tuple[dict[str, Any], int]:
                                 historical=historical)
             ledger.open(Obligation(f"ob-{p.id}", "exception" if need.get("kind") == "exception" else "predicate_evidence",
                                    p.id, p.question, material=True))
-        ctx = Context(cat, load_live_entries(cat), applicability_filter(Collection(tuple(members.values())), entities, as_of, historical_as_known=historical), specs)
+        entity_date_filter = applicability_filter(Collection(tuple(members.values())), entities, as_of, historical_as_known=historical)
+        def scoped_filter(candidate):
+            member = members.get(candidate.revision_id)
+            if member is None or not request.scope or not member.scope:
+                return Applicability.UNKNOWN
+            if member.scope != request.scope:
+                return Applicability.NO_MATCH
+            return entity_date_filter(candidate)
+        ctx = Context(cat, load_live_entries(cat), scoped_filter, specs)
         state = RunState(request, plan, ledger)
         summary = run_until_done(state, ctx)
         final = finalize(state, ctx, summary, mode=mode, lookup=_origin_lookup(cat))
@@ -188,8 +211,6 @@ def cmd_ask(a: argparse.Namespace) -> tuple[dict[str, Any], int]:
             } for r in st.trace],
             "providers_called": 0,
         }
-    if a.trace_out:
-        Path(a.trace_out).write_text(json.dumps(result, indent=2), encoding="utf-8")
     return result, (0 if final.status == "decided" else 3)
 
 

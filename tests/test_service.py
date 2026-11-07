@@ -157,3 +157,58 @@ def test_cli_starts_real_loopback_service(tmp_path):
     finally:
         child.terminate()
         child.wait(timeout=5)
+
+
+def test_authored_question_uses_catalog_and_preserves_fresh_deferral(tmp_path):
+    server = create_server(tmp_path / "catalog.sqlite", host="127.0.0.1", port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    port = server.server_address[1]
+    origin = f"http://127.0.0.1:{port}"
+    def post(path, payload):
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        connection.request("POST", path, json.dumps(payload), {"Content-Type": "application/json", "Origin": origin})
+        response = connection.getresponse()
+        result = response.status, json.loads(response.read())
+        connection.close()
+        return result
+    source = {"source_id": "policy.md", "text": "# Refund limit\nRefunds are accepted within 14 days of purchase.\n",
+              "scope": "project", "entities": ["customer:42"], "effective_from": "2026-01-01", "effective_to": "open",
+              "observed_at": "2026-01-02", "authority": "team:policy"}
+    request = {"schema_version": "qjig.request.v1", "request_id": "request-1", "question": "Refund after 20 days?",
+               "role": "reviewer", "role_version": "1", "scope": "project"}
+    policy = {"label": "AUTHORED CONTROL", "entities": ["customer:42"], "as_of": "2026-11-15", "mode": "snapshot",
+              "facts": {"refund_days": 20},
+              "plan": {"origin": "authored", "predicates": [{"id": "within", "question": "Within refund limit?"}], "expression": {"ref": "within"}},
+              "needs": {"within": {"query": "refund days limit", "want": 1, "max_bytes": 4000,
+                                   "evaluator": {"kind": "numeric_threshold", "field": "refund_days", "pattern": "within (\\d+) days", "operator": "lte"}}}}
+    try:
+        assert post("/api/sources", source)[0] == 201
+        status, payload = post("/api/ask", {"request": request, "policy": policy})
+        assert status == 200 and payload["kind"] == "deterministic"
+        result = payload["result"]
+        assert result["status"] == "decided" and result["outcome"] is False and result["providers_called"] == 0
+        assert result["origin_updates"] == []
+        status, current = post("/api/ask", {"request": request, "policy": {**policy, "mode": "current_required"}})
+        assert status == 200 and current["result"]["status"] == "decided"
+        assert current["result"]["origin_updates"] == []
+        assert result["records"][0]["evidence"][0]["text"].find("14 days") >= 0
+        fresh = {**policy, "plan": {**policy["plan"], "origin": "fresh"}}
+        status, payload = post("/api/ask", {"request": request, "policy": fresh})
+        assert status == 200 and payload["result"]["status"] == "deferred"
+        assert "plan_coverage_unestablished" in payload["result"]["reasons"]
+        wrong_scope = {**request, "scope": "other-project"}
+        status, payload = post("/api/ask", {"request": wrong_scope, "policy": policy})
+        assert status == 200 and payload["result"]["status"] == "deferred"
+        assert payload["result"]["records"][0]["exclusions"][0]["reason"] == "inapplicable"
+        wrong_entity = {**policy, "entities": ["customer:other"]}
+        status, payload = post("/api/ask", {"request": request, "policy": wrong_entity})
+        assert status == 200 and payload["result"]["status"] == "deferred"
+        assert post("/api/ask", {"request": request})[0] == 400
+        assert post("/api/ask", {"request": [], "policy": policy})[0] == 400
+        assert post("/api/ask", {"request": request, "policy": []})[0] == 400
+        assert post("/api/ask", {"request": request, "policy": {**policy, "as_of": "2025-11-15"}})[1]["result"]["status"] == "deferred"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

@@ -914,7 +914,8 @@
       "depends_on": [
         "T038",
         "T051",
-        "T053A"
+        "T053A",
+        "T053B"
       ],
       "status": "pending",
       "files": [
@@ -1400,7 +1401,8 @@
       "finding": "F04",
       "depends_on": [
         "R03",
-        "R04A"
+        "R04A",
+        "R04B"
       ],
       "status": "pending",
       "files": [],
@@ -1771,6 +1773,45 @@
       "acceptance": "Real local HTTP imports and lists source revisions with same-origin write restrictions and explicit malformed-request failures.",
       "command": "python -m pytest tests/test_service.py::test_loopback_catalog_import_and_origin_guard -q",
       "evidence": "Red: loopback service and CLI entrypoint absent; reimporting an old source revision staled the current revision. Green: actual localhost HTTP covers import/list/inspect, host and origin rejection, malformed input, concurrent identical imports, restart persistence, old-revision reimport and CLI subprocess startup. Service tests 4 passed; full offline suite 358 passed before two strengthened input assertions. Full T053, browser and fresh-provider paths remain pending."
+    },
+    {
+      "id": "T053B",
+      "phase": "P5",
+      "depends_on": [
+        "T053A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/service.py",
+        "src/qjig/cli.py",
+        "tests/test_service.py",
+        "README.md"
+      ],
+      "test_file": "tests/test_service.py",
+      "test_name": "test_authored_question_uses_catalog_and_preserves_fresh_deferral",
+      "action": "Expose deterministic authored question path over local service",
+      "acceptance": "Real HTTP uses the catalog and decision spine; authored control can decide and a fresh plan cannot bypass coverage deferral.",
+      "command": "python -m pytest tests/test_service.py::test_authored_question_uses_catalog_and_preserves_fresh_deferral -q",
+      "evidence": "Red: /api/ask did not exist; catalog-owned source was misreported as changed and mismatched scope could decide. Green: real HTTP invokes shared deterministic CLI decision spine, authored control decides, fresh origin defers, wrong scope/entity/date defers, malformed objects fail, and catalog-owned current sources are not reported changed. Focused service/CLI/finalize 14 passed; full offline suite 359 passed. Fresh hosted path, persisted runs and browser remain pending."
+    },
+    {
+      "id": "R04B",
+      "phase": "repair",
+      "finding": "F04",
+      "depends_on": [
+        "R04A"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/applicability.py",
+        "src/qjig/acquisition.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_fresh_scope_mismatch_never_reaches_planner",
+      "action": "Enforce request scope for fresh source acquisition",
+      "acceptance": "A scope mismatch or unknown scope cannot be presented as applicable planner or judge evidence; exact scope behavior and provenance remain explicit.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_scope_mismatch_never_reaches_planner -q",
+      "evidence": ""
     }
   ]
 }

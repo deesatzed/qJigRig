@@ -8,8 +8,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .applicability import MemberMetadata, Interval
-from .cli import _dec, _member_from_row, _member_row
-from .contracts import ContractError
+from .cli import _dec, _member_from_row, _member_row, run_authored
+from .contracts import ContractError, Request
 from .indexing import index_entries, invalidate_superseded, save_entries
 from .sources import SourceRevision, decode_source
 from .store import Catalog
@@ -88,7 +88,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._trusted_host() or not self._trusted_origin():
             self._reply(403, {"error": "untrusted host or origin"})
             return
-        if self.path != "/api/sources":
+        if self.path not in ("/api/sources", "/api/ask"):
             self._reply(404, {"error": "not found"})
             return
         lengths = self.headers.get_all("Content-Length", [])
@@ -104,11 +104,21 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             body = json.loads(self.rfile.read(length).decode("utf-8"))
-            result, created = self._import_source(body)
-        except (ValueError, TypeError, KeyError, UnicodeError, ContractError):
-            self._reply(400, {"error": "invalid source request"})
+            if self.path == "/api/sources":
+                result, created = self._import_source(body)
+                self._reply(201 if created else 200, result)
+            else:
+                if not isinstance(body, dict) or set(body) != {"request", "policy"}:
+                    raise ContractError("request and policy required")
+                if not isinstance(body["request"], dict) or not isinstance(body["policy"], dict):
+                    raise ContractError("request and policy must be objects")
+                request = Request.from_dict(body["request"])
+                with self.server.writer_lock:
+                    result, _ = run_authored(self.server.catalog, request, body["policy"])
+                self._reply(200, {"kind": "deterministic", "result": result})
+        except (ValueError, TypeError, KeyError, UnicodeError, ContractError, ArithmeticError, re.error):
+            self._reply(400, {"error": "invalid request"})
             return
-        self._reply(201 if created else 200, result)
 
     def _import_source(self, body: object) -> tuple[dict, bool]:
         if not isinstance(body, dict) or set(body) != _FIELDS:
