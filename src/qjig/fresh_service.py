@@ -165,6 +165,42 @@ class FreshWorkbench:
             events = Journal(con, lambda: 0).events(replay['request']['request_id'])
         return make_fresh_receipt(archive_bytes, events, replay['request']['request_id'])
 
+    def check_cases(self, run_id: str, cases: object) -> dict:
+        """Evaluate explicit hypothetical assignments against a saved graph, without inference."""
+        from .assurance import Counterexample, check_counterexamples
+        from .logic import Observation, Outcome
+        from .plans import parse_plan
+        if not isinstance(cases, list) or not 1 <= len(cases) <= 20:
+            raise ContractError('one to twenty hypothetical cases required')
+        saved = self.replay(run_id)
+        view = saved['plan']
+        if view is None:
+            raise ContractError('structurally replayable plan required')
+        plan = parse_plan({'origin': view['origin'], 'expression': view['expression'],
+                           'predicates': [{'id': predicate['id'], 'question': predicate['question'],
+                                           'depends_on': list(predicate['depends_on']),
+                                           **({'exact_operator': predicate['exact_operator']}
+                                              if predicate['exact_operator'] is not None else {})}
+                                          for predicate in view['predicates']]})
+        parsed = []
+        for case in cases:
+            if (not isinstance(case, dict) or set(case) != {'case_id', 'assignments', 'expected'}
+                    or not isinstance(case['case_id'], str) or not case['case_id'].strip() or len(case['case_id']) > 128
+                    or not isinstance(case['assignments'], dict) or not isinstance(case['expected'], str)):
+                raise ContractError('invalid hypothetical case')
+            try:
+                assignments = {key: Observation(Outcome(value), 'authored_hypothetical')
+                               for key, value in case['assignments'].items()}
+                expected = Outcome(case['expected'])
+            except (TypeError, ValueError):
+                raise ContractError('invalid hypothetical outcome') from None
+            parsed.append(Counterexample(case['case_id'], assignments, expected, 'authored_hypothetical'))
+        results = check_counterexamples(plan, parsed)
+        return {'run_id': run_id, 'archive_digest': saved['verification']['digest'],
+                'attribution': 'authored_hypothetical', 'independent': False,
+                'results': [{'case_id': item.case_id, 'expected': item.expected.value, 'actual': item.actual.value,
+                             'classification': item.classification} for item in results]}
+
     def list_runs(self) -> list[dict]:
         runs = self.state_dir / 'runs'
         if runs.is_symlink():

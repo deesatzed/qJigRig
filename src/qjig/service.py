@@ -260,7 +260,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._trusted_host() or not self._trusted_origin():
             self._reply(403, {"error": "untrusted host or origin"})
             return
-        if self.path not in ("/api/sources", "/api/ask", "/api/fresh", "/api/interpretations", "/api/interventions", "/api/programs/from-run"):
+        if self.path not in ("/api/sources", "/api/ask", "/api/fresh", "/api/fresh-cases", "/api/interpretations", "/api/interventions", "/api/programs/from-run"):
             self._reply(404, {"error": "not found"})
             return
         lengths = self.headers.get_all("Content-Length", [])
@@ -279,6 +279,15 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/sources":
                 result, created = self._import_source(body)
                 self._reply(201 if created else 200, result)
+            elif self.path == "/api/fresh-cases":
+                if self.server.fresh_backend is None:
+                    self._reply(503, {"error": "fresh planning is not configured"})
+                    return
+                if not isinstance(body, dict) or set(body) != {'run_id', 'cases'}:
+                    raise ContractError('run and hypothetical cases required')
+                with self.server.writer_lock:
+                    result = self.server.fresh_backend.check_cases(body['run_id'], body['cases'])
+                self._reply(200, result)
             elif self.path == "/api/fresh":
                 if self.server.fresh_backend is None:
                     self._reply(503, {"error": "fresh planning is not configured"})
@@ -346,6 +355,9 @@ class Handler(BaseHTTPRequestHandler):
                     result["reasons"] = list(result["reasons"]) + ["catalog_changed_during_run"]
                 self._reply(200, {"kind": "deterministic", "result": result,
                                   "source_state_before": before, "source_state_after": after, "run_id": run_id})
+        except FileNotFoundError:
+            self._reply(404, {"error": "saved run unavailable"})
+            return
         except BudgetExceeded:
             self._reply(409, {"error": "fresh planning preflight unavailable or budget exhausted"})
             return

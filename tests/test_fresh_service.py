@@ -366,6 +366,8 @@ def test_interrupted_fresh_run_exposes_pending_attempt_after_restart(tmp_path):
         assert partial_check['resources']['actual_input_tokens'] is None
         assert replay['review'] is None
         assert replay['reconciliation']['status'] == 'required'
+        with pytest.raises(ClientError):
+            client.check_fresh_cases(run_id, [{'case_id':'unavailable','assignments':{},'expected':'true'}])
         assert replay['reconciliation']['unresolved'][0]['stage'] == 'planner'
         assert replay['resources']['calls'] == 1 and replay['resources']['cost_status'] == 'unknown'
         assert replay['resources']['known_cost_usd'] is None
@@ -600,6 +602,25 @@ def test_fresh_enabling_graph_is_visible_and_replayed(tmp_path):
         assert 'ob-plan-coverage' in result['blocking_obligations'] and transport.calls_made==8
         replay=client.get_fresh_run(result['run_id'])
         assert replay['plan']==result['plan'] and replay['verification']['status']=='unanchored'
+        controls = client.check_fresh_cases(result['run_id'], [
+            {'case_id':'enabling', 'assignments':{'eligible':'true','ordinary':'false','exception':'true'}, 'expected':'true'},
+            {'case_id':'missing', 'assignments':{'eligible':'true','ordinary':'false'}, 'expected':'true'},
+            {'case_id':'opposite', 'assignments':{'eligible':'true','ordinary':'false','exception':'true'}, 'expected':'false'}])
+        assert controls['archive_digest'] == replay['verification']['digest']
+        assert controls['independent'] is False and controls['attribution'] == 'authored_hypothetical'
+        assert [item['classification'] for item in controls['results']] == [
+            'matches_authored_expectation','inconclusive','contradicts_authored_expectation']
+        with pytest.raises(ClientError):
+            client.check_fresh_cases(result['run_id'], [{'case_id':'invalid','assignments':{'other':'true'},'expected':'true'}])
+        with pytest.raises(ClientError):
+            client.check_fresh_cases(result['run_id'], [])
+        duplicate = {'case_id':'same','assignments':{},'expected':'true'}
+        with pytest.raises(ClientError):
+            client.check_fresh_cases(result['run_id'], [duplicate, duplicate])
+        with pytest.raises(ClientError, match='404'):
+            client.check_fresh_cases('0'*64, [{'case_id':'missing','assignments':{},'expected':'true'}])
+        assert client.get_fresh_run(result['run_id'])['verification']['digest'] == controls['archive_digest']
+        assert transport.calls_made == 8
         if os.environ.get('QJIG_CHROMIUM_PATH'):
             playwright=pytest.importorskip('playwright.sync_api')
             with playwright.sync_playwright() as p:

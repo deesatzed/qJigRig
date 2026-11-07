@@ -4283,6 +4283,26 @@
       "acceptance": "Show predicate questions and Boolean composition in immediate and structurally replayed fresh results, labeled unvalidated and incomplete.",
       "command": "python -m pytest tests/test_fresh_service.py::test_fresh_enabling_graph_is_visible_and_replayed -q",
       "evidence": "Red: fresh service omitted the plan. Synthetic actual-pipeline and Chrome replay display an enabling graph eligible AND (ordinary OR exception), retain conditional true and request-level deferral, and suppress plan output for invalid archives. Chrome/fresh/replay/assurance checks: 25 passed. This does not establish that a real model composes exceptions correctly; R05 and hosted checks remain open."
+    },
+    {
+      "id": "R05C",
+      "phase": "P5",
+      "depends_on": [
+        "R05B",
+        "T055I"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/service.py",
+        "src/qjig/agents.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_fresh_enabling_graph_is_visible_and_replayed",
+      "action": "Check authored hypothetical counterexamples against saved fresh plans",
+      "acceptance": "Role clients evaluate bounded explicit assignments against a structurally replayed graph without inference or mutation, preserving non-independent attribution.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_fresh_enabling_graph_is_visible_and_replayed -q",
+      "evidence": "Red: RoleClient had no saved-plan counterexample path. Synthetic service tests exercise enabling, missing and contradictory assumptions, invalid and duplicate cases, missing runs and unchanged archive digest; Chrome/fresh/assurance/client/service checks 20 passed. Results are authored hypotheses, not source facts, independent labels or real-model quality evidence. Full R05 and hosted checks remain open."
     }
   ]
 }

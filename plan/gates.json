@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "06b304728a2dd9f465a4089d0e79d9f4d505a302db5d6d62f5b5cd54f491a905",
-  "queue_sha256": "60dd363482cae6a99591e1dbc072fe2c1c3946232a05e9f455f2220d6654cbef",
+  "queue_sha256": "d3f736727ce1ad7a9f621154bd3f319e70ad3203ce61a55d9fcee943e5d2eb8c",
   "gates": [
     {
       "id": "F01",
@@ -51,7 +51,8 @@
       "task_ids": [
         "R05",
         "R05A",
-        "R05B"
+        "R05B",
+        "R05C"
       ],
       "evidence": []
     },
@@ -301,6 +302,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_planner_receives_bounded_verified_applicable_sources -q",
       "queue_evidence_assertion": "Red: planner prompt contained only question and corpus hash. Green: stand-in planning receives bounded verified applicable primary/exception/contradiction candidates, records exclusions/channel omissions/truncation, labels source text untrusted, binds packet content into prompt hash, and remains deferred. Tests include applicable instruction contamination and inapplicable exclusion; no model resistance inferred. Full offline suite 343 passed. R05 and T050 retain semantic evaluation and live comparison requirements."
+    },
+    {
+      "id": "R05C",
+      "status": "unverified",
+      "task_ids": [
+        "R05C"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_service.py::test_fresh_enabling_graph_is_visible_and_replayed -q",
+      "queue_evidence_assertion": "Red: RoleClient had no saved-plan counterexample path. Synthetic service tests exercise enabling, missing and contradictory assumptions, invalid and duplicate cases, missing runs and unchanged archive digest; Chrome/fresh/assurance/client/service checks 20 passed. Results are authored hypotheses, not source facts, independent labels or real-model quality evidence. Full R05 and hosted checks remain open."
     },
     {
       "id": "R06",

@@ -115,6 +115,11 @@ class RoleClient:
             raise ContractError('invalid fresh run identity')
         return self._request('GET', '/api/fresh-runs/' + run_id)
 
+    def check_fresh_cases(self, run_id: str, cases: list[dict]) -> dict:
+        if not isinstance(run_id, str) or not re.fullmatch(r'[0-9a-f]{64}', run_id) or not isinstance(cases, list):
+            raise ContractError('fresh run identity and cases required')
+        return self._request('POST', '/api/fresh-cases', {'run_id': run_id, 'cases': cases})
+
     def ask_fresh(self, request_id: str, question: str, scope: str, *, as_of: str, entities: list[str]) -> dict:
         if (any(not isinstance(value, str) or not value.strip() for value in (request_id, question, scope, as_of))
                 or not isinstance(entities, list)
