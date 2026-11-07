@@ -21,9 +21,9 @@ def test_goal_budget_survives_restart_and_enforces_partition_and_request_caps(tm
         with pytest.raises(ContractError):
             resumed.reserve("attempt-1", "request-1", "smoke", tokens=200, cost_usd=0.2)
         resumed.reserve("attempt-2", "request-2", "holdout", tokens=400, cost_usd=0.4)
-        resumed.record_usage("attempt-2", input_tokens=100, output_tokens=50, cost_usd=0.1)
+        resumed.record_usage("attempt-2", input_tokens=100, output_tokens=50, cost_usd=0.35)
         with pytest.raises(BudgetExceeded):
-            resumed.reserve("attempt-3", "request-3", "holdout", tokens=201, cost_usd=0.1)
+            resumed.reserve("attempt-3", "request-3", "holdout", tokens=201, cost_usd=0.3)
         assert resumed.totals() == Budget(2, 600, 0.6)
     with pytest.raises(ContractError):
         GoalBudget.open(path, total=Budget(5, 1000, 1.0), per_request=per_request, allocations=allocations)
@@ -92,10 +92,12 @@ def test_actual_usage_unknown_and_exceeded_bounds_are_not_hidden(tmp_path):
     with GoalBudget.open(tmp_path / "unknown.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as ledger:
         ledger.reserve("a", "r", "smoke", tokens=100, cost_usd=0.1)
         assert ledger.actual_usage()["cost_usd"] is None
+        assert ledger.committed() == Budget(1, 100, 0.1)
     with GoalBudget.open(tmp_path / "overrun.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as ledger:
         ledger.reserve("a", "r", "smoke", tokens=100, cost_usd=0.1)
         ledger.record_usage("a", input_tokens=100, output_tokens=1, cost_usd=0.11)
         assert ledger.actual_usage()["cost_usd"] == 0.11
+        assert ledger.committed() == Budget(1, 101, 0.11)
         with pytest.raises(BudgetExceeded, match="bound_exceeded"):
             ledger.reserve("b", "r", "smoke", tokens=50, cost_usd=0.05)
 
@@ -209,3 +211,17 @@ def test_recover_after_interruption_between_journal_receipt_and_goal_update(tmp_
         assert goal.actual_usage()["unknown_calls"] == 1
         assert goal.recover_receipt(events[0].payload["goal_attempt_id"], journal) == events[0].call_id
         assert goal.actual_usage()["cost_usd"] == 0.1
+
+
+def test_complete_usage_releases_only_unused_reservation_after_restart(tmp_path):
+    path = tmp_path / "g.sqlite"
+    limit = Budget(2, 100, 0.2)
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={"smoke": limit}) as goal:
+        goal.reserve("a", "r", "smoke", tokens=90, cost_usd=0.18)
+        goal.record_usage("a", input_tokens=20, output_tokens=10, cost_usd=0.06)
+        assert goal.totals() == Budget(1, 90, 0.18)  # original reservation is preserved
+        assert goal.committed() == Budget(1, 30, 0.06)
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={"smoke": limit}) as goal:
+        goal.reserve("b", "r", "smoke", tokens=70, cost_usd=0.14)
+        assert goal.totals() == Budget(2, 160, 0.32)  # sum of original bounds, not actual spend
+        assert goal.committed() == Budget(2, 100, 0.2)

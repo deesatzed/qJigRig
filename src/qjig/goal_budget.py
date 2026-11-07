@@ -1,7 +1,7 @@
 """Persistent goal-wide reservation ledger; does not itself authorize provider calls.
 
-Reservations are conservative and never released here. The caller must use one fixed
-ledger for the whole goal; moving or replacing the file is not an accounting reset.
+Original reservations remain recorded; complete usage commits actuals, while unknown
+usage retains the bound. One fixed ledger must cover the whole goal.
 """
 from __future__ import annotations
 
@@ -78,6 +78,24 @@ class GoalBudget:
 
     def totals(self) -> Budget:
         count, tokens, cost = self._sum(self._con.execute("SELECT tokens, cost FROM reservations").fetchall())
+        return Budget(count, tokens, float(cost))
+
+    @staticmethod
+    def _committed_rows(rows) -> tuple[int, int, Decimal]:
+        tokens = 0
+        cost = Decimal(0)
+        for bound, bound_cost, inp, out, actual_cost in rows:
+            if inp is None or out is None or actual_cost is None:
+                tokens += bound
+                cost += Decimal(bound_cost)
+            else:
+                tokens += inp + out
+                cost += Decimal(actual_cost)
+        return len(rows), tokens, cost
+
+    def committed(self) -> Budget:
+        rows = self._con.execute("SELECT r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()
+        count, tokens, cost = self._committed_rows(rows)
         return Budget(count, tokens, float(cost))
 
     def record_usage(self, attempt_id: str, *, input_tokens: int | None, output_tokens: int | None, cost_usd: float | None) -> None:
@@ -165,11 +183,11 @@ class GoalBudget:
             if any(i + o > bound or Decimal(c) > Decimal(cost) for bound, cost, i, o, c in previous):
                 raise BudgetExceeded("bound_exceeded", "observed usage exceeded its reservation")
             for label, query, args, limit in (
-                ("goal", "SELECT tokens,cost FROM reservations", (), self._total),
-                ("partition", "SELECT tokens,cost FROM reservations WHERE partition=?", (partition,), self._allocations[partition]),
-                ("request", "SELECT tokens,cost FROM reservations WHERE request_id=?", (request_id,), self._per_request),
+                ("goal", "SELECT r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id", (), self._total),
+                ("partition", "SELECT r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id WHERE r.partition=?", (partition,), self._allocations[partition]),
+                ("request", "SELECT r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id WHERE r.request_id=?", (request_id,), self._per_request),
             ):
-                n, t, c = self._sum(self._con.execute(query, args).fetchall())
+                n, t, c = self._committed_rows(self._con.execute(query, args).fetchall())
                 if not _fits((n + 1 + hold_back_calls, t + tokens + hold_back_tokens,
                               c + _cost(cost_usd) + _cost(hold_back_cost_usd)), limit):
                     raise BudgetExceeded(label, "reservation exceeds persistent limit")
