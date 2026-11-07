@@ -1204,7 +1204,8 @@
       "depends_on": [
         "T066",
         "T052",
-        "T068A"
+        "T068A",
+        "T068B"
       ],
       "status": "pending",
       "files": [
@@ -2596,6 +2597,24 @@
       "acceptance": "New direct prompts omit internal request IDs while archives retain them, and replay remains versioned for prior records.",
       "command": "python -m pytest tests/test_evaluation.py::test_direct_provider_prompt_excludes_internal_assignment_identity -q",
       "evidence": "Red: direct provider prompt contained a canary request ID that could encode arm mapping. Green: version 2 prompt omits request_id while local archive preserves it; version 1 legacy replay is tested with an emulated recording. Focused 27 passed; full offline 499 passed. This does not prove other fields, source content or other provider entrypoints are free of labels."
+    },
+    {
+      "id": "T068B",
+      "phase": "P6",
+      "depends_on": [
+        "T065C",
+        "T068A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_direct_score_binds_private_reference_and_required_source_quotes",
+      "action": "Compare replayed direct answers with bound attributed references",
+      "acceptance": "An externally pinned reference must match the run context and sources; score records evidence coverage and keeps unvalidated reference provenance explicit.",
+      "command": "python -m pytest tests/test_evaluation.py::test_direct_score_binds_private_reference_and_required_source_quotes -q",
+      "evidence": "Red: no attributed reference comparison for direct archives existed. Green: a pinned private reference must match a structurally replayed run context and source set; exact required source quotes are compared to returned citations, and authored/AI-review provenance remains unvalidated. Synthetic tests cover matches, mismatches, deferrals, missing evidence, mismatched context and invalid hashes. Focused 17 passed; full offline 504 passed. Failed assignments, reference correctness, semantic relevance, full corpus isolation and aggregate comparison remain open."
     }
   ]
 }

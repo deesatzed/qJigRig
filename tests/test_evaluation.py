@@ -364,3 +364,88 @@ def test_legacy_direct_prompt_archive_remains_replayable(tmp_path, monkeypatch):
         archive._con.execute('DROP TRIGGER context_no_update')
         archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1', (encoded, hashlib.sha256(encoded.encode()).hexdigest()))
         assert verify_direct_archive(archive, journal)['status'] == 'unanchored'
+
+
+def test_direct_score_binds_private_reference_and_required_source_quotes(tmp_path):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_direct import run_direct
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.evaluation_scoring import reference_digest, score_direct_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    code, secret = b'Tests must pass.', b'private labels'
+    (tmp_path / 'code').write_bytes(code); (tmp_path / 'label').write_bytes(secret)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    search = DirectRetrieval(tmp_path, [item('code', code)], [item('label', secret)], want=1, max_bytes=3000, followups=0)
+    revision, ident = search._revisions[0].revision_id, search._entries[0].entry_id
+    response = RawResponse(200, json.dumps({'action': 'answer', 'query': None, 'answer': 'yes',
+                                           'citations': [{'entry_id': ident, 'quote': 'Tests must pass.'}]}),
+                           {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01})
+    with Journal.open(tmp_path / 'j.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
+        request = Request('run-1', 'Do tests pass?', 'reviewer', '1', 'project')
+        run_direct(search, request, BudgetLedger(Budget(2, 10000, 1), journal, request.request_id),
+                   StandInTransport([response]), archive=archive, provider='stand-in', model='test', max_tokens=100,
+                   as_of='2026-11-07', entities=[])
+        run_hash = verify_direct_archive(archive, journal)['sha256']
+        ref = {'case_id': 'case-1', 'question': request.question, 'role': request.role, 'role_version': request.role_version,
+               'scope': request.scope, 'as_of': '2026-11-07', 'entities': [], 'historical_as_known': False,
+               'source_revisions': [revision], 'expected_answer': 'yes', 'provenance': 'authored_unvalidated',
+               'evidence': [{'revision_id': revision, 'quote': 'must pass'}]}
+        digest = reference_digest(ref)
+        scored = score_direct_archive(archive, journal, ref, expected_run_sha256=run_hash, expected_reference_sha256=digest)
+        assert scored['classification'] == 'matches_reference' and scored['reference_provenance'] == 'authored_unvalidated'
+        assert scored['required_evidence_covered'] is True and scored['semantic_assurance'] == 'not_assessed'
+        changed = dict(ref, question='A different question?')
+        with pytest.raises(ContractError):
+            score_direct_archive(archive, journal, changed, expected_run_sha256=run_hash, expected_reference_sha256=reference_digest(changed))
+        with pytest.raises(ContractError):
+            score_direct_archive(archive, journal, ref, expected_run_sha256=run_hash, expected_reference_sha256='0'*64)
+        ref2 = dict(ref, evidence=[{'revision_id': revision, 'quote': 'Tests'}])
+        assert score_direct_archive(archive, journal, ref2, expected_run_sha256=run_hash,
+                                    expected_reference_sha256=reference_digest(ref2))['required_evidence_covered'] is True
+        ref3 = dict(ref, evidence=[{'revision_id': revision, 'quote': 'not in source'}])
+        with pytest.raises(ContractError):
+            score_direct_archive(archive, journal, ref3, expected_run_sha256=run_hash, expected_reference_sha256=reference_digest(ref3))
+
+
+@pytest.mark.parametrize(('answer', 'expected', 'quote', 'classification'), [
+    ('yes', 'no', 'Tests must pass.', 'differs_from_reference'),
+    ('unknown', 'yes', 'Tests must pass.', 'unjustified_deferral'),
+    ('unknown', 'unknown', 'Tests must pass.', 'justified_deferral'),
+    ('yes', 'yes', 'Tests', 'unknown_review'),
+])
+def test_direct_score_reports_reference_mismatch_and_incomplete_evidence(tmp_path, answer, expected, quote, classification):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_direct import run_direct
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.evaluation_scoring import reference_digest, score_direct_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    code, secret = b'Tests must pass.', b'private labels'
+    (tmp_path / 'code').write_bytes(code); (tmp_path / 'label').write_bytes(secret)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    search = DirectRetrieval(tmp_path, [item('code', code)], [item('label', secret)], want=1, max_bytes=3000, followups=0)
+    revision, ident = search._revisions[0].revision_id, search._entries[0].entry_id
+    body = json.dumps({'action': 'answer', 'query': None, 'answer': answer,
+                       'citations': [{'entry_id': ident, 'quote': quote}]})
+    with Journal.open(tmp_path / 'j.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
+        request = Request('run-1', 'Do tests pass?', 'reviewer', '1', 'project')
+        run_direct(search, request, BudgetLedger(Budget(2, 10000, 1), journal, request.request_id),
+                   StandInTransport([RawResponse(200, body, {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01})]),
+                   archive=archive, provider='stand-in', model='test', max_tokens=100, as_of='2026-11-07', entities=[])
+        ref = {'case_id': 'c', 'question': request.question, 'role': request.role, 'role_version': '1', 'scope': 'project',
+               'as_of': '2026-11-07', 'entities': [], 'historical_as_known': False, 'source_revisions': [revision],
+               'expected_answer': expected, 'provenance': 'ai_reviewed_unvalidated',
+               'evidence': [{'revision_id': revision, 'quote': 'must pass'}]}
+        score = score_direct_archive(archive, journal, ref, expected_run_sha256=verify_direct_archive(archive, journal)['sha256'],
+                                     expected_reference_sha256=reference_digest(ref))
+        assert score['classification'] == classification
+        assert score['reference_provenance'] == 'ai_reviewed_unvalidated'
