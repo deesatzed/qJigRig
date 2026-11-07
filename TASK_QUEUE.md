@@ -1,16 +1,14 @@
 # qJig task queue
 
-This queue implements GOAL.md. T001-T038 (phases P1-P3, the offline deterministic slice) are complete with receipts in plan/tasks.json and PROGRESS.md; T039-T074 are pending. Source-project tests do not close these tasks.
+This queue implements GOAL.md. T001-T045 and T047 (P1-P3 plus the offline, stand-in-tested parts of P4) are complete with receipts in plan/tasks.json and PROGRESS.md; T046 and T048-T074 are pending. T046 is blocked on the owner's model choice, budget and key arrangement. Source-project tests do not close these tasks.
 
 Authoritative machine-readable dependencies: [plan/tasks.json](plan/tasks.json). Exact per-task red/green/commit steps: [detailed build plan](docs/plans/2026-11-06-qjig-build.md).
 
-## Next five small tasks
+## Next tasks
 
-1. T039: record call intent in a journal before any provider side effect.
-2. T040: refuse a blind retry of an uncertain paid call.
-3. T041: enforce request-wide physical call reservations.
-4. T042: validate typed responses and keep invalid HTTP-success output.
-5. T043: bind a fresh bounded planner response to request, corpus and model.
+1. T046 (BLOCKED, needs the owner): opt-in real planner/judge smoke with receipts. Needs a model ID chosen from a current lookup, a call/token/spend budget, and how the key is supplied.
+2. T048-T052 depend on T046 in plan/tasks.json (fresh pipeline, Hy4 escalation, assurance cases, replay, cost aggregation).
+3. Independent of T046 in substance but ordered after it in the plan: P5 (T053-T062) and P6 (T063-T074). Starting them early would need a recorded plan change.
 
 P4 onward touches providers: it needs a labeled stand-in transport (approval) for offline tests and a configured budget before any live call.
 
