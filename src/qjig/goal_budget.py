@@ -396,13 +396,14 @@ class GoalBudget:
         raise ContractError("no matching unconsumed required work")
 
     def check_required_work(self, work_id: str, *, request_id: str, partition: str, stage: str,
-                            provider: str, model: str, tokens: int, cost_usd: float, work_binding_sha256: str) -> None:
+                            provider: str, model: str, tokens: int, cost_usd: float, work_binding_sha256: str) -> str:
         """Check that an unconsumed bound slot is part of an intact frozen run set."""
         row = self._con.execute("SELECT s.set_id,w.work_binding_sha256 FROM run_set_work s JOIN required_work w ON w.work_id=s.work_id WHERE w.work_id=?", (work_id,)).fetchone()
         if row is None or row[1] is None or row[1] != work_binding_sha256:
             raise ContractError("required work binding is unavailable")
         self.select_required_work(row[0], request_id=request_id, partition=partition, stage=stage, provider=provider,
                                   model=model, tokens=tokens, cost_usd=cost_usd, allowed_work_ids={work_id})
+        return row[0]
 
     def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float,
                 hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0,

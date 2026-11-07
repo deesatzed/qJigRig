@@ -8,11 +8,13 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import replace
+from decimal import Decimal
 
 from .acquisition import MAX_ROUNDS
 from .contracts import ContractError
 from .plans import MAX_PREDICATES
-from .providers import ProviderRequest, fresh_work_binding, make_call_reservation
+from .providers import CallReservation, ProviderRequest, _ceiling_token_cost, fresh_work_binding, make_call_reservation
+from .budgets import _valid_cost
 
 
 def _slot_id(request_id, partition, request, input_tokens, pricing_sha256, index):
@@ -84,3 +86,25 @@ def fresh_slot_reservation(goal, set_id: str, *, request_id: str, partition: str
                                       allowed_work_ids=allowed)
     return replace(bound, required_id=ident,
                    work_binding_sha256=fresh_work_binding(request, input_tokens, bound.pricing_sha256))
+
+
+def check_fresh_stage_slots(goal, *, request_id: str, partition: str, request: ProviderRequest,
+                            reservation_factory, count: int) -> str:
+    """Verify all expected slots for one stage and return their common frozen set ID."""
+    if reservation_factory is None or type(count) is not int or count < 1:
+        raise ContractError('fresh stage reservations are unavailable')
+    bound = reservation_factory(request)
+    if (not isinstance(bound, CallReservation) or bound.request_sha256 != request.input_sha256()
+            or bound.required_id is None or bound.work_binding_sha256 is None or not _valid_cost(bound.cost_usd)
+            or Decimal(str(bound.cost_usd)) < _ceiling_token_cost(request, bound.input_tokens)
+            or bound.work_binding_sha256 != fresh_work_binding(request, bound.input_tokens, bound.pricing_sha256)):
+        raise ContractError('fresh stage reservation is not bound')
+    set_ids = set()
+    for index in range(count):
+        ident = _slot_id(request_id, partition, request, bound.input_tokens, bound.pricing_sha256, index)
+        set_ids.add(goal.check_required_work(ident, request_id=request_id, partition=partition, stage=request.stage,
+                    provider=request.provider, model=request.model, tokens=bound.input_tokens + request.max_tokens,
+                    cost_usd=bound.cost_usd, work_binding_sha256=bound.work_binding_sha256))
+    if len(set_ids) != 1:
+        raise ContractError('fresh stage slots span different frozen sets')
+    return set_ids.pop()

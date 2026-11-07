@@ -366,6 +366,7 @@ def run_fresh(
     reviewer_max_tokens: int = 800,
     reviewer_max_price: dict | None = None,
     review_reservation_factory: ReservationFactory | None = None,
+    require_complete_reservations: bool = False,
     reservation_factory: ReservationFactory | None = None, archive=None,
     applicability_inputs: ApplicabilityInputs | None = None,
     role_priors: dict[str, float] | None = None,
@@ -379,6 +380,10 @@ def run_fresh(
     passages for review but can never close it, so the result is a deferral that names the gap.
     """
     _check_role_priors({} if role_priors is None else role_priors)
+    if type(require_complete_reservations) is not bool or (require_complete_reservations and ledger._goal_budget is None):
+        raise ContractError('complete fresh preflight requires a goal ledger')
+    review_set = None
+    fresh_set = None
     # Freeze and validate both limits before archive writes or provider calls.
     def freeze_price(value):
         if value is None:
@@ -407,7 +412,7 @@ def run_fresh(
                         or Decimal(str(held.cost_usd)) < _ceiling_token_cost(probe, held.input_tokens)
                         or held.work_binding_sha256 != fresh_work_binding(probe, held.input_tokens, held.pricing_sha256)):
                     raise ContractError('review reservation is not bound')
-                ledger._goal_budget.check_required_work(held.required_id, request_id=request.request_id,
+                review_set = ledger._goal_budget.check_required_work(held.required_id, request_id=request.request_id,
                     partition=ledger._partition, stage=probe.stage, provider=probe.provider, model=probe.model,
                     tokens=held.input_tokens + probe.max_tokens, cost_usd=held.cost_usd,
                     work_binding_sha256=held.work_binding_sha256)
@@ -415,6 +420,30 @@ def run_fresh(
                 unavailable = PlanReviewOutcome('unavailable', None, None, 'review_preflight_unavailable')
                 return FreshRun('deferred', ('plan_coverage_unestablished', 'review_preflight_unavailable'),
                                 'review_preflight_unavailable', None, None, None, {}, {}, (), None, unavailable)
+    if ledger._goal_budget is not None and (reviewer is not None or require_complete_reservations):
+        from .fresh_preflight import check_fresh_stage_slots
+        from .plans import MAX_PREDICATES
+        from .program_review import PlanReviewOutcome
+        try:
+            probes = [ProviderRequest('planner', planner[0], planner[1], '',
+                                      planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS,
+                                      max_price=planner_max_price)]
+            probes += [ProviderRequest(stage, judge[0], judge[1], '',
+                                       judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS,
+                                       max_price=judge_max_price) for stage in ('judge_positive', 'judge_negative')]
+            sets = {check_fresh_stage_slots(ledger._goal_budget, request_id=request.request_id, partition=ledger._partition,
+                                           request=probe, reservation_factory=reservation_factory,
+                                           count=1 if probe.stage == 'planner' else MAX_PREDICATES * MAX_ROUNDS)
+                    for probe in probes}
+            if review_set is not None:
+                sets.add(review_set)
+            if len(sets) != 1:
+                raise ContractError('fresh stages span different frozen sets')
+            fresh_set = sets.pop()
+        except (ContractError, BudgetExceeded, TypeError, IndexError):
+            unavailable = PlanReviewOutcome('unavailable', None, None, 'fresh_preflight_unavailable') if reviewer else None
+            return FreshRun('deferred', ('plan_coverage_unestablished', 'fresh_preflight_unavailable'),
+                            'fresh_preflight_unavailable', None, None, None, {}, {}, (), None, unavailable)
     revision_ids = sorted({entry.span.revision_id for entry in entries})
     entity_date = {revision_id: revision_applicability(revision_id) for revision_id in revision_ids}
     if any(not isinstance(value, Applicability) for value in entity_date.values()):
@@ -452,6 +481,7 @@ def run_fresh(
             "applicability_provenance": "recorded_inputs" if applicability_inputs is not None else "verdict_only",
             "applicability_inputs": applicability_inputs.to_dict() if applicability_inputs is not None else None,
             "planning_evidence": planning_evidence,
+            **({'fresh_run_set': fresh_set} if fresh_set is not None else {}),
             **({"reviewer": {"provider": reviewer[0], "model": reviewer[1], "max_tokens": reviewer_max_tokens,
                              "max_price": reviewer_max_price}} if reviewer is not None else {}),
         })

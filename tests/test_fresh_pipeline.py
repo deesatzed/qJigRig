@@ -758,8 +758,8 @@ def test_fresh_review_does_not_follow_uncertain_judge_call(tmp_path):
         assert all(event.stage != 'plan_review' for event in journal.events('req-f'))
 
 
-@pytest.mark.parametrize('include_review', [True, False])
-def test_fresh_review_consumes_separately_reserved_slot(tmp_path, include_review):
+@pytest.mark.parametrize('include_review,missing_judge,split_sets', [(True, False, False), (False, False, False), (True, True, False), (True, False, True)])
+def test_fresh_review_consumes_separately_reserved_slot(tmp_path, include_review, missing_judge, split_sets):
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
     from qjig.fresh_preflight import fresh_run_allocations, fresh_slot_reservation
     from qjig.goal_budget import GoalBudget
@@ -776,13 +776,19 @@ def test_fresh_review_consumes_separately_reserved_slot(tmp_path, include_review
                                   planner_model=models['planner'], judge_model=models['judge'],
                                   planner_input=1000, planner_output=50, judge_input=1000, judge_output=50,
                                   planner_price=cap, judge_price=cap, reviewer=review if include_review else None)
+    if missing_judge:
+        removed = next(slot for slot in slots if slot['stage'] == 'judge_positive')
+        slots.remove(removed)
     inputs = ApplicabilityInputs(Collection((MemberMetadata(REV.revision_id, 'project', Interval('2026-01-01', OPEN)),)),
                                  frozenset(), '2026-11-07', False)
     limit = Budget(30, 50000, 1)
     with cat, journal, RunArchive.open(tmp_path / 'archive') as archive, GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
-        goal.reserve_run_set('fresh-run', slots)
+        goal.reserve_run_set('fresh-run', [slot for slot in slots if not split_sets or not slot['stage'].startswith('judge_')])
+        if split_sets:
+            goal.reserve_run_set('other-run', [slot for slot in slots if slot['stage'].startswith('judge_')])
         def reserve(request):
-            return fresh_slot_reservation(goal, 'fresh-run', request_id=REQUEST.request_id, partition='smoke',
+            set_id = 'other-run' if split_sets and request.stage.startswith('judge_') else 'fresh-run'
+            return fresh_slot_reservation(goal, set_id, request_id=REQUEST.request_id, partition='smoke',
                                           request=request, model=models[request.model], input_tokens=1000,
                                           input_bound_provenance='synthetic fixture')
         ledger = BudgetLedger(limit, journal, REQUEST.request_id, goal_budget=goal, partition='smoke')
@@ -793,7 +799,10 @@ def test_fresh_review_consumes_separately_reserved_slot(tmp_path, include_review
                            planner_max_tokens=50, judge_max_tokens=50, reviewer_max_tokens=50,
                            planner_max_price=cap, judge_max_price=cap, reviewer_max_price=cap)
         assert result.status == 'deferred' and 'plan_coverage_unestablished' in result.reasons
-        if include_review:
+        if missing_judge or split_sets:
+            assert result.review.status == 'unavailable' and result.review.failure == 'fresh_preflight_unavailable'
+            assert transport.calls_made == 0 and journal.events('req-f') == []
+        elif include_review:
             assert result.review.status == 'recorded' and transport.calls_made == 4
             assert goal._con.execute("SELECT COUNT(*) FROM required_work WHERE stage='plan_review' AND attempt_id IS NOT NULL").fetchone()[0] == 1
         else:
