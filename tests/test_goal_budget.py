@@ -168,7 +168,7 @@ def test_recover_goal_usage_from_matching_durable_receipt(tmp_path):
         goal.reserve("attempt", "r", "smoke", tokens=100, cost_usd=0.2)
         run_journaled(journal, call=lambda: ("ok", {"prompt_tokens": 20, "completion_tokens": 10, "cost_usd": 0.1}),
                       request_id="r", stage="planner", provider="stand-in", model="m", input_sha256="a" * 64,
-                      intent_payload={"goal_attempt_id": "attempt"})
+                      intent_payload={"goal_attempt_id": "attempt", "reserve_tokens": 100, "reserve_cost_usd": 0.2})
         assert goal.actual_usage()["unknown_calls"] == 1
         assert goal.recover_receipt("attempt", journal) == "r#1"
         assert goal.actual_usage() == {"calls": 1, "input_tokens": 20, "output_tokens": 10, "cost_usd": 0.1, "known_input_tokens": 20, "known_output_tokens": 10, "known_cost_usd": 0.1, "unknown_calls": 0}
@@ -410,3 +410,35 @@ def test_run_set_refuses_corruption_and_concurrent_aggregate_overbooking(tmp_pat
             goal.reserve('attempt', ident, 'pilot', tokens=150, cost_usd=0.15, required_id=ident, stage='judge', provider='stand-in', model='altered')
         with pytest.raises(ContractError, match='differ'):
             goal.reserve_run_set(ident, [{**assignment, 'work_id': ident, 'request_id': ident}])
+
+
+def test_recover_rejects_journal_reservation_mismatch_without_releasing_budget(tmp_path):
+    from qjig.journal import Journal, run_journaled
+
+    limit = Budget(2, 500, 0.5)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        goal.reserve('attempt', 'r', 'smoke', tokens=100, cost_usd=0.2)
+        run_journaled(journal, call=lambda: ('ok', {'prompt_tokens': 20, 'completion_tokens': 10, 'cost_usd': 0.1}),
+                      request_id='r', stage='judge', provider='stand-in', model='m', input_sha256='a'*64,
+                      intent_payload={'goal_attempt_id': 'attempt', 'reserve_tokens': 101, 'reserve_cost_usd': 0.2})
+        with pytest.raises(ContractError, match='reservation'):
+            goal.recover_receipt('attempt', journal)
+        assert goal.actual_usage()['unknown_calls'] == 1
+        with pytest.raises(BudgetExceeded, match='unknown'):
+            goal.reserve('next', 'r2', 'smoke', tokens=1, cost_usd=0.01)
+
+
+def test_recover_rejects_receipt_with_different_request_binding(tmp_path):
+    from dataclasses import replace
+    from qjig.journal import Journal
+
+    limit = Budget(2, 500, 0.5)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        goal.reserve('attempt', 'r', 'smoke', tokens=100, cost_usd=0.2)
+        intent = journal.record_intent(request_id='r', stage='judge', provider='stand-in', model='m', input_sha256='a'*64,
+                                       payload={'goal_attempt_id': 'attempt', 'reserve_tokens': 100, 'reserve_cost_usd': 0.2})
+        journal.record_terminal(replace(intent, input_sha256='b'*64), 'receipt',
+                                {'usage': {'prompt_tokens': 20, 'completion_tokens': 10, 'cost_usd': 0.1}})
+        with pytest.raises(ContractError, match='binding'):
+            goal.recover_receipt('attempt', journal)
+        assert goal.actual_usage()['unknown_calls'] == 1

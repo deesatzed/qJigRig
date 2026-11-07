@@ -130,7 +130,7 @@ class GoalBudget:
         The caller must supply the original trusted journal. A hash binds the recorded
         recovery to the receipt but does not authenticate the journal or its contents.
         """
-        row = self._con.execute("SELECT request_id FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone()
+        row = self._con.execute("SELECT request_id,tokens,cost FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone()
         if row is None:
             raise ContractError("unknown reservation")
         events = journal.events(row[0])
@@ -138,10 +138,19 @@ class GoalBudget:
         if len(intents) != 1:
             raise ContractError("no unique matching journal intent")
         intent = intents[0]
+        bound_tokens, bound_cost = intent.payload.get("reserve_tokens"), intent.payload.get("reserve_cost_usd")
+        if (not _valid_tokens(bound_tokens) or not _valid_cost(bound_cost) or bound_tokens != row[1]
+                or _cost(bound_cost) != Decimal(row[2])):
+            raise ContractError("journal reservation differs from goal reservation")
+        required = self._con.execute("SELECT work_id,stage,provider,model FROM required_work WHERE attempt_id=?", (attempt_id,)).fetchone()
+        if required is not None and (intent.payload.get("required_id"), intent.stage, intent.provider, intent.model) != required:
+            raise ContractError("journal required reservation binding differs")
         terminal = [e for e in events if e.call_id == intent.call_id and e.kind in ("receipt", "failure", "uncertain", "reconciled")]
         if len(terminal) != 1 or terminal[0].kind != "receipt":
             raise ContractError("no unique completed journal receipt")
         receipt = terminal[0]
+        if (receipt.request_id, receipt.stage, receipt.provider, receipt.model, receipt.input_sha256) != (intent.request_id, intent.stage, intent.provider, intent.model, intent.input_sha256):
+            raise ContractError("journal receipt binding differs from intent")
         usage = receipt.payload.get("usage")
         if not isinstance(usage, dict):
             raise ContractError("receipt usage is not an object")
