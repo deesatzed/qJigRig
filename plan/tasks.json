@@ -1038,7 +1038,8 @@
       "id": "T060",
       "phase": "P5",
       "depends_on": [
-        "T058"
+        "T058",
+        "T060A"
       ],
       "status": "pending",
       "files": [
@@ -1924,6 +1925,27 @@
       "acceptance": "Actual local clients can order tied candidates by matching role/version/revision while source identities and material obligations remain distinct and provenance records ignored estimates.",
       "command": "python -m pytest tests/test_agents.py::test_role_estimates_order_ties_without_cross_role_leakage -q",
       "evidence": "Red: actual authored service ignored explicit role proposals and returned the same lexical tie order to both roles. Green: matching role/version/live entry/revision proposals break lexical ties in authored acquisition; result retains applied and ignored provenance. Two real local clients exercise different tie ordering, stale and invalid proposals, stronger lexical precedence and a material zero-score exception. Focused 32 passed; full offline suite 395 passed. Proposals are caller assertions; persistent role-estimate storage, full T058 and hosted paths remain open."
+    },
+    {
+      "id": "T060A",
+      "phase": "P5",
+      "depends_on": [
+        "T058A",
+        "T009"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/claims.py",
+        "src/qjig/store.py",
+        "src/qjig/service.py",
+        "src/qjig/agents.py"
+      ],
+      "test_file": "tests/test_claims.py",
+      "test_name": "test_clients_share_interpretation_without_turning_it_into_source",
+      "action": "Persist and share source-linked interpretations through local service",
+      "acceptance": "One client records an attributed interpretation with an exact verified source span; another sees it as an interpretation, and original source/index content stays separate.",
+      "command": "python -m pytest tests/test_claims.py::test_clients_share_interpretation_without_turning_it_into_source -q",
+      "evidence": "Red: role clients could not share interpretations. Green: catalog v4 persists content-identified attributed interpretations linked to revalidated source spans, separate from source/index rows. Two actual loopback clients share and reopen a synthetic claim; claim-only search remains deferred, invalid spans/hashes refuse, concurrent identical claims deduplicate, v1-v3 migrations preserve sources. Focused 17 passed; full suite 398 passed. Role attribution is asserted, not authenticated; multi-process crash consistency, review, export and full T060 remain open."
     }
   ]
 }

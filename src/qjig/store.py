@@ -7,7 +7,7 @@ from pathlib import Path
 from .contracts import ContractError
 from .sources import SourceRevision, decode_source
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _SCHEMA = """
 CREATE TABLE revisions(
@@ -52,6 +52,14 @@ CREATE TABLE member_metadata(
 );
 """
 
+_CLAIM_SCHEMA = """
+CREATE TABLE agent_interpretations(claim_id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+CREATE TRIGGER agent_interpretations_no_update BEFORE UPDATE ON agent_interpretations
+  BEGIN SELECT RAISE(ABORT, 'interpretations are immutable'); END;
+CREATE TRIGGER agent_interpretations_no_delete BEFORE DELETE ON agent_interpretations
+  BEGIN SELECT RAISE(ABORT, 'interpretations are immutable'); END;
+"""
+
 
 class Catalog:
     def __init__(self, con: sqlite3.Connection) -> None:
@@ -62,11 +70,13 @@ class Catalog:
         con = sqlite3.connect(str(path))
         version = con.execute("PRAGMA user_version").fetchone()[0]
         if version == 0:
-            con.executescript(_SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
+            con.executescript(_SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
         elif version == 1:  # additive migrations: index entries, then member metadata
-            con.executescript(_INDEX_SCHEMA + _METADATA_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
+            con.executescript(_INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
         elif version == 2:  # additive migration: member metadata
-            con.executescript(_METADATA_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
+            con.executescript(_METADATA_SCHEMA + _CLAIM_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
+        elif version == 3:
+            con.executescript(_CLAIM_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
         elif version != SCHEMA_VERSION:
             con.close()
             raise ContractError(f"unsupported catalog schema version {version}")
@@ -173,3 +183,11 @@ class Catalog:
 
     def revision_ids(self) -> list[str]:
         return [r[0] for r in self._con.execute("SELECT revision_id FROM revisions ORDER BY revision_id")]
+
+    def put_interpretation(self, claim_id: str, payload: str) -> bool:
+        with self._con:
+            cursor = self._con.execute("INSERT OR IGNORE INTO agent_interpretations VALUES (?,?)", (claim_id, payload))
+            return cursor.rowcount == 1
+
+    def interpretation_rows(self) -> list[tuple[str, str]]:
+        return self._con.execute("SELECT claim_id,payload FROM agent_interpretations ORDER BY claim_id").fetchall()

@@ -80,13 +80,14 @@ def test_version_1_catalog_migrates_to_add_index_table(tmp_path):
     con = sqlite3.connect(db)
     con.execute("DROP TABLE index_entries")
     con.execute("DROP TABLE member_metadata")
+    con.execute("DROP TABLE agent_interpretations")
     con.execute("PRAGMA user_version = 1")
     con.commit()
     con.close()
     with Catalog.open(db) as cat:
         assert cat.get_revision(r.revision_id) == r  # old data intact
         assert cat.index_rows(r.revision_id) == []  # new table present
-    assert sqlite3.connect(db).execute("PRAGMA user_version").fetchone()[0] == 3
+    assert sqlite3.connect(db).execute("PRAGMA user_version").fetchone()[0] == 4
 
 
 def test_version_2_catalog_migrates_to_add_metadata_table(tmp_path):
@@ -96,6 +97,7 @@ def test_version_2_catalog_migrates_to_add_metadata_table(tmp_path):
         cat.add_revision(r)
     con = sqlite3.connect(db)
     con.execute("DROP TABLE member_metadata")
+    con.execute("DROP TABLE agent_interpretations")
     con.execute("PRAGMA user_version = 2")
     con.commit()
     con.close()
@@ -103,3 +105,18 @@ def test_version_2_catalog_migrates_to_add_metadata_table(tmp_path):
         assert cat.get_revision(r.revision_id) == r
         cat.put_metadata_row((r.revision_id, "project", None, "[]", "2026-01-01", "open", None))
         assert len(cat.metadata_rows()) == 1
+
+
+def test_version_3_catalog_migrates_interpretations_without_losing_sources(tmp_path):
+    db = tmp_path / 'catalog.sqlite'
+    original = rev(b'original source\n')
+    with Catalog.open(db) as cat:
+        cat.add_revision(original)
+    with sqlite3.connect(db) as con:
+        con.execute('DROP TABLE agent_interpretations')
+        con.execute('PRAGMA user_version = 3')
+    with Catalog.open(db) as cat:
+        assert cat.get_revision(original.revision_id) == original
+        assert cat.interpretation_rows() == []
+    with sqlite3.connect(db) as con:
+        assert con.execute('PRAGMA user_version').fetchone()[0] == 4

@@ -70,6 +70,18 @@ class RoleClient:
             raise ContractError('invalid revision identity')
         return self._request('GET', '/api/sources/' + revision_id)
 
+    def add_interpretation(self, text: str, evidence: dict) -> dict:
+        if not isinstance(text, str) or not text.strip() or not isinstance(evidence, dict):
+            raise ContractError('interpretation text and evidence are required')
+        return self._request('POST', '/api/interpretations', {'role_id': self.role.role_id,
+                             'role_version': self.role.version, 'text': text, 'evidence': evidence})
+
+    def list_interpretations(self) -> list[dict]:
+        result = self._request('GET', '/api/interpretations')
+        if not isinstance(result.get('interpretations'), list):
+            raise ClientError('local service returned invalid interpretation list')
+        return result['interpretations']
+
     def ask(self, request_id: str, question: str, scope: str, policy: dict) -> dict:
         if any(not isinstance(value, str) or not value.strip() for value in (request_id, question, scope)) or not isinstance(policy, dict):
             raise ContractError('request identity, question, scope and policy are required')

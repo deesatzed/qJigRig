@@ -10,6 +10,7 @@ from pathlib import Path
 from .applicability import MemberMetadata, Interval
 from .cli import _dec, _member_from_row, _member_row, run_authored
 from .contracts import ContractError, Request
+from .claims import add_interpretation, list_interpretations
 from .indexing import index_entries, invalidate_superseded, save_entries
 from .sources import SourceRevision, decode_source
 from .store import Catalog
@@ -68,6 +69,13 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif self.path == "/api/health":
             self._reply(200, {"ok": True, "service": "qjig"})
+        elif self.path == "/api/interpretations":
+            try:
+                with Catalog.open(self.server.catalog) as catalog:
+                    interpretations = list_interpretations(catalog)
+                self._reply(200, {"interpretations": interpretations})
+            except ContractError:
+                self._reply(500, {"error": "stored interpretation invalid"})
         elif self.path == "/api/sources":
             with Catalog.open(self.server.catalog) as catalog:
                 sources = []
@@ -100,7 +108,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._trusted_host() or not self._trusted_origin():
             self._reply(403, {"error": "untrusted host or origin"})
             return
-        if self.path not in ("/api/sources", "/api/ask"):
+        if self.path not in ("/api/sources", "/api/ask", "/api/interpretations"):
             self._reply(404, {"error": "not found"})
             return
         lengths = self.headers.get_all("Content-Length", [])
@@ -118,6 +126,10 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length).decode("utf-8"))
             if self.path == "/api/sources":
                 result, created = self._import_source(body)
+                self._reply(201 if created else 200, result)
+            elif self.path == "/api/interpretations":
+                with self.server.writer_lock, Catalog.open(self.server.catalog) as catalog:
+                    result, created = add_interpretation(catalog, body)
                 self._reply(201 if created else 200, result)
             else:
                 if not isinstance(body, dict) or set(body) != {"request", "policy"}:
