@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+from decimal import Decimal
 import socket
 import urllib.error
 import urllib.request
@@ -15,6 +17,8 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from .budgets import BudgetExceeded, BudgetLedger
+from .contracts import ContractError
+from .pricing import upper_cost
 from .journal import UncertainOutcome
 from .logic import Observation, Outcome
 
@@ -37,6 +41,38 @@ class ProviderRequest:
             sort_keys=True, ensure_ascii=False,
         )
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class CallReservation:
+    """A calculated reservation bound to one request; provenance is an assertion, not verification."""
+    request_sha256: str
+    input_tokens: int
+    cost_usd: float
+    pricing_sha256: str
+    input_bound_provenance: str
+    hold_back_calls: int = 0
+    hold_back_tokens: int = 0
+    hold_back_cost_usd: float = 0
+
+
+def make_call_reservation(request: ProviderRequest, model: dict, *, input_tokens: int, input_bound_provenance: str,
+                          hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0) -> CallReservation:
+    if not isinstance(input_bound_provenance, str) or not input_bound_provenance.strip():
+        raise ContractError("input bound provenance is required")
+    if not isinstance(model, dict) or model.get("id") != request.model:
+        raise ContractError("pricing model does not match request")
+    cost = upper_cost(model, input_tokens=input_tokens, output_tokens=request.max_tokens)
+    as_float = float(cost)
+    if not math.isfinite(as_float):
+        raise ContractError("price bound is not representable")
+    if Decimal(str(as_float)) < cost:
+        as_float = math.nextafter(as_float, math.inf)
+    if not math.isfinite(as_float):
+        raise ContractError("price bound is not representable")
+    snapshot = json.dumps(model, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+    return CallReservation(request.input_sha256(), input_tokens, as_float, hashlib.sha256(snapshot.encode("utf-8")).hexdigest(),
+                           input_bound_provenance, hold_back_calls, hold_back_tokens, hold_back_cost_usd)
 
 
 @dataclass(frozen=True)
@@ -210,8 +246,10 @@ def _validate(text: str, schema: dict[str, FieldSpec]) -> tuple[dict | None, str
 Validator = Callable[[str], tuple[dict | None, str | None]]
 
 
-def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequest, schema: "dict[str, FieldSpec] | Validator") -> TypedCall:
+def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequest, schema: "dict[str, FieldSpec] | Validator", *, reservation: CallReservation | None = None) -> TypedCall:
     """One budgeted, journaled provider attempt returning a validated value or an explicit failure."""
+    if reservation is not None and (not isinstance(reservation, CallReservation) or reservation.request_sha256 != request.input_sha256()):
+        raise ContractError("reservation does not match provider request")
     if isinstance(transport, OpenRouterTransport):
         raise BudgetExceeded("preflight_unavailable", "hosted calls require complete input, cost and goal-wide reservations")
 
@@ -234,9 +272,16 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
             extra.update(validation="ok")
         return (value, failure, digest, raw.usage), raw.usage or {}, extra
 
+    kwargs = {} if reservation is None else {
+        "reserve_input_tokens": reservation.input_tokens, "reserve_cost_usd": reservation.cost_usd,
+        "hold_back_calls": reservation.hold_back_calls, "hold_back_tokens": reservation.hold_back_tokens,
+        "hold_back_cost_usd": reservation.hold_back_cost_usd,
+        "reservation_binding": {"request_sha256": reservation.request_sha256, "pricing_sha256": reservation.pricing_sha256,
+                                "input_bound_provenance": reservation.input_bound_provenance},
+    }
     value, failure, digest, usage = ledger.run(
         request.stage, attempt, provider=request.provider, model=request.model,
-        input_sha256=request.input_sha256(), reserve_tokens=request.max_tokens,
+        input_sha256=request.input_sha256(), reserve_tokens=request.max_tokens, **kwargs,
     )
     call_id = ledger.last_call_id()
     return TypedCall(failure is None, value, failure, call_id, digest, usage)

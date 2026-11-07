@@ -257,3 +257,30 @@ def test_live_provider_without_complete_preflight_never_dispatches(tmp_path):
         with pytest.raises(BudgetExceeded):
             call_typed(ledger, transport, REQ, SCHEMA)
         assert seen == [] and journal.events("preflight") == []
+
+
+def test_bound_reservation_rejects_changed_request_and_reaches_goal_ledger(tmp_path):
+    """Synthetic pricing, input bound and stand-in response; no hosted call."""
+    from qjig.goal_budget import GoalBudget
+    from qjig.providers import make_call_reservation
+    from qjig.contracts import ContractError
+
+    model = {"id": REQ.model, "context_length": 1000, "top_provider": {"max_completion_tokens": 100},
+             "pricing": {"prompt": "0.001", "completion": "0.001"}}
+    bound = make_call_reservation(REQ, model, input_tokens=100, input_bound_provenance="synthetic fixture")
+    limit = Budget(2, 500, 1)
+    with GoalBudget.open(tmp_path / "goal.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal, Journal.open(tmp_path / "j.sqlite") as journal:
+        ledger = BudgetLedger(limit, journal, "r", goal_budget=goal, partition="smoke")
+        transport = StandInTransport([RawResponse(200, GOOD, USAGE)])
+        changed_requests = [ProviderRequest(REQ.stage, REQ.provider, REQ.model, REQ.prompt + " changed", REQ.max_tokens),
+                            ProviderRequest(REQ.stage, REQ.provider, "other-model", REQ.prompt, REQ.max_tokens),
+                            ProviderRequest(REQ.stage, REQ.provider, REQ.model, REQ.prompt, REQ.max_tokens + 1)]
+        for changed in changed_requests:
+            with pytest.raises(ContractError):
+                call_typed(ledger, transport, changed, SCHEMA, reservation=bound)
+        assert goal.totals().max_calls == 0 and transport.calls_made == 0
+        result = call_typed(ledger, transport, REQ, SCHEMA, reservation=bound)
+        assert result.ok and goal.totals().max_tokens == 150
+        intent = journal.events("r")[0]
+        assert intent.payload["reservation_binding"]["request_sha256"] == REQ.input_sha256()
+        assert intent.payload["reservation_binding"]["pricing_sha256"] == bound.pricing_sha256
