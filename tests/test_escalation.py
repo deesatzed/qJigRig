@@ -192,3 +192,43 @@ def test_escalation_requires_raw_success_response_in_prior_receipts(tmp_path):
         with pytest.raises(ContractError, match='raw response'):
             escalate_predicate(standalone, ledger, transport, 'Question?', packet, reason='unknown', provider='stand-in')
         assert transport.calls_made == 0
+
+
+def test_capped_standalone_and_escalation_keep_distinct_price_limits(tmp_path):
+    rev = SourceRevision.create('p/a.md', '/x', decode_source(b'# Refunds\nRefunds apply.', encoding='utf-8'))
+    packet = build_packet(bm25_candidates(index_entries(rev), 'refunds'), max_bytes=3000)
+    response = RawResponse(200, json.dumps({'supported': False, 'quote': '', 'reason': 'none'}),
+                           {'prompt_tokens': 2, 'completion_tokens': 1, 'cost_usd': 0.01})
+    first_cap = {'prompt': 1.0, 'completion': 2.0}
+    escalation_cap = {'prompt': 3.0, 'completion': 4.0}
+    with Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(Budget(4, 5000, 1), journal, 'r')
+        standalone = judge_predicate(ledger, StandInTransport([response, response]), 'Question?', packet,
+                                     provider='stand-in', model='m', max_price=first_cap)
+        result = escalate_predicate(standalone, ledger, StandInTransport([response, response]), 'Question?', packet,
+                                    reason='unknown', provider='stand-in', max_price=escalation_cap)
+        assert result.standalone is standalone and ledger.used_calls() == 4
+        intents = [e for e in journal.events('r') if e.kind == 'intent']
+        assert [e.payload['request_max_price'] for e in intents] == [first_cap, first_cap, escalation_cap, escalation_cap]
+
+
+def test_escalation_refuses_altered_standalone_routing_ceiling(tmp_path):
+    import pytest
+    from qjig.contracts import ContractError
+    rev = SourceRevision.create('p/a.md', '/x', decode_source(b'# Refunds\nRefunds apply.', encoding='utf-8'))
+    packet = build_packet(bm25_candidates(index_entries(rev), 'refunds'), max_bytes=3000)
+    response = RawResponse(200, json.dumps({'supported': False, 'quote': '', 'reason': 'none'}),
+                           {'prompt_tokens': 2, 'completion_tokens': 1, 'cost_usd': 0.01})
+    with Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(Budget(4, 5000, 1), journal, 'r')
+        standalone = judge_predicate(ledger, StandInTransport([response, response]), 'Question?', packet,
+                                     provider='stand-in', model='m', max_price={'prompt': 1, 'completion': 2})
+        journal._con.execute('DROP TRIGGER events_no_update')
+        seq, raw = journal._con.execute("SELECT seq,payload FROM events WHERE kind='intent' ORDER BY seq LIMIT 1").fetchone()
+        payload = json.loads(raw)
+        payload['request_max_price']['prompt'] = 9
+        journal._con.execute('UPDATE events SET payload=? WHERE seq=?', (json.dumps(payload), seq))
+        transport = StandInTransport([response, response])
+        with pytest.raises(ContractError, match='binding'):
+            escalate_predicate(standalone, ledger, transport, 'Question?', packet, reason='unknown', provider='stand-in')
+        assert transport.calls_made == 0

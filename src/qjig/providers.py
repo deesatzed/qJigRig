@@ -369,7 +369,8 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
     }
     value, failure, digest, usage = ledger.run(
         request.stage, attempt, provider=request.provider, model=request.model,
-        input_sha256=request.input_sha256(), reserve_tokens=request.max_tokens, context_binding=context_binding, **kwargs,
+        input_sha256=request.input_sha256(), reserve_tokens=request.max_tokens, context_binding=context_binding,
+        request_max_price=dict(request.max_price) if request.max_price is not None else None, **kwargs,
     )
     call_id = ledger.last_call_id()
     return TypedCall(failure is None, value, failure, call_id, digest, usage)

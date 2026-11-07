@@ -28,7 +28,7 @@ def escalate_predicate(standalone: JudgeResult, ledger: BudgetLedger, transport:
                        question: str, packet: EvidencePacket, *, reason: str, provider: str,
                        applicability: Callable[[str], Applicability] | None = None,
                        max_tokens: int = JUDGE_MAX_TOKENS,
-                       reservation_factory: ReservationFactory | None = None) -> EscalationResult:
+                       reservation_factory: ReservationFactory | None = None, max_price: dict | None = None) -> EscalationResult:
     """Run one explicitly identified escalation using the caller's shared ledger.
 
     Model identity is fixed, but a stand-in transport is still only a fixture.
@@ -73,5 +73,5 @@ def escalate_predicate(standalone: JudgeResult, ledger: BudgetLedger, transport:
         raise ContractError('standalone result differs from recorded sides')
     result = judge_predicate(ledger, transport, question, packet, provider=provider, model=HY4_MODEL,
                              applicability=applicability, max_tokens=max_tokens,
-                             reservation_factory=reservation_factory, stage_prefix='escalation')
+                             reservation_factory=reservation_factory, stage_prefix='escalation', max_price=max_price)
     return EscalationResult(standalone, result, reason, provider, HY4_MODEL, transport.label)
