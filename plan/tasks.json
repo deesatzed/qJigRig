@@ -1423,7 +1423,8 @@
         "R08H",
         "R08I",
         "R08J",
-        "R08K"
+        "R08K",
+        "R08L"
       ],
       "status": "pending",
       "files": [],
@@ -3477,6 +3478,24 @@
       "acceptance": "With a quiescent captured baseline, apply a caller-supplied post-baseline snapshot as a non-increasing persisted aggregate cost ceiling, including existing required-work commitments; reject intervening ledger usage.",
       "command": "python -m pytest tests/test_goal_budget.py::test_refresh_restricts_remaining_account_budget_without_reset -q",
       "evidence": "Red: account-bound ledger lacked a refresh mechanism. A quiescent baseline and caller-supplied subsequent snapshot now yield a persisted non-increasing ceiling of known prior goal spend plus observed remaining account credit; ledger changes invalidate the baseline. Tests cover restart, higher subsequent observations, unknown pending usage, unbound policies and preallocated required work. Snapshot order, authenticity and freshness remain caller responsibilities; concurrent external spend and BYOK billing are unverified. This does not authorize hosted dispatch."
+    },
+    {
+      "id": "R08L",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08K"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/account_client.py"
+      ],
+      "test_file": "tests/test_account_limits.py",
+      "test_name": "test_account_refresh_fetches_after_baseline_and_keeps_only_constraints",
+      "action": "Acquire account observations between baseline and restriction",
+      "acceptance": "Read only fixed OpenRouter key and credits endpoints after capturing a quiescent baseline; reject redirects, invalid or oversized responses, avoid exposing credentials and persist only sanitized constraints.",
+      "command": "python -m pytest tests/test_account_limits.py::test_account_refresh_fetches_after_baseline_and_keeps_only_constraints -q",
+      "evidence": "Red: no account refresh client existed. The client acquires a ledger baseline, reads the two fixed HTTPS endpoints with bounded responses and no redirects, validates both responses and applies the existing transactional restriction. Synthetic tests cover successful restriction, invalid and redirect failures, private-field exclusion, ledger changes during fetch, and a real local HTTP redirect. Tests use no provider network or model calls. Account data is not atomic across endpoints and may drift; BYOK costs and full pre-dispatch bounds remain unknown, and hosted dispatch stays gated."
     }
   ]
 }

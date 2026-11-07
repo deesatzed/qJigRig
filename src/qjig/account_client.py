@@ -1,0 +1,50 @@
+"""Read-only account refresh; does not authorize provider model calls."""
+from __future__ import annotations
+
+import json
+import urllib.error
+import urllib.request
+from decimal import Decimal
+from pathlib import Path
+
+from .account_limits import account_spend_constraints
+from .providers import _NoRedirect, load_env_value
+
+
+class AccountRefreshError(Exception):
+    """Account observations were unavailable or invalid."""
+
+
+def _get(url: str, headers: dict, timeout: float) -> tuple[int, str]:
+    request = urllib.request.Request(url, headers=headers, method='GET')
+    with urllib.request.build_opener(_NoRedirect).open(request, timeout=timeout) as response:
+        body = response.read(65537)
+        if len(body) > 65536:
+            raise ValueError('account response too large')
+        return response.status, body.decode('utf-8')
+
+
+def refresh_account_constraints(goal, env_path: Path, *, get=_get) -> None:
+    """Fetch account data after a quiescent baseline, then persist a restriction.
+
+    Account data is a time-sensitive source claim. No hosted request is authorized,
+    and separate BYOK billing and concurrent external spending remain unknown.
+    """
+    baseline = goal.account_refresh_baseline()
+    key = load_env_value(Path(env_path), 'OPENROUTER_API_KEY')
+    if not key:
+        raise AccountRefreshError('account credential unavailable')
+    try:
+        responses = []
+        for endpoint in ('key', 'credits'):
+            status, body = get('https://openrouter.ai/api/v1/' + endpoint,
+                               {'Authorization': 'Bearer ' + key}, 15.0)
+            if status != 200 or not isinstance(body, str) or len(body.encode('utf-8')) > 65536:
+                raise ValueError('account response unavailable')
+            responses.append(json.loads(body, parse_float=Decimal))
+        # Validate the complete pair before persisting either observation.
+        account_spend_constraints(*responses, goal_ceiling_usd=25)
+    except Exception:
+        # Never expose a provider body, URL exception, or credential in diagnostics.
+        raise AccountRefreshError('account observations unavailable or invalid') from None
+    goal.restrict_account_snapshot(baseline, tuple(responses))
