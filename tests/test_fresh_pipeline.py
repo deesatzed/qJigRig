@@ -976,3 +976,15 @@ def test_mandatory_only_truncated_evidence_is_not_judged(tmp_path):
         assert final.observation.outcome is Outcome.UNKNOWN
         assert final.observation.reason in ('truncated','budget_omission')
         assert 'ob-plan-coverage' in result.summary.stop.blocking_obligations
+
+
+def test_frozen_evaluation_rejects_unbound_new_planner_prompt(tmp_path):
+    from qjig.contracts import ContractError
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN)])
+    with cat, journal:
+        with pytest.raises(ContractError, match='does not bind'):
+            run_fresh(request=REQUEST,catalog=cat,entries=entries,ledger=ledger,transport=transport,
+                planner=('stand-in','planner'),judge=('stand-in','judge'),
+                revision_applicability=lambda rid: Applicability.MATCH,
+                evaluation_case_binding={'case_id':'locked'},planner_prompt_version='exception_applicability_v2')
+        assert transport.calls_made == 0 and journal.events(REQUEST.request_id) == []

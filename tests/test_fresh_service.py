@@ -69,6 +69,11 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert transport.calls_made == 4
         assert (tmp_path / 'fresh' / 'journal.sqlite').is_file()
         assert (tmp_path / 'fresh' / 'runs' / result['run_id'] / 'run.sqlite').is_file()
+        with sqlite3.connect(tmp_path / 'fresh' / 'runs' / result['run_id'] / 'run.sqlite') as con:
+            context=json.loads(con.execute('SELECT data FROM run_context WHERE id=1').fetchone()[0])
+            planner_event=json.loads(con.execute("SELECT data FROM events WHERE kind='request' ORDER BY seq LIMIT 1").fetchone()[0])
+        assert context['planner_prompt_version']=='exception_applicability_v2'
+        assert 'whether each material exception actually applies to this request' in planner_event['prompt']
         builder_transport = StandInTransport([raw({'predicates': [{'id': 'p', 'question': 'Refund limit?'}], 'expression': {'ref': 'p'}}),
             raw({'supported': True, 'quote': quote, 'reason': 'fixture'}),
             raw({'supported': False, 'quote': '', 'reason': 'fixture'}),
@@ -282,7 +287,19 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     assert verify_fresh_receipt(json.loads(receipt_download.read_text()))['status'] == 'unanchored'
                 finally:
                     browser.close()
-        with sqlite3.connect(tmp_path / 'fresh' / 'runs' / result['run_id'] / 'run.sqlite') as con:
+        archive_path = tmp_path / 'fresh' / 'runs' / result['run_id'] / 'run.sqlite'
+        with sqlite3.connect(archive_path) as con:
+            row=con.execute('SELECT data,sha256 FROM run_context WHERE id=1').fetchone()
+            changed=json.loads(row[0]); changed['planner_prompt_version']='legacy_v1'
+            encoded=json.dumps(changed,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
+            con.execute('DROP TRIGGER context_no_update')
+            con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',(encoded,hashlib.sha256(encoded.encode()).hexdigest()))
+        with pytest.raises(ClientError, match='409'):
+            client.get_fresh_run(result['run_id'])
+        with sqlite3.connect(archive_path) as con:
+            con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',row)
+        assert client.get_fresh_run(result['run_id'])['verification']['status']=='unanchored'
+        with sqlite3.connect(archive_path) as con:
             con.execute('DROP TRIGGER event_no_update')
             con.execute("UPDATE events SET data='{}' WHERE kind='run_result'")
         with pytest.raises(ClientError, match='409'):

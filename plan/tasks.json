@@ -4303,6 +4303,27 @@
       "acceptance": "Role clients evaluate bounded explicit assignments against a structurally replayed graph without inference or mutation, preserving non-independent attribution.",
       "command": "python -m pytest tests/test_fresh_service.py::test_fresh_enabling_graph_is_visible_and_replayed -q",
       "evidence": "Red: RoleClient had no saved-plan counterexample path. Synthetic service tests exercise enabling, missing and contradictory assumptions, invalid and duplicate cases, missing runs and unchanged archive digest; Chrome/fresh/assurance/client/service checks 20 passed. Results are authored hypotheses, not source facts, independent labels or real-model quality evidence. Full R05 and hosted checks remain open."
+    },
+    {
+      "id": "R05D",
+      "phase": "repair",
+      "depends_on": [
+        "R05A",
+        "R05B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/planner.py",
+        "src/qjig/acquisition.py",
+        "src/qjig/replay.py",
+        "src/qjig/fresh_service.py"
+      ],
+      "test_file": "tests/test_planner.py",
+      "test_name": "test_planner_prompt_distinguishes_exception_applicability_and_legacy",
+      "action": "Version an exception-applicability planner prompt for the local workbench",
+      "acceptance": "Ask for case-specific material exception applicability and enabling/restricting composition, retain exact legacy prompt replay, and refuse unbound prompt changes in frozen evaluation paths.",
+      "command": "python -m pytest tests/test_planner.py::test_planner_prompt_distinguishes_exception_applicability_and_legacy -q",
+      "evidence": "Red: no versioned applicability prompt existed. Workbench synthetic calls record v2; old prompt text and replay remain supported, reclassifying v2 as legacy is rejected, and frozen evaluation refuses the unbound v2 before calls. Chrome/planner/fresh/replay/evaluation checks: 146 passed. Prompt compliance and semantic improvement by real models remain unproven; R05 and hosted gates remain open."
     }
   ]
 }

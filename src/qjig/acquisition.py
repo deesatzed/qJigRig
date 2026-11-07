@@ -21,7 +21,7 @@ from .stopping import StopDecision, check_stop
 from .budgets import BudgetExceeded, BudgetLedger
 from .judge import JUDGE_MAX_TOKENS, JudgeResult, QuoteRef, judge_predicate
 from .obligations import Obligation
-from .planner import PLANNER_MAX_TOKENS, PlanBinding, request_fresh_plan
+from .planner import PLANNER_MAX_TOKENS, PLANNER_PROMPT_VERSIONS, PlanBinding, request_fresh_plan
 from .providers import ProviderRequest, ProviderUnavailable, ReservationFactory, Transport
 from .journal import ReconciliationRequired, UncertainOutcome
 from .plans import Plan as _Plan  # noqa: F401
@@ -371,6 +371,7 @@ def run_fresh(
     judge: tuple[str, str],
     revision_applicability: Callable[[str], Applicability],
     planner_max_tokens: int | None = None,
+    planner_prompt_version: str = 'legacy_v1',
     judge_max_tokens: int | None = None,
     planner_max_price: dict | None = None,
     judge_max_price: dict | None = None,
@@ -395,6 +396,10 @@ def run_fresh(
     model-written, a material plan-coverage obligation is always opened; retrieval can offer exception
     passages for review but can never close it, so the result is a deferral that names the gap.
     """
+    if planner_prompt_version not in PLANNER_PROMPT_VERSIONS:
+        raise ContractError('unsupported planner prompt version')
+    if evaluation_case_binding is not None and planner_prompt_version != 'legacy_v1':
+        raise ContractError('evaluation configuration does not bind this planner prompt version')
     if type(full_source_evidence) is not bool or (full_source_evidence and evaluation_case_binding is None):
         raise ContractError('full source mode requires a checked evaluation case')
     if evaluation_case_binding is not None:
@@ -515,6 +520,7 @@ def run_fresh(
         # Bind the exact verdicts, effective settings and corpus before any planner call.
         archive.record_context({
             "schema": "qjig.fresh-context.v1", "request": request.to_dict(),
+            **({'planner_prompt_version': planner_prompt_version} if planner_prompt_version != 'legacy_v1' else {}),
             **({"evaluation_case_binding": evaluation_case_binding} if evaluation_case_binding is not None else {}),
             **({"evaluation_assignment": evaluation_assignment} if evaluation_assignment is not None else {}),
             "budget": ledger.budget.to_dict() if ledger.budget else None,
@@ -551,7 +557,7 @@ def run_fresh(
         outcome = request_fresh_plan(
             ledger, transport, request, corpus_revision_ids=sorted({e.span.revision_id for e in entries}),
             provider=planner[0], model=planner[1], reservation_factory=reservation_factory, archive=archive,
-            planning_evidence=planning_evidence, max_price=planner_max_price, **kw,
+            planning_evidence=planning_evidence, max_price=planner_max_price, prompt_version=planner_prompt_version, **kw,
         )
     except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
         failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
@@ -627,7 +633,8 @@ def run_fresh(
                                         raw_packet['limit'], len(json.dumps(raw_packet, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')))
                 member_rows = {row['revision_id']: {key: value for key, value in row.items() if key != 'revision_id'}
                                for row in applicability_inputs.to_dict()['members']}
-                planner_prompt = _planner_prompt(request, corpus_manifest_sha256(revision_ids), planning_evidence)
+                planner_prompt = _planner_prompt(request, corpus_manifest_sha256(revision_ids), planning_evidence,
+                                                 prompt_version=planner_prompt_version)
                 review_binding = {'request': request.to_dict(), 'plan': {'origin': plan.origin,
                                   'predicates': [{'id': p.id, 'question': p.question, 'depends_on': list(p.depends_on),
                                                   **({'exact_operator': p.exact_operator} if p.exact_operator is not None else {})}

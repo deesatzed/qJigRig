@@ -20,6 +20,23 @@ PLAN_JSON = {
 USAGE = {"prompt_tokens": 30, "completion_tokens": 40, "cost_usd": 0.0}
 
 
+def test_planner_prompt_distinguishes_exception_applicability_and_legacy():
+    from qjig.planner import _planner_prompt
+    modern = _planner_prompt(REQUEST, 'corpus', prompt_version='exception_applicability_v2')
+    legacy = _planner_prompt(REQUEST, 'corpus', prompt_version='legacy_v1')
+    assert 'whether each material exception actually applies to this request' in modern
+    assert 'enabling exceptions as alternative paths' in modern
+    assert 'restricting exceptions as blockers' in modern
+    assert 'could change the answer' not in modern
+    assert 'could change the answer' in legacy
+    assert legacy == (
+        'Break the question into 1 to 6 yes/no predicates and one expression over them using only '
+        'and/or/not. Return ONLY JSON {"predicates":[{"id","question","depends_on"?,"exact_operator"?}],'
+        '"expression":{"op":"and|or|not","args":[...]} | {"ref":"id"}}. Do not include code, origin or comments. '
+        'Always include one predicate asking whether any exception, waiver or special case could change the answer.\n'
+        'Question: Can customer 42 get a refund after 20 days?\nRole: reviewer v1\nScope: project\nCorpus manifest: corpus')
+
+
 def setup(tmp_path, bodies, calls=5):
     j = Journal.open(tmp_path / "j.sqlite")
     return j, BudgetLedger(Budget(calls, 5000, 1.0), j, "req-1"), StandInTransport([RawResponse(200, b, USAGE) for b in bodies])

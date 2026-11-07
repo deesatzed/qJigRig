@@ -41,7 +41,8 @@ def _check_review(record, call_id, request, response, validation, context, plan)
     members = {row['revision_id']: {k: v for k, v in row.items() if k != 'revision_id'} for row in inputs.to_dict()['members']}
     ids = sorted(context['corpus'])
     planner = context['planner']
-    planner_prompt = _planner_prompt(Request.from_dict(context['request']), corpus_manifest_sha256(ids), context['planning_evidence'])
+    planner_prompt = _planner_prompt(Request.from_dict(context['request']), corpus_manifest_sha256(ids), context['planning_evidence'],
+                                     prompt_version=context.get('planner_prompt_version', 'legacy_v1'))
     expected = {'request': context['request'], 'plan': {'origin': plan.origin,
                 'predicates': [{'id': p.id, 'question': p.question, 'depends_on': list(p.depends_on),
                                 **({'exact_operator': p.exact_operator} if p.exact_operator is not None else {})}
@@ -196,7 +197,8 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
                         settings = context["planner"]
                         expected_prompt = _planner_prompt(Request.from_dict(context["request"]),
                                                           corpus_manifest_sha256(context["corpus"]),
-                                                          context["planning_evidence"])
+                                                          context["planning_evidence"],
+                                                          prompt_version=context.get('planner_prompt_version', 'legacy_v1'))
                         if (request.prompt != expected_prompt or request.model != settings["model"] or
                             request.provider != settings["provider"] or request.max_tokens != settings["max_tokens"] or
                             request.max_price != settings.get("max_price")):

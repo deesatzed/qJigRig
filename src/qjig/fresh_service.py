@@ -267,6 +267,7 @@ class FreshWorkbench:
                 run = run_fresh(request=request, catalog=catalog, entries=entries, ledger=ledger, transport=transport,
                     planner=(planner['provider'], planner['model']['id']), judge=(judge['provider'], judge['model']['id']),
                     reviewer=(reviewer['provider'], reviewer['model']['id']), planner_max_tokens=planner['output_tokens'],
+                    planner_prompt_version='exception_applicability_v2',
                     judge_max_tokens=judge['output_tokens'], reviewer_max_tokens=reviewer['output_tokens'],
                     planner_max_price=planner['max_price'], judge_max_price=judge['max_price'], reviewer_max_price=reviewer['max_price'],
                     reservation_factory=reserve, review_reservation_factory=reserve, require_complete_reservations=True,

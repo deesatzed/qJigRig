@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "06b304728a2dd9f465a4089d0e79d9f4d505a302db5d6d62f5b5cd54f491a905",
-  "queue_sha256": "d3f736727ce1ad7a9f621154bd3f319e70ad3203ce61a55d9fcee943e5d2eb8c",
+  "queue_sha256": "92817031747375181b36231bc579283c6919502a3e1570ad127af72fa4307d5a",
   "gates": [
     {
       "id": "F01",
@@ -52,7 +52,8 @@
         "R05",
         "R05A",
         "R05B",
-        "R05C"
+        "R05C",
+        "R05D"
       ],
       "evidence": []
     },
@@ -313,6 +314,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_fresh_service.py::test_fresh_enabling_graph_is_visible_and_replayed -q",
       "queue_evidence_assertion": "Red: RoleClient had no saved-plan counterexample path. Synthetic service tests exercise enabling, missing and contradictory assumptions, invalid and duplicate cases, missing runs and unchanged archive digest; Chrome/fresh/assurance/client/service checks 20 passed. Results are authored hypotheses, not source facts, independent labels or real-model quality evidence. Full R05 and hosted checks remain open."
+    },
+    {
+      "id": "R05D",
+      "status": "unverified",
+      "task_ids": [
+        "R05D"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_planner.py::test_planner_prompt_distinguishes_exception_applicability_and_legacy -q",
+      "queue_evidence_assertion": "Red: no versioned applicability prompt existed. Workbench synthetic calls record v2; old prompt text and replay remain supported, reclassifying v2 as legacy is rejected, and frozen evaluation refuses the unbound v2 before calls. Chrome/planner/fresh/replay/evaluation checks: 146 passed. Prompt compliance and semantic improvement by real models remain unproven; R05 and hosted gates remain open."
     },
     {
       "id": "R06",
