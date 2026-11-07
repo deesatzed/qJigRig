@@ -183,9 +183,15 @@ def test_fresh_pipeline_archives_each_model_attempt(tmp_path):
     cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE)])
     with cat, journal, RunArchive.open(tmp_path / "archive") as archive:
         archive.add_source(REV.source_id, TEXT.encode())
+        original_send = transport.send
+        def inspect_before_send(request):
+            assert archive.revision(REV.revision_id) == REV
+            return original_send(request)
+        transport.send = inspect_before_send
         result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
                            planner=("stand-in", "planner"), judge=("stand-in", "judge"),
                            revision_applicability=lambda rid: Applicability.MATCH, archive=archive)
         assert result.status == "deferred"
         assert [event["kind"] for event in archive.events()] == ["request", "response", "validation"] * 3
         assert archive.source(REV.source_id) == TEXT.encode()
+        assert archive.revision(REV.revision_id) == REV

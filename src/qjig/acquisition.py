@@ -253,6 +253,10 @@ def run_fresh(
     model-written, a material plan-coverage obligation is always opened; retrieval can offer exception
     passages for review but can never close it, so the result is a deferral that names the gap.
     """
+    if archive is not None:
+        # Bind the entire supplied corpus before any external planner call.
+        for revision_id in sorted({entry.span.revision_id for entry in entries}):
+            archive.add_revision(catalog.get_revision(revision_id))
     kw = {} if planner_max_tokens is None else {"max_tokens": planner_max_tokens}
     try:
         outcome = request_fresh_plan(

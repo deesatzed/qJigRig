@@ -1357,7 +1357,8 @@
       "depends_on": [
         "R08",
         "R07A",
-        "R07B"
+        "R07B",
+        "R07C"
       ],
       "status": "pending",
       "files": [],
@@ -1490,6 +1491,27 @@
       "acceptance": "Synthetic request, response and validated result persist in call order; failure and interruption remain explicit.",
       "command": "python -m pytest tests/test_run_archive.py::test_typed_call_archives_before_dispatch -q",
       "evidence": "Red: typed call and run_fresh lacked archive argument. Green: synthetic request recorded before dispatch, raw response and validated results recorded, malformed and timeout paths retained, post-dispatch archive failure leaves uncertain journal intent, three-call fresh pipeline archived; full offline suite 311 passed. Live harness, source/config snapshots, complete transport metadata, sanitization and replay remain R07."
+    },
+    {
+      "id": "R07C",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R07B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/run_archive.py",
+        "src/qjig/acquisition.py",
+        "tests/test_run_archive.py",
+        "tests/test_fresh_pipeline.py"
+      ],
+      "test_file": "tests/test_run_archive.py",
+      "test_name": "test_archive_preserves_multiple_source_revisions",
+      "action": "Bind exact source revisions into fresh run archive",
+      "acceptance": "Multiple revisions retain portable ids, exact bytes and decoding with verified identities before provider dispatch.",
+      "command": "python -m pytest tests/test_run_archive.py::test_archive_preserves_multiple_source_revisions -q",
+      "evidence": "Red: archive had no revision API and fresh run did not snapshot revisions. Green: distinct revisions of one source retain bytes and encoding across reopen, forged identity is rejected, and stand-in transport confirms source is archived before dispatch. Full offline suite 313 passed. R07 still requires configuration, applicability, sanitization, metadata, replay and live-harness integration."
     }
   ]
 }

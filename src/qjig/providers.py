@@ -282,7 +282,11 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
         if not 200 <= raw.http_status < 300:
             value, failure = None, "http_error"
         else:
-            value, failure = schema(raw.body) if callable(schema) else _validate(raw.body, schema)
+            try:
+                value, failure = schema(raw.body) if callable(schema) else _validate(raw.body, schema)
+            except Exception:
+                # The provider did return; retain its usage without exposing validator details.
+                value, failure = None, "validator_error"
         if archive is not None:
             try:
                 archive.record_validation(call_id, value, failure)

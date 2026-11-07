@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .contracts import ContractError
 from .providers import ProviderRequest, RawResponse
-from .sources import _check_source_id
+from .sources import SourceRevision, _check_source_id, decode_source
 
 
 class RunArchive:
@@ -36,6 +36,9 @@ class RunArchive:
             con.executescript('''
                 PRAGMA synchronous=FULL;
                 CREATE TABLE IF NOT EXISTS sources(source_id TEXT PRIMARY KEY, sha256 TEXT NOT NULL, raw BLOB NOT NULL);
+                CREATE TABLE IF NOT EXISTS revisions(revision_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, origin TEXT NOT NULL, encoding TEXT NOT NULL, raw BLOB NOT NULL);
+                CREATE TRIGGER IF NOT EXISTS revision_no_update BEFORE UPDATE ON revisions BEGIN SELECT RAISE(ABORT, 'immutable revision'); END;
+                CREATE TRIGGER IF NOT EXISTS revision_no_delete BEFORE DELETE ON revisions BEGIN SELECT RAISE(ABORT, 'immutable revision'); END;
                 CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, call_id TEXT NOT NULL,
                                                   data TEXT NOT NULL, recorded_at REAL NOT NULL, UNIQUE(kind, call_id));
                 CREATE TRIGGER IF NOT EXISTS source_no_update BEFORE UPDATE ON sources BEGIN SELECT RAISE(ABORT, 'immutable source'); END;
@@ -77,6 +80,30 @@ class RunArchive:
         if hashlib.sha256(row[1]).hexdigest() != row[0]:
             raise ContractError("source snapshot hash mismatch")
         return row[1]
+
+    def add_revision(self, revision: SourceRevision) -> None:
+        if not isinstance(revision, SourceRevision):
+            raise ContractError("source revision required")
+        rebuilt = SourceRevision.create(revision.source_id, revision.origin,
+                                        decode_source(revision.decoded.raw, encoding=revision.decoded.encoding))
+        if rebuilt != revision:
+            raise ContractError("source revision identity does not match bytes and decoding")
+        row = self._con.execute("SELECT source_id,origin,encoding,raw FROM revisions WHERE revision_id=?", (revision.revision_id,)).fetchone()
+        values = (revision.source_id, revision.origin, revision.decoded.encoding, revision.decoded.raw)
+        if row is not None:
+            if row != values:
+                raise ContractError("revision already bound to different provenance")
+            return
+        self._con.execute("INSERT INTO revisions VALUES(?,?,?,?,?)", (revision.revision_id, *values))
+
+    def revision(self, revision_id: str) -> SourceRevision:
+        row = self._con.execute("SELECT source_id,origin,encoding,raw FROM revisions WHERE revision_id=?", (revision_id,)).fetchone()
+        if row is None:
+            raise KeyError(revision_id)
+        source_id, origin, encoding, raw = row
+        revision = SourceRevision.create(source_id, origin, decode_source(raw, encoding=encoding))
+        revision.require_pin(revision_id)
+        return revision
 
     def _event(self, kind: str, call_id: str, data: dict) -> None:
         if not isinstance(call_id, str) or not call_id.strip():

@@ -120,3 +120,45 @@ def test_typed_call_archives_malformed_output_and_timeout(tmp_path):
             call_typed(ledger, transport, request, {"x": FieldSpec(int)}, archive=archive)
         assert archive.events()[-1]["data"] == {"failure": "uncertain_outcome"}
         assert len(journal.pending("r")) == 1
+
+
+def test_validator_exception_retains_response_and_usage(tmp_path):
+    """A failed validator is not a provider failure and must retain billed work."""
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget
+    from qjig.journal import Journal
+    from qjig.providers import StandInTransport, call_typed
+
+    request = ProviderRequest("planner", "stand-in", "m", "question", 20)
+    usage = {"prompt_tokens": 5, "completion_tokens": 3, "cost_usd": 0.01}
+    with RunArchive.open(tmp_path / "run") as archive, Journal.open(tmp_path / "journal.sqlite") as journal:
+        ledger = BudgetLedger(Budget(2, 100, 1), journal, "r")
+        transport = StandInTransport([RawResponse(200, '{"x":1}', usage)])
+        def broken_validator(text):
+            raise RuntimeError("internal diagnostic with potentially sensitive text")
+        result = call_typed(ledger, transport, request, broken_validator, archive=archive)
+        assert result.failure == "validator_error" and result.value is None
+        assert archive.events()[1]["data"]["body"] == '{"x":1}'
+        assert archive.events()[2]["data"] == {"value": None, "failure": "validator_error"}
+        assert [e.kind for e in journal.events("r")] == ["intent", "receipt"]
+        assert journal.events("r")[-1].payload["usage"] == usage
+        assert not journal.pending("r") and ledger.used_calls() == 1
+        assert "sensitive text" not in repr(archive.events()) + repr(journal.events("r"))
+
+
+def test_archive_preserves_multiple_source_revisions(tmp_path):
+    from dataclasses import replace
+    from qjig.contracts import ContractError
+    from qjig.sources import SourceRevision, decode_source
+
+    first = SourceRevision.create("src/policy.md", "synthetic", decode_source(b"line\r\n", encoding="utf-8"))
+    second = SourceRevision.create("src/policy.md", "synthetic", decode_source(b"new\n", encoding="utf-8"))
+    with RunArchive.open(tmp_path / "run") as archive:
+        archive.add_revision(first)
+        archive.add_revision(second)
+        assert archive.revision(first.revision_id) == first
+        assert archive.revision(second.revision_id) == second
+        with pytest.raises(ContractError):
+            archive.add_revision(replace(first, revision_id=second.revision_id))
+    with RunArchive.open(tmp_path / "run") as reopened:
+        assert reopened.revision(first.revision_id).decoded.raw == b"line\r\n"
