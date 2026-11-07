@@ -61,6 +61,8 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert judgment['negative']['support'] == 'unknown' and judgment['negative']['quote'] is None
         assert any('Contact support for help.' in item['text'] for item in result['records'][0]['evidence'])
         assert 'Contact support' not in judgment['positive']['quote']
+        assert 'exception' in result['records'][0]['channels']['missing']
+        assert 'ob-plan-coverage' in result['blocking_obligations']
         assert any(quote in item['text'] for record in result['records'] for item in record['evidence'])
         assert transport.calls_made == 4
         assert (tmp_path / 'fresh' / 'journal.sqlite').is_file()
@@ -102,6 +104,10 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     assert 'fixture review' in page.locator('#fresh-result').inner_text()
                     assert 'Model-cited passage' in page.locator('#fresh-result').inner_text()
                     assert 'Retrieved passages' in page.locator('#fresh-result').inner_text()
+                    assert 'No retrieved hits for:' in page.locator('#fresh-result').inner_text()
+                    assert 'exception' in page.locator('#fresh-result').inner_text()
+                    assert 'A missing hit does not establish absence.' in page.locator('#fresh-result').inner_text()
+                    assert 'Material obligations remain open: ob-plan-coverage' in page.locator('#fresh-result').inner_text()
                     assert quote in page.locator('#fresh-result').inner_text()
                     assert browser_transport.calls_made == 4
                     page.route('**/api/catalog-state', lambda route: route.fulfill(status=503, json={'error': 'unavailable'}))
@@ -145,6 +151,7 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert replay['request']['question'] == 'Refund limit?'
         assert replay['request']['role'] == 'reviewer' and replay['request']['role_version'] == '1'
         assert replay['result']['status'] == 'deferred'
+        assert 'ob-plan-coverage' in replay['result']['blocking_obligations']
         assert replay['review']['review_id'] == result['review']['review_id']
         assert replay['review']['assessment'] == 'uncertain' and replay['review']['reason'] == 'fixture review'
         assert replay['resources']['status'] == 'recorded_unverified'
@@ -251,6 +258,9 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     assert 'fixture review' in page.locator('#fresh-replay').inner_text()
                     assert 'Recorded calls: 4' in page.locator('#fresh-replay').inner_text()
                     assert 'Model-cited passage' in page.locator('#fresh-replay').inner_text()
+                    assert 'No retrieved hits for:' in page.locator('#fresh-replay').inner_text()
+                    assert 'exception' in page.locator('#fresh-replay').inner_text()
+                    assert 'Material obligations remain open: ob-plan-coverage' in page.locator('#fresh-replay').inner_text()
                     with page.expect_download() as info:
                         page.get_by_role('link', name='Download fresh archive').click()
                     assert info.value.suggested_filename.endswith('.sqlite')

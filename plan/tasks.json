@@ -4172,6 +4172,24 @@
       "acceptance": "Check each declared price ceiling against the corresponding retained token reservation; insufficient reservation is invalid and missing ceiling remains incomplete.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: a rehashed synthetic receipt with cost reserve below its own routing ceiling was labeled unanchored. It is now invalid despite actual cost fitting; fresh/replay/budget checks 64 passed and 1 skipped; Chrome fresh checks 4 passed. This only checks retained assertions, not current pricing, complete input bounds, provider authenticity or aggregate budget."
+    },
+    {
+      "id": "T055H",
+      "phase": "P5",
+      "depends_on": [
+        "T055G"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Expose fresh acquisition diagnostics and open obligations",
+      "acceptance": "Show recorded missing, excluded, omitted and truncated acquisition information and open material obligations in immediate and saved fresh results without inferring absence from missing hits.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: fresh service dropped the recorded channel report and blocking obligations. Synthetic actual-pipeline and Chrome checks now show missing exception-channel hits, the explicit no-absence caveat and the coverage obligation in immediate and saved views. Focused browser/fresh/replay checks: 65 passed; final browser walkthrough: 1 passed. Channel diagnostics are recorded, not independently verified; R04/R05 remain open."
     }
   ]
 }

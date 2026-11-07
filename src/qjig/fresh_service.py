@@ -245,7 +245,8 @@ class FreshWorkbench:
                                         'judgment': _judgment_view(judgment) if judgment else None,
                                         'evidence': [{'revision_id': item.revision_id, 'start': item.start, 'end': item.end,
                                                       'text': item.text, 'truncated': item.truncated} for item in trace.evidence],
-                                        'exclusions': [{'reason': item.reason} for item in trace.exclusions]})
+                                        'exclusions': [asdict(item) for item in trace.exclusions],
+                                        'channels': asdict(trace.channels) if trace.channels is not None else None})
                 conditional = evaluate(run.state.plan.expression, run.state.observations).outcome.value if run.state else None
                 review_record = run.review.record if run.review else None
                 review_payload = review_record['payload'] if review_record is not None else None
@@ -257,6 +258,7 @@ class FreshWorkbench:
                           'review_id': review_record['sha256'] if review_record else None}
                 return {'kind': 'fresh', 'status': 'deferred', 'answer': None, 'conditional_outcome': conditional,
                         'reasons': list(run.reasons) + (['catalog_changed_during_run'] if before != after else []),
+                        'blocking_obligations': list(run.summary.stop.blocking_obligations) if run.summary else None,
                         'plan_failure': run.plan_failure, 'records': records, 'review': review,
                         'run_id': run_id, 'source_state_before': before, 'source_state_after': after,
                         'provider_assurance': 'synthetic' if isinstance(transport, StandInTransport) else 'hosted_unverified'}
