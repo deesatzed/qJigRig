@@ -1530,3 +1530,97 @@ def test_factorial_allocation_enumerates_real_arm_work_before_reservation(tmp_pa
     with GoalBudget.open(tmp_path/'short.sqlite',total=Budget(700,200000,10),per_request=Budget(30,6000,1),allocations=short) as goal:
         with pytest.raises(BudgetExceeded):reserve_evaluation_plan(goal,'factorial',plan,expected_plan_sha256=plan['sha256'])
         assert goal._con.execute('SELECT COUNT(*) FROM evaluation_plans').fetchone()[0]==0
+
+
+def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path):
+    import json
+    from contextlib import ExitStack
+    from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget,Request
+    from qjig.direct_preflight import direct_slot_reservation
+    from qjig.evaluation import load_isolated_sources,validate_evaluation_design
+    from qjig.evaluation_budget import build_factorial_allocation,reserve_evaluation_plan
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_direct import run_locked_direct
+    from qjig.evaluation_fresh import run_locked_fresh
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.evaluation_scoring import make_reference,reference_digest,fresh_journal_digest,build_reserved_holdout_comparison
+    from qjig.fresh_preflight import fresh_slot_reservation
+    from qjig.goal_budget import GoalBudget
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse,StandInTransport
+    from qjig.replay import verify_archive
+    from qjig.run_archive import RunArchive
+    code,gold=b'Tests must pass.',b'PRIVATE_FACTORIAL_REFERENCE'
+    (tmp_path/'code').write_bytes(code);(tmp_path/'label').write_bytes(gold)
+    item=lambda path,raw:{'path':path,'sha256':hashlib.sha256(raw).hexdigest()}
+    sources,protected=[item('code',code)],[item('label',gold)]
+    design=_sample_design();design['families'][4]['source_hashes']=[sources[0]['sha256']]
+    digest=validate_evaluation_design(design)
+    ref=make_reference(case_id='holdout',request=Request('hidden','Do tests pass?','reviewer','1','project'),
+        sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],historical_as_known=False,
+        expected_answer='yes',provenance='authored_unvalidated',evidence=[{'path':'code','quote':'Tests must pass.'}])
+    lock={'schema':'qjig.evaluation-case.v1','case_id':'holdout','design_sha256':digest,'question':'Do tests pass?',
+          'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
+          'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
+    case_hashes={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']}
+    case_hashes['holdout']=case_lock_digest(lock)
+    inputs=ApplicabilityInputs(Collection((MemberMetadata(ref['source_revisions'][0],'project',Interval('2020-01-01',OPEN)),)),
+                               frozenset(),'2026-11-07',False)
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
+    plan=build_factorial_allocation(design,case_hashes,{k:dict(spec) for k in ('direct','planner','judge','reviewer')},
+                                    expected_design_sha256=digest,assignment_secret=b'synthetic-private-test-secret-32-bytes')
+    usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
+    raw=lambda value:RawResponse(200,json.dumps(value),usage)
+    total=Budget(800,200000,10);per=Budget(30,6000,1)
+    allocations={'development':Budget(200,50000,2),'pilot':Budget(200,50000,2),'holdout':Budget(400,100000,6)}
+    entries={}
+    with ExitStack() as stack:
+        goal=stack.enter_context(GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations))
+        journal=stack.enter_context(Journal.open(tmp_path/'journal.sqlite'))
+        reserve_evaluation_plan(goal,'factorial',plan,expected_plan_sha256=plan['sha256'])
+        for arm in design['arms']:
+            assignment=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==arm and a['repeat']==1)
+            rid=assignment['request_id'];ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout')
+            archive=stack.enter_context(RunArchive.open(tmp_path/('archive-'+arm)))
+            binding={'plan_id':'factorial','plan_sha256':plan['sha256'],'arm':arm,'repeat':1}
+            if arm in ('combined','decomposition_only'):
+                transport=StandInTransport([raw({'predicates':[{'id':'p','question':'Do tests pass?'}],'expression':{'ref':'p'}}),
+                    raw({'supported':True,'quote':'Tests must pass.','reason':'synthetic'}),
+                    raw({'supported':False,'quote':'','reason':'synthetic'}),raw({'assessment':'uncertain','reason':'synthetic'})])
+                def factory(req):return fresh_slot_reservation(goal,'evaluation:factorial',request_id=rid,partition='holdout',
+                    request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
+                result=run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=digest,
+                    expected_case_sha256=case_lock_digest(lock),applicability_inputs=inputs,ledger=ledger,transport=transport,
+                    archive=archive,planner=('stand-in',model['id']),judge=('stand-in',model['id']),reviewer=('stand-in',model['id']),
+                    planner_max_tokens=100,judge_max_tokens=100,reviewer_max_tokens=100,planner_max_price=cap,
+                    judge_max_price=cap,reviewer_max_price=cap,reservation_factory=factory,review_reservation_factory=factory,
+                    assignment_binding=binding,evidence_mode='full' if arm=='decomposition_only' else 'catalog')
+                assert result.status=='deferred' and result.review.status=='recorded' and transport.calls_made==4
+                replay=verify_archive(archive);assert replay.status=='unanchored'
+                run_hash=replay.digest;journal_hash=fresh_journal_digest(journal,rid)
+            else:
+                transport=StandInTransport([raw({'action':'answer','query':None,'answer':'unknown','citations':[]})])
+                def factory(req):return direct_slot_reservation(goal,'evaluation:factorial',request_id=rid,partition='holdout',
+                    request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
+                mode={'direct_full_evidence':'full','direct_retrieval':'retrieved','retrieval_only':'catalog'}[arm]
+                result=run_locked_direct(tmp_path,design,lock,ref,protected,expected_design_sha256=digest,
+                    expected_case_sha256=case_lock_digest(lock),ledger=ledger,transport=transport,archive=archive,
+                    provider='stand-in',model=model['id'],max_tokens=100,want=1,max_bytes=5000,
+                    followups=0 if mode=='full' else 1,evidence_mode=mode,applicability_inputs=inputs,
+                    reservation_factory=factory,max_price=cap,assignment_binding=binding)
+                assert result['status']=='recorded_unvalidated' and transport.calls_made==1
+                replay=verify_direct_archive(archive,journal);assert replay['status']=='unanchored'
+                run_hash=replay['sha256'];journal_hash=None
+            prompts=[e['data']['prompt'] for e in archive.events() if e['kind']=='request']
+            assert all(gold.decode() not in p and rid not in p and arm not in p for p in prompts)
+            entries[arm]={'archive':archive,'journal':journal,'reference':ref,'run_sha256':run_hash,
+                          'reference_sha256':reference_digest(ref),'journal_sha256':journal_hash}
+        assert goal.audit_journal(journal)['status']=='verified'
+        for arm in ('direct_full_evidence','retrieval_only','decomposition_only','combined'):
+            report=build_reserved_holdout_comparison(goal,design,[entries['direct_retrieval'],entries[arm]],plan_id='factorial',
+                expected_plan_sha256=plan['sha256'],expected_design_sha256=digest,baseline_arm='direct_retrieval',candidate_arm=arm)
+            assert report['recorded_pairs']==1 and report['missing_pairs']==5 and report['outcome_support'] is None

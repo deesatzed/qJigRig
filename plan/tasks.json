@@ -1178,7 +1178,8 @@
         "T066A",
         "T066B",
         "T066C",
-        "T066D"
+        "T066D",
+        "T066E"
       ],
       "status": "pending",
       "files": [
@@ -3214,6 +3215,23 @@
       "acceptance": "All five arms get their actual bounded stage templates with mandatory review before atomic reservation; insufficient capacity refuses.",
       "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_enumerates_real_arm_work_before_reservation -q",
       "evidence": "Red: complete evaluation plans accepted caller-provided placeholder stages but had no builder for the five actual arm templates. The builder now generates opaque deterministic assignment IDs and physical direct, bounded-followup, planner, paired-judge and mandatory review slots for every case/arm/repeat; insufficient capacity rolls back atomically. Focused evaluation/fresh-preflight/goal suite 98 passed; full offline suite 548 passed. The local draft produced 105 assignments and 1197 synthetic slots in .local/verification/factorial-allocation-synthetic-ar472ibq. This uses synthetic prices and input bounds; decomposition reserves extra judge rounds, smoke/acceptance and escalation are separate, and actual hosted preflight remains unverified."
+    },
+    {
+      "id": "T066E",
+      "phase": "evaluation",
+      "depends_on": [
+        "T066C",
+        "T066D",
+        "R08F"
+      ],
+      "status": "complete",
+      "files": [],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_factorial_allocation_executes_all_arms_with_reserved_review",
+      "action": "Verify a complete synthetic five-arm execution against the generated reservation",
+      "acceptance": "One checked case executes all five reserved arms; required fresh review, replay, accounting and paired reports retain missing assignments.",
+      "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
+      "evidence": "Verification-only addition: a single synthetic holdout case exercised all five arms from one generated 60-assignment reservation. The two fresh arms each made planner, paired judge and review calls, remained deferred, replayed and joined the archive-derived holdout report; the other arms replayed, the common goal/journal audit passed, and the other five holdout pairs stayed missing. Private reference, request and arm IDs were absent from prompts. Focused evaluation/fresh-preflight/goal/replay 114 passed; full offline suite 549 passed. One synthetic case is not a complete comparison, real inference, matched-work evidence or provider authorization."
     }
   ]
 }
