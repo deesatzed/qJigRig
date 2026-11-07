@@ -1585,6 +1585,11 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
         journal=stack.enter_context(Journal.open(tmp_path/'journal.sqlite'))
         reserve_evaluation_plan(goal,'factorial',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'factorial',expected_plan_sha256=plan['sha256'])
+        config_digest = campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000) if driver=='runner' else None
+        if driver=='runner':
+            assert campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000)==config_digest
+            with pytest.raises(ContractError):
+                campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=2,max_bytes=5000)
         for arm in design['arms']:
             assignment=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==arm and a['repeat']==1)
             rid=assignment['request_id'];ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout')
@@ -1603,11 +1608,21 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                 with pytest.raises(ContractError):
                     run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
                         applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
-                        config=bad_config,want=1,max_bytes=5000)
+                        config=bad_config,want=1,max_bytes=5000,expected_config_sha256=config_digest)
                 assert campaign.status()['in_progress']==[] and journal.events(rid)==[] and transport.calls_made==0
+                with pytest.raises(ContractError):
+                    run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
+                        applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
+                        config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=2,max_bytes=5000,
+                        expected_config_sha256=config_digest)
+                with pytest.raises(ContractError):
+                    run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
+                        applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
+                        config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,
+                        expected_config_sha256='0'*64)
                 receipt=run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
                     applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
-                    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000)
+                    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,expected_config_sha256=config_digest)
                 assert receipt['status']=='scored' and transport.calls_made==(4 if arm in ('combined','decomposition_only') else 1)
                 prompts=[e['data']['prompt'] for e in archive.events() if e['kind']=='request']
                 assert all(gold.decode() not in p and rid not in p and arm not in p for p in prompts)
@@ -1671,7 +1686,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             with pytest.raises(ContractError):
                 run_campaign_assignment(campaign,pending['request_id'],tmp_path,design,lock,ref,protected,
                     applicability_inputs=inputs,transport=timed_out,archive=interrupted,journal=journal,
-                    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000)
+                    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,expected_config_sha256=config_digest)
             assert timed_out.calls_made==1 and journal.pending(pending['request_id'])
         else:
             campaign.claim(pending['request_id'])
@@ -1683,6 +1698,12 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as reopened:
         recovered=EvaluationCampaign(reopened,'factorial',expected_plan_sha256=plan['sha256'])
         assert recovered.status()['scored']==5 and recovered.status()['in_progress']==[pending['request_id']]
+        if driver=='runner':
+            import sqlite3
+            recovered.require_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},
+                                     want=1,max_bytes=5000,expected_config_sha256=config_digest)
+            with pytest.raises(sqlite3.IntegrityError):
+                reopened._con.execute("UPDATE evaluation_campaign_config SET value='{}'")
         with pytest.raises(ContractError):recovered.claim(other['request_id'])
         with pytest.raises(ContractError):EvaluationCampaign(reopened,'factorial',expected_plan_sha256='0'*64)
         import sqlite3

@@ -25,6 +25,9 @@ class EvaluationCampaign:
             seq INTEGER PRIMARY KEY AUTOINCREMENT, plan_id TEXT NOT NULL, request_id TEXT NOT NULL,
             kind TEXT NOT NULL CHECK(kind IN ('started','scored')), payload TEXT NOT NULL,
             UNIQUE(plan_id,request_id,kind))''')
+        goal._con.execute('CREATE TABLE IF NOT EXISTS evaluation_campaign_config (plan_id TEXT PRIMARY KEY, value TEXT NOT NULL, sha256 TEXT NOT NULL)')
+        goal._con.execute("CREATE TRIGGER IF NOT EXISTS campaign_config_no_update BEFORE UPDATE ON evaluation_campaign_config BEGIN SELECT RAISE(ABORT, 'campaign config immutable'); END")
+        goal._con.execute("CREATE TRIGGER IF NOT EXISTS campaign_config_no_delete BEFORE DELETE ON evaluation_campaign_config BEGIN SELECT RAISE(ABORT, 'campaign config immutable'); END")
         goal._con.execute("CREATE TRIGGER IF NOT EXISTS campaign_events_no_update BEFORE UPDATE ON evaluation_campaign_events BEGIN SELECT RAISE(ABORT, 'campaign events immutable'); END")
         goal._con.execute("CREATE TRIGGER IF NOT EXISTS campaign_events_no_delete BEFORE DELETE ON evaluation_campaign_events BEGIN SELECT RAISE(ABORT, 'campaign events immutable'); END")
         self._snapshot()
@@ -51,6 +54,12 @@ class EvaluationCampaign:
         self._goal._verify_run_set(set_id,*frozen)
         assignments = {a['request_id']:a for a in manifest['assignments']}
         rows = self._goal._con.execute('SELECT request_id,kind,payload FROM evaluation_campaign_events WHERE plan_id=? ORDER BY seq',(self._plan_id,)).fetchall()
+        config_row = self._goal._con.execute('SELECT value,sha256 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
+        config_digest = None
+        if config_row is not None:
+            config_value,config_digest = config_row
+            if hashlib.sha256(config_value.encode('utf-8')).hexdigest() != config_digest:
+                raise ContractError('campaign configuration integrity differs')
         started, scored = set(), set()
         for request_id,kind,payload in rows:
             if request_id not in assignments:
@@ -60,7 +69,8 @@ class EvaluationCampaign:
             except (TypeError,ValueError) as exc:
                 raise ContractError('invalid campaign event') from exc
             if kind == 'started':
-                if request_id in started or started-scored or data != {'plan_sha256':digest}:
+                expected_claim = {'plan_sha256':digest, **({'config_sha256':config_digest} if config_digest is not None else {})}
+                if request_id in started or started-scored or data != expected_claim:
                     raise ContractError('invalid campaign claim')
                 started.add(request_id)
             elif kind == 'scored':
@@ -77,6 +87,78 @@ class EvaluationCampaign:
             else:
                 raise ContractError('invalid campaign event kind')
         return manifest,assignments,started,scored
+
+    def freeze_config(self, config: dict, *, want: int, max_bytes: int) -> str:
+        """Persist declared stage settings and shared packet limits before claims."""
+        from .direct_preflight import direct_run_allocations
+        from .fresh_preflight import fresh_run_allocations
+        if (type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024
+                or not isinstance(config,dict) or set(config) != {'direct','planner','judge','reviewer'}
+                or any(not isinstance(v,dict) or set(v) != {'provider','model','input_tokens','output_tokens','max_price'}
+                       for v in config.values())):
+            raise ContractError('invalid campaign configuration')
+        direct,planner,judge,reviewer=(config[k] for k in ('direct','planner','judge','reviewer'))
+        if planner['provider'] != judge['provider']:
+            raise ContractError('fresh planner and judge providers must match')
+        payload={'schema':'qjig.campaign-config.v1','plan_sha256':self._digest,'want':want,'max_bytes':max_bytes,'stages':config}
+        try:
+            encoded=json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
+            digest=hashlib.sha256(encoded.encode('utf-8')).hexdigest()
+        except (TypeError,ValueError,UnicodeError) as exc:
+            raise ContractError('campaign configuration is not finite JSON') from exc
+        con=self._goal._con
+        con.execute('BEGIN IMMEDIATE')
+        try:
+            _,assignments,started,_=self._snapshot()
+            row=con.execute('SELECT value,sha256 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
+            if row is not None:
+                if row != (encoded,digest):
+                    raise ContractError('campaign configuration differs from frozen value')
+                con.execute('COMMIT')
+                return digest
+            if started:
+                raise ContractError('campaign configuration must precede claims')
+            for assignment in assignments.values():
+                arm,rid=assignment['arm'],assignment['request_id']
+                partition=assignment['work'][0]['partition']
+                if arm in ('combined','decomposition_only'):
+                    work=fresh_run_allocations(request_id=rid,partition=partition,provider=planner['provider'],
+                        planner_model=planner['model'],judge_model=judge['model'],planner_input=planner['input_tokens'],
+                        planner_output=planner['output_tokens'],judge_input=judge['input_tokens'],judge_output=judge['output_tokens'],
+                        planner_price=planner['max_price'],judge_price=judge['max_price'],reviewer=reviewer)
+                elif arm in ('direct_full_evidence','direct_retrieval','retrieval_only'):
+                    work=direct_run_allocations(request_id=rid,partition=partition,provider=direct['provider'],model=direct['model'],
+                        input_tokens=direct['input_tokens'],output_tokens=direct['output_tokens'],max_price=direct['max_price'],
+                        followups=0 if arm=='direct_full_evidence' else 1)
+                else:
+                    raise ContractError('unsupported campaign arm')
+                if sorted(work,key=lambda x:x['work_id']) != assignment['work']:
+                    raise ContractError('campaign configuration differs from reserved work')
+            con.execute('INSERT INTO evaluation_campaign_config VALUES(?,?,?)',(self._plan_id,encoded,digest))
+            con.execute('COMMIT')
+            return digest
+        except BaseException:
+            con.execute('ROLLBACK')
+            raise
+
+    def require_config(self, config: dict, *, want: int, max_bytes: int, expected_config_sha256: str) -> None:
+        """Check an externally anchored frozen configuration without modifying it."""
+        if not isinstance(expected_config_sha256,str) or len(expected_config_sha256)!=64 or any(c not in '0123456789abcdef' for c in expected_config_sha256):
+            raise ContractError('campaign configuration anchor required')
+        row=self._goal._con.execute('SELECT value,sha256 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
+        if row is None:
+            raise ContractError('campaign configuration unavailable')
+        encoded,digest=row
+        if (hashlib.sha256(encoded.encode('utf-8')).hexdigest()!=digest or not hmac.compare_digest(digest,expected_config_sha256)):
+            raise ContractError('campaign configuration anchor differs')
+        try:
+            expected=json.dumps({'schema':'qjig.campaign-config.v1','plan_sha256':self._digest,'want':want,
+                                 'max_bytes':max_bytes,'stages':config},sort_keys=True,separators=(',',':'),
+                                ensure_ascii=False,allow_nan=False)
+        except (TypeError,ValueError,UnicodeError) as exc:
+            raise ContractError('campaign configuration is not finite JSON') from exc
+        if encoded != expected:
+            raise ContractError('campaign configuration differs')
 
     def status(self) -> dict:
         manifest,assignments,started,scored = self._snapshot()
@@ -95,8 +177,10 @@ class EvaluationCampaign:
             if con.execute('SELECT 1 FROM required_work WHERE request_id=? AND attempt_id IS NOT NULL LIMIT 1',(request_id,)).fetchone():
                 raise ContractError('assignment already has consumed work')
             assignment = assignments[request_id]
+            config_row=con.execute('SELECT sha256 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
+            payload={'plan_sha256':self._digest, **({'config_sha256':config_row[0]} if config_row else {})}
             con.execute('INSERT INTO evaluation_campaign_events(plan_id,request_id,kind,payload) VALUES(?,?,?,?)',
-                        (self._plan_id,request_id,'started',json.dumps({'plan_sha256':self._digest},sort_keys=True)))
+                        (self._plan_id,request_id,'started',json.dumps(payload,sort_keys=True)))
             con.execute('COMMIT')
         except BaseException:
             con.execute('ROLLBACK')
@@ -115,6 +199,24 @@ class EvaluationCampaign:
         assignment = assignments[request_id]
         if archive.context().get('request',{}).get('request_id') != request_id:
             raise ContractError('archive request differs from claim')
+        config_row=self._goal._con.execute('SELECT value FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
+        if config_row is not None:
+            frozen=json.loads(config_row[0]);context=archive.context();stages=frozen['stages'];arm=assignment['arm']
+            if context.get('want') != frozen['want'] or context.get('max_bytes') != frozen['max_bytes']:
+                raise ContractError('archive packet configuration differs')
+            if arm in ('combined','decomposition_only'):
+                for name in ('planner','judge','reviewer'):
+                    actual=context.get(name);spec=stages[name]
+                    if (not isinstance(actual,dict) or actual.get('provider') != spec['provider']
+                            or actual.get('model') != spec['model']['id'] or actual.get('max_tokens') != spec['output_tokens']
+                            or actual.get('max_price') != spec['max_price']):
+                        raise ContractError('archive stage configuration differs')
+            else:
+                spec=stages['direct']
+                if (context.get('provider') != spec['provider'] or context.get('model') != spec['model']['id']
+                        or context.get('max_tokens') != spec['output_tokens'] or context.get('max_price') != spec['max_price']
+                        or context.get('followups') != (0 if arm=='direct_full_evidence' else 1)):
+                    raise ContractError('archive direct configuration differs')
         family = next(c['family'] for c in manifest['design']['cases'] if c['id']==assignment['case_id'])
         partition = next(f['partition'] for f in manifest['design']['families'] if f['id']==family)
         score = score_reserved_assignment(self._goal,archive,journal,reference,partition=partition,
@@ -146,7 +248,7 @@ class EvaluationCampaign:
 def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root, design: dict,
                             lock: dict, reference: dict, protected: list[dict], *,
                             applicability_inputs, transport, archive, journal, config: dict,
-                            want: int, max_bytes: int) -> dict:
+                            want: int, max_bytes: int, expected_config_sha256: str) -> dict:
     """Run and score one claimed factorial assignment; never retry an interrupted claim.
 
     Input/price bounds, evidence configuration and external anchors are caller
@@ -168,6 +270,7 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             or not isinstance(journal,Journal) or not isinstance(applicability_inputs,ApplicabilityInputs)
             or type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024):
         raise ContractError('invalid campaign run inputs')
+    campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
     manifest,assignments,started,_ = campaign._snapshot()
     if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
         raise ContractError('campaign assignment unavailable')

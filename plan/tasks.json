@@ -1279,7 +1279,8 @@
       "depends_on": [
         "T070",
         "T071A",
-        "T071B"
+        "T071B",
+        "T071C"
       ],
       "status": "pending",
       "files": [
@@ -3271,6 +3272,23 @@
       "acceptance": "Validate case and physical stage configuration before durable claim, run the correct bounded arm, replay and record a scored receipt without automatic retry.",
       "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
       "evidence": "Red: durable claims were not connected to a campaign execution entry point. The guarded runner now checks the pinned case, applicability, complete reserved physical stage configuration and empty archive before claiming, dispatches the selected checked arm, replays and records a scored receipt, and never automatically retries an interrupted claim. Synthetic manual and runner paths each exercised all five arms including reviews; changed bounds refused before claim and a timed-out direct call left the claim unresolved and blocked subsequent claims. Focused evaluation/goal/replay/fresh-preflight 115 passed; full offline suite 550 passed. Caller-provided want/max_bytes and input/price bounds are not frozen or externally verified; lower-level APIs can bypass the campaign, a full multi-assignment driver and hosted preflight remain open."
+    },
+    {
+      "id": "T071C",
+      "phase": "evaluation",
+      "depends_on": [
+        "T071B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_campaign.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_factorial_allocation_executes_all_arms_with_reserved_review",
+      "action": "Freeze campaign stage and retrieval configuration before execution",
+      "acceptance": "Persist immutable stage configuration and packet limits tied to the reserved plan; reject altered configuration before claims or calls.",
+      "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
+      "evidence": "Red: guarded campaign execution accepted unpinned packet limits and no immutable campaign configuration existed. The goal ledger now persists stage settings and shared want/max_bytes before claims, checks all assignment work against the reserved slots, records the configuration digest in claims and verifies archive configuration at completion. Synthetic five-arm runs reject changed stage inputs, limits and anchors; reopen and immutability checks pass. Focused evaluation/goal/replay/fresh-preflight 115 passed; full offline suite 550 passed. Caller-supplied anchors, source metadata, transport timeouts, pricing and token bounds remain unverified; lower-level APIs bypass the runner and no complete experiment or hosted call occurred."
     }
   ]
 }
