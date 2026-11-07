@@ -1,7 +1,7 @@
 """One bounded acquisition round: schedule a need, retrieve, verify, evaluate, record a trace."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 import math
 from typing import Callable
 
@@ -67,6 +67,7 @@ class Context:
     applicability: Callable[[Candidate], Applicability] | None
     specs: dict[str, NeedSpec]
     max_rounds: int = MAX_ROUNDS
+    archive: object | None = None
 
     def __post_init__(self) -> None:
         if type(self.max_rounds) is not int or not 1 <= self.max_rounds <= MAX_ROUNDS:
@@ -238,6 +239,10 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
         retrieval_method=spec.retrieval_method,
         channels=channel_report,
     )
+    if ctx.archive is not None:
+        data = asdict(record)
+        data["observation"]["outcome"] = record.observation.outcome.value
+        ctx.archive.record_trace(state.request.request_id, record.sequence, data)
     state.trace.append(record)
     return record
 
@@ -403,7 +408,7 @@ def run_fresh(
     obligations.record_retrieval(COVERAGE_ID, hit_count=len(bm25_candidates(entries, EXCEPTION_QUERY)), result=exc)
 
     state = RunState(request, plan, obligations)
-    ctx = Context(catalog, entries, check, specs)
+    ctx = Context(catalog, entries, check, specs, archive=archive)
     summary = run_until_done(state, ctx)
     reasons = ("plan_coverage_unestablished",) + tuple(r for r in summary.stop.reasons if r != "plan_coverage_unestablished")
     return FreshRun(

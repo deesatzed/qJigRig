@@ -193,7 +193,7 @@ def test_fresh_pipeline_archives_each_model_attempt(tmp_path):
                            planner=("stand-in", "planner"), judge=("stand-in", "judge"),
                            revision_applicability=lambda rid: Applicability.MATCH, archive=archive)
         assert result.status == "deferred"
-        assert [event["kind"] for event in archive.events()] == ["request", "response", "validation"] * 3
+        assert [event["kind"] for event in archive.events()] == ["request", "response", "validation"] * 3 + ["trace"]
         assert archive.source(REV.source_id) == TEXT.encode()
         assert archive.revision(REV.revision_id) == REV
 
@@ -443,3 +443,50 @@ def test_contradiction_channel_reaches_judge_with_other_channels(tmp_path):
         assert all("Another policy allows thirty days" in prompt and "Special items may be returned" in prompt for prompt in prompts[1:])
         assert set(result.state.trace[0].channels.delivered) == {"primary", "exception", "contradiction"}
         assert result.status == "deferred"
+
+
+def test_fresh_trace_is_durable_before_next_predicate(tmp_path):
+    from qjig.run_archive import RunArchive
+
+    plan = {"predicates": [{"id": "p1", "question": "refund purchase?"}, {"id": "p2", "question": "refund days?"}],
+            "expression": {"op": "and", "args": [{"ref": "p1"}, {"ref": "p2"}]}}
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(plan), side(False), side(False), side(False), side(False)])
+    with cat, journal, RunArchive.open(tmp_path / "archive") as archive:
+        send = transport.send
+        judge_calls = []
+        def inspect_order(request):
+            if request.stage.startswith("judge_"):
+                judge_calls.append(request.stage)
+                if len(judge_calls) == 3:
+                    traces = [event for event in archive.events() if event["kind"] == "trace"]
+                    assert len(traces) == 1 and traces[0]["data"]["predicate_id"] == "p1"
+            return send(request)
+        transport.send = inspect_order
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                           revision_applicability=lambda rid: Applicability.MATCH, archive=archive)
+        traces = [event["data"] for event in archive.events() if event["kind"] == "trace"]
+        assert len(traces) == 2 and result.status == "deferred"
+        assert traces[0]["channels"]["hits"]["exception"] > 0
+        assert traces[0]["evidence"][0]["revision_id"] == REV.revision_id
+        assert traces[0]["observation"]["outcome"] == "unknown"
+    with RunArchive.open(tmp_path / "archive") as archive:
+        assert len([event for event in archive.events() if event["kind"] == "trace"]) == 2
+
+
+def test_fresh_trace_survives_interruption_during_next_predicate(tmp_path):
+    from qjig.run_archive import RunArchive
+
+    plan = {"predicates": [{"id": "p1", "question": "refund purchase?"}, {"id": "p2", "question": "refund days?"}],
+            "expression": {"op": "and", "args": [{"ref": "p1"}, {"ref": "p2"}]}}
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(plan), side(False), side(False), KeyboardInterrupt()])
+    with cat, journal, RunArchive.open(tmp_path / "archive") as archive:
+        with pytest.raises(KeyboardInterrupt):
+            run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                      planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                      revision_applicability=lambda rid: Applicability.MATCH, archive=archive)
+        assert len(journal.pending(REQUEST.request_id)) == 1
+    with RunArchive.open(tmp_path / "archive") as archive:
+        traces = [e["data"] for e in archive.events() if e["kind"] == "trace"]
+        assert len(traces) == 1 and traces[0]["predicate_id"] == "p1"
+        assert traces[0]["channels"]["delivered"]

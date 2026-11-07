@@ -1361,7 +1361,8 @@
         "R07C",
         "R07D",
         "R07E",
-        "R07F"
+        "R07F",
+        "R07G"
       ],
       "status": "pending",
       "files": [],
@@ -1641,6 +1642,27 @@
       "acceptance": "Verified applicable exception and contradiction candidates reach judging with channel omissions and exclusions recorded.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_exception_channel_reaches_relevant_judge -q",
       "evidence": "Red: an exception passage without primary-query overlap did not reach the stand-in judge. Green: primary/exception/contradiction channels select verified applicable spans; role-zero exception still reaches judging; shared candidate deduplicated; excluded, missing, omitted and truncated paths remain distinct and omission defers; invalid priors refuse before call. Full offline suite 335 passed. Channel searches are lexical and do not prove completeness; durable trace export and live assessment remain open under R04."
+    },
+    {
+      "id": "R07G",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R07F",
+        "R04A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/run_archive.py",
+        "src/qjig/acquisition.py",
+        "tests/test_fresh_pipeline.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_fresh_trace_is_durable_before_next_predicate",
+      "action": "Persist each fresh acquisition trace incrementally",
+      "acceptance": "Source spans, channel results, exclusions and observations survive interruption before subsequent predicate calls.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_trace_is_durable_before_next_predicate -q",
+      "evidence": "Red: earlier predicate trace was absent when the next judge call began. Green: each synthetic acquisition trace, including source spans, channel status, exclusions and observation, is persisted before the next predicate; simulated interruption preserves the first trace and a pending later intent. Focused fresh/acquisition/archive suite 42 passed; full suite 337 passed. Integrity verification and full replay remain pending."
     }
   ]
 }

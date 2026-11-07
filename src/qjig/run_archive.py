@@ -158,6 +158,11 @@ class RunArchive:
             raise ContractError("failure has no recorded request")
         self._event("failure", call_id, {"failure": failure})
 
+    def record_trace(self, request_id: str, sequence: int, data: dict) -> None:
+        if not isinstance(request_id, str) or not request_id or type(sequence) is not int or sequence < 1:
+            raise ContractError("invalid trace identity")
+        self._event("trace", f"{request_id}#{sequence}", data)
+
     def events(self) -> list[dict]:
         rows = self._con.execute("SELECT seq,kind,call_id,data,recorded_at FROM events ORDER BY seq").fetchall()
         return [{"seq": r[0], "kind": r[1], "call_id": r[2], "data": json.loads(r[3]), "recorded_at": r[4]} for r in rows]
