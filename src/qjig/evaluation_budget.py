@@ -149,3 +149,53 @@ def validate_assignment_binding(binding: dict) -> None:
             or not isinstance(binding['arm'], str) or not binding['arm'].strip()
             or type(binding['repeat']) is not int or binding['repeat'] < 1):
         raise ContractError('evaluation assignment binding required')
+
+
+def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
+                               expected_design_sha256: str, assignment_secret: bytes) -> dict:
+    """Enumerate all declared five-arm physical slots from explicit bounds.
+
+    The secret keeps private assignment mappings out of provider-visible IDs.
+    Models, prices and complete input bounds remain caller assertions; this does
+    not establish a safe hosted preflight or reserve smoke/acceptance work.
+    """
+    from .direct_preflight import direct_run_allocations
+    from .fresh_preflight import fresh_run_allocations
+    validate_evaluation_design(design,expected_digest=expected_design_sha256)
+    arms = {'direct_full_evidence','direct_retrieval','retrieval_only','decomposition_only','combined'}
+    if set(design['arms']) != arms:
+        raise ContractError('factorial allocation requires the five specified arms')
+    if not isinstance(assignment_secret,bytes) or not 32 <= len(assignment_secret) <= 4096:
+        raise ContractError('private assignment secret required')
+    if not isinstance(config,dict) or set(config) != {'direct','planner','judge','reviewer'}:
+        raise ContractError('complete factorial model configuration required')
+    for spec in config.values():
+        if not isinstance(spec,dict) or set(spec) != {'provider','model','input_tokens','output_tokens','max_price'}:
+            raise ContractError('invalid factorial stage configuration')
+    direct, planner, judge, reviewer = (config[k] for k in ('direct','planner','judge','reviewer'))
+    if planner['provider'] != judge['provider']:
+        raise ContractError('fresh planner and judge providers must match')
+    families = {f['id']:f['partition'] for f in design['families']}
+    assignments, templates = [], {}
+    for case in design['cases']:
+        partition = families[case['family']]
+        for arm in sorted(arms):
+            for repeat in range(1,design['repeats'][partition]+1):
+                identity = _encode([expected_design_sha256,case['id'],arm,repeat]).encode('utf-8')
+                request_id = 'qj-' + hmac.new(assignment_secret,identity,hashlib.sha256).hexdigest()
+                if arm in ('combined','decomposition_only'):
+                    work = fresh_run_allocations(request_id=request_id,partition=partition,provider=planner['provider'],
+                        planner_model=planner['model'],judge_model=judge['model'],
+                        planner_input=planner['input_tokens'],planner_output=planner['output_tokens'],
+                        judge_input=judge['input_tokens'],judge_output=judge['output_tokens'],
+                        planner_price=planner['max_price'],judge_price=judge['max_price'],reviewer=reviewer)
+                else:
+                    work = direct_run_allocations(request_id=request_id,partition=partition,provider=direct['provider'],
+                        model=direct['model'],input_tokens=direct['input_tokens'],output_tokens=direct['output_tokens'],
+                        max_price=direct['max_price'],followups=0 if arm=='direct_full_evidence' else 1)
+                counts = dict(Counter(slot['stage'] for slot in work))
+                if arm in templates and templates[arm] != counts:
+                    raise ContractError('factorial stage template changed')
+                templates[arm] = counts
+                assignments.append({'case_id':case['id'],'arm':arm,'repeat':repeat,'request_id':request_id,'work':work})
+    return make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=expected_design_sha256)

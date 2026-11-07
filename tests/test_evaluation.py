@@ -1492,3 +1492,41 @@ def test_decomposition_only_uses_all_applicable_sources_and_replays(tmp_path):
                 ledger=BudgetLedger(Budget(8,50000,1),journal,'r'),transport=transport,archive=archive,
                 planner=('stand-in','planner'),judge=('stand-in','judge'),evidence_mode='full')
         assert transport.calls_made==0 and journal.events('r')==[] and archive.events()==[]
+
+
+def test_factorial_allocation_enumerates_real_arm_work_before_reservation(tmp_path):
+    from collections import Counter
+    from qjig.contracts import Budget
+    from qjig.budgets import BudgetExceeded
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_budget import build_factorial_allocation,reserve_evaluation_plan
+    from qjig.goal_budget import GoalBudget
+    design=_sample_design();digest=validate_evaluation_design(design)
+    hashes={case['id']:hashlib.sha256(case['id'].encode()).hexdigest() for case in design['cases']}
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,
+          'max_price':{'prompt':2,'completion':3}}
+    config={name:dict(spec) for name in ('direct','planner','judge','reviewer')}
+    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'x'*32)
+    assert len(plan['manifest']['assignments'])==60
+    templates=plan['manifest']['stage_templates']
+    assert templates['direct_full_evidence']=={'direct_initial':1}
+    assert templates['direct_retrieval']==templates['retrieval_only']=={'direct_initial':1,'direct_final':1}
+    for arm in ('combined','decomposition_only'):
+        assert templates[arm]=={'planner':1,'judge_positive':12,'judge_negative':12,'plan_review':1}
+    assert all(Counter(s['stage'] for s in a['work'])==Counter(templates[a['arm']]) for a in plan['manifest']['assignments'])
+    assert all(a['case_id'] not in a['request_id'] and a['arm'] not in a['request_id'] for a in plan['manifest']['assignments'])
+    assert build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'x'*32)==plan
+    assert build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'y'*32)['sha256']!=plan['sha256']
+    with pytest.raises(ContractError):
+        build_factorial_allocation(design,hashes,{k:v for k,v in config.items() if k!='reviewer'},
+                                   expected_design_sha256=digest,assignment_secret=b'x'*32)
+    budgets={'development':Budget(200,50000,2),'pilot':Budget(200,50000,2),'holdout':Budget(400,100000,6)}
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=Budget(800,200000,10),per_request=Budget(30,6000,1),allocations=budgets) as goal:
+        receipt=reserve_evaluation_plan(goal,'factorial',plan,expected_plan_sha256=plan['sha256'])
+        assert receipt['assignments']==60 and receipt['work_items']==684
+    short={'development':Budget(100,50000,2),'pilot':Budget(200,50000,2),'holdout':Budget(400,100000,6)}
+    with GoalBudget.open(tmp_path/'short.sqlite',total=Budget(700,200000,10),per_request=Budget(30,6000,1),allocations=short) as goal:
+        with pytest.raises(BudgetExceeded):reserve_evaluation_plan(goal,'factorial',plan,expected_plan_sha256=plan['sha256'])
+        assert goal._con.execute('SELECT COUNT(*) FROM evaluation_plans').fetchone()[0]==0

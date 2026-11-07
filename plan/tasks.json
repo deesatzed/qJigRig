@@ -1409,7 +1409,8 @@
         "R08B",
         "R08C",
         "R08D",
-        "R08E"
+        "R08E",
+        "R08F"
       ],
       "status": "pending",
       "files": [],
@@ -3193,6 +3194,26 @@
       "acceptance": "Planner and each judge receive all applicable source text or refuse before the first call; recorded full-source work replays and preserves request-level deferral.",
       "command": "python -m pytest tests/test_evaluation.py::test_decomposition_only_uses_all_applicable_sources_and_replays -q",
       "evidence": "Red: checked fresh execution lacked full-source mode. Planner and judges now receive every complete applicable source or refuse before dispatch; predicate evaluation uses full-source entries with one round and request remains deferred. Synthetic goal-reserved combined/decomposition assignments, wrong-arm refusal, full-source replay/scoring, insufficient space, inapplicability and altered trace are checked. Focused evaluation/acquisition/replay/goal 115 passed before final binding cases; final 3 focused passed; full offline suite 547 passed. A separate lexical exception scan remains for coverage bookkeeping; model packet selection does not use it. Bounds, price, semantic quality, matched work and hosted comparisons remain unverified."
+    },
+    {
+      "id": "R08F",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08E",
+        "T066C",
+        "T066D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_budget.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_factorial_allocation_enumerates_real_arm_work_before_reservation",
+      "action": "Enumerate bounded physical work for every declared factorial assignment",
+      "acceptance": "All five arms get their actual bounded stage templates with mandatory review before atomic reservation; insufficient capacity refuses.",
+      "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_enumerates_real_arm_work_before_reservation -q",
+      "evidence": "Red: complete evaluation plans accepted caller-provided placeholder stages but had no builder for the five actual arm templates. The builder now generates opaque deterministic assignment IDs and physical direct, bounded-followup, planner, paired-judge and mandatory review slots for every case/arm/repeat; insufficient capacity rolls back atomically. Focused evaluation/fresh-preflight/goal suite 98 passed; full offline suite 548 passed. The local draft produced 105 assignments and 1197 synthetic slots in .local/verification/factorial-allocation-synthetic-ar472ibq. This uses synthetic prices and input bounds; decomposition reserves extra judge rounds, smoke/acceptance and escalation are separate, and actual hosted preflight remains unverified."
     }
   ]
 }
