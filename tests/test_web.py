@@ -135,3 +135,53 @@ def test_review_records_are_visible_from_local_workbench(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_review_view_reports_local_source_freshness(tmp_path):
+    import json
+    from qjig.contracts import Request
+    from qjig.indexing import index_entries
+    from qjig.programs import make_draft, make_review
+    from qjig.sources import SourceRevision, decode_source
+    from qjig.store import Catalog
+    path = tmp_path / 'catalog.sqlite'
+    revision = SourceRevision.create('rule.md', 'fixture', decode_source(b'# Rule\nTests pass.\n', encoding='utf-8'))
+    metadata = {'scope': 'project', 'authority_id': None, 'entity_keys': [], 'effective_start': '2026-01-01', 'effective_end': 'open', 'observed_at': None}
+    binding = {'request': Request('r', 'Can this merge?', 'reviewer', '1', 'project').to_dict(),
+               'plan': {'origin': 'fresh', 'predicates': [{'id': 'p', 'question': 'Tests pass?'}], 'expression': {'ref': 'p'}},
+               'corpus_revision_ids': [revision.revision_id], 'source_metadata': {revision.revision_id: metadata},
+               'as_of': '2026-11-07', 'entities': [], 'historical_as_known': False,
+               'planner': {'provider': 'stand-in', 'model': 'planner', 'prompt_sha256': 'b'*64, 'config': {}}}
+    reviewer = {'kind': 'synthetic', 'provider': 'stand-in', 'model': 'reviewer', 'prompt_sha256': 'c'*64, 'config': {}}
+    review = make_review(binding, reviewer, {'assessment': 'uncertain', 'reason': 'Fixture'})
+    with Catalog.open(path) as catalog:
+        catalog.import_snapshot(revision, index_entries(revision), (revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+        draft_id, _ = catalog.save_reviewed_draft(make_draft(binding), review, catalog.source_state())
+    server = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    def fetch():
+        conn = http.client.HTTPConnection('127.0.0.1', server.server_address[1], timeout=5)
+        conn.request('GET', '/api/reviews')
+        response = conn.getresponse()
+        assert response.status == 200
+        result = json.loads(response.read())['reviews'][0]
+        conn.close()
+        return result
+    try:
+        assert fetch()['programs'] == [{'draft_id': draft_id, 'source_freshness': 'matches_local_index'}]
+        unknown = SourceRevision.create('other.md', 'fixture', decode_source(b'# Other\nNew.\n', encoding='utf-8'))
+        with Catalog.open(path) as catalog:
+            catalog.add_revision(unknown)
+        assert fetch()['programs'][0]['source_freshness'] == 'unknown'
+        with Catalog.open(path) as catalog:
+            catalog.import_snapshot(unknown, index_entries(unknown), (unknown.revision_id, 'other', None, '[]', '2026-01-01', 'open', None))
+        assert fetch()['programs'][0]['source_freshness'] == 'matches_local_index'
+        newer = SourceRevision.create('rule.md', 'fixture', decode_source(b'# Rule\nTests and review pass.\n', encoding='utf-8'))
+        with Catalog.open(path) as catalog:
+            catalog.import_snapshot(newer, index_entries(newer), (newer.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+        assert fetch()['programs'][0]['source_freshness'] == 'stale'
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

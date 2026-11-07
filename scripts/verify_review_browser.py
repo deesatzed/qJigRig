@@ -34,8 +34,8 @@ def main():
         response = RawResponse(200, json.dumps({'assessment': 'uncertain', 'reason': 'More evidence needed.'}),
                                {'prompt_tokens': 12, 'completion_tokens': 5, 'cost_usd': 0.01})
         with Catalog.open(root / 'catalog.sqlite') as catalog, Journal.open(root / 'journal.sqlite') as journal, RunArchive.open(root / 'archive') as archive:
-            catalog.add_revision(revision)
-            catalog.put_metadata_row((revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+            catalog.import_snapshot(revision, index_entries(revision),
+                                    (revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
             outcome = review_plan(catalog, BudgetLedger(Budget(2, 10000, 1), journal, 'r'), StandInTransport([response]),
                                   binding, packet, provider='stand-in', model='reviewer', archive=archive)
             assert outcome.status == 'recorded' and not outcome.activation
@@ -53,13 +53,21 @@ def main():
                     area.get_by_text('Can this merge?').wait_for()
                     assert 'Synthetic review · unvalidated' in area.inner_text()
                     assert 'More evidence needed.' in area.inner_text()
+                    assert 'Local source index matches this draft' in area.inner_text()
                     source_button = area.get_by_role('button', name='Inspect source', exact=False)
                     source_button.focus()
                     page.keyboard.press('Enter')
                     page.wait_for_function("() => document.querySelector('#source-preview').textContent.includes('Tests must pass.')")
+                    page.locator('#intervention-form [name="passage"]').fill('must pass')
+                    page.locator('#intervention-form [name="replacement"]').fill('must pass and be reviewed')
+                    page.locator('#intervention-form button[type="submit"]').click()
+                    area.get_by_text('Source snapshot changed · review is stale').wait_for()
+                    area.get_by_role('button', name='Inspect source', exact=False).click()
+                    page.wait_for_function("() => document.querySelector('#source-preview').textContent.includes('Tests must pass.')")
                     page.set_viewport_size({'width': 390, 'height': 844})
                     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
                     print(json.dumps({'status': 'passed', 'synthetic_review_visible': True, 'keyboard_source_inspection': True,
+                                      'source_change_shown_stale': True,
                                       'viewport_width': 390, 'hosted_calls': 0, 'semantic_assurance': 'not_assessed'}))
                 finally:
                     browser.close()

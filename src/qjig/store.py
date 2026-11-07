@@ -471,6 +471,9 @@ class Catalog:
         except (ValueError, TypeError, KeyError) as exc:
             raise ContractError('stored draft integrity failure') from exc
 
+    def program_draft_ids(self) -> list[str]:
+        return [row[0] for row in self._con.execute('SELECT draft_id FROM program_drafts ORDER BY draft_id')]
+
     def link_program_review(self, draft_id: str, review_id: str, expected_source_state: str) -> None:
         from .programs import verify_review
         self._con.execute('BEGIN IMMEDIATE')

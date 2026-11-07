@@ -5,3 +5,5 @@ On 2026-11-07, `scripts/verify_review_browser.py` created a non-sensitive synthe
 The optional script uses Playwright and an existing Chromium executable; the local invocation set `PYTHONPATH=src:.local/verification/playwright-lib` and `QJIG_CHROMIUM_PATH` to the locally installed browser. The script reported `status: passed`, `synthetic_review_visible: true`, `keyboard_source_inspection: true`, and zero hosted calls.
 
 This checks a read-only review inspection path. It does not demonstrate hosted review, automatic fresh runs from the browser, review freshness, program activation, full accessibility, source authority or semantic quality. The review is an unvalidated snapshot and the source control opens its bound revision; it is not a current-source applicability check.
+
+A later rerun added a source intervention through the browser. The displayed local index status changed from matching to stale, and the review control still opened its original bound revision. This is a local catalog check performed on refresh; it does not monitor external files or establish semantic freshness.

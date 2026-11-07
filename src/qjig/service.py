@@ -115,6 +115,13 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 with Catalog.open(self.server.catalog) as catalog:
                     reviews = []
+                    programs_by_review = {}
+                    for draft_id in catalog.program_draft_ids():
+                        draft = catalog.program_draft(draft_id)
+                        status = catalog.program_status(draft_id, draft['payload']['binding'])
+                        for review_id in status['review_ids']:
+                            programs_by_review.setdefault(review_id, []).append({
+                                'draft_id': draft_id, 'source_freshness': status['source_freshness']['status']})
                     for ident in catalog.program_review_ids():
                         record = catalog.program_review(ident)
                         payload = record['payload']
@@ -125,7 +132,8 @@ class Handler(BaseHTTPRequestHandler):
                                         'as_of': binding['as_of'], 'source_revisions': binding['corpus_revision_ids'],
                                         'reviewer_kind': reviewer['kind'], 'provider': reviewer['provider'], 'model': reviewer['model'],
                                         'assessment': result.get('assessment') if isinstance(result.get('assessment'), str) else None,
-                                        'reason': result.get('reason') if isinstance(result.get('reason'), str) else None})
+                                        'reason': result.get('reason') if isinstance(result.get('reason'), str) else None,
+                                        'programs': programs_by_review.get(ident, [])})
                 self._reply(200, {'reviews': reviews})
             except (ContractError, ValueError, KeyError, TypeError, AttributeError, sqlite3.Error):
                 self._reply(500, {'error': 'stored review invalid'})

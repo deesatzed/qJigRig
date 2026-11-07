@@ -999,7 +999,8 @@
         "T057E",
         "T057F",
         "T057G",
-        "T057H"
+        "T057H",
+        "T057I"
       ],
       "status": "pending",
       "files": [
@@ -2384,6 +2385,27 @@
       "acceptance": "Superseded or added applicable sources cannot appear current; missing or ambiguous local source state remains unknown.",
       "command": "python -m pytest tests/test_programs.py::test_draft_source_freshness_is_explicit_and_conservative -q",
       "evidence": "Red: no local draft source-freshness check existed. Green: a catalog snapshot distinguishes matching local index, superseded/new applicable source, and unknown missing/unindexed/ambiguous/invalid metadata or orphan index; program status incorporates stale or unknown. Synthetic focused 74 passed; full offline 483 passed. This does not monitor external files, prove corpus completeness, source authority, semantic quality or permit activation; full T057/R01B remain open."
+    },
+    {
+      "id": "T057I",
+      "phase": "P5",
+      "depends_on": [
+        "T057E",
+        "T057G",
+        "T057H"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/store.py",
+        "src/qjig/service.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_web.py",
+      "test_name": "test_review_view_reports_local_source_freshness",
+      "action": "Display conservative draft freshness beside reviews",
+      "acceptance": "A local source change is visible as stale beside its linked review; missing source state remains unknown.",
+      "command": "python -m pytest tests/test_web.py::test_review_view_reports_local_source_freshness -q",
+      "evidence": "Red: saved-review endpoint omitted linked draft source freshness. Green: service checks draft links and reports matching, stale or unknown local source state; browser displays it and refreshes after local edits. Synthetic HTTP test exercises matching, missing metadata and supersession; Chromium walkthrough changes source and observes stale while inspecting original bound revision. Full offline suite 484 passed. This does not monitor external files or establish semantic correctness or full T057."
     }
   ]
 }
