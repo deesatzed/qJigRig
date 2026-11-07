@@ -313,7 +313,7 @@
       "depends_on": [
         "T017"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/roles.py"
       ],
@@ -321,7 +321,8 @@
       "test_name": "test_role_version_binding",
       "action": "Store an estimated role score against role and revision",
       "acceptance": "Changing role version makes the old estimate unavailable as a current prior",
-      "command": "python -m pytest tests/test_roles.py::test_role_version_binding -q"
+      "command": "python -m pytest tests/test_roles.py::test_role_version_binding -q",
+      "evidence": "Red: ModuleNotFoundError qjig.roles (initial contract). Green: focused 1 passed in 0.03s; tests/test_roles.py 9 passed in 0.04s; full suite 81 passed in 0.15s. 2026-11-06."
     },
     {
       "id": "T020",

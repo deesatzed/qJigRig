@@ -131,3 +131,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `TopicIndex.attach` creates proposed `TopicLink`s holding a `SpanRef` (revision, offsets, text hash) and no text; two topics on one entry share an identical span reference; attach is idempotent; blank topics rejected. Limits: in-memory only, not persisted in the catalog and lost on exit; topics are exact strings; method name is a placeholder for manual attachment.
 - Red: ModuleNotFoundError qjig.topics (initial contract). Green: focused 1 passed in 0.04s; tests/test_topics.py 2 passed in 0.03s; full suite 72 passed in 0.16s. 2026-11-06.
+
+## 2026-11-06: T019 complete
+
+- `RoleDefinition`, `RoleEstimate` (field `estimated_usefulness`, finite [0,1], state proposed) and `RoleEstimateStore`. `current_prior` returns an estimate only for the exact role id, role version, entry and revision; a version change or source change makes it unavailable while `all_for` still lists the old estimate; overwriting an existing key is refused; bad scores (bool, NaN, out of range, string, None) rejected. Limits: in-memory only; nothing produces estimates yet; scores are uncalibrated and are not truth or authority.
+- Red: ModuleNotFoundError qjig.roles (initial contract). Green: focused 1 passed in 0.03s; tests/test_roles.py 9 passed in 0.04s; full suite 81 passed in 0.15s. 2026-11-06.
