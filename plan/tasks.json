@@ -160,7 +160,7 @@
       "depends_on": [
         "T009"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/applicability.py"
       ],
@@ -168,7 +168,8 @@
       "test_name": "test_per_member_dates",
       "action": "Represent independently dated collection members",
       "acceptance": "Old and new policy coexist without a shared effective interval",
-      "command": "python -m pytest tests/test_applicability.py::test_per_member_dates -q"
+      "command": "python -m pytest tests/test_applicability.py::test_per_member_dates -q",
+      "evidence": "Red: ModuleNotFoundError qjig.applicability (initial contract). Green: focused 1 passed in 0.04s; tests/test_applicability.py 10 passed in 0.03s; full suite 51 passed in 0.11s. 2026-11-06."
     },
     {
       "id": "T011",

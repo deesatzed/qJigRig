@@ -86,3 +86,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `Catalog` in `src/qjig/store.py` (SQLite, explicit open, context manager). Two revisions of one source survive close/reopen with raw bytes and encoding intact; same-id re-add is idempotent and keeps the first origin; UPDATE/DELETE blocked by triggers; reads detect tampering; unknown schema version refused. Limits: single-writer only (not tested concurrently); no entity/scope/date metadata yet (T010); no atomic multi-record writes beyond single inserts.
 - Red: ModuleNotFoundError qjig.store (initial contract). Green: focused 1 passed in 0.04s; tests/test_store.py 4 passed in 0.04s; full suite 41 passed in 0.10s. 2026-11-06.
+
+## 2026-11-06: T010 complete
+
+- `Interval`, `MemberMetadata`, `Collection`, `Applicability` (match/no_match/unknown) in `src/qjig/applicability.py`. Old [2026-01-01,2026-10-31] and new [2026-11-01, open] policy coexist in one collection with no shared interval; inclusive bounds; unknown boundary gives UNKNOWN unless the other bound already excludes the date; strict ISO dates; duplicate revision in a collection rejected. Limit: metadata is not yet persisted in the catalog.
+- Red: ModuleNotFoundError qjig.applicability (initial contract). Green: focused 1 passed in 0.04s; tests/test_applicability.py 10 passed in 0.03s; full suite 51 passed in 0.11s. 2026-11-06.
