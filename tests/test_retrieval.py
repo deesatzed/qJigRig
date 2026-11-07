@@ -149,3 +149,28 @@ def test_expansion_is_bounded_deterministic_and_does_not_infer_absence():
     assert result == bm25_expanded_candidates(list(reversed(entries)), query)
     assert result[0].span.text.startswith("# Policy")
     assert bm25_expanded_candidates(entries, "unmentioned") == []
+
+
+def test_mandatory_channels_share_one_candidate_without_wasting_slots():
+    from qjig.retrieval import select_unique_with_mandatory
+
+    entries = entries_for(("shared.md", "# Exception\nRefund exception applies.\n"),
+                          ("other.md", "# Conflict\nConflicting refund policy.\n"))
+    shared = bm25_candidates(entries, "exception")[0]
+    conflict = bm25_candidates(entries, "conflicting")[0]
+    selection = select_unique_with_mandatory({"primary": [shared], "exception": [shared], "contradiction": [conflict]},
+                                             required_channels={"primary", "exception", "contradiction"}, limit=2, role_priors={})
+    assert len(selection.candidates) == 2
+    assert set(selection.covered) == {"primary", "exception", "contradiction"}
+    assert selection.omitted == ()
+
+
+def test_unique_selection_uses_role_only_to_order_lexical_ties():
+    from qjig.retrieval import select_unique_with_mandatory
+
+    entries = entries_for(("a.md", "# Rule\nRefund allowed.\n"), ("b.md", "# Rule\nRefund allowed.\n"))
+    candidates = bm25_candidates(entries, "refund")
+    preferred = candidates[-1]
+    choice = select_unique_with_mandatory({"primary": candidates}, {"primary"}, 1, {preferred.entry_id: 1.0})
+    assert choice.candidates[0].entry_id == preferred.entry_id
+    assert choice.covered == ("primary",) and choice.omitted == ()

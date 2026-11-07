@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from typing import Callable
 
 from .applicability import Applicability, ApplicabilityInputs
@@ -12,8 +13,8 @@ from .obligations import ObligationLedger
 from .packets import EvidencePacket
 from .plans import Plan
 from .contracts import Request
-from .recovery import Exclusion, RecoveryResult, recover_packet
-from .retrieval import BM25_METHOD, EXPANDED_BM25_METHOD, Candidate, bm25_candidates, bm25_expanded_candidates
+from .recovery import Exclusion, RecoveryResult, check_candidate, recover_packet
+from .retrieval import BM25_METHOD, EXPANDED_BM25_METHOD, Candidate, bm25_candidates, bm25_expanded_candidates, select_unique_with_mandatory
 from .scheduler import next_need
 from .stopping import StopDecision, check_stop
 from .budgets import BudgetExceeded, BudgetLedger
@@ -33,6 +34,11 @@ class EvalResult:
     evidence_entry_ids: tuple[str, ...] = ()
 
 
+def _check_role_priors(priors: dict[str, float]) -> None:
+    if not isinstance(priors, dict) or any(not isinstance(k, str) or type(v) not in (int, float) or not math.isfinite(v) or not 0 <= v <= 1 for k, v in priors.items()):
+        raise ContractError("role priors must be finite scores from zero to one")
+
+
 @dataclass(frozen=True)
 class NeedSpec:
     """How to look for one predicate's evidence and how to evaluate what is found."""
@@ -43,10 +49,13 @@ class NeedSpec:
     evaluate: Callable[[EvidencePacket, RecoveryResult], EvalResult]
     followup: "NeedSpec | None" = None  # the single targeted second attempt, if any
     retrieval_method: str = BM25_METHOD
+    channel_queries: tuple[tuple[str, str], ...] = ()
+    role_priors: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.retrieval_method not in (BM25_METHOD, EXPANDED_BM25_METHOD):
             raise ContractError("unknown retrieval method")
+        _check_role_priors(self.role_priors)
 
 MAX_ROUNDS = 2  # baseline cap per predicate: the first attempt plus one targeted followup
 
@@ -111,6 +120,18 @@ class TraceEvidence:
 
 
 @dataclass(frozen=True)
+class ChannelReport:
+    hits: dict[str, int]
+    selected: tuple[str, ...]
+    missing: tuple[str, ...]
+    excluded: tuple[str, ...]
+    omitted: tuple[str, ...]
+    delivered: tuple[str, ...]
+    packet_omissions: tuple[str, ...]
+    packet_truncations: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class TraceRecord:
     sequence: int
     request_id: str
@@ -122,6 +143,7 @@ class TraceRecord:
     exclusions: tuple[Exclusion, ...]
     observation: Observation
     retrieval_method: str = BM25_METHOD
+    channels: ChannelReport | None = None
 
 
 def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
@@ -147,13 +169,51 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
     spec = base if state.attempts.get(pid, 0) == 0 else base.followup
     search = bm25_expanded_candidates if spec.retrieval_method == EXPANDED_BM25_METHOD else bm25_candidates
     candidates = search(ctx.entries, spec.query)
-    recovery = recover_packet(
-        ctx.catalog, candidates, want=spec.want, max_bytes=spec.max_bytes, applicability=ctx.applicability
-    )
+    channel_report = None
+    if spec.channel_queries:
+        raw_channels = {"primary": candidates, **{name: search(ctx.entries, query) for name, query in spec.channel_queries}}
+        verified, channel_exclusions = {}, []
+        for name, items in raw_channels.items():
+            verified[name] = []
+            for candidate in items:
+                problem = check_candidate(ctx.catalog, candidate)
+                if problem is None and ctx.applicability is not None:
+                    applicability = ctx.applicability(candidate)
+                    if applicability is Applicability.NO_MATCH:
+                        problem = Exclusion(candidate.entry_id, "inapplicable")
+                    elif applicability is Applicability.UNKNOWN:
+                        problem = Exclusion(candidate.entry_id, "applicability_unknown")
+                if problem is None:
+                    verified[name].append(candidate)
+                elif problem not in channel_exclusions:
+                    channel_exclusions.append(problem)
+        selection = select_unique_with_mandatory(verified, set(raw_channels), spec.want, spec.role_priors)
+        unique = list(selection.candidates)
+        recovery = recover_packet(ctx.catalog, unique, want=spec.want, max_bytes=spec.max_bytes, applicability=ctx.applicability)
+        recovery = RecoveryResult(recovery.packet, tuple(channel_exclusions) + recovery.exclusions,
+                                  recovery.alternatives, recovery.unfilled)
+        channel_report = ChannelReport(
+            hits={name: len(items) for name, items in raw_channels.items()},
+            selected=selection.covered,
+            missing=tuple(sorted(name for name, items in raw_channels.items() if not items)),
+            excluded=tuple(sorted(name for name, items in raw_channels.items() if items and not verified[name])),
+            omitted=selection.omitted,
+            delivered=tuple(sorted(name for name, items in verified.items() if any(
+                item.entry_id == candidate.entry_id and not item.truncated
+                for item in recovery.packet.items for candidate in items))),
+            packet_omissions=tuple(item.entry_id for item in recovery.packet.omitted),
+            packet_truncations=recovery.packet.truncated_entry_ids,
+        )
+    else:
+        recovery = recover_packet(
+            ctx.catalog, candidates, want=spec.want, max_bytes=spec.max_bytes, applicability=ctx.applicability
+        )
     ob_id = f"ob-{pid}"
     state.ledger.record_retrieval(ob_id, hit_count=len(candidates), result=recovery)
     ob = state.ledger.get(ob_id)
-    if ob.status == "unresolved":  # nothing usable, or truncated/omitted: do not evaluate partial evidence
+    if channel_report is not None and channel_report.omitted:
+        observation = Observation(Outcome.UNKNOWN, "mandatory_channel_omitted")
+    elif ob.status == "unresolved":  # nothing usable, or truncated/omitted: do not evaluate partial evidence
         observation = Observation(Outcome.UNKNOWN, ob.reason)
     else:
         result = spec.evaluate(recovery.packet, recovery)
@@ -176,6 +236,7 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
         exclusions=recovery.exclusions,
         observation=observation,
         retrieval_method=spec.retrieval_method,
+        channels=channel_report,
     )
     state.trace.append(record)
     return record
@@ -222,6 +283,7 @@ def run_until_done(state: RunState, ctx: Context) -> RunSummary:
 
 COVERAGE_ID = "ob-plan-coverage"
 EXCEPTION_QUERY = "exception exceptions waiver unless except special case"
+CONTRADICTION_QUERY = "contradiction conflicting conflict superseded revision override"
 
 
 @dataclass(frozen=True)
@@ -253,6 +315,7 @@ def run_fresh(
     judge_max_tokens: int | None = None,
     reservation_factory: ReservationFactory | None = None, archive=None,
     applicability_inputs: ApplicabilityInputs | None = None,
+    role_priors: dict[str, float] | None = None,
     want: int = 3,
     max_bytes: int = 3000,
 ) -> FreshRun:
@@ -262,6 +325,7 @@ def run_fresh(
     model-written, a material plan-coverage obligation is always opened; retrieval can offer exception
     passages for review but can never close it, so the result is a deferral that names the gap.
     """
+    _check_role_priors({} if role_priors is None else role_priors)
     revision_ids = sorted({entry.span.revision_id for entry in entries})
     applicability = {revision_id: revision_applicability(revision_id) for revision_id in revision_ids}
     if any(not isinstance(value, Applicability) for value in applicability.values()):
@@ -281,7 +345,7 @@ def run_fresh(
             "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS},
             "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS},
             "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": EXPANDED_BM25_METHOD,
-            "reservation_factory_configured": reservation_factory is not None,
+            "reservation_factory_configured": reservation_factory is not None, "role_priors": role_priors or {},
             "corpus": {key: value.value for key, value in applicability.items()},
             "applicability_provenance": "recorded_inputs" if applicability_inputs is not None else "verdict_only",
             "applicability_inputs": applicability_inputs.to_dict() if applicability_inputs is not None else None,
@@ -328,7 +392,9 @@ def run_fresh(
 
     check = lambda c: bound_applicability(c.revision_id)  # noqa: E731
     specs = {p.id: NeedSpec(p.question, want, max_bytes, make_evaluator(p.question, p.id),
-                            retrieval_method=EXPANDED_BM25_METHOD) for p in plan.predicates}
+                            retrieval_method=EXPANDED_BM25_METHOD,
+                            channel_queries=(("exception", EXCEPTION_QUERY), ("contradiction", CONTRADICTION_QUERY)),
+                            role_priors=role_priors or {}) for p in plan.predicates}
     obligations = ObligationLedger()
     for p in plan.predicates:
         obligations.open(Obligation(f"ob-{p.id}", "predicate_evidence", p.id, p.question, material=True))

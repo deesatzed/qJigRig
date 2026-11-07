@@ -145,3 +145,37 @@ def select_with_mandatory(
         chosen.append(item)
     chosen.sort(key=lambda x: (-x[1].score, -role_priors.get(x[1].entry_id, NEUTRAL_PRIOR), x[0], x[1].entry_id))
     return Selection(tuple(chosen), missing, tuple(omitted))
+
+
+@dataclass(frozen=True)
+class UniqueSelection:
+    candidates: tuple[Candidate, ...]
+    covered: tuple[str, ...]
+    missing: tuple[str, ...]
+    omitted: tuple[str, ...]
+
+
+def select_unique_with_mandatory(channels: dict[str, list[Candidate]], required_channels: set[str],
+                                 limit: int, role_priors: dict[str, float]) -> UniqueSelection:
+    """Reserve channel access without counting a shared source span twice."""
+    if type(limit) is not int or limit < 1:
+        raise ValueError("selection limit must be a positive integer")
+    ordered = {name: sorted(items, key=lambda c: (-c.score, -role_priors.get(c.entry_id, NEUTRAL_PRIOR), c.entry_id))
+               for name, items in channels.items()}
+    chosen: dict[str, Candidate] = {}
+    order = sorted(required_channels, key=lambda name: (name != "primary", name))
+    for name in order:
+        items = ordered.get(name, [])
+        if not items or any(c.entry_id in chosen for c in items):
+            continue
+        if len(chosen) < limit:
+            chosen[items[0].entry_id] = items[0]
+    for _, candidate in sorted(((name, c) for name, items in ordered.items() for c in items),
+                               key=lambda pair: (-pair[1].score, -role_priors.get(pair[1].entry_id, NEUTRAL_PRIOR), pair[0], pair[1].entry_id)):
+        if len(chosen) >= limit:
+            break
+        chosen.setdefault(candidate.entry_id, candidate)
+    covered = tuple(sorted(name for name, items in ordered.items() if any(c.entry_id in chosen for c in items)))
+    missing = tuple(sorted(name for name in required_channels if not ordered.get(name)))
+    omitted = tuple(sorted(name for name in required_channels if ordered.get(name) and name not in covered))
+    return UniqueSelection(tuple(chosen.values()), covered, missing, omitted)

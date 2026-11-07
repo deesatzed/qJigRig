@@ -297,3 +297,149 @@ def test_recorded_zero_hit_reaches_fresh_judge(tmp_path, run_index, predicate_id
     assert trace.query == question and trace.hit_count > 0 and trace.evidence
     assert trace.retrieval_method == EXPANDED_BM25_METHOD
     assert run.status == "deferred" and "plan_coverage_unestablished" in run.reasons
+
+
+def test_exception_channel_reaches_relevant_judge(tmp_path):
+    """Stand-in judge sees verified applicable exception, even when query matches ordinary text only."""
+    from qjig.retrieval import EXPANDED_BM25_METHOD
+    ordinary = SourceRevision.create("a/rule.md", "synthetic", decode_source(b"# Rules\nRefunds are accepted within 14 days.\n", encoding="utf-8"))
+    exception = SourceRevision.create("b/exception.md", "synthetic", decode_source(b"# Exceptions\nDefective items may be returned up to 30 days.\n", encoding="utf-8"))
+    plan = {"predicates": [{"id": "p1", "question": "Is the refund within the ordinary 14 day period?"}], "expression": {"ref": "p1"}}
+    prompts = []
+    class Spy(StandInTransport):
+        def send(self, request):
+            prompts.append(request.prompt)
+            return super().send(request)
+    with Catalog.open(tmp_path / "c.sqlite") as cat, Journal.open(tmp_path / "j.sqlite") as journal:
+        for revision in (ordinary, exception):
+            cat.add_revision(revision)
+            save_entries(cat, index_entries(revision))
+        entries = current_entries(cat, ordinary.source_id, ordinary.revision_id) + current_entries(cat, exception.source_id, exception.revision_id)
+        transport = Spy([raw(plan), side(False), side(False)])
+        ledger = BudgetLedger(Budget(6, 50000, 1), journal, REQUEST.request_id)
+        priors = {entry.entry_id: (0.0 if entry.span.revision_id == exception.revision_id else 1.0) for entry in entries}
+        run = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                        planner=("stand-in", "planner"), judge=("stand-in", "judge"), want=2, role_priors=priors,
+                        revision_applicability=lambda rid: Applicability.MATCH)
+        assert len(prompts) == 3
+        assert all("Defective items may be returned up to 30 days" in prompt for prompt in prompts[1:])
+        trace = run.state.trace[0]
+        assert trace.retrieval_method == EXPANDED_BM25_METHOD
+        assert exception.revision_id in {e.revision_id for e in trace.evidence}
+        assert "exception" in trace.channels.selected
+        assert "contradiction" in trace.channels.missing
+        assert run.status == "deferred" and run.state.ledger.absence_established("ob-plan-coverage") is False
+
+
+def test_available_mandatory_channel_omission_defers_before_judging(tmp_path):
+    """Three independently matching channels and only two slots; no obligation disappears."""
+    documents = [
+        ("rule.md", b"# Rules\nRefunds expire on day fourteen.\n"),
+        ("exception.md", b"# Exceptions\nDefective items may be returned.\n"),
+        ("conflict.md", b"# Contradiction\nA conflicting rule exists.\n"),
+    ]
+    plan = {"predicates": [{"id": "p1", "question": "refund fourteen"}], "expression": {"ref": "p1"}}
+    with Catalog.open(tmp_path / "c.sqlite") as cat, Journal.open(tmp_path / "j.sqlite") as journal:
+        entries = []
+        for source_id, raw_bytes in documents:
+            rev = SourceRevision.create(source_id, "synthetic", decode_source(raw_bytes, encoding="utf-8"))
+            cat.add_revision(rev)
+            save_entries(cat, index_entries(rev))
+            entries += current_entries(cat, source_id, rev.revision_id)
+        transport = StandInTransport([raw(plan)])
+        ledger = BudgetLedger(Budget(6, 50000, 1), journal, REQUEST.request_id)
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=("stand-in", "planner"), judge=("stand-in", "judge"), want=2,
+                           revision_applicability=lambda rid: Applicability.MATCH)
+        trace = result.state.trace[0]
+        assert transport.calls_made == 1
+        assert trace.observation.reason == "mandatory_channel_omitted"
+        assert trace.channels.omitted and trace.channels.missing == ()
+        assert result.status == "deferred"
+
+
+def test_inapplicable_exception_is_recorded_and_never_sent(tmp_path):
+    ordinary = SourceRevision.create("rule.md", "synthetic", decode_source(b"# Rules\nRefunds expire fourteen days.\n", encoding="utf-8"))
+    exception = SourceRevision.create("exception.md", "synthetic", decode_source(b"# Exceptions\nSpecial case for another entity.\n", encoding="utf-8"))
+    plan = {"predicates": [{"id": "p1", "question": "refund fourteen"}], "expression": {"ref": "p1"}}
+    prompts = []
+    class Spy(StandInTransport):
+        def send(self, request):
+            prompts.append(request.prompt)
+            return super().send(request)
+    with Catalog.open(tmp_path / "c.sqlite") as cat, Journal.open(tmp_path / "j.sqlite") as journal:
+        entries = []
+        for rev in (ordinary, exception):
+            cat.add_revision(rev)
+            save_entries(cat, index_entries(rev))
+            entries += current_entries(cat, rev.source_id, rev.revision_id)
+        transport = Spy([raw(plan), side(False), side(False)])
+        ledger = BudgetLedger(Budget(6, 50000, 1), journal, REQUEST.request_id)
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=("stand-in", "planner"), judge=("stand-in", "judge"), want=2,
+                           revision_applicability=lambda rid: Applicability.NO_MATCH if rid == exception.revision_id else Applicability.MATCH)
+        trace = result.state.trace[0]
+        assert "exception" in trace.channels.excluded
+        assert any(ex.reason == "inapplicable" for ex in trace.exclusions)
+        assert all("Special case for another entity" not in prompt for prompt in prompts[1:])
+        assert result.status == "deferred"
+
+
+def test_invalid_role_priors_are_rejected_before_provider_call(tmp_path):
+    from qjig.contracts import ContractError
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN)])
+    with cat, journal:
+        with pytest.raises(ContractError):
+            run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                      planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                      role_priors={"entry": float("nan")}, revision_applicability=lambda rid: Applicability.MATCH)
+        assert transport.calls_made == 0 and journal.events(REQUEST.request_id) == []
+
+
+def test_channel_packet_truncation_is_visible_and_defers(tmp_path):
+    ordinary = SourceRevision.create("rule.md", "synthetic", decode_source(("# Rules\nRefunds fourteen " + "x" * 800).encode(), encoding="utf-8"))
+    exception = SourceRevision.create("exception.md", "synthetic", decode_source(("# Exceptions\n" + "y" * 800).encode(), encoding="utf-8"))
+    plan = {"predicates": [{"id": "p1", "question": "refund fourteen"}], "expression": {"ref": "p1"}}
+    with Catalog.open(tmp_path / "c.sqlite") as cat, Journal.open(tmp_path / "j.sqlite") as journal:
+        entries = []
+        for rev in (ordinary, exception):
+            cat.add_revision(rev)
+            save_entries(cat, index_entries(rev))
+            entries += current_entries(cat, rev.source_id, rev.revision_id)
+        transport = StandInTransport([raw(plan)])
+        ledger = BudgetLedger(Budget(6, 50000, 1), journal, REQUEST.request_id)
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=("stand-in", "planner"), judge=("stand-in", "judge"), want=2, max_bytes=600,
+                           revision_applicability=lambda rid: Applicability.MATCH)
+        report = result.state.trace[0].channels
+        assert report.packet_truncations or report.packet_omissions
+        assert transport.calls_made == 1
+        assert result.state.observations["p1"].outcome is Outcome.UNKNOWN
+
+
+def test_contradiction_channel_reaches_judge_with_other_channels(tmp_path):
+    documents = [("rule.md", b"# Rules\nRefunds expire fourteen days.\n"),
+                 ("exception.md", b"# Exceptions\nSpecial items may be returned.\n"),
+                 ("conflict.md", b"# Contradiction\nAnother policy allows thirty days.\n")]
+    plan = {"predicates": [{"id": "p1", "question": "refund fourteen"}], "expression": {"ref": "p1"}}
+    prompts = []
+    class Spy(StandInTransport):
+        def send(self, request):
+            prompts.append(request.prompt)
+            return super().send(request)
+    with Catalog.open(tmp_path / "c.sqlite") as cat, Journal.open(tmp_path / "j.sqlite") as journal:
+        entries = []
+        for source_id, raw_bytes in documents:
+            revision = SourceRevision.create(source_id, "synthetic", decode_source(raw_bytes, encoding="utf-8"))
+            cat.add_revision(revision)
+            save_entries(cat, index_entries(revision))
+            entries += current_entries(cat, source_id, revision.revision_id)
+        transport = Spy([raw(plan), side(False), side(False)])
+        ledger = BudgetLedger(Budget(6, 50000, 1), journal, REQUEST.request_id)
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=("stand-in", "planner"), judge=("stand-in", "judge"), want=3,
+                           revision_applicability=lambda rid: Applicability.MATCH)
+        assert len(prompts) == 3
+        assert all("Another policy allows thirty days" in prompt and "Special items may be returned" in prompt for prompt in prompts[1:])
+        assert set(result.state.trace[0].channels.delivered) == {"primary", "exception", "contradiction"}
+        assert result.status == "deferred"

@@ -1395,7 +1395,8 @@
       "phase": "repair",
       "finding": "F04",
       "depends_on": [
-        "R03"
+        "R03",
+        "R04A"
       ],
       "status": "pending",
       "files": [],
@@ -1619,6 +1620,27 @@
       "acceptance": "Recorded zero-hit question reaches a stand-in judge with verified source spans and versioned acquisition trace; authored baseline remains unchanged.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_recorded_zero_hit_reaches_fresh_judge -q",
       "evidence": "Red: first saved zero-hit predicate made only the planner call. Green: all three saved zero-hit questions reach the stand-in judge with verified spans and expanded-method trace; authored CLI trace retains baseline method. Focused CLI/fresh/retrieval 27 passed before expanding the parametrized cases; full suite 327 passed. Full R03 and live comparison remain pending."
+    },
+    {
+      "id": "R04A",
+      "phase": "repair",
+      "finding": "F04",
+      "depends_on": [
+        "R03B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/acquisition.py",
+        "src/qjig/retrieval.py",
+        "tests/test_fresh_pipeline.py",
+        "tests/test_retrieval.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_exception_channel_reaches_relevant_judge",
+      "action": "Integrate mandatory evidence channels into offline fresh acquisition",
+      "acceptance": "Verified applicable exception and contradiction candidates reach judging with channel omissions and exclusions recorded.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_exception_channel_reaches_relevant_judge -q",
+      "evidence": "Red: an exception passage without primary-query overlap did not reach the stand-in judge. Green: primary/exception/contradiction channels select verified applicable spans; role-zero exception still reaches judging; shared candidate deduplicated; excluded, missing, omitted and truncated paths remain distinct and omission defers; invalid priors refuse before call. Full offline suite 335 passed. Channel searches are lexical and do not prove completeness; durable trace export and live assessment remain open under R04."
     }
   ]
 }
