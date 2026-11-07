@@ -435,7 +435,7 @@
       "depends_on": [
         "T025"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/plans.py"
       ],
@@ -443,7 +443,8 @@
       "test_name": "test_validate_ast",
       "action": "Validate unique refs operators depth and predicate cap",
       "acceptance": "Dangling refs cycles unknown operators and more than six predicates fail",
-      "command": "python -m pytest tests/test_plans.py::test_validate_ast -q"
+      "command": "python -m pytest tests/test_plans.py::test_validate_ast -q",
+      "evidence": "Red: ModuleNotFoundError qjig.plans (initial contract). Green: focused 1 passed in 0.03s; tests/test_plans.py 19 passed in 0.03s; full suite 127 passed in 0.18s. 2026-11-06."
     },
     {
       "id": "T027",

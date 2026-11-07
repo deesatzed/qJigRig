@@ -170,3 +170,8 @@ Full qJig suite after T024: see the T024 receipt above. All P2 behavior is offli
 
 - `Support`, `Outcome`, `combine_support` in `src/qjig/logic.py`: (supported,unknown)->TRUE, (unknown,supported)->FALSE, (unknown,unknown)->UNKNOWN, (supported,supported)->CONFLICT, all four distinct; booleans, strings, None and numbers are rejected. Limit: this is the mapping only; nothing yet decides when a side counts as supported (T044/T045).
 - Red: ModuleNotFoundError qjig.logic (initial contract). Green: focused 4 passed in 0.03s; tests/test_logic.py 10 passed in 0.03s; full suite 108 passed in 0.16s. 2026-11-06.
+
+## 2026-11-06: T026 complete
+
+- `parse_plan` in `src/qjig/plans.py` validates untrusted plan data into frozen `Plan`/`Predicate`, raising `PlanError` with a named `code`: 17 invalid shapes each give their own code (dangling_ref, dangling_dependency, duplicate_predicate, unknown_operator, dependency_cycle, self_dependency, too_many_predicates, no_predicates, too_deep, not_arity, and_arity, unknown_exact_operator, bad_origin, bad_id, extra_node_key, executable_code_field, bad_node). Boundaries pass: 6 predicates, expression depth 12; depth 13 fails. Limits: a valid plan is not known complete; `exact_operator` names a whitelist only (evaluation is T031); the plan's `origin` is a self-declared label.
+- Red: ModuleNotFoundError qjig.plans (initial contract). Green: focused 1 passed in 0.03s; tests/test_plans.py 19 passed in 0.03s; full suite 127 passed in 0.18s. 2026-11-06.
