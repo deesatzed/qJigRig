@@ -4208,6 +4208,24 @@
       "acceptance": "On the final available round, send applicable mandatory-only evidence to the paired judges while retaining primary no-hit diagnostics, the bounded fallback and plan-coverage deferral.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_mandatory_exception_is_judged_after_primary_and_followup_miss -q",
       "evidence": "Red: two primary misses left an applicable exception in the packet but never called either judge. Synthetic checks now cover fallback and no-fallback variants, preserve coverage deferral, and prevent judging an inapplicable exception. Versioned v2 archive replays; relabeling it v1 is invalid. Fresh/acquisition/replay/evaluation regressions: 134 passed; full offline suite before final added parameter: 592 passed, 7 skipped; final focused cases: 3 passed. Hosted and semantic outcome validation remain open."
+    },
+    {
+      "id": "R04E",
+      "phase": "verification",
+      "depends_on": [
+        "R04D",
+        "T061E"
+      ],
+      "status": "complete",
+      "files": [
+        "tests/test_fresh_service.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_mandatory_only_exception_reaches_service_and_replays",
+      "action": "Exercise mandatory-only evidence through the local service and replay",
+      "acceptance": "A role client and browser preserve the no-hit fallback, source-bound exception judgment, open coverage obligation and receipt through the configured synthetic fresh pipeline.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_mandatory_only_exception_reaches_service_and_replays -q",
+      "evidence": "Synthetic actual-service and Chrome walkthrough exercised primary and fallback misses, applicable exception sent to both stand-in judges, deferred result, unvalidated review, cited replay and structurally checked four-call receipt. Focused Chrome/service/engine cases: 3 passed. This is not hosted or independent semantic outcome evidence; R04/R05 remain open."
     }
   ]
 }
