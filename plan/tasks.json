@@ -1414,7 +1414,8 @@
       "finding": "F05",
       "depends_on": [
         "R04",
-        "R05A"
+        "R05A",
+        "R05B"
       ],
       "status": "pending",
       "files": [],
@@ -1683,6 +1684,27 @@
       "acceptance": "Saved incorrect expression and enabling/restricting exception controls produce attributed counterexample results without semantic assurance claims.",
       "command": "python -m pytest tests/test_assurance.py::test_saved_expression_fails_enabling_exception_control -q",
       "evidence": "Red: no authored counterexample checker existed. Green: saved second-run expression evaluates FALSE under an explicitly hypothetical enabling assignment expected TRUE; separate authored enabling, restricting, missing and conflict controls distinguish matched, contradicted and inconclusive outcomes. Focused assurance/logic/plans 56 passed; full suite 339 passed. Attribution is authored and independent=false; source-grounded planning and contamination attacks remain under R05/T050."
+    },
+    {
+      "id": "R05B",
+      "phase": "repair",
+      "finding": "F05",
+      "depends_on": [
+        "R05A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/planner.py",
+        "src/qjig/acquisition.py",
+        "tests/test_fresh_pipeline.py",
+        "tests/test_planner.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_planner_receives_bounded_verified_applicable_sources",
+      "action": "Supply bounded verified sources to offline fresh planning",
+      "acceptance": "Planner receives applicable verified source and exception passages, with omissions and untrusted-source labeling; invalid sources do not enter the prompt.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_planner_receives_bounded_verified_applicable_sources -q",
+      "evidence": "Red: planner prompt contained only question and corpus hash. Green: stand-in planning receives bounded verified applicable primary/exception/contradiction candidates, records exclusions/channel omissions/truncation, labels source text untrusted, binds packet content into prompt hash, and remains deferred. Tests include applicable instruction contamination and inapplicable exclusion; no model resistance inferred. Full offline suite 343 passed. R05 and T050 retain semantic evaluation and live comparison requirements."
     }
   ]
 }

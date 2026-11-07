@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 import math
+import json
 from typing import Callable
 
 from .applicability import Applicability, ApplicabilityInputs
@@ -10,7 +11,7 @@ from .indexing import IndexEntry
 from .contracts import ContractError
 from .logic import Observation, Outcome, evaluate, expression_ids, is_material
 from .obligations import ObligationLedger
-from .packets import EvidencePacket
+from .packets import EvidencePacket, serialize_packet
 from .plans import Plan
 from .contracts import Request
 from .recovery import Exclusion, RecoveryResult, check_candidate, recover_packet
@@ -304,6 +305,42 @@ class FreshRun:
     judgments: dict[str, JudgeResult]
     quote_refs: dict[str, tuple[QuoteRef, ...]]  # predicate id -> verified quote bindings that carried a decision
     coverage_candidates: tuple[str, ...]  # entry ids of exception-channel passages found, offered for review
+    planning_evidence: dict | None = None
+
+
+def _planning_packet(catalog: Catalog, entries: list[IndexEntry], question: str, applicability: Callable[[str], Applicability],
+                     *, want: int, max_bytes: int, role_priors: dict[str, float]) -> dict:
+    """Bounded lexical source context; not evidence of semantic coverage."""
+    raw = {"primary": bm25_expanded_candidates(entries, question),
+           "exception": bm25_expanded_candidates(entries, EXCEPTION_QUERY),
+           "contradiction": bm25_expanded_candidates(entries, CONTRADICTION_QUERY)}
+    usable, excluded = {}, []
+    for name, candidates in raw.items():
+        usable[name] = []
+        for candidate in candidates:
+            problem = check_candidate(catalog, candidate)
+            if problem is None:
+                verdict = applicability(candidate.revision_id)
+                if verdict is not Applicability.MATCH:
+                    problem = Exclusion(candidate.entry_id, "inapplicable" if verdict is Applicability.NO_MATCH else "applicability_unknown")
+            if problem is None:
+                usable[name].append(candidate)
+            elif problem not in excluded:
+                excluded.append(problem)
+    selection = select_unique_with_mandatory(usable, set(raw), want, role_priors)
+    recovered = recover_packet(catalog, list(selection.candidates), want=want, max_bytes=max_bytes,
+                               applicability=lambda candidate: applicability(candidate.revision_id))
+    return {"schema": "qjig.planning-evidence.v1", "assurance": "untrusted_incomplete",
+            "packet": json.loads(serialize_packet(recovered.packet)),
+            "channel_hits": {name: len(items) for name, items in raw.items()},
+            "channel_selected": list(selection.covered),
+            "channel_delivered": sorted(name for name, items in usable.items() if any(
+                item.entry_id == candidate.entry_id and not item.truncated
+                for item in recovered.packet.items for candidate in items)),
+            "channel_missing": [name for name, items in raw.items() if not items],
+            "channel_excluded": [name for name, items in raw.items() if items and not usable[name]],
+            "channel_omitted": list(selection.omitted),
+            "excluded": [asdict(item) for item in excluded + list(recovered.exclusions)]}
 
 
 def run_fresh(
@@ -342,6 +379,8 @@ def run_fresh(
             raise ContractError("applicability inputs do not match recorded verdicts")
     def bound_applicability(revision_id: str) -> Applicability:
         return applicability.get(revision_id, Applicability.UNKNOWN)
+    planning_evidence = _planning_packet(catalog, entries, request.question, bound_applicability,
+                                         want=want, max_bytes=max_bytes, role_priors=role_priors or {})
     if archive is not None:
         # Bind the exact verdicts, effective settings and corpus before any planner call.
         archive.record_context({
@@ -354,6 +393,7 @@ def run_fresh(
             "corpus": {key: value.value for key, value in applicability.items()},
             "applicability_provenance": "recorded_inputs" if applicability_inputs is not None else "verdict_only",
             "applicability_inputs": applicability_inputs.to_dict() if applicability_inputs is not None else None,
+            "planning_evidence": planning_evidence,
         })
         for revision_id in revision_ids:
             archive.add_revision(catalog.get_revision(revision_id))
@@ -361,14 +401,15 @@ def run_fresh(
     try:
         outcome = request_fresh_plan(
             ledger, transport, request, corpus_revision_ids=sorted({e.span.revision_id for e in entries}),
-            provider=planner[0], model=planner[1], reservation_factory=reservation_factory, archive=archive, **kw,
+            provider=planner[0], model=planner[1], reservation_factory=reservation_factory, archive=archive,
+            planning_evidence=planning_evidence, **kw,
         )
     except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
         failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
                    UncertainOutcome: "uncertain_outcome", ReconciliationRequired: "reconciliation_required"}[type(exc)]
-        return FreshRun("deferred", (f"plan_unavailable:{failure}",), failure, None, None, None, {}, {}, ())
+        return FreshRun("deferred", (f"plan_unavailable:{failure}",), failure, None, None, None, {}, {}, (), planning_evidence)
     if not outcome.ok:
-        return FreshRun("deferred", (f"plan_unavailable:{outcome.failure}",), outcome.failure, None, None, None, {}, {}, ())
+        return FreshRun("deferred", (f"plan_unavailable:{outcome.failure}",), outcome.failure, None, None, None, {}, {}, (), planning_evidence)
 
     plan = outcome.plan
     judgments: dict[str, JudgeResult] = {}
@@ -413,5 +454,5 @@ def run_fresh(
     reasons = ("plan_coverage_unestablished",) + tuple(r for r in summary.stop.reasons if r != "plan_coverage_unestablished")
     return FreshRun(
         "deferred", reasons, None, outcome.binding, state, summary, judgments, refs,
-        tuple(i.entry_id for i in exc.packet.items),
+        tuple(i.entry_id for i in exc.packet.items), planning_evidence,
     )

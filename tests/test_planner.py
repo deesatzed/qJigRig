@@ -107,3 +107,16 @@ def test_prompt_asks_for_an_exception_predicate(tmp_path):
         request_fresh_plan(ledger, Spy([RawResponse(200, json.dumps(PLAN_JSON), USAGE)]), REQUEST, corpus_revision_ids=["r"], provider="s", model="m")
     # the prompt tells the model to cover exceptions, and to never rely on that for completeness
     assert "exception" in seen[0].lower() and "waiver" in seen[0].lower()
+
+
+def test_planner_binding_changes_with_source_packet(tmp_path):
+    """Authored stand-in plans; the prompt hash binds source packet content."""
+    journal, ledger, transport = setup(tmp_path, [json.dumps(PLAN_JSON), json.dumps(PLAN_JSON)])
+    with journal:
+        first = request_fresh_plan(ledger, transport, REQUEST, corpus_revision_ids=["rev"], provider="stand-in", model="m",
+                                   planning_evidence={"packet": {"text": "ordinary"}})
+        second = request_fresh_plan(ledger, transport, REQUEST, corpus_revision_ids=["rev"], provider="stand-in", model="m",
+                                    planning_evidence={"packet": {"text": "ordinary with exception"}})
+        assert first.ok and second.ok
+        assert first.binding.corpus_manifest_sha256 == second.binding.corpus_manifest_sha256
+        assert first.binding.prompt_sha256 != second.binding.prompt_sha256
