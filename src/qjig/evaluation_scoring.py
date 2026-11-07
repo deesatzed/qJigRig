@@ -64,7 +64,7 @@ def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha2
         raise ContractError('direct run is not structurally verified')
     context = archive.context()
     request, applicability = context['request'], context['applicability']
-    if context.get('schema') in ('qjig.direct-evaluation.v3', 'qjig.direct-evaluation.v4', 'qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6'):
+    if context.get('schema') in ('qjig.direct-evaluation.v3', 'qjig.direct-evaluation.v4', 'qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6', 'qjig.direct-evaluation.v7', 'qjig.direct-evaluation.v8'):
         binding = context['case_binding']
         if binding['case_id'] != reference['case_id'] or binding['reference_sha256'] != ref_hash:
             raise ContractError('reference differs from recorded case binding')
@@ -549,9 +549,9 @@ def score_reserved_assignment(goal, archive, journal, reference: dict, *, partit
             or not hmac.compare_digest(assignment['plan_sha256'], expected_plan_sha256)):
         raise ContractError('evaluation plan anchor differs')
     schema = context.get('schema')
-    if schema in ('qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6'):
+    if schema in ('qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6', 'qjig.direct-evaluation.v8'):
         case = context.get('case_binding')
-        expected_arm = 'direct_retrieval' if schema.endswith('.v5') else 'direct_full_evidence'
+        expected_arm = 'direct_retrieval' if schema.endswith('.v5') else 'direct_full_evidence' if schema.endswith('.v6') else 'retrieval_only'
         scorer = score_direct_archive
     elif schema == 'qjig.fresh-context.v1':
         case = context.get('evaluation_case_binding')
@@ -593,7 +593,7 @@ def summarize_holdout_comparison(design: dict, records: list[dict], *, expected_
     if not isinstance(expected_design_sha256, str) or not _SHA.fullmatch(expected_design_sha256):
         raise ContractError('design anchor required')
     validate_evaluation_design(design, expected_digest=expected_design_sha256)
-    arms = {'direct_full_evidence', 'direct_retrieval', 'combined'}
+    arms = {'direct_full_evidence', 'direct_retrieval', 'retrieval_only', 'combined'}
     if (baseline_arm not in arms or candidate_arm not in arms or baseline_arm == candidate_arm
             or not isinstance(records, list)):
         raise ContractError('unsupported holdout comparison')

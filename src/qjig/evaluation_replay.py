@@ -8,8 +8,8 @@ import re
 from dataclasses import asdict
 
 from .contracts import ContractError, Request
-from .evaluation import DirectRetrieval, FullEvidence, _full_source_entries, _full_source_packet
-from .evaluation_direct import _prompt, _validator
+from .evaluation import DirectRetrieval, FullEvidence, CatalogRetrieval, _full_source_entries, _full_source_packet
+from .evaluation_direct import _prompt, _validator, _catalog_incomplete
 from .indexing import index_entries
 from .journal import Journal
 from .packets import serialize_packet
@@ -19,13 +19,26 @@ from .run_archive import RunArchive
 
 def _rebuild_search(context, revisions):
     full = context['schema'] in ('qjig.direct-evaluation.v4', 'qjig.direct-evaluation.v6')
-    search = object.__new__(FullEvidence if full else DirectRetrieval)
+    catalog = context['schema'] in ('qjig.direct-evaluation.v7', 'qjig.direct-evaluation.v8')
+    search = object.__new__(FullEvidence if full else CatalogRetrieval if catalog else DirectRetrieval)
     search._revisions = tuple(revisions)
     search._entries = _full_source_entries(revisions) if full else [entry for revision in revisions for entry in index_entries(revision)]
     search._want, search._max_bytes = context['want'], context['max_bytes']
     search._max_rounds, search._expanded, search._trace = 1 + context['followups'], context['expanded'], []
     if full:
         search._packet = _full_source_packet(search._entries, context['max_bytes'])
+    if catalog:
+        from .applicability import ApplicabilityInputs
+        from .acquisition import _check_role_priors
+        search._inputs = ApplicabilityInputs.from_dict(context['catalog_applicability'])
+        search._role_priors = context['catalog_role_priors']
+        _check_role_priors(search._role_priors)
+        search._scope = context['request']['scope']
+        if ({m.revision_id for m in search._inputs.collection.members} != {r.revision_id for r in revisions}
+                or search._inputs.as_of != context['applicability']['as_of']
+                or sorted(search._inputs.request_entities) != context['applicability']['entities']
+                or search._inputs.historical_as_known != context['applicability']['historical_as_known']):
+            raise ContractError('catalog applicability differs')
     return search
 
 
@@ -42,9 +55,9 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
         context, events = archive.context(), archive.events()
         keys = {'schema', 'request', 'source_revisions', 'applicability', 'want', 'max_bytes', 'followups',
                 'expanded', 'provider', 'model', 'max_tokens', 'max_price'}
-        if not isinstance(context, dict) or context.get('schema') not in ('qjig.direct-evaluation.v1', 'qjig.direct-evaluation.v2', 'qjig.direct-evaluation.v3', 'qjig.direct-evaluation.v4', 'qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6'):
+        if not isinstance(context, dict) or context.get('schema') not in ('qjig.direct-evaluation.v1', 'qjig.direct-evaluation.v2', 'qjig.direct-evaluation.v3', 'qjig.direct-evaluation.v4', 'qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6', 'qjig.direct-evaluation.v7', 'qjig.direct-evaluation.v8'):
             raise ContractError('invalid direct context')
-        if context['schema'] in ('qjig.direct-evaluation.v3', 'qjig.direct-evaluation.v4', 'qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6'):
+        if context['schema'] in ('qjig.direct-evaluation.v3', 'qjig.direct-evaluation.v4', 'qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6', 'qjig.direct-evaluation.v7', 'qjig.direct-evaluation.v8'):
             keys.add('case_binding')
             binding = context.get('case_binding')
             if (not isinstance(binding, dict) or set(binding) != {'case_id', 'design_sha256', 'case_sha256', 'reference_sha256'}
@@ -56,7 +69,11 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
             keys.add('retrieval_mode')
             if context.get('retrieval_mode') != 'full_source_v1' or context.get('followups') != 0 or context.get('expanded') is not False:
                 raise ContractError('invalid full evidence mode')
-        if context['schema'] in ('qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6'):
+        if context['schema'] in ('qjig.direct-evaluation.v7', 'qjig.direct-evaluation.v8'):
+            keys.update(('retrieval_mode','catalog_applicability','catalog_role_priors'))
+            if context.get('retrieval_mode') != 'qjig_catalog_v1' or context.get('expanded') is not True:
+                raise ContractError('invalid catalog retrieval mode')
+        if context['schema'] in ('qjig.direct-evaluation.v5', 'qjig.direct-evaluation.v6', 'qjig.direct-evaluation.v8'):
             from .evaluation_budget import validate_assignment_binding
             keys.add('evaluation_assignment')
             validate_assignment_binding(context.get('evaluation_assignment'))
@@ -98,6 +115,8 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
         for step, call_id in enumerate(call_ids):
             trace, sent, response, validated = events[step * 4: step * 4 + 4]
             found = search.search(query)
+            if isinstance(search, CatalogRetrieval) and _catalog_incomplete(found):
+                raise ContractError('catalog evidence was incomplete before dispatch')
             packets.append(found['packet'])
             reconstructed = {key: val for key, val in found.items() if key != 'packet'}
             reconstructed['packet'] = json.loads(serialize_packet(found['packet']))
@@ -169,9 +188,15 @@ def _verify_failure(context, events, journal_events, revisions, request, digest)
         if cursor >= len(events) - 1 or events[cursor]['kind'] != 'trace' or events[cursor]['call_id'] != f'{request.request_id}#{step + 1}' or events[cursor]['data'] != trace:
             raise ContractError('failure search differs')
         cursor += 1
+        if step < len(calls) and isinstance(search, CatalogRetrieval) and _catalog_incomplete(found):
+            raise ContractError('catalog evidence was incomplete before dispatch')
         if step >= len(calls):
-            if result['failure'] not in ('BudgetExceeded', 'ReconciliationRequired', 'preflight_unavailable') or cursor != len(events) - 1:
+            if result['failure'] == 'catalog_evidence_incomplete' and isinstance(search, CatalogRetrieval) and _catalog_incomplete(found):
+                terminal_failure = 'retrieval_failure'
+            elif result['failure'] not in ('BudgetExceeded', 'ReconciliationRequired', 'preflight_unavailable'):
                 raise ContractError('missing direct attempt')
+            if cursor != len(events) - 1:
+                raise ContractError('unexpected events after refusal')
             break  # policy and prior unresolved calls are not fully archived here
         call_id = calls[step]
         if cursor >= len(events) - 1 or events[cursor]['kind'] != 'request':

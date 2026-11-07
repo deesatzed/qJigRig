@@ -1176,7 +1176,8 @@
       "depends_on": [
         "T065",
         "T066A",
-        "T066B"
+        "T066B",
+        "T066C"
       ],
       "status": "pending",
       "files": [
@@ -3150,6 +3151,26 @@
       "acceptance": "Use the real planning acquisition channels, verify source and applicability, retain omissions and enforce bounded followup without decomposition.",
       "command": "python -m pytest tests/test_evaluation.py::test_catalog_retrieval_includes_mandatory_channels_and_excludes_scope -q",
       "evidence": "Red: no non-decomposed adapter exposed qJig planning acquisition. The adapter now uses the existing primary, exception and contradiction channel selection with pinned revisions, recorded applicability/scope, role ordering, packet omissions and at most one followup. Synthetic tests cover required channels, scope exclusion, omitted channels, private-label isolation and followup limit. Focused evaluation/acquisition/retrieval/recovery 75 passed; full offline 543 passed. This is retrieval mechanics only: provider dispatch, refusing unsafe omissions, assignment binding, durable replay, scoring, matched work and hosted runs are not implemented for this arm."
+    },
+    {
+      "id": "T066C",
+      "phase": "evaluation",
+      "depends_on": [
+        "T066B",
+        "R08D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_direct.py",
+        "src/qjig/evaluation_replay.py",
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_retrieval_only_checked_run_replays_and_refuses_omissions",
+      "action": "Run and replay checked retrieval-only assignments",
+      "acceptance": "The catalog path binds applicability, refuses omitted mandatory or truncated evidence before provider calls, archives trace, and replays and scores without inference.",
+      "command": "python -m pytest tests/test_evaluation.py::test_retrieval_only_checked_run_replays_and_refuses_omissions -q",
+      "evidence": "Red: checked direct execution lacked a catalog evidence mode. Catalog retrieval-only now binds checked case, applicability, scope and reserved assignment; traces reconstruct qJig channels and incomplete mandatory selection or packet truncation refuses before the affected provider call. Versioned archives replay successful and refusal paths, score explicit retrieval failure, and support reserved holdout reporting. Synthetic tests cover goal-bound direct/catalog assignments, missing and wrong bindings, no-call omission, replay, private label isolation and changed trace detection. Focused evaluation/acquisition/goal/replay 113 passed before final trace tamper check; final check passed and full offline suite 545 passed. Provider behavior, source authority, complete matched work and hosted comparison remain unverified."
     }
   ]
 }

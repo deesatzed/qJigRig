@@ -6,7 +6,7 @@ import re
 from datetime import date
 from .budgets import BudgetExceeded, BudgetLedger
 from .contracts import ContractError, Request
-from .evaluation import DirectRetrieval, FullEvidence
+from .evaluation import DirectRetrieval, FullEvidence, CatalogRetrieval
 from .journal import ReconciliationRequired, UncertainOutcome
 from .packets import serialize_packet
 from .providers import ProviderRequest, ProviderUnavailable, call_typed
@@ -57,6 +57,12 @@ def _prompt(request, context, packets, allow_search, *, legacy_request_id=False)
     return prompt
 
 
+
+def _catalog_incomplete(found):
+    packet = found['packet']
+    return bool(found['channels']['channel_omitted'] or packet.omitted or packet.truncated_entry_ids)
+
+
 def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, transport, *,
                archive: RunArchive, provider: str, model: str, max_tokens: int,
                as_of: str, entities: list[str], historical_as_known: bool = False,
@@ -86,15 +92,24 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
                        for k in ('design_sha256', 'case_sha256', 'reference_sha256'))):
             raise ContractError('invalid direct case binding')
     full_evidence = isinstance(search, FullEvidence)
+    catalog_evidence = isinstance(search, CatalogRetrieval)
+    if catalog_evidence and (case_binding is None or search._scope != request.scope
+            or search._inputs.as_of != as_of or search._inputs.request_entities != frozenset(entities)
+            or search._inputs.historical_as_known != historical_as_known):
+        raise ContractError('catalog case applicability differs')
     if evaluation_assignment is not None and (case_binding is None or required_run_set is None or ledger._goal_budget is None):
         raise ContractError('evaluation assignment requires goal-budgeted checked execution')
     if full_evidence and case_binding is None:
         raise ContractError('full evidence requires a checked case binding')
-    schema = ('qjig.direct-evaluation.v6' if full_evidence else 'qjig.direct-evaluation.v5') if evaluation_assignment is not None else ('qjig.direct-evaluation.v4' if full_evidence else 'qjig.direct-evaluation.v3' if case_binding is not None else 'qjig.direct-evaluation.v2')
+    schema = (('qjig.direct-evaluation.v8' if evaluation_assignment is not None else 'qjig.direct-evaluation.v7') if catalog_evidence else
+              ('qjig.direct-evaluation.v6' if full_evidence else 'qjig.direct-evaluation.v5') if evaluation_assignment is not None else
+              ('qjig.direct-evaluation.v4' if full_evidence else 'qjig.direct-evaluation.v3' if case_binding is not None else 'qjig.direct-evaluation.v2'))
     archive.record_context({'schema': schema,
                             **({'case_binding': case_binding} if case_binding is not None else {}),
                             **({'evaluation_assignment': evaluation_assignment} if evaluation_assignment is not None else {}),
-                            **({'retrieval_mode': 'full_source_v1'} if full_evidence else {}), 'request': request.to_dict(),
+                            **({'retrieval_mode': 'full_source_v1'} if full_evidence else {}),
+                            **({'retrieval_mode':'qjig_catalog_v1','catalog_applicability':search._inputs.to_dict(),
+                                'catalog_role_priors':search._role_priors} if catalog_evidence else {}), 'request': request.to_dict(),
                             'source_revisions': sorted(r.revision_id for r in search._revisions), 'applicability': context,
                             'want': search._want, 'max_bytes': search._max_bytes,
                             'followups': search._max_rounds - 1, 'expanded': search._expanded,
@@ -111,7 +126,11 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
         trace = {key: value for key, value in found.items() if key != 'packet'}
         trace['packet'] = json.loads(serialize_packet(found['packet']))
         archive.record_trace(request.request_id, len(packets), trace)
-    retrieve(request.question)
+        return found
+    found = retrieve(request.question)
+    if catalog_evidence and _catalog_incomplete(found):
+        return finish({'status':'unavailable','failure':'catalog_evidence_incomplete','answer':None,
+                       'call_ids':calls,'searches':list(search.trace)})
     if ledger._goal_budget is not None:
         from .direct_preflight import check_direct_slots
         try:
@@ -144,7 +163,10 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
         if call.value['action'] == 'answer':
             return finish({'status': 'recorded_unvalidated', 'failure': None, 'answer': call.value['answer'],
                            'citations': call.value['citations'], 'call_ids': calls, 'searches': list(search.trace)})
-        retrieve(call.value['query'])
+        found = retrieve(call.value['query'])
+        if catalog_evidence and _catalog_incomplete(found):
+            return finish({'status':'unavailable','failure':'catalog_evidence_incomplete','answer':None,
+                           'call_ids':calls,'searches':list(search.trace)})
     raise ContractError('direct run ended without an answer')
 
 
@@ -152,7 +174,8 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
                       expected_design_sha256: str, expected_case_sha256: str, ledger: BudgetLedger, transport,
                       archive: RunArchive, provider: str, model: str, max_tokens: int,
                       want: int, max_bytes: int, followups: int, expanded: bool = False,
-                      evidence_mode: str = 'retrieved', reservation_factory=None, max_price=None, assignment_binding=None) -> dict:
+                      evidence_mode: str = 'retrieved', reservation_factory=None, max_price=None, assignment_binding=None,
+                      applicability_inputs=None, role_priors=None) -> dict:
     """Run one checked private case; reference data remains outside model input.
 
     Caller-supplied anchors and protected manifest are not authenticated here.
@@ -175,7 +198,7 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
         required_set = verify_evaluation_assignment(ledger._goal_budget, assignment_binding, case_id=lock_copy['case_id'],
                          case_sha256=expected_case_sha256, design_sha256=expected_design_sha256,
                          request_id=ledger._request_id, partition=ledger._partition)
-        expected_arm = 'direct_full_evidence' if evidence_mode == 'full' else 'direct_retrieval' if evidence_mode == 'retrieved' else None
+        expected_arm = 'direct_full_evidence' if evidence_mode == 'full' else 'direct_retrieval' if evidence_mode == 'retrieved' else 'retrieval_only' if evidence_mode == 'catalog' else None
         if assignment_binding['arm'] != expected_arm:
             raise ContractError('direct arm differs from evidence mode')
     elif assignment_binding is not None:
@@ -185,6 +208,11 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
         if followups != 0 or expanded is not False:
             raise ContractError('full evidence does not use retrieval followups or expansion')
         search = FullEvidence(root, manifest, protected, want=want, max_bytes=max_bytes)
+    elif evidence_mode == 'catalog':
+        if expanded is not False:
+            raise ContractError('catalog retrieval uses its own expansion policy')
+        search = CatalogRetrieval(root,manifest,protected,want=want,max_bytes=max_bytes,followups=followups,
+                                  applicability_inputs=applicability_inputs,scope=prepared.scope,role_priors=role_priors)
     elif evidence_mode == 'retrieved':
         search = DirectRetrieval(root, manifest, protected, want=want, max_bytes=max_bytes, followups=followups, expanded=expanded)
     else:

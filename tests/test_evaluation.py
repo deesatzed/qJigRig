@@ -1020,8 +1020,10 @@ def test_complete_evaluation_reservation_is_atomic_and_restart_safe(tmp_path):
                                       tokens=first['tokens'],cost_usd=first['cost_usd'])
 
 
-def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
+@pytest.mark.parametrize(('mode','arm'), [('full','direct_full_evidence'),('catalog','retrieval_only')])
+def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,arm):
     import json
+    from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
     from qjig.budgets import BudgetLedger
     from qjig.contracts import Budget, Request
     from qjig.direct_preflight import direct_run_allocations,direct_slot_reservation
@@ -1051,13 +1053,15 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
     cap={'prompt':2,'completion':3};families={f['id']:f['partition'] for f in design['families']};assignments=[]
     for case in design['cases']:
         partition=families[case['family']]
-        for arm in design['arms']:
+        for assigned_arm in design['arms']:
             for repeat in range(1,design['repeats'][partition]+1):
                 rid='opaque-'+str(len(assignments));work=direct_run_allocations(request_id=rid,partition=partition,provider='stand-in',model=model,
                          input_tokens=100,output_tokens=100,max_price=cap,followups=0)
-                assignments.append({'case_id':case['id'],'arm':arm,'repeat':repeat,'request_id':rid,'work':work})
+                assignments.append({'case_id':case['id'],'arm':assigned_arm,'repeat':repeat,'request_id':rid,'work':work})
     plan=make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=d)
-    target=next(x for x in assignments if x['case_id']=='holdout' and x['arm']=='direct_full_evidence');rid=target['request_id']
+    inputs=ApplicabilityInputs(Collection(tuple(MemberMetadata(rev,'project',Interval('2020-01-01',OPEN))
+                                               for rev in ref['source_revisions'])),frozenset(),'2026-11-07',False)
+    target=next(x for x in assignments if x['case_id']=='holdout' and x['arm']==arm);rid=target['request_id']
     total=Budget(60,12000,1);per=Budget(1,200,0.1);alloc={'development':Budget(15,3000,0.2),'pilot':Budget(15,3000,0.2),'holdout':Budget(30,6000,0.2)}
     response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),{'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.0001})
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=alloc) as goal,Journal.open(tmp_path/'j.sqlite') as journal,RunArchive.open(tmp_path/'archive') as archive:
@@ -1066,10 +1070,10 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
         def factory(req):return direct_slot_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
         options=dict(expected_design_sha256=d,expected_case_sha256=case_lock_digest(lock),ledger=ledger,transport=transport,
                      archive=archive,provider='stand-in',model=model['id'],max_tokens=100,want=1,max_bytes=3000,
-                     followups=0,evidence_mode='full',max_price=cap,reservation_factory=factory)
+                     followups=0,evidence_mode=mode,applicability_inputs=inputs,max_price=cap,reservation_factory=factory)
         with pytest.raises(ContractError):run_locked_direct(tmp_path,design,lock,ref,protected,**options)
         assert transport.calls_made==0 and journal.events(rid)==[] and archive.events()==[]
-        binding={'plan_id':'study','plan_sha256':plan['sha256'],'arm':'direct_full_evidence','repeat':1}
+        binding={'plan_id':'study','plan_sha256':plan['sha256'],'arm':arm,'repeat':1}
         with pytest.raises(ContractError):run_locked_direct(tmp_path,design,lock,ref,protected,assignment_binding={**binding,'arm':'combined'},**options)
         with pytest.raises(ContractError):run_locked_direct(tmp_path,design,lock,ref,protected,assignment_binding={**binding,'plan_sha256':'0'*64},**options)
         assert transport.calls_made==0 and journal.events(rid)==[]
@@ -1081,31 +1085,31 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
         from qjig.evaluation_scoring import score_reserved_assignment
         scored = score_reserved_assignment(goal,archive,journal,ref,partition='holdout',
             expected_plan_sha256=plan['sha256'],expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
-        assert scored['arm']=='direct_full_evidence' and scored['repeat']==1 and scored['score']['case_id']=='holdout'
+        assert scored['arm']==arm and scored['repeat']==1 and scored['score']['case_id']=='holdout'
         assert scored['score']['resources']['total']['calls']==1
         assert scored['score']['resources']['total']['input_tokens']==10
         from qjig.evaluation_scoring import build_reserved_holdout_comparison
         entry={'archive':archive,'journal':journal,'reference':ref,'run_sha256':replay['sha256'],
                'reference_sha256':reference_digest(ref),'journal_sha256':None}
         report=build_reserved_holdout_comparison(goal,design,[entry],plan_id='study',expected_plan_sha256=plan['sha256'],
-            expected_design_sha256=d,baseline_arm='direct_full_evidence',candidate_arm='combined')
+            expected_design_sha256=d,baseline_arm=arm,candidate_arm='combined')
         assert report['assigned_pairs']==6 and report['recorded_pairs']==0 and report['missing_pairs']==6
         assert any(p['case_id']=='holdout' and p['repeat']==1 and p['baseline_status']=='unknown' for p in report['pairs'])
         assert report['scored_assignments'][0]['score']['resources']['total']['calls']==1
         with pytest.raises(ContractError):
             build_reserved_holdout_comparison(goal,design,[entry,entry],plan_id='study',expected_plan_sha256=plan['sha256'],
-                expected_design_sha256=d,baseline_arm='direct_full_evidence',candidate_arm='combined')
+                expected_design_sha256=d,baseline_arm=arm,candidate_arm='combined')
         with pytest.raises(ContractError):
             build_reserved_holdout_comparison(goal,design,[{**entry,'reference_sha256':'0'*64}],plan_id='study',
-                expected_plan_sha256=plan['sha256'],expected_design_sha256=d,baseline_arm='direct_full_evidence',candidate_arm='combined')
+                expected_plan_sha256=plan['sha256'],expected_design_sha256=d,baseline_arm=arm,candidate_arm='combined')
         with pytest.raises(ContractError):
             build_reserved_holdout_comparison(goal,design,[entry],plan_id='study',expected_plan_sha256='0'*64,
-                expected_design_sha256=d,baseline_arm='direct_full_evidence',candidate_arm='combined')
+                expected_design_sha256=d,baseline_arm=arm,candidate_arm='combined')
         with pytest.raises(ContractError):
             score_reserved_assignment(goal,archive,journal,ref,partition='holdout',expected_plan_sha256='0'*64,
                 expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
         prompt=next(e['data']['prompt'] for e in archive.events() if e['kind']=='request')
-        assert plan['sha256'] not in prompt and rid not in prompt and 'direct_full_evidence' not in prompt
+        assert plan['sha256'] not in prompt and rid not in prompt and arm not in prompt
 
 
 def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(tmp_path):
@@ -1350,3 +1354,64 @@ def test_catalog_retrieval_includes_mandatory_channels_and_excludes_scope(tmp_pa
     assert restricted['channels']['channel_omitted']
     search.search('waiver')
     with pytest.raises(ContractError): search.search('third query')
+
+
+def test_retrieval_only_checked_run_replays_and_refuses_omissions(tmp_path):
+    import json
+    from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget,Request
+    from qjig.evaluation import load_isolated_sources,validate_evaluation_design
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_direct import run_locked_direct
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.evaluation_scoring import make_reference,reference_digest,score_direct_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse,StandInTransport
+    from qjig.run_archive import RunArchive
+    source_data={'primary':b'Deployment requires approval.',
+                 'exception':b'Exception waiver allows deployment without approval.',
+                 'conflict':b'Conflicting revision says deployment does not require approval.'}
+    sources=[]
+    for name,raw in source_data.items():
+        (tmp_path/name).write_bytes(raw);sources.append({'path':name,'sha256':hashlib.sha256(raw).hexdigest()})
+    (tmp_path/'label').write_bytes(b'PRIVATE_REFERENCE_LABEL')
+    protected=[{'path':'label','sha256':hashlib.sha256(b'PRIVATE_REFERENCE_LABEL').hexdigest()}]
+    design=_sample_design();design['families'][0]['source_hashes']=[x['sha256'] for x in sources]
+    digest=validate_evaluation_design(design)
+    ref=make_reference(case_id='dev',request=Request('hidden','Does deployment require approval?','reviewer','1','project'),
+        sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],historical_as_known=False,
+        expected_answer='unknown',provenance='authored_unvalidated',evidence=[{'path':'primary','quote':'requires approval'}])
+    lock={'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':digest,
+          'question':'Does deployment require approval?','role':'reviewer','role_version':'1','scope':'project',
+          'as_of':'2026-11-07','entities':[],'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
+    inputs=ApplicabilityInputs(Collection(tuple(MemberMetadata(rev,'project',Interval('2020-01-01',OPEN))
+                                               for rev in ref['source_revisions'])),frozenset(),'2026-11-07',False)
+    response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),
+                         {'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.001})
+    for want, expected in [(3,'recorded_unvalidated'),(1,'unavailable')]:
+        with Journal.open(tmp_path/f'j{want}.sqlite') as journal, RunArchive.open(tmp_path/f'a{want}') as archive:
+            transport=StandInTransport([response]);ledger=BudgetLedger(Budget(2,10000,1),journal,'r')
+            result=run_locked_direct(tmp_path,design,lock,ref,protected,expected_design_sha256=digest,
+                expected_case_sha256=case_lock_digest(lock),ledger=ledger,transport=transport,archive=archive,
+                provider='stand-in',model='synthetic',max_tokens=100,want=want,max_bytes=5000,followups=0,
+                evidence_mode='catalog',applicability_inputs=inputs)
+            assert result['status']==expected
+            if want==1:
+                assert result['failure']=='catalog_evidence_incomplete' and transport.calls_made==0
+            else:
+                assert transport.calls_made==1 and result['searches'][0]['method']=='qjig_catalog_v1'
+                prompt=next(e['data']['prompt'] for e in archive.events() if e['kind']=='request')
+                assert 'PRIVATE_REFERENCE_LABEL' not in prompt and 'Exception waiver' in prompt and 'Conflicting revision' in prompt
+            replay=verify_direct_archive(archive,journal)
+            assert replay['status']==('unanchored' if want==3 else 'incomplete')
+            score=score_direct_archive(archive,journal,ref,expected_run_sha256=replay['sha256'],
+                                       expected_reference_sha256=reference_digest(ref))
+            assert score['semantic_assurance']=='not_assessed'
+            if want==1: assert score['classification']=='retrieval_failure' and score['recorded_answer'] is None
+            if want==3:
+                trace=next(e for e in archive.events() if e['kind']=='trace')
+                changed=trace['data'];changed['channels']['channel_hits']['exception']+=1
+                archive._con.execute('DROP TRIGGER event_no_update')
+                archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),trace['seq']))
+                assert verify_direct_archive(archive,journal)['status']=='invalid'
