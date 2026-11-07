@@ -810,3 +810,34 @@ def test_fresh_review_consumes_separately_reserved_slot(tmp_path, include_review
             assert result.review.status == 'unavailable' and result.review.failure == 'review_preflight_unavailable'
             assert transport.calls_made == 0 and journal.events('req-f') == []
         assert goal.audit_journal(journal)['status'] == 'verified'
+
+
+def test_legacy_review_prompt_archive_remains_replayable(tmp_path, monkeypatch):
+    import copy
+    import qjig.program_review as review_module
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.replay import verify_archive
+    from qjig.run_archive import RunArchive
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE),
+                                                                 raw({'assessment':'uncertain','reason':'legacy fixture'})])
+    inputs = ApplicabilityInputs(Collection((MemberMetadata(REV.revision_id,'project',Interval('2026-01-01', OPEN)),)),
+                                 frozenset(), '2026-11-07', False)
+    original_prompt, original_review = review_module._review_prompt, review_module.make_review
+    monkeypatch.setattr(review_module, '_review_prompt', lambda binding, packet: original_prompt(binding, packet, legacy_request_id=True))
+    def legacy_review(binding, actor, result):
+        actor = copy.deepcopy(actor); actor['config'].pop('prompt_version', None)
+        return original_review(binding, actor, result)
+    monkeypatch.setattr(review_module, 'make_review', legacy_review)
+    with cat, journal, RunArchive.open(tmp_path/'archive') as archive:
+        original_context = archive.record_context
+        def legacy_context(context):
+            context = copy.deepcopy(context); context['reviewer'].pop('prompt_version', None)
+            return original_context(context)
+        monkeypatch.setattr(archive, 'record_context', legacy_context)
+        run = run_fresh(request=REQUEST,catalog=cat,entries=entries,ledger=ledger,transport=transport,
+                        planner=('stand-in','planner'),judge=('stand-in','judge'),reviewer=('stand-in','reviewer'),
+                        revision_applicability=lambda _: Applicability.MATCH,applicability_inputs=inputs,archive=archive)
+        assert run.review.status == 'recorded'
+        prompt = next(e['data']['prompt'] for e in archive.events() if e['kind']=='request' and e['data']['stage']=='plan_review')
+        assert REQUEST.request_id in prompt
+        assert verify_archive(archive).status == 'unanchored'

@@ -52,14 +52,18 @@ def _check_review(record, call_id, request, response, validation, context, plan)
                 'planner': {'provider': planner['provider'], 'model': planner['model'],
                             'prompt_sha256': hashlib.sha256(planner_prompt.encode('utf-8')).hexdigest(),
                             'config': {'max_tokens': planner['max_tokens'], 'max_price': planner.get('max_price')}}}
-    if binding != expected or request.prompt != _review_prompt(binding, context['planning_evidence']['packet']):
-        raise ContractError('review inputs differ from plan or prompt')
     settings = context['reviewer']
+    prompt_version = settings.get('prompt_version')
+    if prompt_version not in (None, 'request_id_redacted_v2'):
+        raise ContractError('unknown review prompt version')
+    if binding != expected or request.prompt != _review_prompt(binding, context['planning_evidence']['packet'], legacy_request_id=prompt_version is None):
+        raise ContractError('review inputs differ from plan or prompt')
     expected_kind = {'STAND_IN: authored responses, not a model': 'synthetic',
                      'LIVE: openrouter, real model call': 'ai'}.get(context['transport'])
     if (expected_kind is None or actor != {'kind': expected_kind, 'provider': settings['provider'], 'model': settings['model'],
             'prompt_sha256': hashlib.sha256(request.prompt.encode('utf-8')).hexdigest(),
-            'config': {'max_tokens': settings['max_tokens'], 'max_price': settings.get('max_price')}}):
+            'config': {'max_tokens': settings['max_tokens'], 'max_price': settings.get('max_price'),
+                       **({'prompt_version': prompt_version} if prompt_version is not None else {})}}):
         raise ContractError('reviewer provenance differs')
     expected_result = {**validation['value'], 'call_id': call_id, 'raw_sha256': response['body_sha256'], 'usage': response['usage']}
     if payload['result'] != expected_result:

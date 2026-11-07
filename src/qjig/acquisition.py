@@ -483,7 +483,7 @@ def run_fresh(
             "planning_evidence": planning_evidence,
             **({'fresh_run_set': fresh_set} if fresh_set is not None else {}),
             **({"reviewer": {"provider": reviewer[0], "model": reviewer[1], "max_tokens": reviewer_max_tokens,
-                             "max_price": reviewer_max_price}} if reviewer is not None else {}),
+                             "max_price": reviewer_max_price, "prompt_version": "request_id_redacted_v2"}} if reviewer is not None else {}),
         })
         for revision_id in revision_ids:
             archive.add_revision(catalog.get_revision(revision_id))

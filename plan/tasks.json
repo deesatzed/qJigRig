@@ -1117,7 +1117,8 @@
         "T061",
         "T063A",
         "T063B",
-        "T063C"
+        "T063C",
+        "T063D"
       ],
       "status": "pending",
       "files": [
@@ -2736,6 +2737,26 @@
       "acceptance": "The direct runner checks the case and reference before dispatch, records the private case binding locally and excludes it from provider input.",
       "command": "python -m pytest tests/test_evaluation.py::test_locked_direct_run_binds_case_without_exposing_reference -q",
       "evidence": "Red: checked case preparation was not integrated with direct execution. Green: a version 3 direct run validates the case before dispatch, records design/case/reference bindings in the local archive, excludes them from prompts, and verifies scoring uses the recorded case identity. Prior v1/v2 replay remains. Synthetic draft-case path replayed and produced unknown_review; focused 30 and full offline 511 passed. Anchors and protected manifest remain caller assertions; other entrypoints, transformed labels, matched work and hosted runs remain open."
+    },
+    {
+      "id": "T063D",
+      "phase": "P6",
+      "depends_on": [
+        "T057D",
+        "T063C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/program_review.py",
+        "src/qjig/acquisition.py",
+        "src/qjig/replay.py"
+      ],
+      "test_file": "tests/test_program_review.py",
+      "test_name": "test_review_prompt_excludes_internal_request_identity",
+      "action": "Exclude internal request identity from new review prompts",
+      "acceptance": "New review prompts omit request IDs while local review records retain exact binding and prior prompt versions remain replayable.",
+      "command": "python -m pytest tests/test_program_review.py::test_review_prompt_excludes_internal_request_identity -q",
+      "evidence": "Red: optional review prompt exposed internal request identity. Green: review prompt v2 omits request_id while full local review binding retains it; actor and archive context record the prompt version. Synthetic fresh review replay passes, and an emulated legacy prompt archive remains replayable. Focused 64 and full offline 513 passed. Source content, other request fields, protected-manifest completeness and full evaluation isolation remain unverified."
     }
   ]
 }

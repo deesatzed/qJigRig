@@ -125,3 +125,21 @@ def test_reviewed_draft_transaction_rolls_back_on_link_failure(tmp_path, review_
         assert transport.calls_made == 1 and [event.kind for event in journal.events('r')] == ['intent', 'receipt']
         for table in ('program_drafts', 'program_reviews', 'program_review_links'):
             assert catalog._con.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0] == 0
+
+
+def test_review_prompt_excludes_internal_request_identity(tmp_path, review_case):
+    from qjig.program_review import review_plan
+    revision, binding, packet = review_case
+    binding['request']['request_id'] = 'PRIVATE_ARM_MAPPING_REVIEW'
+    response = RawResponse(200, json.dumps({'assessment':'uncertain','reason':'fixture'}),
+                           {'prompt_tokens':12,'completion_tokens':5,'cost_usd':0.01})
+    with Catalog.open(tmp_path/'catalog.sqlite') as catalog, Journal.open(tmp_path/'j.sqlite') as journal, RunArchive.open(tmp_path/'archive') as archive:
+        catalog.add_revision(revision)
+        catalog.put_metadata_row((revision.revision_id,'project',None,'[]','2026-01-01','open',None))
+        outcome = review_plan(catalog, BudgetLedger(Budget(2,10000,1),journal,binding['request']['request_id']),
+                              StandInTransport([response]), binding, packet, provider='stand-in', model='reviewer', archive=archive)
+        prompt = next(event['data']['prompt'] for event in archive.events() if event['kind']=='request')
+        assert outcome.status == 'recorded'
+        assert binding['request']['request_id'] not in prompt and 'request_id' not in prompt
+        assert outcome.record['payload']['binding']['request']['request_id'] == binding['request']['request_id']
+        assert outcome.record['payload']['reviewer']['config']['prompt_version'] == 'request_id_redacted_v2'
