@@ -1420,7 +1420,8 @@
         "R08E",
         "R08F",
         "R08G",
-        "R08H"
+        "R08H",
+        "R08I"
       ],
       "status": "pending",
       "files": [],
@@ -3420,6 +3421,24 @@
       "acceptance": "Use the lowest declared goal, key and credit limits, reject malformed values and keep excluded BYOK spend and provider enforcement unknown.",
       "command": "python -m pytest tests/test_account_limits.py::test_account_ceiling_uses_strictest_remaining_limit_without_claiming_authorization -q",
       "evidence": "Red: no parser derived a conservative account credit ceiling from current-key and credits responses. The parser now chooses the lowest goal, finite key and remaining-credit cap, rejects missing/nonfinite/malformed values, does not treat excluded BYOK as bounded, and never authorizes hosted work. A second red test exposed upward decimal rounding near a cap; bounded high-precision floor arithmetic now preserves the lower value. Authenticated read-only no-redirect key/credits checks succeeded; the key excludes BYOK from its limit. Sanitized ignored receipt: .local/verification/account-constraints-d20599ib.json. Focused account/goal/provider 76 passed; full offline 558 passed. This snapshot can drift, is not yet wired into the persisted GoalBudget policy, does not verify account-side enforcement or complete token/billing bounds, and made no model call."
+    },
+    {
+      "id": "R08I",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08H"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_openrouter_unverified_billing_route_keeps_total_cost_unknown",
+      "action": "Preserve billing-route uncertainty in OpenRouter usage",
+      "acceptance": "BYOK or missing/malformed billing-route information leaves total spend unknown, preserving the reported provider fee separately and preventing further budgeted calls.",
+      "command": "python -m pytest tests/test_providers.py::test_openrouter_unverified_billing_route_keeps_total_cost_unknown -q",
+      "evidence": "Red: BYOK, absent and malformed flags all incorrectly turned a reported zero fee into known total cost. The usage parser now preserves the fee and explicit route while treating total cost as unknown unless is_byok is explicitly false; a synthetic journal and persistent goal-budget check confirms unknown spend stops the next call. Provider usage documentation: https://openrouter.ai/blog/announcements/gif-prompts-omni-search-tool-caching-and-byok-flags/ . No hosted model call occurred. The configured account key is not a management key, so BYOK configuration cannot be established via the management-only listing API. This post-call signal cannot establish pre-dispatch spend bounds and hosted dispatch remains gated."
     }
   ]
 }

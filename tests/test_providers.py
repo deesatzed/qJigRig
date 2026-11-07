@@ -99,7 +99,7 @@ from qjig.providers import OpenRouterTransport, load_env_value  # noqa: E402
 
 LIVE_BODY = json.dumps({
     "choices": [{"message": {"content": GOOD}}],
-    "usage": {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.0002},
+    "usage": {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.0002, "is_byok": False},
 })
 
 
@@ -107,6 +107,39 @@ def _env(tmp_path, text="OPENROUTER_API_KEY=sk-test-SECRET\nBASE_URL=https://ope
     p = tmp_path / ".env"
     p.write_text(text)
     return p
+
+
+@pytest.mark.parametrize('flag', [True, None, 'false'])
+def test_openrouter_unverified_billing_route_keeps_total_cost_unknown(flag):
+    usage = {'prompt_tokens': 11, 'completion_tokens': 7, 'cost': 0.0}
+    if flag is not None:
+        usage['is_byok'] = flag
+    parsed = OpenRouterTransport._usage(json.dumps({'usage': usage}))
+    assert parsed['cost_usd'] is None
+    assert parsed['openrouter_reported_cost_usd'] == 0.0
+    assert parsed['is_byok'] is (flag if type(flag) is bool else None)
+
+
+def test_byok_cost_uncertainty_stops_later_budgeted_call(tmp_path):
+    from qjig.budgets import BudgetExceeded
+    from qjig.goal_budget import GoalBudget
+    from qjig.providers import make_call_reservation
+
+    usage = {'prompt_tokens': 11, 'completion_tokens': 7, 'cost': 0.0, 'is_byok': True}
+    raw = RawResponse(200, GOOD, OpenRouterTransport._usage(json.dumps({'usage': usage})))
+    limit = Budget(2, 500, 1)
+    model = {'id': REQ.model, 'context_length': 1000, 'top_provider': {'max_completion_tokens': 100},
+             'pricing': {'prompt': '0.001', 'completion': '0.001'}}
+    bound = make_call_reservation(REQ, model, input_tokens=100, input_bound_provenance='synthetic fixture')
+    with GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='smoke')
+        transport = StandInTransport([raw, raw])
+        assert call_typed(ledger, transport, REQ, SCHEMA, reservation=bound).ok
+        assert goal.actual_usage()['unknown_calls'] == 1
+        assert journal.events('r')[-1].payload['usage']['is_byok'] is True
+        with pytest.raises(BudgetExceeded):
+            call_typed(ledger, transport, REQ, SCHEMA, reservation=bound)
+        assert transport.calls_made == 1
 
 
 def test_real_adapter_smoke_contract(tmp_path):
@@ -121,7 +154,8 @@ def test_real_adapter_smoke_contract(tmp_path):
     assert t.label == "LIVE: openrouter, real model call"
     raw = t._send_unchecked(ProviderRequest("judge", "openrouter", "vendor/model-x", "Is it?", 50))
     assert raw.http_status == 200 and raw.body == GOOD
-    assert raw.usage == {"prompt_tokens": 11, "completion_tokens": 7, "cost_usd": 0.0002}
+    assert raw.usage == {"prompt_tokens": 11, "completion_tokens": 7, "cost_usd": 0.0002,
+                         "openrouter_reported_cost_usd": 0.0002, "is_byok": False}
     assert seen["url"] == "https://openrouter.ai/api/v1/chat/completions"
     assert seen["payload"]["model"] == "vendor/model-x" and seen["payload"]["max_tokens"] == 50
     assert seen["payload"]["messages"] == [{"role": "user", "content": "Is it?"}]
@@ -348,11 +382,12 @@ def test_http_error_preserves_reported_usage_for_budget_and_journal(tmp_path):
     from qjig.providers import make_call_reservation
 
     envelope = json.dumps({'error': {'message': 'upstream failed'}, 'usage': {
-        'prompt_tokens': 11, 'completion_tokens': 7, 'cost': 0.02}})
+        'prompt_tokens': 11, 'completion_tokens': 7, 'cost': 0.02, 'is_byok': False}})
     adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (502, envelope))
     raw = adapter._send_unchecked(REQ)
     assert raw.http_status == 502
-    assert raw.usage == {'prompt_tokens': 11, 'completion_tokens': 7, 'cost_usd': 0.02}
+    assert raw.usage == {'prompt_tokens': 11, 'completion_tokens': 7, 'cost_usd': 0.02,
+                         'openrouter_reported_cost_usd': 0.02, 'is_byok': False}
     limit = Budget(2, 500, 1)
     model = {'id': REQ.model, 'context_length': 1000, 'top_provider': {'max_completion_tokens': 100},
              'pricing': {'prompt': '0.001', 'completion': '0.001'}}

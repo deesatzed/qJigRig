@@ -287,9 +287,13 @@ class OpenRouterTransport:
         if not isinstance(u, dict):
             return None
         cost = u.get("cost")
+        cost = cost if _valid_cost(cost) else None
+        byok = u.get("is_byok")
+        byok = byok if type(byok) is bool else None
         return {
             "prompt_tokens": u.get("prompt_tokens"), "completion_tokens": u.get("completion_tokens"),
-            "cost_usd": cost if isinstance(cost, (int, float)) and not isinstance(cost, bool) else None,
+            "cost_usd": cost if byok is False else None,
+            "openrouter_reported_cost_usd": cost, "is_byok": byok,
         }
 
 
