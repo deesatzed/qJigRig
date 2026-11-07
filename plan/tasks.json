@@ -1418,7 +1418,8 @@
         "R08C",
         "R08D",
         "R08E",
-        "R08F"
+        "R08F",
+        "R08G"
       ],
       "status": "pending",
       "files": [],
@@ -3382,6 +3383,24 @@
       "acceptance": "An unavailable review with no recorded call stays unknown review after journal checks, without fabricating an answer or verified cause.",
       "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
       "evidence": "Red: an incomplete fresh run with an empty planning packet had unavailable review without a provider-call failure, and its score was rejected. Journal-linked prior calls are now retained while a recorded no-call review remains unknown review with unverified failure cause and no conditional answer. Targeted empty-packet and altered-journal checks passed; focused evaluation/goal/replay/fresh-preflight 120 passed; full offline suite 555 passed. This does not establish review quality or validate the cause of the broad review error."
+    },
+    {
+      "id": "R08G",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08F"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_real_adapter_smoke_contract",
+      "action": "Request provider-reported usage in OpenRouter payloads",
+      "acceptance": "The OpenRouter wire payload requests usage details; missing or invalid cost remains unknown and hosted dispatch stays gated.",
+      "command": "python -m pytest tests/test_providers.py::test_real_adapter_smoke_contract -q",
+      "evidence": "Red: the fake-HTTP OpenRouter adapter omitted the documented usage.include request. The adapter now requests usage details; missing cost remains unknown and the public hosted gate remains closed. Focused provider/pricing/goal suite 79 passed; full offline suite 555 passed. Documentation: https://openrouter.ai/support/ . No live request occurred; response availability, complete provider input/cost bounds, and archived wire-configuration binding remain unverified."
     }
   ]
 }

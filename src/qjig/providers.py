@@ -215,6 +215,7 @@ class OpenRouterTransport:
         body = {
             "model": request.model, "max_tokens": request.max_tokens,
             "messages": [{"role": "user", "content": request.prompt}],
+            "usage": {"include": True},
         }
         if request.max_price is not None:
             body["provider"] = {"max_price": dict(request.max_price)}

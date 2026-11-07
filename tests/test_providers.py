@@ -125,6 +125,7 @@ def test_real_adapter_smoke_contract(tmp_path):
     assert seen["url"] == "https://openrouter.ai/api/v1/chat/completions"
     assert seen["payload"]["model"] == "vendor/model-x" and seen["payload"]["max_tokens"] == 50
     assert seen["payload"]["messages"] == [{"role": "user", "content": "Is it?"}]
+    assert seen["payload"]["usage"] == {"include": True}
     assert seen["headers"]["Authorization"] == "Bearer sk-test-SECRET"
     assert "SECRET" not in repr(t)
 
