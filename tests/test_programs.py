@@ -1,5 +1,6 @@
 """Synthetic review records; no provider calls and no independent adjudication."""
 import copy
+import pytest
 from qjig.contracts import Request
 
 
@@ -95,6 +96,7 @@ def test_draft_links_only_exact_review_without_activation(tmp_path):
     import pytest
     from qjig.contracts import ContractError
     from qjig.programs import make_draft, make_review
+    from qjig.indexing import index_entries
     from qjig.sources import SourceRevision, decode_source
     from qjig.store import Catalog
     revision = SourceRevision.create('source.md', 'fixture', decode_source(b'# Rule\nText\n', encoding='utf-8'))
@@ -113,8 +115,7 @@ def test_draft_links_only_exact_review_without_activation(tmp_path):
     unrelated_review = make_review(different, reviewer, {'assessment': 'no_gap_found'})
     path = tmp_path / 'catalog.sqlite'
     with Catalog.open(path) as catalog:
-        catalog.add_revision(revision)
-        catalog.put_metadata_row((revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+        catalog.import_snapshot(revision, index_entries(revision), (revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
         state = catalog.source_state()
         draft_id = catalog.save_program_draft(draft, state)
         assert catalog.program_status(draft_id, binding)['status'] == 'draft'
@@ -132,3 +133,53 @@ def test_draft_links_only_exact_review_without_activation(tmp_path):
         catalog._con.execute('INSERT INTO program_review_links VALUES (?,?)', (draft_id, other_id))
         with pytest.raises(ContractError, match='link invalid'):
             catalog.program_status(draft_id, binding)
+
+
+@pytest.mark.parametrize('change,expected', [('none', 'matches_local_index'), ('superseded', 'stale'),
+                                             ('new_source', 'stale'), ('unindexed', 'unknown'),
+                                             ('ambiguous', 'unknown'), ('other_scope', 'matches_local_index'),
+                                             ('bound_unindexed', 'unknown'), ('metadata_changed', 'stale'),
+                                             ('unknown_date', 'unknown'), ('orphan_index', 'unknown')])
+def test_draft_source_freshness_is_explicit_and_conservative(tmp_path, change, expected):
+    from qjig.indexing import index_entries, save_entries
+    from qjig.programs import make_draft
+    from qjig.sources import SourceRevision, decode_source
+    from qjig.store import Catalog
+    revision = SourceRevision.create('source.md', 'fixture', decode_source(b'# Rule\nText\n', encoding='utf-8'))
+    metadata = {'scope': 'project', 'authority_id': None, 'entity_keys': [], 'effective_start': '2026-01-01', 'effective_end': 'open', 'observed_at': None}
+    binding = {'request': Request('r', 'Question?', 'reviewer', '1', 'project').to_dict(),
+               'plan': {'origin': 'fresh', 'predicates': [{'id': 'p', 'question': 'Text?'}], 'expression': {'ref': 'p'}},
+               'corpus_revision_ids': [revision.revision_id], 'source_metadata': {revision.revision_id: metadata},
+               'as_of': '2026-11-07', 'entities': [], 'historical_as_known': False,
+               'planner': {'provider': 'stand-in', 'model': 'planner', 'prompt_sha256': 'b'*64, 'config': {}}}
+    with Catalog.open(tmp_path / 'catalog.sqlite') as catalog:
+        catalog.import_snapshot(revision, index_entries(revision), (revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+        draft_id = catalog.save_program_draft(make_draft(binding), catalog.source_state())
+        if change == 'orphan_index':
+            catalog._con.execute('INSERT INTO index_entries VALUES (?,?,?,?,?,?,?,?,?,?)',
+                                 ('orphan', 'missing-revision', 'heading', 'title', 'fixture', 'accepted', 0, 1, 'a'*64, None))
+            catalog._con.commit()
+        elif change == 'bound_unindexed':
+            catalog._con.execute('DELETE FROM index_entries WHERE revision_id=?', (revision.revision_id,))
+            catalog._con.commit()
+        elif change == 'metadata_changed':
+            catalog._con.execute("UPDATE member_metadata SET effective_start='2026-02-01' WHERE revision_id=?", (revision.revision_id,))
+            catalog._con.commit()
+        elif change != 'none':
+            source_id = 'source.md' if change in ('superseded', 'ambiguous') else 'new.md'
+            newer = SourceRevision.create(source_id, 'fixture', decode_source(b'# Other\nDifferent\n', encoding='utf-8'))
+            scope = 'other' if change == 'other_scope' else 'project'
+            if change == 'unindexed':
+                catalog.add_revision(newer)
+            elif change == 'ambiguous':
+                catalog.add_revision(newer)
+                catalog.put_metadata_row((newer.revision_id, scope, None, '[]', '2026-01-01', 'open', None))
+                save_entries(catalog, index_entries(newer))
+            else:
+                start = 'unknown' if change == 'unknown_date' else '2026-01-01'
+                catalog.import_snapshot(newer, index_entries(newer), (newer.revision_id, scope, None, '[]', start, 'open', None))
+        report = catalog.program_source_freshness(draft_id)
+        assert report['status'] == expected
+        assert report['semantic_assurance'] == 'not_assessed' and report['activation'] is False
+        status = catalog.program_status(draft_id, binding)
+        assert status['status'] == ('stale' if expected == 'stale' else 'source_state_unknown' if expected == 'unknown' else 'draft')

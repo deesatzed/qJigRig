@@ -491,7 +491,7 @@ class Catalog:
             raise
 
     def program_status(self, draft_id: str, candidate_binding: dict) -> dict:
-        """Compare a supplied candidate to a saved draft; does not assess current corpus completeness."""
+        """Compare a supplied candidate and local index; does not prove corpus completeness."""
         from .programs import verify_draft, verify_review
         draft = self.program_draft(draft_id)
         if draft is None:
@@ -504,8 +504,104 @@ class Catalog:
             review = self.program_review(review_id)
             if review is None or verify_review(review, draft['payload']['binding'], review['payload']['reviewer'])['status'] != 'matching_unvalidated':
                 raise ContractError('stored review link invalid')
-        return {'status': 'stale' if match == 'stale' else 'review_record_linked' if review_ids else 'draft',
-                'review_ids': review_ids, 'activation': False, 'semantic_assurance': 'not_assessed'}
+        freshness = self.program_source_freshness(draft_id)
+        status = ('stale' if match == 'stale' or freshness['status'] == 'stale' else
+                  'source_state_unknown' if freshness['status'] == 'unknown' else
+                  'review_record_linked' if review_ids else 'draft')
+        return {'status': status, 'review_ids': review_ids, 'source_freshness': freshness,
+                'activation': False, 'semantic_assurance': 'not_assessed'}
+
+    def program_source_freshness(self, draft_id: str) -> dict:
+        """Compare against a local catalog snapshot, not external files or source authority."""
+        from .applicability import Applicability, ApplicabilityInputs, scope_applicability
+        self._con.execute('BEGIN')
+        try:
+            draft = self.program_draft(draft_id)
+            if draft is None:
+                raise ContractError('draft unavailable')
+            binding = draft['payload']['binding']
+            revisions = dict(self._con.execute('SELECT revision_id,source_id FROM revisions').fetchall())
+            metadata = {row[0]: row for row in self.metadata_rows()}
+            states = {}
+            for ident, state in self._con.execute('SELECT revision_id,state FROM index_entries').fetchall():
+                states.setdefault(ident, set()).add(state)
+            live = {}
+            for ident, source in revisions.items():
+                if states.get(ident, set()) & {'proposed', 'accepted'}:
+                    live.setdefault(source, set()).add(ident)
+            bound = set(binding['corpus_revision_ids'])
+            bound_sources, stale, unknown = set(), [], []
+            for ident in sorted((set(states) | set(metadata)) - set(revisions)):
+                unknown.append(f'orphan_catalog_record:{ident}')
+            for ident, values in states.items():
+                if not values <= {'proposed', 'accepted', 'rejected', 'stale'}:
+                    unknown.append(f'invalid_index_state:{ident}')
+            for ident in sorted(bound):
+                source = revisions.get(ident)
+                if source is None or ident not in metadata:
+                    unknown.append(f'bound_source_unavailable:{ident}')
+                    continue
+                if source in bound_sources:
+                    unknown.append(f'multiple_bound_revisions:{source}')
+                bound_sources.add(source)
+                try:
+                    self.get_revision(ident)
+                    row = metadata[ident]
+                    actual = {'scope': row[1], 'authority_id': row[2], 'entity_keys': sorted(json.loads(row[3])),
+                              'effective_start': row[4], 'effective_end': row[5], 'observed_at': row[6]}
+                except (ContractError, ValueError, TypeError):
+                    unknown.append(f'bound_source_invalid:{ident}')
+                    continue
+                if actual != binding['source_metadata'][ident]:
+                    stale.append(f'bound_metadata_changed:{ident}')
+                current = live.get(source, set())
+                if not current or len(current) > 1:
+                    unknown.append(f'current_revision_ambiguous:{source}')
+                elif current != {ident}:
+                    stale.append(f'bound_revision_superseded:{ident}')
+            for ident, source in sorted(revisions.items()):
+                if ident in bound:
+                    continue
+                entry_states = states.get(ident, set())
+                if entry_states and entry_states <= {'stale'}:
+                    continue
+                if source in bound_sources:
+                    if not entry_states:
+                        unknown.append(f'unindexed_revision:{ident}')
+                    continue
+                row = metadata.get(ident)
+                if row is None:
+                    unknown.append(f'source_metadata_unavailable:{ident}')
+                    continue
+                try:
+                    self.get_revision(ident)
+                    member = {'revision_id': ident, 'scope': row[1], 'authority_id': row[2],
+                              'entity_keys': json.loads(row[3]), 'effective_start': row[4],
+                              'effective_end': row[5], 'observed_at': row[6]}
+                    inputs = ApplicabilityInputs.from_dict({'as_of': binding['as_of'],
+                        'historical_as_known': binding['historical_as_known'], 'request_entities': binding['entities'],
+                        'scope_authority_assurance': 'recorded_not_assessed', 'members': [member]})
+                    scope = scope_applicability(binding['request']['scope'], row[1])
+                    verdict = inputs.verdict(ident)
+                except (ContractError, ValueError, TypeError):
+                    unknown.append(f'source_metadata_invalid:{ident}')
+                    continue
+                if Applicability.NO_MATCH in (scope, verdict):
+                    continue
+                if Applicability.UNKNOWN in (scope, verdict) or not entry_states or not entry_states & {'proposed', 'accepted'}:
+                    unknown.append(f'source_applicability_or_index_unknown:{ident}')
+                elif len(live.get(source, set())) > 1:
+                    unknown.append(f'current_revision_ambiguous:{source}')
+                else:
+                    stale.append(f'new_applicable_source:{ident}')
+            snapshot = self._source_state_in_transaction()
+            self._con.commit()
+        except BaseException:
+            self._con.rollback()
+            raise
+        return {'status': 'stale' if stale else 'unknown' if unknown else 'matches_local_index',
+                'reasons': sorted(set(stale + unknown)), 'source_state': snapshot,
+                'activation': False, 'semantic_assurance': 'not_assessed'}
 
     def put_interpretation(self, claim_id: str, payload: str) -> bool:
         with self._con:

@@ -998,7 +998,8 @@
         "T057D",
         "T057E",
         "T057F",
-        "T057G"
+        "T057G",
+        "T057H"
       ],
       "status": "pending",
       "files": [
@@ -2365,6 +2366,24 @@
       "acceptance": "A successful synthetic review stores its exact-bound draft and link atomically, preserves deferral and never activates.",
       "command": "python -m pytest tests/test_program_review.py::test_budgeted_synthetic_review_is_recorded_without_activation -q",
       "evidence": "Red: synthetic review did not create a linked draft. Green: source-checked catalog transaction stores draft, review and link together, preserves non-activation and exposes draft ID in fresh result; replay checks the reference. Forced link failure rolls back all three while the call receipt remains. Focused 79 passed before final restart assertion; full offline 473 passed; synthetic Chromium review walkthrough passed. Catalog and archive are separate stores, and hosted review, lifecycle UI and reuse enforcement remain open."
+    },
+    {
+      "id": "T057H",
+      "phase": "P5",
+      "depends_on": [
+        "T057F",
+        "T056B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/store.py"
+      ],
+      "test_file": "tests/test_programs.py",
+      "test_name": "test_draft_source_freshness_is_explicit_and_conservative",
+      "action": "Compare draft source bindings with local catalog state",
+      "acceptance": "Superseded or added applicable sources cannot appear current; missing or ambiguous local source state remains unknown.",
+      "command": "python -m pytest tests/test_programs.py::test_draft_source_freshness_is_explicit_and_conservative -q",
+      "evidence": "Red: no local draft source-freshness check existed. Green: a catalog snapshot distinguishes matching local index, superseded/new applicable source, and unknown missing/unindexed/ambiguous/invalid metadata or orphan index; program status incorporates stale or unknown. Synthetic focused 74 passed; full offline 483 passed. This does not monitor external files, prove corpus completeness, source authority, semantic quality or permit activation; full T057/R01B remain open."
     }
   ]
 }

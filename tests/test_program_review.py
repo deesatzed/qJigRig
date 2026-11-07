@@ -3,7 +3,7 @@ import json
 import pytest
 from qjig.budgets import BudgetLedger
 from qjig.contracts import Budget, Request
-from qjig.indexing import index_entries
+from qjig.indexing import index_entries, save_entries
 from qjig.journal import Journal
 from qjig.packets import build_packet
 from qjig.providers import RawResponse, StandInTransport
@@ -36,6 +36,7 @@ def test_budgeted_synthetic_review_is_recorded_without_activation(tmp_path, revi
     with Catalog.open(tmp_path / 'catalog.sqlite') as catalog, Journal.open(tmp_path / 'journal.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
         catalog.add_revision(revision)
         catalog.put_metadata_row((revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+        save_entries(catalog, index_entries(revision))
         ledger = BudgetLedger(Budget(2, 10000, 1), journal, 'r')
         outcome = review_plan(catalog, ledger, transport, binding, packet, provider='stand-in', model='reviewer', archive=archive)
         assert outcome.status == 'recorded' and outcome.activation is False
