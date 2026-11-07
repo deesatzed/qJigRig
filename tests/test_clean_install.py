@@ -55,6 +55,44 @@ def test_clean_install_cli_and_loopback_service(tmp_path):
     rendered = cli('trace', '--file', trace)
     assert rendered.returncode == 0 and '14 days' in rendered.stdout
 
+    # Exercise the installed fresh pipeline and exported archive without the
+    # checkout on sys.path. All provider responses and source text are synthetic.
+    fresh_script = r'''
+import json, sys
+from pathlib import Path
+from qjig.contracts import Budget
+from qjig.fresh_service import FreshWorkbench
+from qjig.goal_budget import GoalBudget
+from qjig.providers import RawResponse, StandInTransport
+root = Path(sys.argv[1])
+model = {'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+         'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+spec = {'provider':'stand-in','model':model,'input_tokens':1000,'output_tokens':100,
+        'max_price':{'prompt':2,'completion':3}}
+limit = Budget(30,100000,1)
+usage = {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
+def raw(value): return RawResponse(200,json.dumps(value),usage)
+responses = [raw({'predicates':[{'id':'p','question':'Refund limit?'}],'expression':{'ref':'p'}}),
+             raw({'supported':True,'quote':'Refunds are accepted within 14 days.','reason':'synthetic'}),
+             raw({'supported':False,'quote':'','reason':'synthetic'}),
+             raw({'assessment':'uncertain','reason':'synthetic review'})]
+backend = FreshWorkbench(root/'fresh',goal_factory=lambda:GoalBudget.open(root/'goal.sqlite',
+    total=limit,per_request=limit,allocations={'smoke':limit}),transport_factory=lambda:StandInTransport(responses),
+    partition='smoke',planner=spec,judge=spec,reviewer=spec,budget=limit)
+request={'schema_version':'qjig.request.v1','request_id':'clean-fresh','question':'Refund limit?',
+         'role':'reviewer','role_version':'1','scope':'project'}
+result=backend.run(root/'catalog.sqlite',{'request':request,'as_of':'2026-11-15','entities':[]})
+assert result['status']=='deferred' and result['review']['assurance']=='synthetic_review_unvalidated'
+(root/'fresh-export.sqlite').write_bytes(backend.export(result['run_id']))
+print(json.dumps({'run_id':result['run_id']}))
+'''
+    fresh = subprocess.run([str(python), '-I', '-c', fresh_script, str(tmp_path)], cwd=tmp_path,
+                           env=clean_env, capture_output=True, text=True, timeout=20)
+    assert fresh.returncode == 0, fresh.stderr
+    verified = cli('verify-fresh', '--file', tmp_path / 'fresh-export.sqlite')
+    assert verified.returncode == 0, verified.stderr
+    assert json.loads(verified.stdout)['status'] == 'unanchored'
+
     service = subprocess.Popen([str(python), '-I', '-m', 'qjig', 'serve', '--catalog', str(db), '--host', '127.0.0.1', '--port', '0'],
                                cwd=tmp_path, env=clean_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
