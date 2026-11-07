@@ -842,7 +842,8 @@
       "depends_on": [
         "T048",
         "T041",
-        "R05"
+        "R05",
+        "T049A"
       ],
       "status": "pending",
       "files": [
@@ -1862,6 +1863,26 @@
       "acceptance": "Every journaled attempt, including failure and escalation, contributes to per-stage and total reporting; missing usage is not zero.",
       "command": "python -m pytest tests/test_costs.py::test_resource_report_preserves_failed_and_unknown_usage -q",
       "evidence": "Initial red: resource-report module absent. Green: synthetic completed, failed, uncertain, unfinished and escalation attempts are counted by stage and in totals; token/cost unknowns stay separate from known subtotals and elapsed time comes from recorded events. Duplicate/invalid terminal sequences refuse. Focused resource/budget/journal tests 70 passed; full offline suite 384 passed. One quiescent journal only; no cost provenance, cross-store validation, actual escalation or live model proof. T052 remains pending."
+    },
+    {
+      "id": "T049A",
+      "phase": "P4",
+      "depends_on": [
+        "T044",
+        "T052A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/escalation.py",
+        "src/qjig/judge.py",
+        "src/qjig/budgets.py"
+      ],
+      "test_file": "tests/test_escalation.py",
+      "test_name": "test_standalone_and_escalation_remain_separate",
+      "action": "Exercise separate budgeted escalation using stand-in calls",
+      "acceptance": "Synthetic escalation retains standalone failure, records reason, uses selected model identity and shares request budget with separately identifiable calls.",
+      "command": "python -m pytest tests/test_escalation.py::test_standalone_and_escalation_remain_separate -q",
+      "evidence": "Initial red: escalation module absent. Synthetic paired escalation preserves failed standalone result and reason, records tencent/hy4 identity and distinct escalation stages, shares same request ledger, refuses unrelated ledger or exhausted budget, and reports stage costs. Focused 66 passed; full offline suite 387 passed. Call-ID binding is not exact prompt/corpus binding or authentication; no archive replay, full-run integration or real model evidence. T049 remains pending."
     }
   ]
 }

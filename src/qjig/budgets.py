@@ -91,6 +91,14 @@ class BudgetLedger:
         """Call id of the most recent journaled event for this request (single writer)."""
         return self._journal.events(self._request_id)[-1].call_id
 
+    def has_judge_calls(self, call_ids: tuple[str, ...]) -> bool:
+        """Check recorded standalone call IDs against this request's journal."""
+        if not call_ids or len(set(call_ids)) != len(call_ids):
+            return False
+        intents = {e.call_id for e in self._journal.events(self._request_id)
+                   if e.kind == "intent" and e.stage in ("judge_positive", "judge_negative")}
+        return all(call_id in intents for call_id in call_ids)
+
     def run(
         self, stage: str, call: Callable[[], Any], *, provider: str, model: str, input_sha256: str,
         reserve_tokens: int, reserve_input_tokens: int | None = None, hold_back_calls: int = 0, hold_back_tokens: int = 0,

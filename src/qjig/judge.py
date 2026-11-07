@@ -6,6 +6,7 @@ from typing import Callable
 
 from .applicability import Applicability
 from .budgets import BudgetExceeded, BudgetLedger
+from .contracts import ContractError
 from .logic import Observation, Outcome, Support, combine_support
 from .packets import EvidencePacket
 from .providers import FieldSpec, ProviderRequest, ProviderUnavailable, ReservationFactory, Transport, call_typed
@@ -86,8 +87,8 @@ def _check_quote(side: SideResult, packet: EvidencePacket, applicability: Callab
     return SideResult(Support.SUPPORTED, side.reason, side.quote, None, side.call_id, assurance, ref)
 
 
-def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str, max_tokens: int = JUDGE_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None) -> SideResult:
-    req = ProviderRequest(f"judge_{side}", provider, model, _PROMPT.format(claim=claim, evidence=evidence), max_tokens)
+def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str, max_tokens: int = JUDGE_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge") -> SideResult:
+    req = ProviderRequest(f"{stage_prefix}_{side}", provider, model, _PROMPT.format(claim=claim, evidence=evidence), max_tokens)
     try:
         reservation = reservation_factory(req) if reservation_factory else None
         call = call_typed(ledger, transport, req, SIDE_SCHEMA, reservation=reservation, archive=archive)
@@ -120,15 +121,17 @@ def build_side_prompts(question: str, packet: EvidencePacket) -> tuple[ProviderR
 def judge_predicate(
     ledger: BudgetLedger, transport: Transport, question: str, packet: EvidencePacket, *, provider: str, model: str,
     applicability: Callable[[str], Applicability] | None = None, max_tokens: int = JUDGE_MAX_TOKENS,
-    reservation_factory: ReservationFactory | None = None, archive=None,
+    reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge",
 ) -> JudgeResult:
     """Ask separately whether the evidence supports YES and whether it supports NO; combine the two."""
+    if stage_prefix not in ("judge", "escalation"):
+        raise ContractError("invalid judge stage prefix")
     evidence = render_packet(packet)
-    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens, reservation_factory, archive)
+    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens, reservation_factory, archive, stage_prefix)
     if pos.failure in ("uncertain_outcome", "reconciliation_required"):
         neg = SideResult(Support.UNKNOWN, "reconciliation_required", "", "reconciliation_required", None)
     else:
-        neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens, reservation_factory, archive)
+        neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens, reservation_factory, archive, stage_prefix)
     return _combine_sides(pos, neg, packet, applicability)
 
 
