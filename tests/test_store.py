@@ -79,10 +79,27 @@ def test_version_1_catalog_migrates_to_add_index_table(tmp_path):
         cat.add_revision(r)
     con = sqlite3.connect(db)
     con.execute("DROP TABLE index_entries")
+    con.execute("DROP TABLE member_metadata")
     con.execute("PRAGMA user_version = 1")
     con.commit()
     con.close()
     with Catalog.open(db) as cat:
         assert cat.get_revision(r.revision_id) == r  # old data intact
         assert cat.index_rows(r.revision_id) == []  # new table present
-    assert sqlite3.connect(db).execute("PRAGMA user_version").fetchone()[0] == 2
+    assert sqlite3.connect(db).execute("PRAGMA user_version").fetchone()[0] == 3
+
+
+def test_version_2_catalog_migrates_to_add_metadata_table(tmp_path):
+    db = tmp_path / "catalog.sqlite"
+    r = rev(b"limit 10\n")
+    with Catalog.open(db) as cat:
+        cat.add_revision(r)
+    con = sqlite3.connect(db)
+    con.execute("DROP TABLE member_metadata")
+    con.execute("PRAGMA user_version = 2")
+    con.commit()
+    con.close()
+    with Catalog.open(db) as cat:
+        assert cat.get_revision(r.revision_id) == r
+        cat.put_metadata_row((r.revision_id, "project", None, "[]", "2026-01-01", "open", None))
+        assert len(cat.metadata_rows()) == 1

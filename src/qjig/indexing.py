@@ -187,3 +187,8 @@ def current_entries(catalog: Catalog, source_id: str, current_revision_id: str) 
     if catalog.revision_source_id(current_revision_id) != source_id:
         raise ContractError("revision is not a stored revision of this source")
     return [e for e in load_entries(catalog, current_revision_id) if e.state in ("proposed", "accepted")]
+
+
+def load_live_entries(catalog: Catalog) -> list[IndexEntry]:
+    """Every proposed/accepted entry across the catalog, each re-verified against its stored source."""
+    return [_entry_from_row(catalog, r)[0] for r in catalog.live_index_rows()]

@@ -7,7 +7,7 @@ from pathlib import Path
 from .contracts import ContractError
 from .sources import SourceRevision, decode_source
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE revisions(
@@ -40,6 +40,18 @@ CREATE TABLE index_entries(
 CREATE INDEX index_entries_revision ON index_entries(revision_id);
 """
 
+_METADATA_SCHEMA = """
+CREATE TABLE member_metadata(
+  revision_id TEXT PRIMARY KEY REFERENCES revisions(revision_id),
+  scope TEXT NOT NULL,
+  authority_id TEXT,
+  entity_keys TEXT NOT NULL,
+  effective_start TEXT NOT NULL,
+  effective_end TEXT NOT NULL,
+  observed_at TEXT
+);
+"""
+
 
 class Catalog:
     def __init__(self, con: sqlite3.Connection) -> None:
@@ -50,9 +62,11 @@ class Catalog:
         con = sqlite3.connect(str(path))
         version = con.execute("PRAGMA user_version").fetchone()[0]
         if version == 0:
-            con.executescript(_SCHEMA + _INDEX_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
-        elif version == 1:  # additive migration: index entries
-            con.executescript(_INDEX_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
+            con.executescript(_SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
+        elif version == 1:  # additive migrations: index entries, then member metadata
+            con.executescript(_INDEX_SCHEMA + _METADATA_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
+        elif version == 2:  # additive migration: member metadata
+            con.executescript(_METADATA_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
         elif version != SCHEMA_VERSION:
             con.close()
             raise ContractError(f"unsupported catalog schema version {version}")
@@ -142,3 +156,20 @@ class Catalog:
     def revision_source_id(self, revision_id: str) -> str | None:
         row = self._con.execute("SELECT source_id FROM revisions WHERE revision_id=?", (revision_id,)).fetchone()
         return row[0] if row else None
+
+    def live_index_rows(self) -> list[tuple]:
+        return self._con.execute(
+            f"SELECT {self._ENTRY_COLS} FROM index_entries WHERE state IN ('proposed','accepted') "
+            "ORDER BY revision_id, start, \"end\", entry_id"
+        ).fetchall()
+
+    def put_metadata_row(self, row: tuple) -> None:
+        """row = (revision_id, scope, authority_id, entity_keys_json, start, end, observed_at). First write wins."""
+        with self._con:
+            self._con.execute("INSERT OR IGNORE INTO member_metadata VALUES (?,?,?,?,?,?,?)", row)
+
+    def metadata_rows(self) -> list[tuple]:
+        return self._con.execute("SELECT * FROM member_metadata ORDER BY revision_id").fetchall()
+
+    def revision_ids(self) -> list[str]:
+        return [r[0] for r in self._con.execute("SELECT revision_id FROM revisions ORDER BY revision_id")]
