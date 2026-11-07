@@ -47,6 +47,7 @@ class GoalBudget:
             con.execute("BEGIN IMMEDIATE")
             con.execute("CREATE TABLE IF NOT EXISTS policy (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS reservations (attempt_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, partition TEXT NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL)")
+            con.execute("CREATE TABLE IF NOT EXISTS usage (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), input_tokens INTEGER, output_tokens INTEGER, cost TEXT)")
             row = con.execute("SELECT value FROM policy WHERE id=1").fetchone()
             if row is None:
                 con.execute("INSERT INTO policy VALUES(1, ?)", (policy,))
@@ -76,6 +77,33 @@ class GoalBudget:
         count, tokens, cost = self._sum(self._con.execute("SELECT tokens, cost FROM reservations").fetchall())
         return Budget(count, tokens, float(cost))
 
+    def record_usage(self, attempt_id: str, *, input_tokens: int | None, output_tokens: int | None, cost_usd: float | None) -> None:
+        """Record one observed outcome; missing fields remain unknown and never release reservations."""
+        if ((input_tokens is not None and not _valid_tokens(input_tokens)) or
+            (output_tokens is not None and not _valid_tokens(output_tokens)) or
+            (cost_usd is not None and not _valid_cost(cost_usd))):
+            raise ContractError("invalid actual usage")
+        self._con.execute("BEGIN IMMEDIATE")
+        try:
+            if not self._con.execute("SELECT 1 FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone():
+                raise ContractError("unknown reservation")
+            if self._con.execute("SELECT 1 FROM usage WHERE attempt_id=?", (attempt_id,)).fetchone():
+                raise ContractError("usage already recorded")
+            self._con.execute("INSERT INTO usage VALUES(?,?,?,?)", (attempt_id, input_tokens, output_tokens,
+                              str(_cost(cost_usd)) if cost_usd is not None else None))
+            self._con.execute("COMMIT")
+        except BaseException:
+            self._con.execute("ROLLBACK")
+            raise
+
+    def actual_usage(self) -> dict:
+        rows = self._con.execute("SELECT u.input_tokens, u.output_tokens, u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()
+        return {"calls": len(rows), "input_tokens": sum(r[0] for r in rows if r[0] is not None),
+                "output_tokens": sum(r[1] for r in rows if r[1] is not None),
+                "cost_usd": (float(sum((Decimal(r[2]) for r in rows if r[2] is not None), Decimal(0)))
+                             if not rows or any(r[2] is not None for r in rows) else None),
+                "unknown_calls": sum(any(v is None for v in row) for row in rows)}
+
     def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float) -> None:
         if any(not isinstance(v, str) or not v.strip() for v in (attempt_id, request_id, partition)):
             raise ContractError("reservation identities must be non-empty")
@@ -85,6 +113,11 @@ class GoalBudget:
         try:
             if self._con.execute("SELECT 1 FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone():
                 raise ContractError("attempt already reserved")
+            previous = self._con.execute("SELECT r.tokens, r.cost, u.input_tokens, u.output_tokens, u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()
+            if any(i is None or o is None or c is None for _, _, i, o, c in previous):
+                raise BudgetExceeded("usage_unknown", "previous call has unknown or pending usage")
+            if any(i + o > bound or Decimal(c) > Decimal(cost) for bound, cost, i, o, c in previous):
+                raise BudgetExceeded("bound_exceeded", "observed usage exceeded its reservation")
             for label, query, args, limit in (
                 ("goal", "SELECT tokens,cost FROM reservations", (), self._total),
                 ("partition", "SELECT tokens,cost FROM reservations WHERE partition=?", (partition,), self._allocations[partition]),
