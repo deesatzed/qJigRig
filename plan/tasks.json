@@ -4020,6 +4020,25 @@
       "acceptance": "Return the stored review assurance, assessment, reason and identity; label an unavailable review not assessed.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: service returned a noncanonical assurance and omitted review assessment and reason. Synthetic actual-pipeline and Chrome tests display the stored review record; malformed review returns not_assessed without a review identity. Focused browser/fresh/review tests: 57 passed. Review remains unvalidated and no hosted call occurred."
+    },
+    {
+      "id": "T057M",
+      "phase": "P5",
+      "depends_on": [
+        "T057L",
+        "T056E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Expose the archived unvalidated review on fresh replay",
+      "acceptance": "After service restart, show the archived review assessment and reason with its assurance separately from source evidence; absent review remains unavailable.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: replay did not return the archived review. Synthetic actual-pipeline replay and Chrome now show the matching review identity, assessment, reason and unvalidated assurance after restart; interrupted run retains no review. Browser/fresh/replay/review checks: 28 passed. Structural replay is not authentication, semantic correctness or independent review."
     }
   ]
 }

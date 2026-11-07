@@ -72,9 +72,16 @@ class FreshWorkbench:
                 raise ContractError('fresh run identity mismatch')
             results = [event['data'] for event in events if event['kind'] == 'run_result']
             traces = [event['data'] for event in events if event['kind'] == 'trace']
+            reviews = [event['data'] for event in events if event['kind'] == 'review_record']
+            review = None
+            if len(reviews) == 1:
+                record = reviews[0]
+                payload = record['payload']
+                review = {'review_id': record['sha256'], 'assurance': payload['assurance'],
+                          'assessment': payload['result'].get('assessment'), 'reason': payload['result'].get('reason')}
             return {'run_id': run_id, 'request': request.to_dict(),
                     'result': results[0] if len(results) == 1 else None,
-                    'traces': traces, 'verification': asdict(report),
+                    'traces': traces, 'review': review, 'verification': asdict(report),
                     'reconciliation': self._reconciliation(request.request_id, events),
                     'source_freshness': 'not_assessed'}
 
