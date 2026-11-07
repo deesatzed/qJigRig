@@ -175,3 +175,8 @@ Full qJig suite after T024: see the T024 receipt above. All P2 behavior is offli
 
 - `parse_plan` in `src/qjig/plans.py` validates untrusted plan data into frozen `Plan`/`Predicate`, raising `PlanError` with a named `code`: 17 invalid shapes each give their own code (dangling_ref, dangling_dependency, duplicate_predicate, unknown_operator, dependency_cycle, self_dependency, too_many_predicates, no_predicates, too_deep, not_arity, and_arity, unknown_exact_operator, bad_origin, bad_id, extra_node_key, executable_code_field, bad_node). Boundaries pass: 6 predicates, expression depth 12; depth 13 fails. Limits: a valid plan is not known complete; `exact_operator` names a whitelist only (evaluation is T031); the plan's `origin` is a self-declared label.
 - Red: ModuleNotFoundError qjig.plans (initial contract). Green: focused 1 passed in 0.03s; tests/test_plans.py 19 passed in 0.03s; full suite 127 passed in 0.18s. 2026-11-06.
+
+## 2026-11-06: T027 complete
+
+- `Observation`, `Evaluation`, `evaluate` in `src/qjig/logic.py`. Hand-written 16-row AND and OR tables and the 4-row NOT table all match (30 parametrized cases plus a reasons test). Unknown/conflict leaves are returned with predicate id, state and reason; a conclusive operand drops irrelevant unresolved siblings and records the witness; a missing observation is unknown with reason `no_observation`. Limits: leaves are independent here (e.g. A OR NOT A with A unknown stays unknown until T028); precedence choice is recorded as D016.
+- Red: ImportError Observation (initial contract). Green: focused 16 passed in 0.03s; tests/test_logic.py 31 passed in 0.03s; full suite 148 passed in 0.19s. 2026-11-06.

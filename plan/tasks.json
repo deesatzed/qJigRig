@@ -452,7 +452,7 @@
       "depends_on": [
         "T026"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/logic.py"
       ],
@@ -460,7 +460,8 @@
       "test_name": "test_compose_truth_table",
       "action": "Evaluate bounded AND OR NOT with unresolved states",
       "acceptance": "Exact truth-table cases preserve unknown and conflict reasons",
-      "command": "python -m pytest tests/test_logic.py::test_compose_truth_table -q"
+      "command": "python -m pytest tests/test_logic.py::test_compose_truth_table -q",
+      "evidence": "Red: ImportError Observation (initial contract). Green: focused 16 passed in 0.03s; tests/test_logic.py 31 passed in 0.03s; full suite 148 passed in 0.19s. 2026-11-06."
     },
     {
       "id": "T028",
