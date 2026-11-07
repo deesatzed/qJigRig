@@ -56,6 +56,12 @@ def main() -> None:
                     assert original['result']['outcome'] is False and original['run_id']
                     run_id = original['run_id']
                     page.wait_for_function("() => document.querySelector('#result-status').textContent === 'Decided · no'")
+                    page.locator('#saved-runs button').filter(has_text=run_id[:12]).click()
+                    page.wait_for_function("() => document.querySelector('#saved-run-message').textContent.startsWith('Saved snapshot opened')")
+                    page.locator('#draft-run').click()
+                    page.wait_for_function("() => document.querySelector('#draft-run-message').textContent.includes('saved as a draft')")
+                    assert 'Authored control' in page.locator('#program-list').inner_text()
+                    assert 'Not active' in page.locator('#program-list').inner_text()
                     page.locator('#sources li button').first.click()
                     page.wait_for_function("() => document.querySelector('#selected-source').textContent.startsWith('Selected:')")
                     page.locator('#intervention-form [name="passage"]').fill('14')
@@ -63,6 +69,7 @@ def main() -> None:
                     page.locator('#intervention-form button[type="submit"]').click()
                     page.wait_for_function("() => document.querySelector('#intervention-message').textContent.startsWith('Revision created')")
                     page.wait_for_function("() => document.querySelector('#result-status').textContent === 'Source changed · rerun'")
+                    page.locator('#program-list').get_by_text('Source snapshot changed · draft is stale').wait_for()
                     page.locator('#question-form button[type="submit"]').click()
                     page.wait_for_function("() => document.querySelector('#result-status').textContent === 'Decided · yes'")
                     stop(server, thread)
@@ -83,7 +90,7 @@ def main() -> None:
                     page.set_viewport_size({'width': 390, 'height': 844})
                     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
                     print(json.dumps({'status': 'passed', 'original_outcome': False, 'changed_outcome': True,
-                                      'saved_run_reopened_after_restart': True, 'download_verified': True,
+                                      'authored_draft_created_and_stale': True, 'saved_run_reopened_after_restart': True, 'download_verified': True,
                                       'source_status': 'stale', 'viewport_width': 390,
                                       'semantics': 'not_assessed', 'provider_calls': 0}))
                 finally:

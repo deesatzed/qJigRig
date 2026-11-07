@@ -16,6 +16,7 @@ from .interventions import apply_intervention, list_interventions
 from .export import export_authored, verify_authored_export
 from .indexing import index_entries
 from .sources import SourceRevision, decode_source
+from .programs import make_draft
 from .store import Catalog, CatalogStateChanged
 
 MAX_BODY = 1_000_000
@@ -124,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
                                          'scope': request['scope'], 'role': request['role'],
                                          'role_version': request['role_version'], 'as_of': binding['as_of'],
                                          'source_revisions': binding['corpus_revision_ids'],
-                                         'status': status['status'], 'source_freshness': status['source_freshness']['status'],
+                                         'origin': binding['plan']['origin'], 'status': status['status'], 'source_freshness': status['source_freshness']['status'],
                                          'review_ids': status['review_ids'], 'activation': status['activation'],
                                          'semantic_assurance': status['semantic_assurance']})
                 self._reply(200, {'programs': programs})
@@ -202,7 +203,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._trusted_host() or not self._trusted_origin():
             self._reply(403, {"error": "untrusted host or origin"})
             return
-        if self.path not in ("/api/sources", "/api/ask", "/api/interpretations", "/api/interventions"):
+        if self.path not in ("/api/sources", "/api/ask", "/api/interpretations", "/api/interventions", "/api/programs/from-run"):
             self._reply(404, {"error": "not found"})
             return
         lengths = self.headers.get_all("Content-Length", [])
@@ -221,6 +222,34 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/sources":
                 result, created = self._import_source(body)
                 self._reply(201 if created else 200, result)
+            elif self.path == "/api/programs/from-run":
+                if not isinstance(body, dict) or set(body) != {'run_id'} or not isinstance(body['run_id'], str) or not re.fullmatch(r'[0-9a-f]{64}', body['run_id']):
+                    raise ContractError('invalid run identity')
+                with self.server.writer_lock, Catalog.open(self.server.catalog) as catalog:
+                    text = catalog.authored_run_row(body['run_id'])
+                    if text is None:
+                        raise ContractError('saved run unavailable')
+                    bundle = json.loads(text)
+                    if bundle.get('sha256') != body['run_id'] or verify_authored_export(bundle)['status'] != 'unanchored':
+                        raise ContractError('saved run invalid')
+                    payload = bundle['payload']
+                    state = catalog.source_state()
+                    if state != payload['source_state']:
+                        raise CatalogStateChanged('saved run source state changed')
+                    live = sorted({row[1] for row in catalog.live_index_rows()})
+                    rows = {row[0]: row for row in catalog.metadata_rows()}
+                    if not live or any(ident not in rows for ident in live):
+                        raise ContractError('source metadata unavailable')
+                    metadata = {ident: {'scope': rows[ident][1], 'authority_id': rows[ident][2],
+                                        'entity_keys': json.loads(rows[ident][3]), 'effective_start': rows[ident][4],
+                                        'effective_end': rows[ident][5], 'observed_at': rows[ident][6]} for ident in live}
+                    policy = payload['policy']
+                    binding = {'request': payload['result']['request'], 'plan': policy['plan'],
+                               'corpus_revision_ids': live, 'source_metadata': metadata, 'as_of': policy['as_of'],
+                               'entities': policy.get('entities', []), 'historical_as_known': policy.get('historical_as_known', False),
+                               'planner': {'kind': 'authored_control', 'policy': policy, 'source_run_sha256': body['run_id']}}
+                    ident = catalog.save_program_draft(make_draft(binding), state)
+                self._reply(200, {'draft_id': ident, 'origin': 'authored_control', 'activation': False})
             elif self.path == "/api/interpretations":
                 with self.server.writer_lock, Catalog.open(self.server.catalog) as catalog:
                     result, created = add_interpretation(catalog, body)
@@ -253,6 +282,9 @@ class Handler(BaseHTTPRequestHandler):
                     result["reasons"] = list(result["reasons"]) + ["catalog_changed_during_run"]
                 self._reply(200, {"kind": "deterministic", "result": result,
                                   "source_state_before": before, "source_state_after": after, "run_id": run_id})
+        except CatalogStateChanged:
+            self._reply(409, {"error": "source state changed; rerun before creating draft"})
+            return
         except (ValueError, TypeError, KeyError, UnicodeError, ContractError, ArithmeticError, re.error):
             self._reply(400, {"error": "invalid request"})
             return

@@ -276,3 +276,44 @@ def test_catalog_state_changes_only_when_source_catalog_changes(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_saved_authored_run_creates_exact_bound_nonactive_draft(tmp_path):
+    from qjig.store import Catalog
+    path = tmp_path / 'catalog.sqlite'
+    server = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+    port = server.server_address[1]
+    def post(route, data):
+        conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+        conn.request('POST', route, json.dumps(data), {'Content-Type': 'application/json', 'Origin': f'http://127.0.0.1:{port}'})
+        response = conn.getresponse(); status, body = response.status, json.loads(response.read()); conn.close()
+        return status, body
+    source = {'source_id': 'policy.md', 'text': '# Rule\nRefund within 14 days.\n', 'scope': 'project',
+              'entities': [], 'effective_from': '2026-01-01', 'effective_to': 'open', 'observed_at': None, 'authority': None}
+    request = {'schema_version': 'qjig.request.v1', 'request_id': 'r', 'question': 'Refund after 20 days?',
+               'role': 'reviewer', 'role_version': '1', 'scope': 'project'}
+    policy = {'label': 'AUTHORED CONTROL', 'entities': [], 'as_of': '2026-11-15', 'mode': 'snapshot', 'facts': {'days': 20},
+              'plan': {'origin': 'authored', 'predicates': [{'id': 'p', 'question': 'Within limit?'}], 'expression': {'ref': 'p'}},
+              'needs': {'p': {'query': 'refund days', 'want': 1, 'max_bytes': 4000,
+                              'evaluator': {'kind': 'numeric_threshold', 'field': 'days', 'pattern': r'within (\d+) days', 'operator': 'lte'}}}}
+    try:
+        assert post('/api/sources', source)[0] == 201
+        status, run = post('/api/ask', {'request': request, 'policy': policy})
+        assert status == 200 and run['run_id']
+        status, result = post('/api/programs/from-run', {'run_id': run['run_id']})
+        assert status == 200 and result['activation'] is False
+        with Catalog.open(path) as catalog:
+            binding = catalog.program_draft(result['draft_id'])['payload']['binding']
+            assert binding['planner'] == {'kind': 'authored_control', 'policy': policy, 'source_run_sha256': run['run_id']}
+            assert binding['plan'] == policy['plan']
+            assert catalog.program_status(result['draft_id'], binding)['status'] == 'draft'
+            import copy
+            changed = copy.deepcopy(binding)
+            changed['planner']['policy']['facts']['days'] = 21
+            assert catalog.program_status(result['draft_id'], changed)['status'] == 'stale'
+        assert post('/api/programs/from-run', {'run_id': run['run_id']})[1]['draft_id'] == result['draft_id']
+        assert post('/api/sources', {**source, 'text': '# Rule\nRefund within 30 days.\n'})[0] == 201
+        assert post('/api/programs/from-run', {'run_id': run['run_id']})[0] == 409
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=5)

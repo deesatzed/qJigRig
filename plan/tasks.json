@@ -1001,7 +1001,8 @@
         "T057G",
         "T057H",
         "T057I",
-        "T057J"
+        "T057J",
+        "T057K"
       ],
       "status": "pending",
       "files": [
@@ -2481,6 +2482,26 @@
       "acceptance": "Unreviewed and reviewed drafts remain inspectable with separate local source freshness, linked reviews, source revisions and no activation claim.",
       "command": "python -m pytest tests/test_web.py::test_draft_programs_visible_with_status_and_source_links -q",
       "evidence": "Red: no saved-program API or draft view. Green: real local HTTP tests cover unreviewed and linked synthetic-review drafts, nonactivation, source links and stale source revision. Chromium synthetic walkthrough inspects linked draft, source and stale transition at desktop and 390px. Focused 27 passed before expanded assertions; full offline suite 488 passed. No program creation, hosted review, activation, semantic validation or full T057 claimed."
+    },
+    {
+      "id": "T057K",
+      "phase": "P5",
+      "depends_on": [
+        "T057J"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/programs.py",
+        "src/qjig/service.py",
+        "src/qjig/web.py",
+        "scripts/verify_saved_run_browser.py"
+      ],
+      "test_file": "tests/test_service.py",
+      "test_name": "test_saved_authored_run_creates_exact_bound_nonactive_draft",
+      "action": "Create an explicitly authored draft from an intact saved control",
+      "acceptance": "Draft binds the complete authored policy, request and current source snapshot; stale runs refuse and no activation is implied.",
+      "command": "python -m pytest tests/test_service.py::test_saved_authored_run_creates_exact_bound_nonactive_draft -q",
+      "evidence": "Red: no route created a draft from a saved authored run. Green: local route verifies saved bundle and unchanged catalog, binds the full authored policy and run identity plus current live source revisions, and persists a nonactive draft. Tests cover idempotency, changed policy binding and rejection after source change. Chromium created an authored draft, observed it stale after an intervention, and reopened/exported the original run after restart. Focused suite 35 passed before final extra assertion; full offline 489 passed. No fresh hosted inference, semantic validation, activation or general program reuse is established."
     }
   ]
 }

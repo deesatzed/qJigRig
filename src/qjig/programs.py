@@ -26,6 +26,11 @@ def _copy(value):
 
 
 def _actor(value):
+    if isinstance(value, dict) and value.get('kind') == 'authored_control':
+        if (set(value) != {'kind', 'policy', 'source_run_sha256'} or not isinstance(value['policy'], dict)
+                or not isinstance(value['source_run_sha256'], str) or not _SHA.fullmatch(value['source_run_sha256'])):
+            raise ContractError('invalid authored provenance')
+        return _copy(value)
     if not isinstance(value, dict) or set(value) != {'provider', 'model', 'prompt_sha256', 'config'}:
         raise ContractError('invalid model provenance')
     if (any(not isinstance(value[k], str) or not value[k].strip() for k in ('provider', 'model'))
@@ -78,6 +83,12 @@ def _binding(value):
     value['source_metadata'] = {row['revision_id']: {k: v for k, v in row.items() if k != 'revision_id'}
                                 for row in inputs.to_dict()['members']}
     value['planner'] = _actor(value['planner'])
+    if value['planner'].get('kind') == 'authored_control':
+        policy = value['planner']['policy']
+        if (value['plan']['origin'] != 'authored' or policy.get('plan') != value['plan']
+                or policy.get('as_of') != value['as_of'] or sorted(policy.get('entities', [])) != value['entities']
+                or policy.get('historical_as_known', False) != value['historical_as_known']):
+            raise ContractError('authored policy differs from binding')
     return value
 
 
