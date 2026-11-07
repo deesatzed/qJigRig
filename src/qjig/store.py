@@ -9,7 +9,7 @@ from pathlib import Path
 from .contracts import ContractError
 from .sources import SourceRevision, decode_source
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 class CatalogStateChanged(ContractError):
@@ -82,6 +82,14 @@ CREATE TRIGGER authored_runs_no_delete BEFORE DELETE ON authored_runs
   BEGIN SELECT RAISE(ABORT, 'authored runs are immutable'); END;
 """
 
+_REVIEW_SCHEMA = """
+CREATE TABLE program_reviews(review_id TEXT PRIMARY KEY, record TEXT NOT NULL);
+CREATE TRIGGER program_reviews_no_update BEFORE UPDATE ON program_reviews
+  BEGIN SELECT RAISE(ABORT, 'program reviews are immutable'); END;
+CREATE TRIGGER program_reviews_no_delete BEFORE DELETE ON program_reviews
+  BEGIN SELECT RAISE(ABORT, 'program reviews are immutable'); END;
+"""
+
 
 def _execute_schema(con: sqlite3.Connection, script: str) -> None:
     """Execute schema statements inside the caller's transaction, including triggers."""
@@ -107,11 +115,11 @@ class Catalog:
             if version != SCHEMA_VERSION:
                 con.execute("BEGIN IMMEDIATE")
                 version = con.execute("PRAGMA user_version").fetchone()[0]
-                scripts = {0: _SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA,
-                           1: _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA,
-                           2: _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA,
-                           3: _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA, 4: _INTERVENTION_SCHEMA + _RUN_SCHEMA,
-                           5: _RUN_SCHEMA}
+                scripts = {0: _SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA,
+                           1: _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA,
+                           2: _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA,
+                           3: _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA, 4: _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA,
+                           5: _RUN_SCHEMA + _REVIEW_SCHEMA, 6: _REVIEW_SCHEMA}
                 if version == SCHEMA_VERSION:
                     pass  # another opener completed the migration while we waited
                 elif version in scripts:
@@ -327,6 +335,56 @@ class Catalog:
     def authored_run_row(self, run_id: str) -> str | None:
         row = self._con.execute('SELECT bundle FROM authored_runs WHERE run_id=?', (run_id,)).fetchone()
         return None if row is None else row[0]
+
+    def save_program_review(self, record: dict, expected_source_state: str) -> str:
+        """Persist an unvalidated review bound to intact local revisions and metadata."""
+        from .programs import verify_review
+        try:
+            payload = record['payload']
+            if verify_review(record, payload['binding'], payload['reviewer'])['status'] != 'matching_unvalidated':
+                raise ContractError('invalid review record')
+            data = json.dumps(record, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+            ident = record['sha256']
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ContractError('invalid review record') from exc
+        self._con.execute('BEGIN IMMEDIATE')
+        try:
+            if self._source_state_in_transaction() != expected_source_state:
+                raise CatalogStateChanged('catalog changed before review storage')
+            rows = {row[0]: row for row in self.metadata_rows()}
+            for revision in payload['binding']['corpus_revision_ids']:
+                try:
+                    self.get_revision(revision)  # reconstitutes and checks the pinned identity
+                    row = rows[revision]
+                    metadata = {'scope': row[1], 'authority_id': row[2], 'entity_keys': sorted(json.loads(row[3])),
+                                'effective_start': row[4], 'effective_end': row[5], 'observed_at': row[6]}
+                except (KeyError, ValueError, TypeError) as exc:
+                    raise ContractError('review source or metadata unavailable') from exc
+                if metadata != payload['binding']['source_metadata'][revision]:
+                    raise ContractError('review source metadata differs')
+            self._con.execute('INSERT OR IGNORE INTO program_reviews VALUES (?,?)', (ident, data))
+            if self._con.execute('SELECT record FROM program_reviews WHERE review_id=?', (ident,)).fetchone()[0] != data:
+                raise ContractError('review identity collision')
+            self._con.commit()
+            return ident
+        except BaseException:
+            self._con.rollback()
+            raise
+
+    def program_review(self, review_id: str) -> dict | None:
+        """Read an immutable record and recheck its content identity."""
+        from .programs import verify_review
+        row = self._con.execute('SELECT record FROM program_reviews WHERE review_id=?', (review_id,)).fetchone()
+        if row is None:
+            return None
+        try:
+            record = json.loads(row[0])
+            payload = record['payload']
+            if record['sha256'] != review_id or verify_review(record, payload['binding'], payload['reviewer'])['status'] != 'matching_unvalidated':
+                raise ContractError('stored review integrity failure')
+            return record
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ContractError('stored review integrity failure') from exc
 
     def put_interpretation(self, claim_id: str, payload: str) -> bool:
         with self._con:

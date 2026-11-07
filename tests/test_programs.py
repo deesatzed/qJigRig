@@ -41,3 +41,51 @@ def test_review_record_exact_binding():
     assert review['payload']['binding']['request']['question'] == 'Can this change be merged?'
     ai_reviewer = {**reviewer, 'kind': 'ai', 'provider': 'asserted-provider'}
     assert make_review(review['payload']['binding'], ai_reviewer, {'finding': 'asserted'})['payload']['assurance'] == 'ai_reviewed_unvalidated'
+
+
+def test_review_record_persistence_and_source_binding(tmp_path):
+    import pytest
+    from qjig.contracts import ContractError
+    from qjig.programs import make_review, verify_review
+    from qjig.sources import SourceRevision, decode_source
+    from qjig.store import Catalog, CatalogStateChanged
+    revision = SourceRevision.create('source.md', 'fixture', decode_source(b'# Rule\nText\n', encoding='utf-8'))
+    metadata = {'scope': 'project', 'authority_id': None, 'entity_keys': [], 'effective_start': '2026-01-01',
+                'effective_end': 'open', 'observed_at': None}
+    binding = {'request': Request('r', 'Question?', 'reviewer', '1', 'project').to_dict(),
+               'plan': {'origin': 'fresh', 'predicates': [{'id': 'p', 'question': 'Text?'}], 'expression': {'ref': 'p'}},
+               'corpus_revision_ids': [revision.revision_id], 'source_metadata': {revision.revision_id: metadata},
+               'as_of': '2026-11-07', 'entities': [], 'historical_as_known': False,
+               'planner': {'provider': 'stand-in', 'model': 'planner', 'prompt_sha256': 'b'*64, 'config': {}}}
+    reviewer = {'kind': 'synthetic', 'provider': 'stand-in', 'model': 'reviewer', 'prompt_sha256': 'c'*64, 'config': {}}
+    record = make_review(binding, reviewer, {'finding': 'fixture'})
+    path = tmp_path / 'catalog.sqlite'
+    with Catalog.open(path) as catalog:
+        before_import = catalog.source_state()
+        with pytest.raises(ContractError):
+            catalog.save_program_review(record, before_import)
+        catalog.add_revision(revision)
+        catalog.put_metadata_row((revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+        state = catalog.source_state()
+        with pytest.raises(CatalogStateChanged):
+            catalog.save_program_review(record, before_import)
+        ident = catalog.save_program_review(record, state)
+        assert ident == record['sha256'] == catalog.save_program_review(record, state)
+    with Catalog.open(path) as catalog:
+        restored = catalog.program_review(ident)
+        assert restored == record and verify_review(restored, binding, reviewer)['status'] == 'matching_unvalidated'
+        changed = copy.deepcopy(binding)
+        changed['source_metadata'][revision.revision_id]['scope'] = 'other'
+        wrong_record = make_review(changed, reviewer, {'finding': 'fixture'})
+        with pytest.raises(ContractError):
+            catalog.save_program_review(wrong_record, catalog.source_state())
+    import json
+    import sqlite3
+    with sqlite3.connect(path) as con:
+        con.execute('DROP TRIGGER program_reviews_no_update')
+        payload = copy.deepcopy(record)
+        payload['payload']['result']['finding'] = 'tampered'
+        con.execute('UPDATE program_reviews SET record=? WHERE review_id=?', (json.dumps(payload), ident))
+    with Catalog.open(path) as catalog:
+        with pytest.raises(ContractError, match='integrity'):
+            catalog.program_review(ident)

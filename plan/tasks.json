@@ -992,7 +992,8 @@
         "T051",
         "T056",
         "R01",
-        "T057A"
+        "T057A",
+        "T057B"
       ],
       "status": "pending",
       "files": [
@@ -2226,6 +2227,23 @@
       "acceptance": "Changes to request, graph, corpus, applicability or reviewer provenance invalidate the recorded match; AI review never activates a program.",
       "command": "python -m pytest tests/test_programs.py::test_review_record_exact_binding -q",
       "evidence": "Red: no exact-bound review record existed. Green: canonical synthetic records bind request/role/scope, graph, revisions and applicability metadata, planner/reviewer prompt/configuration and result; changes are stale, altered records invalid, and matching cannot activate. Synthetic and asserted AI labels are distinct. Focused 23 passed; full offline 452 passed. No persistence, provider execution, authenticated provenance, source completeness, or full T057/R01B is established."
+    },
+    {
+      "id": "T057B",
+      "phase": "P5",
+      "depends_on": [
+        "T057A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/store.py"
+      ],
+      "test_file": "tests/test_programs.py",
+      "test_name": "test_review_record_persistence_and_source_binding",
+      "action": "Persist exact-bound review records in catalog",
+      "acceptance": "A review record round-trips across restart only with intact referenced revisions and matching stored applicability metadata.",
+      "command": "python -m pytest tests/test_programs.py::test_review_record_persistence_and_source_binding -q",
+      "evidence": "Red: no durable review storage existed. Green: catalog schema v7 persists immutable content-addressed records after transactional source-state, pinned-revision and per-source metadata checks; restart, idempotency, wrong metadata, stale catalog and modified stored record are tested. Prior schema migration fixtures repaired and v6 migration tested. Full offline suite 454 passed. No provider review, program activation, source authority, independent authenticity or full T057/R01B established."
     }
   ]
 }
