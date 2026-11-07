@@ -111,6 +111,24 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(200, {'bundle': bundle, 'verification': verification})
             except (ContractError, ValueError, TypeError, AttributeError, sqlite3.Error):
                 self._reply(500, {'error': 'stored run invalid'})
+        elif self.path == "/api/reviews":
+            try:
+                with Catalog.open(self.server.catalog) as catalog:
+                    reviews = []
+                    for ident in catalog.program_review_ids():
+                        record = catalog.program_review(ident)
+                        payload = record['payload']
+                        binding, reviewer, result = payload['binding'], payload['reviewer'], payload['result']
+                        reviews.append({'review_id': ident, 'assurance': payload['assurance'],
+                                        'question': binding['request']['question'], 'scope': binding['request']['scope'],
+                                        'role': binding['request']['role'], 'role_version': binding['request']['role_version'],
+                                        'as_of': binding['as_of'], 'source_revisions': binding['corpus_revision_ids'],
+                                        'reviewer_kind': reviewer['kind'], 'provider': reviewer['provider'], 'model': reviewer['model'],
+                                        'assessment': result.get('assessment') if isinstance(result.get('assessment'), str) else None,
+                                        'reason': result.get('reason') if isinstance(result.get('reason'), str) else None})
+                self._reply(200, {'reviews': reviews})
+            except (ContractError, ValueError, KeyError, TypeError, AttributeError, sqlite3.Error):
+                self._reply(500, {'error': 'stored review invalid'})
         elif self.path == "/api/interpretations":
             try:
                 with Catalog.open(self.server.catalog) as catalog:

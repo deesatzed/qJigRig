@@ -386,6 +386,9 @@ class Catalog:
         except (ValueError, TypeError, KeyError) as exc:
             raise ContractError('stored review integrity failure') from exc
 
+    def program_review_ids(self) -> list[str]:
+        return [row[0] for row in self._con.execute('SELECT review_id FROM program_reviews ORDER BY review_id')]
+
     def put_interpretation(self, claim_id: str, payload: str) -> bool:
         with self._con:
             cursor = self._con.execute("INSERT OR IGNORE INTO agent_interpretations VALUES (?,?)", (claim_id, payload))

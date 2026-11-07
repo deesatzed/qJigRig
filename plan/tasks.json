@@ -995,7 +995,8 @@
         "T057A",
         "T057B",
         "T057C",
-        "T057D"
+        "T057D",
+        "T057E"
       ],
       "status": "pending",
       "files": [
@@ -2302,6 +2303,26 @@
       "acceptance": "Synthetic fresh review archives bind the reviewer request, response, review record, plan, sources and final result and replay without provider calls.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_configured_fresh_run_records_separate_review -q",
       "evidence": "Red: a synthetic reviewed fresh archive replayed as incomplete due unsupported review stage. Green: archive retains the review record; offline replay binds reviewer settings and prompt, validated response, review result, plan, source/applicability context and final review ID. Rehashed altered result is rejected against response; replay test prohibits inference. Focused 22 passed; full offline 464 passed. This is structural consistency, not authenticated provenance, source completeness or semantic quality; full R07/T051 and hosted replay remain open."
+    },
+    {
+      "id": "T057E",
+      "phase": "P5",
+      "depends_on": [
+        "T057B",
+        "T054A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/store.py",
+        "src/qjig/service.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_web.py",
+      "test_name": "test_review_records_are_visible_from_local_workbench",
+      "action": "Expose saved review records in local workbench",
+      "acceptance": "Saved synthetic review provenance, limits and source references are available through the local service and visible browser controls.",
+      "command": "python -m pytest tests/test_web.py::test_review_records_are_visible_from_local_workbench -q",
+      "evidence": "Red: no review endpoint or browser view existed. Green: local service exposes integrity-checked saved review summaries and browser shows unvalidated reviewer provenance, result, snapshot context and source inspection. Tampered storage returns an error. Optional synthetic Chromium walkthrough passed keyboard source inspection and 390px no-overflow. Full offline suite 470 passed. This is read-only inspection, not hosted review, freshness, accessibility certification, activation or full T057."
     }
   ]
 }

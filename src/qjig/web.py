@@ -19,7 +19,8 @@ HTML = '''<!doctype html>
 <label>Search terms<input name="query" required></label><label>Threshold pattern <span class="muted">regular expression with one numeric capture group</span><input name="pattern" required placeholder="within (\\d+) days"></label><label>Comparison<select name="operator"><option value="lte">Value is at most the threshold</option><option value="lt">Value is below the threshold</option><option value="gte">Value is at least the threshold</option><option value="gt">Value is above the threshold</option><option value="eq">Value equals the threshold</option></select></label>
 <button type="submit">Run authored rule <span aria-hidden="true">↗</span></button><p id="question-message" role="status" aria-live="polite"></p></form>
 <section class="result" aria-labelledby="result-title"><div class="list-head"><h3 id="result-title">Result &amp; evidence</h3><span id="result-status" class="badge">Not run</span></div><p class="muted">Catalog changes are checked while this page is open; external files are not monitored.</p><div id="result" aria-live="polite"><p class="muted">Your result, evidence and open questions will appear here.</p></div></section>
-<section class="result" aria-labelledby="saved-title"><div class="list-head"><h3 id="saved-title">Saved runs</h3><button id="refresh-runs" class="quiet" type="button">Refresh</button></div><p class="note">Saved bundles retain cited source bytes. Structural checks do not authenticate the record or establish that its decision is correct.</p><ul id="saved-runs"><li class="muted">No saved runs loaded.</li></ul><p id="saved-run-message" role="status" aria-live="polite"></p><button id="download-run" type="button" disabled>Download selected bundle</button></section></section></div>
+<section class="result" aria-labelledby="saved-title"><div class="list-head"><h3 id="saved-title">Saved runs</h3><button id="refresh-runs" class="quiet" type="button">Refresh</button></div><p class="note">Saved bundles retain cited source bytes. Structural checks do not authenticate the record or establish that its decision is correct.</p><ul id="saved-runs"><li class="muted">No saved runs loaded.</li></ul><p id="saved-run-message" role="status" aria-live="polite"></p><button id="download-run" type="button" disabled>Download selected bundle</button></section>
+<section class="result" aria-labelledby="reviews-title"><div class="list-head"><h3 id="reviews-title">Saved reviews</h3><button id="refresh-reviews" class="quiet" type="button">Refresh</button></div><p class="note">Reviews are unvalidated records of a specific snapshot. They do not activate a program or establish that all conditions were found.</p><div id="review-list" aria-live="polite"><p class="muted">No reviews loaded.</p></div></section></section></div>
 <footer>Sources and interpretations stay distinct. Unknown information remains unknown.</footer></main></body></html>'''
 
 CSS = '''
@@ -48,6 +49,16 @@ byId("refresh").addEventListener("click", refreshSources);
 async function refreshRuns() { const list = byId("saved-runs"); list.replaceChildren(); try { const data = await api("/api/runs"); if (!data.runs.length) { line(list, "li", "No saved runs yet.", "muted"); return; } for (const run of data.runs) { const li = document.createElement("li"), button = document.createElement("button"); button.type = "button"; button.textContent = `${run.question} · ${run.status} · ${run.run_id.slice(0, 12)}`; button.addEventListener("click", () => openSavedRun(run.run_id)); li.append(button); list.append(li); } } catch (error) { line(list, "li", `Could not load runs: ${error.message}`, "error"); } }
 async function openSavedRun(runId) { const serial = ++runSerial; selectedRun = null; byId("download-run").disabled = true; byId("saved-run-message").textContent = "Opening saved result…"; try { const data = await api(`/api/runs/${runId}`); if (serial !== runSerial) return; if (data.verification.status !== "unanchored" || data.bundle.sha256 !== runId) throw new Error("Saved bundle did not pass structural checks"); selectedRun = data.bundle; resultSourceState = data.bundle.payload.source_state; renderResult(data.bundle.payload.result); byId("download-run").disabled = false; byId("saved-run-message").textContent = "Saved snapshot opened. The bundle is unanchored; decision semantics were not assessed."; await checkSourceState(); } catch (error) { if (serial === runSerial) byId("saved-run-message").textContent = `Could not open saved result: ${error.message}`; } }
 byId("refresh-runs").addEventListener("click", refreshRuns);
+async function refreshReviews() { const area = byId("review-list"); area.replaceChildren(); try {
+  const data = await api("/api/reviews"); if (!data.reviews.length) { line(area, "p", "No saved reviews yet.", "muted"); return; }
+  for (const review of data.reviews) { const block = line(area, "div", "", "evidence");
+    line(block, "strong", review.question); line(block, "p", `${review.reviewer_kind === "synthetic" ? "Synthetic review" : "AI review"} · unvalidated · ${review.provider} / ${review.model}`);
+    line(block, "p", `Assessment: ${review.assessment || "not recorded"}`); if (review.reason) line(block, "p", review.reason);
+    line(block, "p", `Scope: ${review.scope} · ${review.role} / ${review.role_version} · as of ${review.as_of}`);
+    for (const revision of review.source_revisions) { const button = line(block, "button", `Inspect source ${revision.slice(0, 17)}…`, "quiet"); button.type = "button"; button.addEventListener("click", async () => { await openSource(revision); byId("selected-source").scrollIntoView({behavior:"smooth", block:"center"}); }); }
+  }
+} catch (error) { line(area, "p", `Could not load reviews: ${error.message}`, "error"); } }
+byId("refresh-reviews").addEventListener("click", refreshReviews);
 byId("download-run").addEventListener("click", () => { if (!selectedRun) return; const blob = new Blob([JSON.stringify(selectedRun, null, 2)], {type:"application/json"}), url = URL.createObjectURL(blob), a = document.createElement("a"); a.href = url; a.download = `qjig-run-${selectedRun.sha256}.json`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
 async function refreshInterpretations() {
   const area = byId("interpretation-list"); area.replaceChildren();
@@ -98,6 +109,7 @@ refreshSources();
 refreshInterpretations();
 refreshInterventions();
 refreshRuns();
+refreshReviews();
 window.setInterval(checkSourceState, 3000);
 window.addEventListener("focus", checkSourceState);
 '''
