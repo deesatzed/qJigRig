@@ -1422,7 +1422,8 @@
         "R08G",
         "R08H",
         "R08I",
-        "R08J"
+        "R08J",
+        "R08K"
       ],
       "status": "pending",
       "files": [],
@@ -3458,6 +3459,24 @@
       "acceptance": "Reject initial goal policies above the observed account credit cap; persist sanitized constraints with the immutable policy and reject reopening with omitted or changed constraints.",
       "command": "python -m pytest tests/test_goal_budget.py::test_account_snapshot_binds_persistent_policy_without_authorizing_calls -q",
       "evidence": "Red: GoalBudget could not bind an account snapshot. The ledger now rejects a goal above the observed credit ceiling before creating its database, persists only sanitized derived constraints in the same transaction as the immutable policy, and rejects changed or omitted binding on reopen. Restart preserves actual usage. A caller-supplied snapshot can drift, excluded BYOK remains unknown, and this binding does not itself authorize hosted dispatch; refresh and complete pre-dispatch bounds remain open."
+    },
+    {
+      "id": "R08K",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08J"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/goal_budget.py"
+      ],
+      "test_file": "tests/test_goal_budget.py",
+      "test_name": "test_refresh_restricts_remaining_account_budget_without_reset",
+      "action": "Apply lower refreshed account constraints without resetting aggregate usage",
+      "acceptance": "With a quiescent captured baseline, apply a caller-supplied post-baseline snapshot as a non-increasing persisted aggregate cost ceiling, including existing required-work commitments; reject intervening ledger usage.",
+      "command": "python -m pytest tests/test_goal_budget.py::test_refresh_restricts_remaining_account_budget_without_reset -q",
+      "evidence": "Red: account-bound ledger lacked a refresh mechanism. A quiescent baseline and caller-supplied subsequent snapshot now yield a persisted non-increasing ceiling of known prior goal spend plus observed remaining account credit; ledger changes invalidate the baseline. Tests cover restart, higher subsequent observations, unknown pending usage, unbound policies and preallocated required work. Snapshot order, authenticity and freshness remain caller responsibilities; concurrent external spend and BYOK billing are unverified. This does not authorize hosted dispatch."
     }
   ]
 }

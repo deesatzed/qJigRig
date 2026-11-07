@@ -30,6 +30,60 @@ from qjig.budgets import BudgetExceeded
 from qjig.goal_budget import GoalBudget
 
 
+def test_refresh_restricts_remaining_account_budget_without_reset(tmp_path):
+    initial = ({'data': {'limit_remaining': 1, 'include_byok_in_limit': False, 'is_free_tier': False}},
+               {'data': {'total_credits': 1, 'total_usage': 0}})
+    limit = Budget(4, 1000, 1)
+    path = tmp_path / 'goal.sqlite'
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}, account_snapshot=initial) as goal:
+        goal.reserve('a', 'r', 'smoke', tokens=10, cost_usd=0.2)
+        goal.record_usage('a', input_tokens=3, output_tokens=2, cost_usd=0.1)
+        baseline = goal.account_refresh_baseline()
+        reduced = ({'data': {**initial[0]['data'], 'limit_remaining': 0.2}}, initial[1])
+        goal.restrict_account_snapshot(baseline, reduced)
+        goal.reserve('b', 'r', 'smoke', tokens=10, cost_usd=0.2)
+        goal.record_usage('b', input_tokens=3, output_tokens=2, cost_usd=0.1)
+        baseline = goal.account_refresh_baseline()
+        goal.restrict_account_snapshot(baseline, initial)  # a higher observation cannot raise the cap
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}, account_snapshot=initial) as goal:
+        with pytest.raises(BudgetExceeded):
+            goal.reserve('c', 'r', 'smoke', tokens=10, cost_usd=0.11)
+        goal.reserve('c', 'r', 'smoke', tokens=10, cost_usd=0.1)
+        with pytest.raises(BudgetExceeded):
+            goal.account_refresh_baseline()  # pending usage cannot be treated as spent
+
+
+def test_refresh_rejects_intervening_usage_and_unbound_policy(tmp_path):
+    snapshot = ({'data': {'limit_remaining': 1, 'include_byok_in_limit': False, 'is_free_tier': False}},
+                {'data': {'total_credits': 1, 'total_usage': 0}})
+    limit = Budget(3, 500, 1)
+    with GoalBudget.open(tmp_path / 'unbound.sqlite', total=limit, per_request=limit, allocations={'s': limit}) as goal:
+        with pytest.raises(ContractError):
+            goal.account_refresh_baseline()
+    with GoalBudget.open(tmp_path / 'bound.sqlite', total=limit, per_request=limit, allocations={'s': limit}, account_snapshot=snapshot) as goal:
+        baseline = goal.account_refresh_baseline()
+        goal.reserve('a', 'r', 's', tokens=10, cost_usd=0.1)
+        goal.record_usage('a', input_tokens=2, output_tokens=2, cost_usd=0.05)
+        with pytest.raises(ContractError, match='changed'):
+            goal.restrict_account_snapshot(baseline, snapshot)
+
+
+def test_refresh_restriction_includes_preallocated_required_work(tmp_path):
+    initial = ({'data': {'limit_remaining': 1, 'include_byok_in_limit': False, 'is_free_tier': False}},
+               {'data': {'total_credits': 1, 'total_usage': 0}})
+    limit = Budget(3, 500, 1)
+    with GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'s': limit}, account_snapshot=initial) as goal:
+        goal.reserve_required('r', 's', [('mandatory', 10, 0.25, 'judge', 'stand-in', 'm')])
+        baseline = goal.account_refresh_baseline()
+        reduced = ({'data': {**initial[0]['data'], 'limit_remaining': 0.2}}, initial[1])
+        goal.restrict_account_snapshot(baseline, reduced)
+        with pytest.raises(BudgetExceeded, match='account'):
+            goal.reserve('a', 'r', 's', tokens=1, cost_usd=0.01)
+        with pytest.raises(BudgetExceeded, match='account'):
+            goal.reserve('a', 'r', 's', tokens=10, cost_usd=0.25, required_id='mandatory',
+                         stage='judge', provider='stand-in', model='m')
+
+
 def test_goal_budget_survives_restart_and_enforces_partition_and_request_caps(tmp_path):
     path = tmp_path / "budget.sqlite"
     total = Budget(4, 1000, 1.0)

@@ -26,8 +26,9 @@ def _fits(used: tuple[int, int, Decimal], limit: Budget) -> bool:
 
 
 class GoalBudget:
-    def __init__(self, con: sqlite3.Connection, total: Budget, per_request: Budget, allocations: dict[str, Budget]):
+    def __init__(self, con: sqlite3.Connection, total: Budget, per_request: Budget, allocations: dict[str, Budget], account_bound: bool):
         self._con, self._total, self._per_request, self._allocations = con, total, per_request, allocations
+        self._account_bound = account_bound
 
     @classmethod
     def open(cls, path: str | Path, *, total: Budget, per_request: Budget, allocations: dict[str, Budget],
@@ -62,6 +63,9 @@ class GoalBudget:
         try:
             con.execute("BEGIN IMMEDIATE")
             con.execute("CREATE TABLE IF NOT EXISTS policy (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL)")
+            con.execute("CREATE TABLE IF NOT EXISTS account_restrictions (id INTEGER PRIMARY KEY, ceiling TEXT NOT NULL, snapshot TEXT NOT NULL, baseline TEXT NOT NULL)")
+            con.execute("CREATE TRIGGER IF NOT EXISTS account_restrictions_no_update BEFORE UPDATE ON account_restrictions BEGIN SELECT RAISE(ABORT, 'account restriction immutable'); END")
+            con.execute("CREATE TRIGGER IF NOT EXISTS account_restrictions_no_delete BEFORE DELETE ON account_restrictions BEGIN SELECT RAISE(ABORT, 'account restriction immutable'); END")
             con.execute("CREATE TABLE IF NOT EXISTS reservations (attempt_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, partition TEXT NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS usage (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), input_tokens INTEGER, output_tokens INTEGER, cost TEXT)")
             con.execute("CREATE TABLE IF NOT EXISTS holds (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), calls INTEGER NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL)")
@@ -86,7 +90,44 @@ class GoalBudget:
             con.execute("ROLLBACK")
             con.close()
             raise
-        return cls(con, total, per_request, dict(allocations))
+        return cls(con, total, per_request, dict(allocations), account_snapshot is not None)
+
+    def account_refresh_baseline(self) -> str:
+        """Capture a quiescent ledger state before fetching a new account snapshot.
+
+        This is an ordering check, not proof of snapshot authenticity or freshness.
+        """
+        if not self._account_bound:
+            raise ContractError("account-bound policy required")
+        rows = self._con.execute("SELECT r.attempt_id,r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id ORDER BY r.attempt_id").fetchall()
+        if any(any(v is None for v in row[3:]) for row in rows):
+            raise BudgetExceeded("usage_unknown", "account refresh requires known usage")
+        return hashlib.sha256(json.dumps(rows, separators=(',', ':')).encode()).hexdigest()
+
+    def restrict_account_snapshot(self, baseline: str, snapshot: tuple[dict, dict]) -> None:
+        """Persist a non-increasing spend ceiling from a snapshot fetched after baseline.
+
+        Caller must obtain the snapshot after capturing baseline. External spending,
+        BYOK billing, source authenticity and freshness remain unverified.
+        """
+        if not isinstance(snapshot, tuple) or len(snapshot) != 2:
+            raise ContractError("key and credit account snapshots required")
+        constraints = account_spend_constraints(*snapshot, goal_ceiling_usd=25)
+        self._con.execute("BEGIN IMMEDIATE")
+        try:
+            if self.account_refresh_baseline() != baseline:
+                raise ContractError("account refresh baseline changed")
+            spent = sum_costs(Decimal(row[0]) for row in self._con.execute("SELECT cost FROM usage"))
+            observed_cap = sum_costs((spent, constraints['openrouter_credit_ceiling_usd']))
+            previous = [Decimal(row[0]) for row in self._con.execute("SELECT ceiling FROM account_restrictions")]
+            ceiling = min([_cost(self._total.max_cost_usd), observed_cap, *previous])
+            safe = {k: str(v) if isinstance(v, Decimal) else v for k, v in constraints.items()}
+            self._con.execute("INSERT INTO account_restrictions (ceiling,snapshot,baseline) VALUES(?,?,?)",
+                              (str(ceiling), json.dumps(safe, sort_keys=True, separators=(',', ':')), baseline))
+            self._con.execute("COMMIT")
+        except BaseException:
+            self._con.execute("ROLLBACK")
+            raise
 
     def close(self) -> None:
         self._con.close()
@@ -295,8 +336,11 @@ class GoalBudget:
             n, t, c = self._committed_rows(rows)
             pending = self._con.execute("SELECT r.tokens,r.cost FROM required_work r WHERE r.attempt_id IS NULL AND " + condition + " AND (? IS NULL OR r.work_id != ?)", (*args, exclude_required, exclude_required)).fetchall()
             pn, pt, pc = self._sum(pending)
-            if not _fits((n + pn + calls, t + pt + tokens, sum_costs((c, pc, cost))), limit):
+            total_cost = sum_costs((c, pc, cost))
+            if not _fits((n + pn + calls, t + pt + tokens, total_cost), limit):
                 raise BudgetExceeded(label, "reservation exceeds persistent limit")
+            if label == "goal" and any(total_cost > Decimal(row[0]) for row in self._con.execute("SELECT ceiling FROM account_restrictions")):
+                raise BudgetExceeded("account", "reservation exceeds refreshed account ceiling")
 
     def reserve_required(self, request_id: str, partition: str, work: list[tuple[str, int, float, str, str, str]]) -> None:
         """Atomically reserve named future calls; consumed only by their matching request."""
