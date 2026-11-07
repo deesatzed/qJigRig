@@ -1038,14 +1038,14 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
     (tmp_path/'code').write_bytes(code);(tmp_path/'label').write_bytes(gold)
     item=lambda p,v:{'path':p,'sha256':hashlib.sha256(v).hexdigest()}
     sources,protected=[item('code',code)],[item('label',gold)]
-    design=_sample_design();design['families'][0]['source_hashes']=[sources[0]['sha256']];d=validate_evaluation_design(design)
-    ref=make_reference(case_id='dev',request=Request('hidden','Do tests pass?','reviewer','1','project'),
+    design=_sample_design();design['families'][4]['source_hashes']=[sources[0]['sha256']];d=validate_evaluation_design(design)
+    ref=make_reference(case_id='holdout',request=Request('hidden','Do tests pass?','reviewer','1','project'),
                        sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],historical_as_known=False,
                        expected_answer='yes',provenance='authored_unvalidated',evidence=[{'path':'code','quote':'must pass'}])
-    lock={'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':d,'question':'Do tests pass?',
+    lock={'schema':'qjig.evaluation-case.v1','case_id':'holdout','design_sha256':d,'question':'Do tests pass?',
           'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
           'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
-    case_hashes={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']};case_hashes['dev']=case_lock_digest(lock)
+    case_hashes={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']};case_hashes['holdout']=case_lock_digest(lock)
     templates={arm:{'direct_initial':1} for arm in design['arms']}
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     cap={'prompt':2,'completion':3};families={f['id']:f['partition'] for f in design['families']};assignments=[]
@@ -1057,13 +1057,13 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
                          input_tokens=100,output_tokens=100,max_price=cap,followups=0)
                 assignments.append({'case_id':case['id'],'arm':arm,'repeat':repeat,'request_id':rid,'work':work})
     plan=make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=d)
-    target=next(x for x in assignments if x['case_id']=='dev' and x['arm']=='direct_full_evidence');rid=target['request_id']
+    target=next(x for x in assignments if x['case_id']=='holdout' and x['arm']=='direct_full_evidence');rid=target['request_id']
     total=Budget(60,12000,1);per=Budget(1,200,0.1);alloc={'development':Budget(15,3000,0.2),'pilot':Budget(15,3000,0.2),'holdout':Budget(30,6000,0.2)}
     response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),{'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.0001})
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=alloc) as goal,Journal.open(tmp_path/'j.sqlite') as journal,RunArchive.open(tmp_path/'archive') as archive:
         reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])
-        ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='development');transport=StandInTransport([response])
-        def factory(req):return direct_slot_reservation(goal,'evaluation:study',request_id=rid,partition='development',request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
+        ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout');transport=StandInTransport([response])
+        def factory(req):return direct_slot_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
         options=dict(expected_design_sha256=d,expected_case_sha256=case_lock_digest(lock),ledger=ledger,transport=transport,
                      archive=archive,provider='stand-in',model=model['id'],max_tokens=100,want=1,max_bytes=3000,
                      followups=0,evidence_mode='full',max_price=cap,reservation_factory=factory)
@@ -1079,13 +1079,30 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
         from qjig.evaluation_replay import verify_direct_archive
         replay = verify_direct_archive(archive,journal)
         from qjig.evaluation_scoring import score_reserved_assignment
-        scored = score_reserved_assignment(goal,archive,journal,ref,partition='development',
+        scored = score_reserved_assignment(goal,archive,journal,ref,partition='holdout',
             expected_plan_sha256=plan['sha256'],expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
-        assert scored['arm']=='direct_full_evidence' and scored['repeat']==1 and scored['score']['case_id']=='dev'
+        assert scored['arm']=='direct_full_evidence' and scored['repeat']==1 and scored['score']['case_id']=='holdout'
         assert scored['score']['resources']['total']['calls']==1
         assert scored['score']['resources']['total']['input_tokens']==10
+        from qjig.evaluation_scoring import build_reserved_holdout_comparison
+        entry={'archive':archive,'journal':journal,'reference':ref,'run_sha256':replay['sha256'],
+               'reference_sha256':reference_digest(ref),'journal_sha256':None}
+        report=build_reserved_holdout_comparison(goal,design,[entry],plan_id='study',expected_plan_sha256=plan['sha256'],
+            expected_design_sha256=d,baseline_arm='direct_full_evidence',candidate_arm='combined')
+        assert report['assigned_pairs']==6 and report['recorded_pairs']==0 and report['missing_pairs']==6
+        assert any(p['case_id']=='holdout' and p['repeat']==1 and p['baseline_status']=='unknown' for p in report['pairs'])
+        assert report['scored_assignments'][0]['score']['resources']['total']['calls']==1
         with pytest.raises(ContractError):
-            score_reserved_assignment(goal,archive,journal,ref,partition='development',expected_plan_sha256='0'*64,
+            build_reserved_holdout_comparison(goal,design,[entry,entry],plan_id='study',expected_plan_sha256=plan['sha256'],
+                expected_design_sha256=d,baseline_arm='direct_full_evidence',candidate_arm='combined')
+        with pytest.raises(ContractError):
+            build_reserved_holdout_comparison(goal,design,[{**entry,'reference_sha256':'0'*64}],plan_id='study',
+                expected_plan_sha256=plan['sha256'],expected_design_sha256=d,baseline_arm='direct_full_evidence',candidate_arm='combined')
+        with pytest.raises(ContractError):
+            build_reserved_holdout_comparison(goal,design,[entry],plan_id='study',expected_plan_sha256='0'*64,
+                expected_design_sha256=d,baseline_arm='direct_full_evidence',candidate_arm='combined')
+        with pytest.raises(ContractError):
+            score_reserved_assignment(goal,archive,journal,ref,partition='holdout',expected_plan_sha256='0'*64,
                 expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
         prompt=next(e['data']['prompt'] for e in archive.events() if e['kind']=='request')
         assert plan['sha256'] not in prompt and rid not in prompt and 'direct_full_evidence' not in prompt
@@ -1114,17 +1131,17 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
     (tmp_path/'code').write_bytes(code); (tmp_path/'label').write_bytes(gold)
     item = lambda p, v: {'path':p, 'sha256':hashlib.sha256(v).hexdigest()}
     sources, protected = [item('code',code)], [item('label',gold)]
-    design = _sample_design(); design['families'][0]['source_hashes'] = [sources[0]['sha256']]
+    design = _sample_design(); design['families'][4]['source_hashes'] = [sources[0]['sha256']]
     digest = validate_evaluation_design(design)
-    ref = make_reference(case_id='dev', request=Request('hidden','Do tests pass?','reviewer','1','project'),
+    ref = make_reference(case_id='holdout', request=Request('hidden','Do tests pass?','reviewer','1','project'),
         sources=load_isolated_sources(tmp_path,sources,protected), as_of='2026-11-07', entities=[],
         historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
         evidence=[{'path':'code','quote':'Tests must pass.'}])
-    lock = {'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':digest,'question':'Do tests pass?',
+    lock = {'schema':'qjig.evaluation-case.v1','case_id':'holdout','design_sha256':digest,'question':'Do tests pass?',
         'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
         'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
     case_hashes = {c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']}
-    case_hashes['dev'] = case_lock_digest(lock)
+    case_hashes['holdout'] = case_lock_digest(lock)
     model = {'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
              'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     cap = {'prompt':2,'completion':3}
@@ -1145,7 +1162,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
                 templates[arm] = dict(Counter(x['stage'] for x in work))
                 assignments.append({'case_id':case['id'],'arm':arm,'repeat':repeat,'request_id':rid,'work':work})
     plan = make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=digest)
-    target = next(a for a in assignments if a['case_id']=='dev' and a['arm']=='combined' and a['repeat']==1)
+    target = next(a for a in assignments if a['case_id']=='holdout' and a['arm']=='combined' and a['repeat']==1)
     rid = target['request_id']; per = Budget(30,6000,1)
     allocations = {p:Budget(500,150000,6) for p in ('development','pilot','holdout')}
     total = Budget(1500,450000,18)
@@ -1159,9 +1176,9 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal, \
          Journal.open(tmp_path/'journal.sqlite') as journal, RunArchive.open(tmp_path/'archive') as archive:
         reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])
-        ledger = BudgetLedger(per,journal,rid,goal_budget=goal,partition='development')
+        ledger = BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout')
         def factory(req):
-            return fresh_slot_reservation(goal,'evaluation:study',request_id=rid,partition='development',
+            return fresh_slot_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',
                 request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
         binding = {'plan_id':'study','plan_sha256':plan['sha256'],'arm':'combined','repeat':1}
         transport = StandInTransport(responses)
@@ -1184,10 +1201,10 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
         journal_anchor = fresh_journal_digest(journal,rid)
         for invalid_anchor in (None,'0'*64):
             with pytest.raises(ContractError):
-                score_reserved_assignment(goal,archive,journal,ref,partition='development',
+                score_reserved_assignment(goal,archive,journal,ref,partition='holdout',
                     expected_plan_sha256=plan['sha256'],expected_run_sha256=replay.digest,
                     expected_reference_sha256=reference_digest(ref),expected_journal_sha256=invalid_anchor)
-        record = score_reserved_assignment(goal,archive,journal,ref,partition='development',
+        record = score_reserved_assignment(goal,archive,journal,ref,partition='holdout',
             expected_plan_sha256=plan['sha256'],expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref),
             expected_journal_sha256=journal_anchor)
         assert record['arm']=='combined' and record['repeat']==1
@@ -1195,6 +1212,12 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
         resource = record['score']['resources']['total']
         assert resource['calls']==3 and resource['input_tokens']==30 and resource['output_tokens']==15
         assert resource['cost_usd']==pytest.approx(0.0003) and resource['latency_seconds'] is not None
+        from qjig.evaluation_scoring import build_reserved_holdout_comparison
+        entry={'archive':archive,'journal':journal,'reference':ref,'run_sha256':replay.digest,
+               'reference_sha256':reference_digest(ref),'journal_sha256':journal_anchor}
+        report=build_reserved_holdout_comparison(goal,design,[entry],plan_id='study',expected_plan_sha256=plan['sha256'],
+            expected_design_sha256=digest,baseline_arm='direct_full_evidence',candidate_arm='combined')
+        assert report['candidate_unknown']==1 and report['missing_pairs']==6
         with pytest.raises(ContractError):
             score_reserved_assignment(goal,archive,journal,ref,partition='pilot',expected_plan_sha256=plan['sha256'],
                 expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
@@ -1208,7 +1231,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
         tampered = verify_archive(archive)
         assert tampered.status == 'unanchored'
         with pytest.raises(ContractError):
-            score_reserved_assignment(goal,archive,journal,ref,partition='development',expected_plan_sha256=plan['sha256'],
+            score_reserved_assignment(goal,archive,journal,ref,partition='holdout',expected_plan_sha256=plan['sha256'],
                 expected_run_sha256=tampered.digest,expected_reference_sha256=reference_digest(ref))
 
 

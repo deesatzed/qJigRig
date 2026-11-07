@@ -1220,7 +1220,8 @@
         "T068H",
         "T068I",
         "T068J",
-        "T068K"
+        "T068K",
+        "T068L"
       ],
       "status": "pending",
       "files": [
@@ -3094,6 +3095,24 @@
       "acceptance": "The declared holdout denominator is preserved; deferrals, absent cases and incomplete support never become positive results or complete rates.",
       "command": "python -m pytest tests/test_evaluation.py::test_holdout_comparison_keeps_deferrals_and_missing_pairs_unknown -q",
       "evidence": "Red: no request-level paired holdout summary existed. Synthetic summary now enumerates all declared holdout case/repeat pairs, rejects duplicate run identities and changed references, treats combined request deferrals and missing evidence as unknown, and calculates rates and differences only when the respective denominator is fully mechanically scorable. Focused evaluation/costs/replay 65 passed; full offline 542 passed. Records and private arm mappings remain caller assertions and exact-quote coverage is not semantic support or independent accuracy; no actual comparison was run."
+    },
+    {
+      "id": "T068L",
+      "phase": "evaluation",
+      "depends_on": [
+        "T068K",
+        "R08D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_goal_budgeted_case_requires_matching_reserved_assignment",
+      "action": "Build holdout comparison from pinned reserved archives",
+      "acceptance": "Reconstruct holdout scores and arm mappings from a pinned plan, archives, references and journals; missing assignments remain missing and wrong anchors reject.",
+      "command": "python -m pytest tests/test_evaluation.py::test_goal_budgeted_case_requires_matching_reserved_assignment -q",
+      "evidence": "Red: paired summaries required caller-supplied scores and arm mappings. The builder now verifies a pinned persisted evaluation plan and run set, reconstructs each score from its archived reserved assignment, pinned reference and journal, and reports the complete holdout denominator with missing assignments retained. Synthetic direct and combined holdout archives exercised separately; duplicate entries, wrong plan/reference anchors and missing pairs reject or remain missing. Focused evaluation/goal/replay 100 passed before the combined-path extension; combined path passed, and full offline suite 542 passed. Anchors, source authority, quiescence and reference validity remain external assertions; no complete comparison or hosted call occurred."
     }
   ]
 }

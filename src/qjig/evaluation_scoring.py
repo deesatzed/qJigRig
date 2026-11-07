@@ -655,3 +655,58 @@ def summarize_holdout_comparison(design: dict, records: list[dict], *, expected_
             'baseline_support_rate':base_rate,'candidate_support_rate':candidate_rate,
             'paired_difference':None if base_rate is None or candidate_rate is None else candidate_rate-base_rate,
             'pairs':pairs,'semantic_assurance':'not_assessed'}
+
+
+def build_reserved_holdout_comparison(goal, design: dict, entries: list[dict], *, plan_id: str,
+                                      expected_plan_sha256: str, expected_design_sha256: str,
+                                      baseline_arm: str, candidate_arm: str) -> dict:
+    """Rebuild paired holdout scores from pinned archives and a persisted plan.
+
+    Input anchors, source authority, the journal's quiescence and reference truth
+    remain external assertions. This makes no provider call or semantic judgment.
+    """
+    from .evaluation_budget import make_evaluation_plan, validate_assignment_binding
+    from .goal_budget import GoalBudget
+    if not isinstance(goal, GoalBudget) or not isinstance(entries, list):
+        raise ContractError('goal ledger and archive entries required')
+    validate_assignment_binding({'plan_id':plan_id,'plan_sha256':expected_plan_sha256,'arm':'combined','repeat':1})
+    row = goal._con.execute('SELECT set_id,manifest,sha256 FROM evaluation_plans WHERE plan_id=?',(plan_id,)).fetchone()
+    if row is None:
+        raise ContractError('evaluation plan unavailable')
+    set_id, encoded, digest = row
+    if (set_id != 'evaluation:'+plan_id or not hmac.compare_digest(digest,expected_plan_sha256)
+            or hashlib.sha256(encoded.encode('utf-8')).hexdigest() != digest):
+        raise ContractError('evaluation plan anchor differs')
+    try:
+        manifest = json.loads(encoded)
+        rebuilt = make_evaluation_plan(manifest['design'],manifest['case_hashes'],manifest['stage_templates'],
+                                       manifest['assignments'],expected_design_sha256=manifest['design_sha256'])
+    except (KeyError,TypeError,ValueError) as exc:
+        raise ContractError('evaluation plan invalid') from exc
+    if (rebuilt['sha256'] != digest or rebuilt['manifest'] != manifest or manifest['design'] != design
+            or manifest['design_sha256'] != expected_design_sha256):
+        raise ContractError('evaluation design differs')
+    frozen = goal._con.execute('SELECT manifest,sha256 FROM run_sets WHERE set_id=?',(set_id,)).fetchone()
+    if frozen is None:
+        raise ContractError('evaluation run set unavailable')
+    goal._verify_run_set(set_id,*frozen)
+    records = []
+    for entry in entries:
+        if not isinstance(entry,dict) or set(entry) != {'archive','journal','reference','run_sha256','reference_sha256','journal_sha256'}:
+            raise ContractError('invalid holdout archive entry')
+        archive = entry['archive']
+        try:
+            assignment = archive.context()['evaluation_assignment']
+        except (AttributeError,KeyError,TypeError) as exc:
+            raise ContractError('holdout archive assignment unavailable') from exc
+        validate_assignment_binding(assignment)
+        if assignment['plan_id'] != plan_id or assignment['plan_sha256'] != digest:
+            raise ContractError('holdout archive plan differs')
+        records.append(score_reserved_assignment(goal,archive,entry['journal'],entry['reference'],partition='holdout',
+            expected_plan_sha256=digest,expected_run_sha256=entry['run_sha256'],
+            expected_reference_sha256=entry['reference_sha256'],expected_journal_sha256=entry['journal_sha256']))
+    report = summarize_holdout_comparison(design,records,expected_design_sha256=expected_design_sha256,
+                                          baseline_arm=baseline_arm,candidate_arm=candidate_arm)
+    report['plan_sha256'] = digest
+    report['scored_assignments'] = records
+    return report
