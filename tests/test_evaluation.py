@@ -412,6 +412,7 @@ def test_direct_score_binds_private_reference_and_required_source_quotes(tmp_pat
         scored = score_direct_archive(archive, journal, ref, expected_run_sha256=run_hash, expected_reference_sha256=digest)
         assert scored['classification'] == 'matches_reference' and scored['reference_provenance'] == 'authored_unvalidated'
         assert scored['required_evidence_covered'] is True and scored['semantic_assurance'] == 'not_assessed'
+        assert scored['recorded_answer'] == 'yes' and scored['reference_expected_answer'] == 'yes'
         changed = dict(ref, question='A different question?')
         with pytest.raises(ContractError):
             score_direct_archive(archive, journal, changed, expected_run_sha256=run_hash, expected_reference_sha256=reference_digest(changed))
@@ -533,3 +534,34 @@ def test_failed_followup_remains_assigned_and_tampering_is_rejected(tmp_path):
         archive._con.execute('DROP TRIGGER event_no_update')
         archive._con.execute("UPDATE events SET data=? WHERE kind='run_result'", (json.dumps(altered),))
         assert verify_direct_archive(archive, journal)['status'] == 'invalid'
+
+
+def test_paired_interventions_keep_missing_and_evidence_gaps_visible():
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_scoring import summarize_intervention_pairs
+    design = _sample_design(); digest = validate_evaluation_design(design)
+    def score(case, run, ref, actual, expected, evidence):
+        return {'case_id': case, 'run_sha256': run*64, 'reference_sha256': ref*64,
+                'reference_provenance': 'authored_unvalidated', 'recorded_answer': actual,
+                'reference_expected_answer': expected, 'required_evidence_covered': evidence,
+                'classification': 'matches_reference' if evidence else 'unknown_review',
+                'answer_matches_reference': actual == expected, 'semantic_assurance': 'not_assessed'}
+    records = [{'arm':'combined','repeat':1,'score':score('pilot','a','c','no','no',True)},
+               {'arm':'combined','repeat':1,'score':score('pilot-changed','b','d','yes','yes',True)}]
+    result = summarize_intervention_pairs(design, records, expected_design_sha256=digest)
+    assert len(result['pairs']) == 20 and result['complete_pairs'] == 1
+    selected = next(p for p in result['pairs'] if p['parent_case']=='pilot' and p['arm']=='combined')
+    assert selected['comparison'] == 'matches_reference' and selected['observed_change'] is True
+    assert selected['expected_change'] is True and selected['evidence_covered'] is True
+    assert sum(p['comparison']=='unknown_review' for p in result['pairs']) == 19
+    with pytest.raises(ContractError):
+        summarize_intervention_pairs(design, records + [records[0]], expected_design_sha256=digest)
+    reused = {**records[1], 'score': {**records[1]['score'], 'run_sha256': records[0]['score']['run_sha256']}}
+    with pytest.raises(ContractError):
+        summarize_intervention_pairs(design, [records[0], reused], expected_design_sha256=digest)
+    inconsistent = {'arm': 'direct_retrieval', 'repeat': 1, 'score': {**records[0]['score'], 'run_sha256': 'f'*64, 'reference_sha256': 'e'*64}}
+    with pytest.raises(ContractError):
+        summarize_intervention_pairs(design, records + [inconsistent], expected_design_sha256=digest)
+    changed = [records[0], {**records[1], 'score': {**records[1]['score'], 'required_evidence_covered': False}}]
+    altered = summarize_intervention_pairs(design, changed, expected_design_sha256=digest)
+    assert next(p for p in altered['pairs'] if p['parent_case']=='pilot' and p['arm']=='combined')['comparison'] == 'unknown_review'

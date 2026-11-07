@@ -1239,7 +1239,8 @@
       "id": "T070",
       "phase": "P6",
       "depends_on": [
-        "T069"
+        "T069",
+        "T070A"
       ],
       "status": "pending",
       "files": [
@@ -2653,6 +2654,25 @@
       "acceptance": "Malformed and unsupported outputs, provider failure and uncertain calls remain distinct; unverified refusal stays unknown and no missing answer is fabricated.",
       "command": "python -m pytest tests/test_evaluation.py::test_direct_agent_preserves_failures_without_inventing_an_answer -q",
       "evidence": "Red: direct reference scoring rejected all failed or uncertain runs. Green: replay checks failed search/prompt/receipt chains and distinguishes malformed output, unsupported citation, provider failure and uncertain outcome; timeout remains pending reconciliation and unverified budget refusal stays unknown review. Synthetic tests include failure on the second call and tampering. Focused evaluation/replay/ledger suite 72 passed before additional cases; full offline 506 passed before final provider-unavailable parameter, then focused 5 passed. This does not validate missing policy evidence, reconcile calls, authenticate providers or complete the full assigned comparison."
+    },
+    {
+      "id": "T070A",
+      "phase": "P6",
+      "depends_on": [
+        "T064A",
+        "T068B",
+        "T068C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_paired_interventions_keep_missing_and_evidence_gaps_visible",
+      "action": "Compare paired intervention answer and evidence records",
+      "acceptance": "Every declared parent/intervention arm and repeat remains visible; missing assignments or decisive evidence remain unknown, and reference and run identities remain distinct.",
+      "command": "python -m pytest tests/test_evaluation.py::test_paired_interventions_keep_missing_and_evidence_gaps_visible -q",
+      "evidence": "Red: no paired report enumerated intervention assignments. Green: scored records retain observed and expected answers, and the report compares each parent/intervention by arm and repeat, requiring both answers and exact evidence coverage. Missing or incomplete pairs stay unknown; duplicate runs and inconsistent case references reject. Synthetic evaluation tests 21 passed; full offline 508 passed. The local draft has 45 paired assignments, all unknown with zero runs. Arm mappings and scores remain caller assertions; full experiment verification and semantic adjudication remain open."
     }
   ]
 }
