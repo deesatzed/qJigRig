@@ -219,3 +219,67 @@ def test_browser_reports_unconfigured_fresh_backend(tmp_path):
                 browser.close()
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)
+
+
+def test_interrupted_fresh_run_exposes_pending_attempt_after_restart(tmp_path):
+    from qjig.contracts import ContractError
+    from qjig.fresh_service import FreshWorkbench
+
+    model = {'id': 'synthetic/model', 'context_length': 10000,
+             'top_provider': {'max_completion_tokens': 1000},
+             'pricing': {'prompt': '0.000001', 'completion': '0.000002'}}
+    spec = {'provider': 'stand-in', 'model': model, 'input_tokens': 1000, 'output_tokens': 100,
+            'max_price': {'prompt': 2, 'completion': 3}}
+    limit, total = Budget(30, 100000, 1), Budget(60, 200000, 2)
+    transport = StandInTransport([KeyboardInterrupt()])
+    backend = FreshWorkbench(tmp_path / 'fresh', goal_factory=lambda: GoalBudget.open(tmp_path / 'goal.sqlite',
+        total=total, per_request=limit, allocations={'smoke': total}), transport_factory=lambda: transport,
+        partition='smoke', planner=spec, judge=spec, reviewer=spec, budget=limit)
+    path = tmp_path / 'catalog.sqlite'
+    server = create_server(path, port=0, fresh_backend=backend)
+    thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+    try:
+        client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '1', 'Review'))
+        client.import_source({'source_id':'policy.md','text':'# Policy\nRefunds within 14 days.\n','scope':'project',
+                              'entities':[],'effective_from':'2026-01-01','effective_to':'open',
+                              'observed_at':None,'authority':None})
+        request = {'schema_version':'qjig.request.v1','request_id':'interrupted','question':'Refund limit?',
+                   'role':'reviewer','role_version':'1','scope':'project'}
+        body = {'request':request,'as_of':'2026-11-15','entities':[]}
+        with pytest.raises(KeyboardInterrupt):
+            backend.run(path, body)
+        assert transport.calls_made == 1
+        server.shutdown(); server.server_close(); thread.join(timeout=5)
+        server = create_server(path, port=0, fresh_backend=backend)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '1', 'Review'))
+        run_id = client.list_fresh_runs()[0]['run_id']
+        replay = client.get_fresh_run(run_id)
+        assert replay['verification']['status'] == 'incomplete'
+        assert replay['reconciliation']['status'] == 'required'
+        assert replay['reconciliation']['unresolved'][0]['stage'] == 'planner'
+        with pytest.raises(ContractError): backend.run(path, body)
+        assert transport.calls_made == 1
+        if os.environ.get('QJIG_CHROMIUM_PATH'):
+            playwright = pytest.importorskip('playwright.sync_api')
+            with playwright.sync_playwright() as p:
+                browser = p.chromium.launch(headless=True, executable_path=os.environ['QJIG_CHROMIUM_PATH'])
+                try:
+                    page = browser.new_page(); page.goto(f'http://127.0.0.1:{server.server_address[1]}/')
+                    page.locator('#fresh-runs').get_by_role('button', name='Refund limit?', exact=False).click()
+                    page.get_by_text('Provider outcome unknown; reconciliation is required before retry.').wait_for()
+                finally:
+                    browser.close()
+        journal = tmp_path / 'fresh' / 'journal.sqlite'
+        moved = tmp_path / 'fresh' / 'journal-held.sqlite'
+        journal.rename(moved)
+        try:
+            assert client.get_fresh_run(run_id)['reconciliation']['status'] == 'unknown'
+        finally:
+            moved.rename(journal)
+        second = {'request': {**request, 'request_id': 'after-interruption'}, 'as_of':'2026-11-15', 'entities':[]}
+        followup = backend.run(path, second)
+        assert followup['status'] == 'deferred' and followup['plan_failure'] == 'budget_exceeded'
+        assert transport.calls_made == 1
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=5)

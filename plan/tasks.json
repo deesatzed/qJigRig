@@ -3949,6 +3949,25 @@
       "acceptance": "After a role-defined source intervention, rerun synthetic fresh planning against the child revision and preserve the prior run across restart and export.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Opt-in real Chrome walkthrough with two role clients: builder changed 14 to 30 days; reviewer saw stale evidence then reran to the child passage; child revision was archived and the original run reopened and exported after restart. Focused browser/client tests 5 passed. Provider responses were synthetic; T062 hosted and interruption gates remain open."
+    },
+    {
+      "id": "T062D",
+      "phase": "P5",
+      "depends_on": [
+        "T056E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/web.py",
+        "docs/workflows/fresh-configuration.md"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_interrupted_fresh_run_exposes_pending_attempt_after_restart",
+      "action": "Expose durable unresolved fresh attempts after interruption",
+      "acceptance": "Reopen an interrupted synthetic run after restart, show pending reconciliation, preserve unknown when journal is unavailable, and avoid a further attempt while usage remains unresolved.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_interrupted_fresh_run_exposes_pending_attempt_after_restart -q",
+      "evidence": "Red: replay omitted reconciliation status. A synthetic KeyboardInterrupt during planner dispatch left a durable pending intent; service restart and Chrome displayed the unknown provider outcome, missing journal produced unknown, and repeated or new requests made no second provider attempt. Browser/journal/replay checks 26 passed. This simulates interruption in process and does not establish real hosted-provider reconciliation or full T062."
     }
   ]
 }

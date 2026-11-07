@@ -75,7 +75,30 @@ class FreshWorkbench:
             return {'run_id': run_id, 'request': request.to_dict(),
                     'result': results[0] if len(results) == 1 else None,
                     'traces': traces, 'verification': asdict(report),
+                    'reconciliation': self._reconciliation(request.request_id, events),
                     'source_freshness': 'not_assessed'}
+
+    def _reconciliation(self, request_id: str, archive_events: list[dict]) -> dict:
+        """Read pending journal intents; absence or disagreement is unknown, not clear."""
+        path = self.state_dir / 'journal.sqlite'
+        unknown = {'status': 'unknown', 'unresolved': []}
+        if path.is_symlink() or not path.is_file():
+            return unknown
+        try:
+            with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as connection:
+                if connection.execute('PRAGMA user_version').fetchone()[0] != 1:
+                    return unknown
+                journal = Journal(connection, lambda: 0)
+                events = journal.events(request_id)
+                intents = {event.call_id for event in events if event.kind == 'intent'}
+                archived = {event['call_id'] for event in archive_events if event['kind'] == 'request'}
+                if not intents or not archived <= intents:
+                    return unknown
+                pending = journal.pending(request_id)
+                return {'status': 'required' if pending else 'clear',
+                        'unresolved': [{'call_id': event.call_id, 'stage': event.stage} for event in pending]}
+        except (OSError, sqlite3.Error, ValueError, TypeError, KeyError):
+            return unknown
 
     def export(self, run_id: str) -> bytes:
         """Copy and structurally check a consistent SQLite snapshot, without inference."""
