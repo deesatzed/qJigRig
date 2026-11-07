@@ -161,3 +161,7 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `Obligation` and `ObligationLedger` in `src/qjig/obligations.py`. A retrieval with zero hits leaves a material exception obligation `unresolved` with reason `no_retrieval_hit` and it keeps blocking; `absence_established` is always False; only `satisfy` with evidence references closes it. Distinct reasons recorded: no_retrieval_hit, source_unavailable, only_inapplicable_candidates, applicability_unknown, truncated, budget_omission. Evidence found is `evidence_found`, not satisfied. Limits: in-memory ledger; 'satisfied' semantics (what counts as proof) are left to later evaluation tasks; `absence_established` is a contract marker, not a computation.
 - Red: ModuleNotFoundError qjig.obligations (initial contract). Green: focused 1 passed in 0.03s; tests/test_obligations.py 4 passed in 0.03s; full suite 98 passed in 0.16s. 2026-11-06.
+
+## Phase note: P1-P2 (T006-T024)
+
+Full qJig suite after T024: see the T024 receipt above. All P2 behavior is offline and deterministic; test inputs are a few authored strings in test files, not services or datasets. Phase P3 (T025-T038) follows.
