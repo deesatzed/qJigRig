@@ -913,7 +913,8 @@
       "phase": "P5",
       "depends_on": [
         "T038",
-        "T051"
+        "T051",
+        "T053A"
       ],
       "status": "pending",
       "files": [
@@ -1748,6 +1749,28 @@
       "acceptance": "Replay detects judge prompt and typed-validation changes even when internal request hashes are recomputed.",
       "command": "python -m pytest tests/test_replay.py::test_replay_rejects_rehashed_judge_prompt_and_changed_validation -q",
       "evidence": "Red: replay accepted a modified judge prompt with recomputed request hash, altered validation, and jointly fabricated trace/result outcome. Green: replay rebuilds judge prompts from plan and verified spans, reruns pure typed validation, and recomputes paired quote-based observations without inference; tests include valid quote, conflict and fabricated quote. Focused replay/judge/fresh 44 passed; full offline suite 354 passed. Semantic quality, partial-failure reconstruction, journal and goal-ledger reconciliation remain open under T051."
+    },
+    {
+      "id": "T053A",
+      "phase": "P5",
+      "depends_on": [
+        "T038",
+        "T051A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/service.py",
+        "src/qjig/cli.py",
+        "tests/test_service.py",
+        "README.md",
+        "IMPLEMENT.md"
+      ],
+      "test_file": "tests/test_service.py",
+      "test_name": "test_loopback_catalog_import_and_origin_guard",
+      "action": "Build loopback catalog service foundation",
+      "acceptance": "Real local HTTP imports and lists source revisions with same-origin write restrictions and explicit malformed-request failures.",
+      "command": "python -m pytest tests/test_service.py::test_loopback_catalog_import_and_origin_guard -q",
+      "evidence": "Red: loopback service and CLI entrypoint absent; reimporting an old source revision staled the current revision. Green: actual localhost HTTP covers import/list/inspect, host and origin rejection, malformed input, concurrent identical imports, restart persistence, old-revision reimport and CLI subprocess startup. Service tests 4 passed; full offline suite 358 passed before two strengthened input assertions. Full T053, browser and fresh-provider paths remain pending."
     }
   ]
 }

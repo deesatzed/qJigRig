@@ -244,6 +244,10 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--request", required=True)
     q.add_argument("--policy", required=True)
     q.add_argument("--trace-out")
+    server = sub.add_parser("serve", help="start the local catalog service")
+    server.add_argument("--catalog", required=True)
+    server.add_argument("--host", default="127.0.0.1")
+    server.add_argument("--port", type=int, default=8766)
     t = sub.add_parser("trace", help="render a saved trace for a person")
     t.add_argument("--file", required=True)
     return p
@@ -252,6 +256,17 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "serve":
+            from .service import create_server
+            server = create_server(args.catalog, host=args.host, port=args.port)
+            try:
+                print(json.dumps({"host": server.server_address[0], "port": server.server_address[1]}), flush=True)
+                server.serve_forever()
+            except KeyboardInterrupt:
+                pass
+            finally:
+                server.server_close()
+            return 0
         if args.command == "import":
             print(json.dumps(cmd_import(args)))
             return 0

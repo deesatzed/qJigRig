@@ -12,4 +12,4 @@ For each task in `plan/tasks.json`:
 
 No source dataset, .env, model environment or generated run is a runtime dependency of the new deterministic core. Do not run nested source test discovery as qJig's own suite. Use explicit source-audit commands separately.
 
-Future CLI command after T039: `python -m qjig run --request REQUEST.json --catalog CATALOG --policy POLICY.json`. Future local server after T053: `python -m qjig serve --host 127.0.0.1 --port 8766`. These commands are planned and not currently implemented.
+Future CLI command after T039: `python -m qjig run --request REQUEST.json --catalog CATALOG --policy POLICY.json`. The catalog-only local service is available as `python -m qjig serve --catalog PATH --host 127.0.0.1 --port 8766`; question and browser workflows remain pending. The future `run` command above is not currently implemented.
