@@ -56,6 +56,8 @@ class GoalBudget:
             for column in ("stage", "provider", "model"):
                 if column not in columns:
                     con.execute(f"ALTER TABLE required_work ADD COLUMN {column} TEXT")
+            con.execute("CREATE TABLE IF NOT EXISTS run_sets (set_id TEXT PRIMARY KEY, manifest TEXT NOT NULL, sha256 TEXT NOT NULL)")
+            con.execute("CREATE TABLE IF NOT EXISTS run_set_work (set_id TEXT NOT NULL REFERENCES run_sets(set_id), work_id TEXT UNIQUE NOT NULL REFERENCES required_work(work_id), PRIMARY KEY(set_id,work_id))")
             row = con.execute("SELECT value FROM policy WHERE id=1").fetchone()
             if row is None:
                 con.execute("INSERT INTO policy VALUES(1, ?)", (policy,))
@@ -221,6 +223,64 @@ class GoalBudget:
             self._con.execute("ROLLBACK")
             raise
 
+    def _verify_run_set(self, set_id: str, manifest: str, digest: str) -> None:
+        if hashlib.sha256(manifest.encode("utf-8")).hexdigest() != digest:
+            raise ContractError("run set digest differs from manifest")
+        try:
+            items = json.loads(manifest)
+            expected = [(x["work_id"], x["request_id"], x["partition"], x["tokens"], x["cost_usd"], x["stage"], x["provider"], x["model"]) for x in items]
+        except (ValueError, TypeError, KeyError):
+            raise ContractError("run set manifest is invalid") from None
+        rows = self._con.execute("SELECT w.work_id,w.request_id,w.partition,w.tokens,w.cost,w.stage,w.provider,w.model FROM run_set_work s JOIN required_work w ON w.work_id=s.work_id WHERE s.set_id=? ORDER BY w.work_id", (set_id,)).fetchall()
+        if rows != expected:
+            raise ContractError("run set allocations differ from frozen manifest")
+
+    def reserve_run_set(self, set_id: str, assignments: list[dict]) -> str:
+        """Freeze and reserve every declared physical call together, or reserve none.
+
+        Call bounds and identities are supplied assertions; this does not verify prices,
+        tokenization, experiment coverage, or the authenticity of the database.
+        """
+        if not isinstance(set_id, str) or not set_id.strip() or not isinstance(assignments, list) or not assignments:
+            raise ContractError("run set identity and assignments are required")
+        keys = {"work_id", "request_id", "partition", "tokens", "cost_usd", "stage", "provider", "model"}
+        normalized = []
+        for item in assignments:
+            if not isinstance(item, dict) or set(item) != keys:
+                raise ContractError("invalid run set assignment fields")
+            if any(not isinstance(item[k], str) or not item[k].strip() for k in ("work_id", "request_id", "partition", "stage", "provider", "model")):
+                raise ContractError("invalid run set assignment identity")
+            if item["partition"] not in self._allocations or not _valid_tokens(item["tokens"]) or not _valid_cost(item["cost_usd"]):
+                raise ContractError("invalid run set assignment budget")
+            normalized.append({**item, "cost_usd": str(_cost(item["cost_usd"]))})
+        if len({item["work_id"] for item in normalized}) != len(normalized):
+            raise ContractError("duplicate run set work identity")
+        normalized.sort(key=lambda item: item["work_id"])
+        manifest = json.dumps(normalized, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        digest = hashlib.sha256(manifest.encode("utf-8")).hexdigest()
+        self._con.execute("BEGIN IMMEDIATE")
+        try:
+            existing = self._con.execute("SELECT manifest,sha256 FROM run_sets WHERE set_id=?", (set_id,)).fetchone()
+            if existing is not None:
+                if existing != (manifest, digest):
+                    raise ContractError("run set differs from frozen manifest")
+                self._verify_run_set(set_id, manifest, digest)
+                self._con.execute("COMMIT")
+                return digest
+            self._con.execute("INSERT INTO run_sets VALUES(?,?,?)", (set_id, manifest, digest))
+            for x in normalized:
+                if self._con.execute("SELECT 1 FROM required_work WHERE work_id=?", (x["work_id"],)).fetchone():
+                    raise ContractError("required work already exists")
+                self._check_capacity(x["request_id"], x["partition"], 1, x["tokens"], Decimal(x["cost_usd"]))
+                self._con.execute("INSERT INTO required_work (work_id,request_id,partition,tokens,cost,stage,provider,model) VALUES(?,?,?,?,?,?,?,?)",
+                                  tuple(x[k] for k in ("work_id", "request_id", "partition", "tokens", "cost_usd", "stage", "provider", "model")))
+                self._con.execute("INSERT INTO run_set_work VALUES(?,?)", (set_id, x["work_id"]))
+            self._con.execute("COMMIT")
+            return digest
+        except BaseException:
+            self._con.execute("ROLLBACK")
+            raise
+
     def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float,
                 hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0,
                 required_id: str | None = None, stage: str | None = None, provider: str | None = None,
@@ -232,6 +292,8 @@ class GoalBudget:
             raise ContractError("invalid reservation")
         self._con.execute("BEGIN IMMEDIATE")
         try:
+            for set_id, manifest, digest in self._con.execute("SELECT set_id,manifest,sha256 FROM run_sets").fetchall():
+                self._verify_run_set(set_id, manifest, digest)
             if self._con.execute("SELECT 1 FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone():
                 raise ContractError("attempt already reserved")
             if required_id is not None:

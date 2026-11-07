@@ -352,3 +352,61 @@ def test_legacy_unbound_required_allocation_stays_reserved_but_cannot_be_consume
             goal.reserve('a', 'r', 'smoke', tokens=100, cost_usd=0.1, required_id='old', stage='judge', provider='stand-in', model='m')
         with pytest.raises(BudgetExceeded):
             goal.reserve('b', 'r', 'smoke', tokens=1, cost_usd=0.01)
+
+
+def test_full_run_set_reservation_is_atomic_frozen_and_survives_restart(tmp_path):
+    path = tmp_path / 'goal.sqlite'
+    total = Budget(4, 400, 0.4)
+    partitions = {'pilot': Budget(2, 200, 0.2), 'holdout': Budget(2, 200, 0.2)}
+    assignments = [
+        {'work_id': 'p1', 'request_id': 'pilot-1', 'partition': 'pilot', 'tokens': 100, 'cost_usd': 0.1, 'stage': 'judge', 'provider': 'stand-in', 'model': 'm'},
+        {'work_id': 'h1', 'request_id': 'hold-1', 'partition': 'holdout', 'tokens': 100, 'cost_usd': 0.1, 'stage': 'judge', 'provider': 'stand-in', 'model': 'm'},
+    ]
+    with GoalBudget.open(path, total=total, per_request=total, allocations=partitions) as goal:
+        oversized = assignments + [{**assignments[1], 'work_id': 'h2', 'request_id': 'hold-2', 'tokens': 101}]
+        with pytest.raises(BudgetExceeded):
+            goal.reserve_run_set('evaluation', oversized)
+        assert goal.totals().max_calls == 0
+        digest = goal.reserve_run_set('evaluation', assignments)
+        assert len(digest) == 64
+    with GoalBudget.open(path, total=total, per_request=total, allocations=partitions) as goal:
+        assert goal.reserve_run_set('evaluation', assignments) == digest
+        with pytest.raises(ContractError):
+            goal.reserve_run_set('evaluation', assignments[:1])
+        with pytest.raises(BudgetExceeded):
+            goal.reserve('extra', 'hold-other', 'holdout', tokens=101, cost_usd=0.1)
+        goal.reserve('attempt', 'hold-1', 'holdout', tokens=100, cost_usd=0.1,
+                     required_id='h1', stage='judge', provider='stand-in', model='m')
+        assert goal.reserve_run_set('evaluation', assignments) == digest
+
+
+def test_run_set_refuses_corruption_and_concurrent_aggregate_overbooking(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    import sqlite3
+
+    path = tmp_path / 'goal.sqlite'
+    limit = Budget(2, 200, 0.2)
+    assignment = {'work_id': 'one', 'request_id': 'r1', 'partition': 'pilot', 'tokens': 150,
+                  'cost_usd': 0.15, 'stage': 'judge', 'provider': 'stand-in', 'model': 'm'}
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'pilot': limit}):
+        pass
+    barrier = Barrier(2)
+    def plan(i):
+        with GoalBudget.open(path, total=limit, per_request=limit, allocations={'pilot': limit}) as goal:
+            barrier.wait(timeout=5)
+            try:
+                goal.reserve_run_set(i, [{**assignment, 'work_id': i, 'request_id': i}])
+                return 'reserved'
+            except BudgetExceeded:
+                return 'refused'
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(plan, ('one', 'two'))) == ['refused', 'reserved']
+    with sqlite3.connect(path) as con:
+        ident = con.execute('SELECT set_id FROM run_sets').fetchone()[0]
+        con.execute('UPDATE required_work SET model = ? WHERE work_id = ?', ('altered', ident))
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'pilot': limit}) as goal:
+        with pytest.raises(ContractError, match='differ'):
+            goal.reserve('attempt', ident, 'pilot', tokens=150, cost_usd=0.15, required_id=ident, stage='judge', provider='stand-in', model='altered')
+        with pytest.raises(ContractError, match='differ'):
+            goal.reserve_run_set(ident, [{**assignment, 'work_id': ident, 'request_id': ident}])
