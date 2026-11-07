@@ -48,3 +48,10 @@ Repository checkpoint: initial qJig source/provenance commit `da1397b`. Staged p
 - Red: `ImportError: Budget` at collection. Green: `test_reject_invalid_budget` 10 cases passed; `tests/test_contracts.py` 12 passed; full suite 13 passed.
 - Rejected: True/False, negatives, floats or strings for counts, NaN/inf/negative cost, non-object budget, unknown/missing budget fields. Accepted: zero limits.
 - Limit: this only validates shape. Nothing enforces or spends a budget yet.
+
+## 2026-11-06: T004 complete
+
+- `decode_source(raw, *, encoding)` in `src/qjig/sources.py` returns a frozen `DecodedSource`: original bytes, `raw_sha256` (of the bytes), named `encoding`, `normalizer="identity"`, decoded `text` (CRLF kept) and `text_sha256` (of the UTF-8 encoding of the text).
+- Red: `ModuleNotFoundError: qjig.sources`. Green: focused test passed; `tests/test_sources.py` 3 passed; full suite 16 passed.
+- Test uses latin-1 `café` + CRLF so the two hashes differ; strict decoding raises `ContractError` rather than substituting characters; the encoding argument is required.
+- Limits: in-memory only. No blob storage, no revision record, no BOM handling policy (a UTF-8 BOM would stay as U+FEFF in text under `utf-8`), no PDF extractor.

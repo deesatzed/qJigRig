@@ -58,7 +58,7 @@
       "depends_on": [
         "T002"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/sources.py"
       ],
@@ -66,7 +66,8 @@
       "test_name": "test_preserve_raw_bytes",
       "action": "Store original source bytes and separate decoded text hash",
       "acceptance": "CRLF bytes retain original raw hash while text decoding is explicit",
-      "command": "python -m pytest tests/test_sources.py::test_preserve_raw_bytes -q"
+      "command": "python -m pytest tests/test_sources.py::test_preserve_raw_bytes -q",
+      "evidence": "Red: ModuleNotFoundError qjig.sources (initial contract). Green: test_preserve_raw_bytes passed; tests/test_sources.py 3 passed; full suite 16 passed. 2026-11-06."
     },
     {
       "id": "T005",
