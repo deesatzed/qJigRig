@@ -98,3 +98,30 @@ def test_escalation_rejects_changed_question_or_packet_provenance(tmp_path):
         with pytest.raises(ContractError, match='binding'):
             escalate_predicate(swapped, ledger, transport, 'Question?', packet, reason='unknown', provider='stand-in')
         assert transport.calls_made == 0 and ledger.used_calls() == 2
+
+
+def test_escalation_refuses_changed_applicability_before_dispatch(tmp_path):
+    import pytest
+    from qjig.applicability import Applicability
+    from qjig.contracts import ContractError
+    rev = SourceRevision.create('p/a.md', '/x', decode_source(b'# Refunds\nRefunds apply.', encoding='utf-8'))
+    packet = build_packet(bm25_candidates(index_entries(rev), 'refunds'), max_bytes=3000)
+    response = RawResponse(200, json.dumps({'supported': False, 'quote': '', 'reason': 'none'}),
+                           {'prompt_tokens': 2, 'completion_tokens': 1, 'cost_usd': 0.01})
+    with Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(Budget(4, 5000, 1), journal, 'r')
+        standalone = judge_predicate(ledger, StandInTransport([response, response]), 'Question?', packet,
+                                     provider='stand-in', model='m', applicability=lambda _: Applicability.MATCH)
+        transport = StandInTransport([response, response])
+        with pytest.raises(ContractError, match='binding'):
+            escalate_predicate(standalone, ledger, transport, 'Question?', packet, reason='unknown', provider='stand-in',
+                               applicability=lambda _: Applicability.NO_MATCH)
+        assert transport.calls_made == 0 and ledger.used_calls() == 2
+        checked = []
+        def same_verdict(revision_id):
+            checked.append(revision_id)
+            return Applicability.MATCH
+        result = escalate_predicate(standalone, ledger, transport, 'Question?', packet, reason='unknown',
+                                    provider='stand-in', applicability=same_verdict)
+        assert result.standalone is standalone and checked == [rev.revision_id]
+        assert transport.calls_made == 2

@@ -1,13 +1,12 @@
 """Separate, explicitly requested paired-judge escalation; never replaces the original."""
 from dataclasses import dataclass
-import hashlib
 from typing import Callable
 
 from .applicability import Applicability
 from .budgets import BudgetLedger
 from .contracts import ContractError
-from .judge import JUDGE_MAX_TOKENS, JudgeResult, build_side_prompts, judge_predicate
-from .packets import EvidencePacket, serialize_packet
+from .judge import JUDGE_MAX_TOKENS, JudgeResult, build_side_prompts, judge_predicate, snapshot_judge_context
+from .packets import EvidencePacket
 from .providers import ReservationFactory, Transport
 
 HY4_MODEL = 'tencent/hy4'
@@ -39,8 +38,8 @@ def escalate_predicate(standalone: JudgeResult, ledger: BudgetLedger, transport:
         raise ContractError('escalation provider is required')
     prompts = build_side_prompts(question, packet)
     calls = tuple((side.call_id, prompt.stage, prompt.prompt) for side, prompt in zip((standalone.positive, standalone.negative), prompts) if side.call_id is not None)
-    packet_sha256 = hashlib.sha256(serialize_packet(packet)).hexdigest()
-    if not ledger.has_judge_calls(calls, packet_sha256):
+    binding, applicability = snapshot_judge_context(packet, applicability)
+    if not ledger.has_judge_calls(calls, binding):
         raise ContractError('standalone ledger binding differs from question or evidence packet')
     result = judge_predicate(ledger, transport, question, packet, provider=provider, model=HY4_MODEL,
                              applicability=applicability, max_tokens=max_tokens,

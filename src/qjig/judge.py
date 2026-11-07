@@ -88,12 +88,12 @@ def _check_quote(side: SideResult, packet: EvidencePacket, applicability: Callab
     return SideResult(Support.SUPPORTED, side.reason, side.quote, None, side.call_id, assurance, ref)
 
 
-def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str, max_tokens: int = JUDGE_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge", packet_sha256: str | None = None) -> SideResult:
+def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str, max_tokens: int = JUDGE_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge", context_binding: dict | None = None) -> SideResult:
     req = ProviderRequest(f"{stage_prefix}_{side}", provider, model, _PROMPT.format(claim=claim, evidence=evidence), max_tokens)
     try:
         reservation = reservation_factory(req) if reservation_factory else None
         call = call_typed(ledger, transport, req, SIDE_SCHEMA, reservation=reservation, archive=archive,
-                          context_binding={"packet_sha256": packet_sha256})
+                          context_binding=context_binding)
     except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
         failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
                    UncertainOutcome: "uncertain_outcome", ReconciliationRequired: "reconciliation_required"}[type(exc)]
@@ -120,6 +120,21 @@ def build_side_prompts(question: str, packet: EvidencePacket) -> tuple[ProviderR
     return out[0], out[1]
 
 
+def snapshot_judge_context(packet: EvidencePacket, applicability: Callable[[str], Applicability] | None):
+    """Freeze recorded verdicts once; they are assertions, not source authentication."""
+    verdicts = None
+    if applicability is not None:
+        verdicts = {}
+        for revision_id in sorted({item.span.revision_id for item in packet.items}):
+            verdict = applicability(revision_id)
+            if not isinstance(verdict, Applicability):
+                raise ContractError("invalid applicability verdict")
+            verdicts[revision_id] = verdict
+    binding = {"packet_sha256": hashlib.sha256(serialize_packet(packet)).hexdigest(),
+               "applicability": None if verdicts is None else {key: value.value for key, value in verdicts.items()}}
+    return binding, None if verdicts is None else verdicts.__getitem__
+
+
 def judge_predicate(
     ledger: BudgetLedger, transport: Transport, question: str, packet: EvidencePacket, *, provider: str, model: str,
     applicability: Callable[[str], Applicability] | None = None, max_tokens: int = JUDGE_MAX_TOKENS,
@@ -129,12 +144,12 @@ def judge_predicate(
     if stage_prefix not in ("judge", "escalation"):
         raise ContractError("invalid judge stage prefix")
     evidence = render_packet(packet)
-    packet_sha256 = hashlib.sha256(serialize_packet(packet)).hexdigest()
-    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens, reservation_factory, archive, stage_prefix, packet_sha256)
+    binding, applicability = snapshot_judge_context(packet, applicability)
+    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens, reservation_factory, archive, stage_prefix, binding)
     if pos.failure in ("uncertain_outcome", "reconciliation_required"):
         neg = SideResult(Support.UNKNOWN, "reconciliation_required", "", "reconciliation_required", None)
     else:
-        neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens, reservation_factory, archive, stage_prefix, packet_sha256)
+        neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens, reservation_factory, archive, stage_prefix, binding)
     return _combine_sides(pos, neg, packet, applicability)
 
 

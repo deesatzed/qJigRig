@@ -91,7 +91,7 @@ class BudgetLedger:
         """Call id of the most recent journaled event for this request (single writer)."""
         return self._journal.events(self._request_id)[-1].call_id
 
-    def has_judge_calls(self, calls: tuple[tuple[str, str, str], ...], packet_sha256: str) -> bool:
+    def has_judge_calls(self, calls: tuple[tuple[str, str, str], ...], context_binding: dict) -> bool:
         """Match standalone sides to this request's recorded prompts and packet."""
         from .providers import ProviderRequest
         call_ids = [call[0] for call in calls]
@@ -103,7 +103,7 @@ class BudgetLedger:
             if event is None or event.stage != stage or not isinstance(event.payload, dict):
                 return False
             tokens = event.payload.get("reserve_output_tokens")
-            if not _valid_tokens(tokens) or tokens == 0 or event.payload.get("context_binding") != {"packet_sha256": packet_sha256}:
+            if not _valid_tokens(tokens) or tokens == 0 or event.payload.get("context_binding") != context_binding:
                 return False
             request = ProviderRequest(stage, event.provider, event.model, prompt, tokens)
             if request.input_sha256() != event.input_sha256:
