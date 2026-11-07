@@ -1112,7 +1112,8 @@
       "id": "T063",
       "phase": "P6",
       "depends_on": [
-        "T061"
+        "T061",
+        "T063A"
       ],
       "status": "pending",
       "files": [
@@ -2406,6 +2407,23 @@
       "acceptance": "A local source change is visible as stale beside its linked review; missing source state remains unknown.",
       "command": "python -m pytest tests/test_web.py::test_review_view_reports_local_source_freshness -q",
       "evidence": "Red: saved-review endpoint omitted linked draft source freshness. Green: service checks draft links and reports matching, stale or unknown local source state; browser displays it and refreshes after local edits. Synthetic HTTP test exercises matching, missing metadata and supersession; Chromium walkthrough changes source and observes stale while inspecting original bound revision. Full offline suite 484 passed. This does not monitor external files or establish semantic correctness or full T057."
+    },
+    {
+      "id": "T063A",
+      "phase": "P6",
+      "depends_on": [
+        "T012"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_allowlisted_evaluation_sources_exclude_reference_artifacts",
+      "action": "Load hash-pinned evaluation sources separately from reference artifacts",
+      "acceptance": "A guarded source loader rejects path aliasing, changed source bytes and verbatim protected artifact content before returning any retrievable input.",
+      "command": "python -m pytest tests/test_evaluation.py::test_allowlisted_evaluation_sources_exclude_reference_artifacts -q",
+      "evidence": "Red: no isolated allowlisted evaluation source loader existed. Green: synthetic loader validates all declared hashes and bounded regular files, rejects overlapping paths, hard links, symlinks, traversal and exact protected-artifact bytes, and returns no partial bundle. Synthetic retrieval over accepted files found no protected markers. Focused 33 passed; full offline 485 passed. Caller completeness, transformed or paraphrased labels, other ingestion entrypoints, full T063 and real evaluation remain unverified."
     }
   ]
 }
