@@ -365,7 +365,7 @@
       "depends_on": [
         "T021"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/recovery.py"
       ],
@@ -373,7 +373,8 @@
       "test_name": "test_missing_source_alternative",
       "action": "Exclude an unavailable candidate and return a verified alternative",
       "acceptance": "Packet records missing-source reason and alternative exact span",
-      "command": "python -m pytest tests/test_recovery.py::test_missing_source_alternative -q"
+      "command": "python -m pytest tests/test_recovery.py::test_missing_source_alternative -q",
+      "evidence": "Red: ModuleNotFoundError qjig.recovery (initial contract). Green: focused 1 passed in 0.04s; tests/test_recovery.py 4 passed in 0.05s; full suite 91 passed in 0.16s. 2026-11-06."
     },
     {
       "id": "T023",
