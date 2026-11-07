@@ -19,7 +19,8 @@ from .run_archive import RunArchive
 
 
 def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, archive_root: Path, *, references: dict,
-                              expected_config_sha256: str | None = None, expected_run_sha256: dict | None = None) -> dict:
+                              expected_config_sha256: str | None = None, expected_run_sha256: dict | None = None,
+                              expected_reference_sha256: dict | None = None, expected_journal_sha256: dict | None = None) -> dict:
     """Inspect assigned work and retained scores without creating archives or calling providers.
 
     Callers must quiesce the separate stores and supply trusted external plan and
@@ -27,7 +28,7 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
     """
     if not isinstance(campaign, EvaluationCampaign) or not isinstance(journal, Journal) or not isinstance(references, dict):
         raise ContractError('campaign, journal and reference mapping are required')
-    _, assignments, started, scored = campaign._snapshot()
+    manifest, assignments, started, scored = campaign._snapshot()
     issues, invalid = [], []
     if set(assignments) - started:
         issues.append('unstarted_assignments')
@@ -51,6 +52,19 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
         raise ContractError('invalid external run anchors')
     if scored - set(expected_run_sha256):
         issues.append('run_anchor_unavailable')
+    if expected_reference_sha256 is None:
+        expected_reference_sha256 = {}
+    case_ids = {case['id'] for case in manifest['design']['cases']}
+    if (not isinstance(expected_reference_sha256, dict) or any(key not in case_ids for key in expected_reference_sha256)
+            or any(not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value) for value in expected_reference_sha256.values())):
+        raise ContractError('invalid external reference anchors')
+    if {assignments[rid]['case_id'] for rid in scored} - set(expected_reference_sha256):
+        issues.append('reference_anchor_unavailable')
+    if expected_journal_sha256 is None:
+        expected_journal_sha256 = {}
+    if (not isinstance(expected_journal_sha256, dict) or any(key not in assignments for key in expected_journal_sha256)
+            or any(not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value) for value in expected_journal_sha256.values())):
+        raise ContractError('invalid external journal anchors')
     audit = campaign._goal.audit_journal(journal)
     if audit['status'] == 'invalid':
         invalid.append('goal_journal_invalid')
@@ -87,6 +101,14 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
             receipt = json.loads(row[0])
             if request_id in expected_run_sha256 and receipt['run_sha256'] != expected_run_sha256[request_id]:
                 raise ContractError('external run anchor differs')
+            case_id = assignment['case_id']
+            if case_id in expected_reference_sha256 and receipt['reference_sha256'] != expected_reference_sha256[case_id]:
+                raise ContractError('external reference anchor differs')
+            if receipt['journal_sha256'] is not None:
+                if request_id not in expected_journal_sha256:
+                    issues.append('journal_anchor_unavailable')
+                elif receipt['journal_sha256'] != expected_journal_sha256[request_id]:
+                    raise ContractError('external journal anchor differs')
             if reference_digest(reference) != receipt['reference_sha256']:
                 raise ContractError('reference digest differs')
             con = sqlite3.connect(db.resolve().as_uri() + '?mode=ro', uri=True, isolation_level=None)

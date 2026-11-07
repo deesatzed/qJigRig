@@ -1812,13 +1812,34 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
         assert report['status']=='incomplete' and report['checked']==4 and report['scored']==4
         assert 'unstarted_assignments' in report['issues'] and 'provider_attribution_not_live' in report['issues']
         assert 'configuration_anchor_unavailable' in report['issues'] and 'run_anchor_unavailable' in report['issues']
+        assert 'reference_anchor_unavailable' in report['issues']
         assert report['provider_authenticity']=='not_established'
         anchors={rid:json.loads(payload)['run_sha256'] for rid,payload in goal._con.execute(
             "SELECT request_id,payload FROM evaluation_campaign_events WHERE plan_id=? AND kind='scored'",('batch',))}
+        reference_anchors={k:reference_digest(v['reference']) for k,v in cases.items()}
+        journal_anchors={rid:json.loads(payload)['journal_sha256'] for rid,payload in goal._con.execute(
+            "SELECT request_id,payload FROM evaluation_campaign_events WHERE plan_id=? AND kind='scored'",('batch',))
+                         if json.loads(payload)['journal_sha256'] is not None}
         anchored=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()},
-                                           expected_config_sha256=config_hash,expected_run_sha256=anchors)
+                                           expected_config_sha256=config_hash,expected_run_sha256=anchors,
+                                           expected_reference_sha256=reference_anchors,expected_journal_sha256=journal_anchors)
         assert anchored['checked']==4 and 'configuration_anchor_unavailable' not in anchored['issues']
         assert 'run_anchor_unavailable' not in anchored['issues']
+        assert 'reference_anchor_unavailable' not in anchored['issues'] and 'journal_anchor_unavailable' not in anchored['issues']
+        wrong_reference=dict(reference_anchors)
+        wrong_reference[next(a['case_id'] for a in plan['manifest']['assignments'] if a['request_id']==calls[0])]='0'*64
+        assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()},
+                                         expected_config_sha256=config_hash,expected_run_sha256=anchors,
+                                         expected_reference_sha256=wrong_reference,expected_journal_sha256=journal_anchors)['status']=='invalid'
+        assert journal_anchors
+        without_journal=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()},
+                                                  expected_config_sha256=config_hash,expected_run_sha256=anchors,
+                                                  expected_reference_sha256=reference_anchors)
+        assert 'journal_anchor_unavailable' in without_journal['issues']
+        wrong_journal=dict(journal_anchors);wrong_journal[next(iter(wrong_journal))]='0'*64
+        assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()},
+                                         expected_config_sha256=config_hash,expected_run_sha256=anchors,
+                                         expected_reference_sha256=reference_anchors,expected_journal_sha256=wrong_journal)['status']=='invalid'
         wrong=dict(anchors);wrong[calls[0]]='0'*64
         assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()},
                                          expected_config_sha256=config_hash,expected_run_sha256=wrong)['status']=='invalid'

@@ -1346,7 +1346,8 @@
         "G01",
         "G02",
         "G03",
-        "G04"
+        "G04",
+        "G05"
       ],
       "status": "pending",
       "files": [
@@ -3747,6 +3748,23 @@
       "acceptance": "Mark missing external anchors incomplete, reject changed anchors, and recheck archived stage and applicability settings against the frozen configuration.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "Independent verification repair while R08 remains open. Red: inspector silently treated locally stored run and config digests as sufficient. Synthetic campaign tests now check missing and wrong external config/run anchors and existing score/archive/journal tampering, while a shared archive-config checker revalidates frozen stage and applicability settings. External anchors are caller-supplied; their provenance and provider execution are not authenticated. No provider calls occurred."
+    },
+    {
+      "id": "G05",
+      "phase": "verification",
+      "depends_on": [
+        "G04"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/live_receipts.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Bind campaign inspection to reference and fresh-journal anchors",
+      "acceptance": "For scored assignments, missing external reference and fresh-journal anchors remain incomplete and mismatched anchors invalidate inspection.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Independent verification repair while R08 remains open. Red: locally stored reference hashes were silently treated as anchors. Synthetic retained campaigns now exercise missing, matching and wrong external reference and fresh-journal hashes, in addition to run/config anchors and tampering. Anchors remain caller assertions and do not authenticate sources or provider execution. No model call occurred."
     }
   ]
 }
