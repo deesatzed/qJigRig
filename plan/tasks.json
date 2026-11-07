@@ -994,7 +994,8 @@
         "R01",
         "T057A",
         "T057B",
-        "T057C"
+        "T057C",
+        "T057D"
       ],
       "status": "pending",
       "files": [
@@ -2262,6 +2263,24 @@
       "acceptance": "A synthetic reviewer sees verified bounded source evidence, and its separately journaled output creates a labeled non-activating record; failures remain explicit.",
       "command": "python -m pytest tests/test_program_review.py::test_budgeted_synthetic_review_is_recorded_without_activation -q",
       "evidence": "Red: no separately budgeted plan-review stage existed. Green: synthetic reviewer gets bounded exact-span, applicable source packet and untrusted-data instructions, with journal/archive and source-state-checked review storage. Malformed output, budget refusal, changed scope/span and source change do not activate/store a review. Full offline 460 passed. This is an explicit standalone entrypoint, not fresh-pipeline automatic integration, hosted inference, model-quality proof or full T057/R01B."
+    },
+    {
+      "id": "T057D",
+      "phase": "P5",
+      "depends_on": [
+        "T057C",
+        "R07E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/acquisition.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_configured_fresh_run_records_separate_review",
+      "action": "Integrate configured review with fresh runs",
+      "acceptance": "A synthetic fresh run records a separate review bound to its generated plan and source context while the request remains deferred.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_configured_fresh_run_records_separate_review -q",
+      "evidence": "Red: fresh run could not configure a reviewer. Green: configured synthetic run performs a separate review after predicate work, persists and identifies it in the archived result while retaining coverage deferral. Budget/malformed failures remain explicit; uncertain judge outcome prevents review dispatch. Focused 56 passed before additional cases; full offline 464 passed. Review-stage archive replay, full lifecycle/UI, complete resource reservation and hosted inference remain open."
     }
   ]
 }

@@ -310,6 +310,7 @@ class FreshRun:
     quote_refs: dict[str, tuple[QuoteRef, ...]]  # predicate id -> verified quote bindings that carried a decision
     coverage_candidates: tuple[str, ...]  # entry ids of exception-channel passages found, offered for review
     planning_evidence: dict | None = None
+    review: object | None = None
 
 
 def _planning_packet(catalog: Catalog, entries: list[IndexEntry], question: str, applicability: Callable[[str], Applicability],
@@ -361,6 +362,10 @@ def run_fresh(
     judge_max_tokens: int | None = None,
     planner_max_price: dict | None = None,
     judge_max_price: dict | None = None,
+    reviewer: tuple[str, str] | None = None,
+    reviewer_max_tokens: int = 800,
+    reviewer_max_price: dict | None = None,
+    review_reservation_factory: ReservationFactory | None = None,
     reservation_factory: ReservationFactory | None = None, archive=None,
     applicability_inputs: ApplicabilityInputs | None = None,
     role_priors: dict[str, float] | None = None,
@@ -379,7 +384,13 @@ def run_fresh(
         if value is None:
             return None
         return dict(ProviderRequest('', '', '', '', 1, max_price=value).max_price)
-    planner_max_price, judge_max_price = freeze_price(planner_max_price), freeze_price(judge_max_price)
+    planner_max_price, judge_max_price, reviewer_max_price = freeze_price(planner_max_price), freeze_price(judge_max_price), freeze_price(reviewer_max_price)
+    if reviewer is not None:
+        if (not isinstance(reviewer, tuple) or len(reviewer) != 2 or
+                any(not isinstance(value, str) or not value.strip() for value in reviewer) or
+                type(reviewer_max_tokens) is not int or reviewer_max_tokens < 1 or
+                archive is None or applicability_inputs is None):
+            raise ContractError("configured review requires reviewer identity, archive and applicability inputs")
     revision_ids = sorted({entry.span.revision_id for entry in entries})
     entity_date = {revision_id: revision_applicability(revision_id) for revision_id in revision_ids}
     if any(not isinstance(value, Applicability) for value in entity_date.values()):
@@ -417,6 +428,8 @@ def run_fresh(
             "applicability_provenance": "recorded_inputs" if applicability_inputs is not None else "verdict_only",
             "applicability_inputs": applicability_inputs.to_dict() if applicability_inputs is not None else None,
             "planning_evidence": planning_evidence,
+            **({"reviewer": {"provider": reviewer[0], "model": reviewer[1], "max_tokens": reviewer_max_tokens,
+                             "max_price": reviewer_max_price}} if reviewer is not None else {}),
         })
         for revision_id in revision_ids:
             archive.add_revision(catalog.get_revision(revision_id))
@@ -481,6 +494,42 @@ def run_fresh(
     ctx = Context(catalog, entries, check, specs, archive=archive)
     summary = run_until_done(state, ctx)
     reasons = ("plan_coverage_unestablished",) + tuple(r for r in summary.stop.reasons if r != "plan_coverage_unestablished")
+    review = None
+    if reviewer is not None:
+        from .packets import EvidencePacket, Omission, PacketItem
+        from .planner import _planner_prompt, corpus_manifest_sha256
+        from .program_review import PlanReviewOutcome, review_plan
+        from .spans import Span
+        import hashlib
+        if halted:
+            review = PlanReviewOutcome('unavailable', None, None, 'reconciliation_required')
+        else:
+            try:
+                raw_packet = planning_evidence['packet']
+                items = tuple(PacketItem(item['entry_id'], Span(item['revision_id'], item['text_sha256'], item['start'], item['end'], item['text']),
+                                         item['truncated'], item['original_end']) for item in raw_packet['items'])
+                omitted = tuple(Omission(item['entry_id'], item['reason']) for item in raw_packet['omitted'])
+                packet = EvidencePacket(items, omitted, tuple(item.entry_id for item in items if item.truncated),
+                                        raw_packet['limit'], len(json.dumps(raw_packet, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')))
+                member_rows = {row['revision_id']: {key: value for key, value in row.items() if key != 'revision_id'}
+                               for row in applicability_inputs.to_dict()['members']}
+                planner_prompt = _planner_prompt(request, corpus_manifest_sha256(revision_ids), planning_evidence)
+                review_binding = {'request': request.to_dict(), 'plan': {'origin': plan.origin,
+                                  'predicates': [{'id': p.id, 'question': p.question, 'depends_on': list(p.depends_on),
+                                                  **({'exact_operator': p.exact_operator} if p.exact_operator is not None else {})}
+                                                 for p in plan.predicates], 'expression': plan.expression},
+                                  'corpus_revision_ids': revision_ids, 'source_metadata': {ident: member_rows[ident] for ident in revision_ids},
+                                  'as_of': applicability_inputs.as_of, 'entities': sorted(applicability_inputs.request_entities),
+                                  'historical_as_known': applicability_inputs.historical_as_known,
+                                  'planner': {'provider': planner[0], 'model': planner[1],
+                                              'prompt_sha256': hashlib.sha256(planner_prompt.encode('utf-8')).hexdigest(),
+                                              'config': {'max_tokens': planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS,
+                                                         'max_price': planner_max_price}}}
+                review = review_plan(catalog, ledger, transport, review_binding, packet, provider=reviewer[0], model=reviewer[1],
+                                     archive=archive, max_tokens=reviewer_max_tokens, max_price=reviewer_max_price,
+                                     reservation_factory=review_reservation_factory)
+            except (ContractError, KeyError, TypeError, ValueError):
+                review = PlanReviewOutcome('unavailable', None, None, 'review_context_or_storage_error')
     if archive is not None:
         archive.record_run_result(request.request_id, {
             "schema": "qjig.fresh-result.v1", "request_id": request.request_id,
@@ -488,8 +537,11 @@ def run_fresh(
             "observations": {key: {"outcome": value.outcome.value, "reason": value.reason}
                              for key, value in state.observations.items()},
             "trace_count": len(state.trace), "blocking_obligations": list(summary.stop.blocking_obligations),
+            **({'review': {'status': review.status, 'failure': review.failure, 'call_id': review.call_id,
+                           'review_id': review.record['sha256'] if review.record is not None else None}}
+               if review is not None else {}),
         })
     return FreshRun(
         "deferred", reasons, None, outcome.binding, state, summary, judgments, refs,
-        tuple(i.entry_id for i in exc.packet.items), planning_evidence,
+        tuple(i.entry_id for i in exc.packet.items), planning_evidence, review,
     )

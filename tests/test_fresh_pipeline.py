@@ -675,3 +675,61 @@ def test_fresh_pipeline_consumes_preflight_slots(tmp_path):
         assert transport.calls_made == 3
         assert goal._con.execute('SELECT COUNT(*) FROM required_work WHERE attempt_id IS NOT NULL').fetchone()[0] == 3
         assert goal.audit_journal(journal)['status'] == 'verified'
+
+
+def test_configured_fresh_run_records_separate_review(tmp_path):
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.run_archive import RunArchive
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE),
+                                                                 raw({'assessment': 'no_gap_found', 'reason': 'synthetic'})])
+    inputs = ApplicabilityInputs(Collection((MemberMetadata(REV.revision_id, 'project', Interval('2026-01-01', OPEN)),)),
+                                 frozenset(), '2026-11-07', False)
+    with cat, journal, RunArchive.open(tmp_path / 'archive') as archive:
+        run = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                        planner=('stand-in', 'planner'), judge=('stand-in', 'judge'),
+                        reviewer=('stand-in', 'reviewer'), revision_applicability=lambda _: Applicability.MATCH,
+                        applicability_inputs=inputs, archive=archive)
+        assert run.status == 'deferred' and 'plan_coverage_unestablished' in run.reasons
+        assert run.state.observations['p1'].outcome is Outcome.FALSE
+        assert run.review.status == 'recorded' and run.review.activation is False
+        assert run.review.record['payload']['assurance'] == 'synthetic_review_unvalidated'
+        assert run.review.record['payload']['binding']['plan']['expression'] == PLAN['expression']
+        assert cat.program_review(run.review.record['sha256']) == run.review.record
+        assert [event.stage for event in journal.events('req-f') if event.kind == 'intent'] == ['planner', 'judge_positive', 'judge_negative', 'plan_review']
+        result = [event['data'] for event in archive.events() if event['kind'] == 'run_result'][0]
+        assert result['review']['review_id'] == run.review.record['sha256']
+        assert transport.calls_made == 4
+
+
+@pytest.mark.parametrize('mode', ['budget', 'malformed'])
+def test_fresh_review_failure_keeps_original_decision_deferred(tmp_path, mode):
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.run_archive import RunArchive
+    responses = [raw(PLAN), side(False), side(True, QUOTE), RawResponse(200, 'not JSON', U)]
+    cat, entries, journal, ledger, transport = build(tmp_path, responses, calls=3 if mode == 'budget' else 4)
+    inputs = ApplicabilityInputs(Collection((MemberMetadata(REV.revision_id, 'project', Interval('2026-01-01', OPEN)),)),
+                                 frozenset(), '2026-11-07', False)
+    with cat, journal, RunArchive.open(tmp_path / 'archive') as archive:
+        run = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                        planner=('stand-in', 'planner'), judge=('stand-in', 'judge'), reviewer=('stand-in', 'reviewer'),
+                        revision_applicability=lambda _: Applicability.MATCH, applicability_inputs=inputs, archive=archive)
+        assert run.status == 'deferred' and 'plan_coverage_unestablished' in run.reasons
+        assert run.state.observations['p1'].outcome is Outcome.FALSE
+        assert run.review.status == 'unavailable' and run.review.activation is False
+        assert run.review.failure == ('budget_exceeded' if mode == 'budget' else 'malformed_output')
+        assert run.review.record is None and cat._con.execute('SELECT COUNT(*) FROM program_reviews').fetchone()[0] == 0
+
+
+def test_fresh_review_does_not_follow_uncertain_judge_call(tmp_path):
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.run_archive import RunArchive
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN), side(False), TimeoutError('uncertain')])
+    inputs = ApplicabilityInputs(Collection((MemberMetadata(REV.revision_id, 'project', Interval('2026-01-01', OPEN)),)),
+                                 frozenset(), '2026-11-07', False)
+    with cat, journal, RunArchive.open(tmp_path / 'archive') as archive:
+        run = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                        planner=('stand-in', 'planner'), judge=('stand-in', 'judge'), reviewer=('stand-in', 'reviewer'),
+                        revision_applicability=lambda _: Applicability.MATCH, applicability_inputs=inputs, archive=archive)
+        assert run.status == 'deferred' and run.review.failure == 'reconciliation_required'
+        assert transport.calls_made == 3 and journal.pending('req-f')
+        assert all(event.stage != 'plan_review' for event in journal.events('req-f'))
