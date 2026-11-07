@@ -622,3 +622,25 @@ def test_fresh_scope_mismatch_never_reaches_planner(tmp_path):
         assert context["scope_verdicts"][revisions[1].revision_id] == "no_match"
         assert context["scope_verdicts"][revisions[2].revision_id] == "unknown"
         assert {item["reason"] for item in context["planning_evidence"]["excluded"]} >= {"inapplicable", "applicability_unknown"}
+
+
+def test_fresh_targeted_retrieval_followup(tmp_path):
+    plan = {'predicates': [{'id': 'p1', 'question': 'Is zephyr eligibility established?'}],
+            'expression': {'ref': 'p1'}}
+    run, used, transport = go(tmp_path, [raw(plan), side(False), side(True, QUOTE)])
+    assert [record.query for record in run.state.trace] == [plan['predicates'][0]['question'], REQUEST.question]
+    assert [record.round_number for record in run.state.trace] == [1, 2]
+    assert run.state.trace[0].observation.reason == 'no_retrieval_hit'
+    assert run.state.observations['p1'].outcome is Outcome.FALSE
+    assert run.status == 'deferred' and 'plan_coverage_unestablished' in run.reasons
+    assert used == 3 and transport.calls_made == 3
+
+
+@pytest.mark.parametrize('responses,expected', [([side(False), side(False)], Outcome.UNKNOWN),
+                                                  ([side(True, QUOTE), side(True, QUOTE)], Outcome.CONFLICT),
+                                                  ([RawResponse(500, 'failure', U), side(False)], Outcome.UNKNOWN)])
+def test_fresh_followup_does_not_repeat_judgment_failure_or_conflict(tmp_path, responses, expected):
+    run, used, transport = go(tmp_path, [raw(PLAN), *responses])
+    assert len(run.state.trace) == 1
+    assert run.state.observations['p1'].outcome is expected
+    assert used == 3 and transport.calls_made == 3

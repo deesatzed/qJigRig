@@ -52,6 +52,7 @@ class NeedSpec:
     retrieval_method: str = BM25_METHOD
     channel_queries: tuple[tuple[str, str], ...] = ()
     role_priors: dict[str, float] = field(default_factory=dict)
+    followup_reasons: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         if self.retrieval_method not in (BM25_METHOD, EXPANDED_BM25_METHOD):
@@ -157,6 +158,8 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
         available = min(ctx.max_rounds, 1 + (1 if base.followup else 0))
         if done >= available:
             exhausted[p.id] = "round_limit" if done >= ctx.max_rounds else "no_targeted_followup"
+        elif done and base.followup_reasons is not None and state.observations[p.id].reason not in base.followup_reasons:
+            exhausted[p.id] = "followup_not_applicable"
     pid = next_need(state.plan, state.observations, exhausted=frozenset(exhausted))
     if pid is None:
         for p_id, reason in exhausted.items():  # material needs left unresolved: say so, once
@@ -405,6 +408,7 @@ def run_fresh(
             "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS, **({"max_price": planner_max_price} if planner_max_price is not None else {})},
             "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS, **({"max_price": judge_max_price} if judge_max_price is not None else {})},
             "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": EXPANDED_BM25_METHOD,
+            "followup_policy": "request_question_on_no_primary_hit_v1",
             "reservation_factory_configured": reservation_factory is not None, "role_priors": role_priors or {},
             "corpus": {key: value.value for key, value in applicability.items()},
             "scope_policy": "exact_nonempty_v1", "source_scopes": scopes,
@@ -456,10 +460,16 @@ def run_fresh(
         return evaluate
 
     check = lambda c: bound_applicability(c.revision_id)  # noqa: E731
-    specs = {p.id: NeedSpec(p.question, want, max_bytes, make_evaluator(p.question, p.id),
-                            retrieval_method=EXPANDED_BM25_METHOD,
-                            channel_queries=(("exception", EXCEPTION_QUERY), ("contradiction", CONTRADICTION_QUERY)),
-                            role_priors=role_priors or {}) for p in plan.predicates}
+    specs = {}
+    for p in plan.predicates:
+        evaluator = make_evaluator(p.question, p.id)
+        common = {"retrieval_method": EXPANDED_BM25_METHOD,
+                  "channel_queries": (("exception", EXCEPTION_QUERY), ("contradiction", CONTRADICTION_QUERY)),
+                  "role_priors": role_priors or {}}
+        followup = (NeedSpec(request.question, want, max_bytes, evaluator, **common)
+                    if request.question.strip() != p.question.strip() else None)
+        specs[p.id] = NeedSpec(p.question, want, max_bytes, evaluator, followup=followup,
+                               followup_reasons=("no_retrieval_hit",), **common)
     obligations = ObligationLedger()
     for p in plan.predicates:
         obligations.open(Obligation(f"ob-{p.id}", "predicate_evidence", p.id, p.question, material=True))

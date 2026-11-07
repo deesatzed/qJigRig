@@ -1420,7 +1420,8 @@
       "depends_on": [
         "R03",
         "R04A",
-        "R04B"
+        "R04B",
+        "R04C"
       ],
       "status": "pending",
       "files": [],
@@ -2171,6 +2172,23 @@
       "acceptance": "A coordinated, rehashed false observation and outcome is rejected when the recorded source and deterministic evaluator disagree; older exports remain explicitly limited.",
       "command": "python -m pytest tests/test_export.py::test_authored_export_rechecks_deterministic_evaluator -q",
       "evidence": "Red: coordinated rehashed false evaluator observation and final outcome passed. Green: v2 exports recheck conclusive deterministic observations and applicability in a time-bounded subprocess; v1 reports not assessed and timeout reports incomplete. Focused 22 passed; full offline suite 423 passed; synthetic Chromium saved-run and download passed. This does not establish retrieval completeness, source authority, authenticity, or evaluator semantic validity; full T051 remains pending."
+    },
+    {
+      "id": "R04C",
+      "phase": "repair",
+      "depends_on": [
+        "R04A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/acquisition.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_fresh_targeted_retrieval_followup",
+      "action": "Integrate bounded targeted retrieval followup into fresh runs",
+      "acceptance": "After a no-hit predicate, one bounded followup uses the original request question; other failures and conflict do not trigger retries.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_targeted_retrieval_followup -q",
+      "evidence": "Red: a no-hit fresh predicate stopped without followup. Green: one versioned original-question followup is allowed only after no_retrieval_hit; earlier trace retained and unknown, conflict, provider failure do not cause a retry. Fresh focused 31 passed; full offline suite 442 passed; repository verifier 119 tasks. This lexical fallback is not semantic relevance proof, fresh coverage remains unestablished, and full R04/live comparison remain pending."
     }
   ]
 }
