@@ -1415,7 +1415,8 @@
         "R07F",
         "R07G",
         "R07I",
-        "R07J"
+        "R07J",
+        "R07K"
       ],
       "status": "pending",
       "files": [],
@@ -2797,6 +2798,26 @@
       "acceptance": "Fresh scoring checks reference and journal bindings and reports the request deferral separately from conditional graph and cited-evidence comparisons.",
       "command": "python -m pytest tests/test_evaluation.py::test_locked_fresh_run_uses_only_checked_sources_and_hides_reference -q",
       "evidence": "Red: replayed fresh runs had no reference comparison separating deferred request from conditional graph. Green: pinned reference/context and journal are checked, and exact required quotes are matched only against supported judge quotations in applicable retrieved spans. Synthetic cases distinguish conditional match from unknown evidence and reject journal tampering. Focused 81 passed before final extra case; full offline 515 passed. Deferral justification is not adjudicated; failed/incomplete fresh runs, full assignment scoring, source authority and semantics remain open."
+    },
+    {
+      "id": "R07K",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R06",
+        "R07J"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/acquisition.py",
+        "src/qjig/replay.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_planner_failure_is_archived_with_attempt_and_reconciliation_state",
+      "action": "Persist terminal summaries for failed fresh planner attempts",
+      "acceptance": "Planner failure records preserve attempted call identities and reconciliation status, remain replayably incomplete and do not imply a decision.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_planner_failure_is_archived_with_attempt_and_reconciliation_state -q",
+      "evidence": "Red: early planner failures left no terminal run summary. Green: malformed, unavailable, timeout and budget paths archive failure type, attempted call IDs and pending-reconciliation status; replay treats them as incomplete, rejects changed classification, and restart retains the records. Focused 19 and full offline 519 passed. Replay does not authenticate the journal or verify unattempted budget policy; early preflight and other crash boundaries remain open."
     }
   ]
 }

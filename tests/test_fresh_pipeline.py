@@ -841,3 +841,35 @@ def test_legacy_review_prompt_archive_remains_replayable(tmp_path, monkeypatch):
         prompt = next(e['data']['prompt'] for e in archive.events() if e['kind']=='request' and e['data']['stage']=='plan_review')
         assert REQUEST.request_id in prompt
         assert verify_archive(archive).status == 'unanchored'
+
+
+@pytest.mark.parametrize('mode', ['malformed', 'timeout', 'unavailable', 'budget'])
+def test_planner_failure_is_archived_with_attempt_and_reconciliation_state(tmp_path, mode):
+    from qjig.providers import ProviderUnavailable
+    from qjig.replay import verify_archive
+    from qjig.run_archive import RunArchive
+    response = {'malformed': RawResponse(200, 'not json', U), 'timeout': TimeoutError('synthetic'),
+                'unavailable': ProviderUnavailable('synthetic'), 'budget': None}[mode]
+    cat, entries, journal, ledger, transport = build(tmp_path, [response], calls=0 if mode=='budget' else 6)
+    with cat, journal, RunArchive.open(tmp_path/'archive') as archive:
+        run = run_fresh(request=REQUEST,catalog=cat,entries=entries,ledger=ledger,transport=transport,
+                        planner=('stand-in','planner'),judge=('stand-in','judge'),
+                        revision_applicability=lambda _: Applicability.MATCH,archive=archive)
+        final = [e for e in archive.events() if e['kind']=='run_result']
+        assert len(final)==1 and final[0]['data']['schema']=='qjig.fresh-failure.v1'
+        assert final[0]['data']['failure']==run.plan_failure and final[0]['data']['status']=='deferred'
+        expected_calls = [e.call_id for e in journal.events('req-f') if e.kind=='intent']
+        assert final[0]['data']['call_ids']==expected_calls
+        assert final[0]['data']['reconciliation_required'] is (mode=='timeout')
+        report = verify_archive(archive)
+        assert report.status=='incomplete' and 'missing_run_result' not in report.issues
+        assert not any(issue.startswith('invalid_run_result') for issue in report.issues)
+        if mode == 'malformed':
+            altered = dict(final[0]['data'], failure='budget_exceeded')
+            archive._con.execute('DROP TRIGGER event_no_update')
+            archive._con.execute("UPDATE events SET data=? WHERE kind='run_result'", (json.dumps(altered),))
+            assert verify_archive(archive).status == 'invalid'
+    if mode != 'malformed':
+        with RunArchive.open(tmp_path/'archive') as reopened, Journal.open(tmp_path/'j.sqlite') as restored_journal:
+            final = [e for e in reopened.events() if e['kind']=='run_result']
+            assert len(final)==1 and final[0]['data']['reconciliation_required'] is bool(restored_journal.pending('req-f'))

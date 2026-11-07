@@ -500,6 +500,16 @@ def run_fresh(
         for revision_id in revision_ids:
             archive.add_revision(catalog.get_revision(revision_id))
     kw = {} if planner_max_tokens is None else {"max_tokens": planner_max_tokens}
+    prior_intents = {e.call_id for e in ledger._journal.events(request.request_id) if e.kind == 'intent'}
+    def planner_failure(failure):
+        if archive is not None:
+            attempts = [e.call_id for e in ledger._journal.events(request.request_id)
+                        if e.kind == 'intent' and e.call_id not in prior_intents]
+            archive.record_run_result(request.request_id, {'schema': 'qjig.fresh-failure.v1',
+                'request_id': request.request_id, 'stage': 'planner', 'status': 'deferred',
+                'failure': failure, 'call_ids': attempts,
+                'reconciliation_required': bool(ledger._journal.pending(request.request_id))})
+        return FreshRun("deferred", (f"plan_unavailable:{failure}",), failure, None, None, None, {}, {}, (), planning_evidence)
     try:
         outcome = request_fresh_plan(
             ledger, transport, request, corpus_revision_ids=sorted({e.span.revision_id for e in entries}),
@@ -509,9 +519,9 @@ def run_fresh(
     except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
         failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
                    UncertainOutcome: "uncertain_outcome", ReconciliationRequired: "reconciliation_required"}[type(exc)]
-        return FreshRun("deferred", (f"plan_unavailable:{failure}",), failure, None, None, None, {}, {}, (), planning_evidence)
+        return planner_failure(failure)
     if not outcome.ok:
-        return FreshRun("deferred", (f"plan_unavailable:{outcome.failure}",), outcome.failure, None, None, None, {}, {}, (), planning_evidence)
+        return planner_failure(outcome.failure)
 
     plan = outcome.plan
     judgments: dict[str, JudgeResult] = {}

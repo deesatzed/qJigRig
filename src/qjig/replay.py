@@ -286,6 +286,33 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
             elif kind == "run_result":
                 if final_result is not None or event["seq"] != events[-1]["seq"]:
                     raise ContractError("run result is duplicated or not final")
+                if data.get('schema') == 'qjig.fresh-failure.v1':
+                    keys = {'schema', 'request_id', 'stage', 'status', 'failure', 'call_ids', 'reconciliation_required'}
+                    if (set(data) != keys or data['request_id'] != context['request']['request_id']
+                            or data['stage'] != 'planner' or data['status'] != 'deferred'
+                            or not isinstance(data['failure'], str) or not data['failure']
+                            or not isinstance(data['call_ids'], list) or len(data['call_ids']) > 1
+                            or set(data['call_ids']) != planner_calls or type(data['reconciliation_required']) is not bool
+                            or plan is not None or traces or pending_judges or review_record is not None
+                            or set(requests) != planner_calls):
+                        raise ContractError('invalid planner failure result')
+                    if data['call_ids']:
+                        call_id = data['call_ids'][0]
+                        if call_id in validation_data:
+                            if validation_data[call_id].get('failure') != data['failure']:
+                                raise ContractError('planner validation failure differs')
+                        elif call_id in failures:
+                            failure_data = next(e['data'] for e in events if e['kind'] == 'failure' and e['call_id'] == call_id)
+                            expected = 'uncertain_outcome' if data['failure'] == 'uncertain_outcome' else 'provider_failure' if data['failure'] == 'provider_unavailable' else None
+                            if failure_data.get('failure') != expected or (expected == 'uncertain_outcome' and not data['reconciliation_required']):
+                                raise ContractError('planner transport failure differs')
+                        else:
+                            raise ContractError('planner failure terminal missing')
+                    elif data['failure'] not in ('budget_exceeded', 'reconciliation_required'):
+                        raise ContractError('unexplained missing planner call')
+                    incomplete.append('planner_failure:' + data['failure'])
+                    final_result = data
+                    continue
                 if (data.get("schema") != "qjig.fresh-result.v1" or data.get("status") != "deferred" or
                     data.get("request_id") != context.get("request", {}).get("request_id") or
                     data.get("expression") != plan_expression or data.get("trace_count") != traces or
