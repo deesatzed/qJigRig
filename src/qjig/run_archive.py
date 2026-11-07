@@ -106,6 +106,12 @@ class RunArchive:
             raise ContractError("source snapshot hash mismatch")
         return row[1]
 
+    def source_ids(self) -> tuple[str, ...]:
+        return tuple(row[0] for row in self._con.execute("SELECT source_id FROM sources ORDER BY source_id"))
+
+    def revision_ids(self) -> tuple[str, ...]:
+        return tuple(row[0] for row in self._con.execute("SELECT revision_id FROM revisions ORDER BY revision_id"))
+
     def add_revision(self, revision: SourceRevision) -> None:
         if not isinstance(revision, SourceRevision):
             raise ContractError("source revision required")
@@ -162,6 +168,11 @@ class RunArchive:
         if not isinstance(request_id, str) or not request_id or type(sequence) is not int or sequence < 1:
             raise ContractError("invalid trace identity")
         self._event("trace", f"{request_id}#{sequence}", data)
+
+    def record_run_result(self, request_id: str, data: dict) -> None:
+        if not isinstance(request_id, str) or not request_id:
+            raise ContractError("run result requires request id")
+        self._event("run_result", request_id, data)
 
     def events(self) -> list[dict]:
         rows = self._con.execute("SELECT seq,kind,call_id,data,recorded_at FROM events ORDER BY seq").fetchall()

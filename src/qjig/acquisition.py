@@ -452,6 +452,14 @@ def run_fresh(
     ctx = Context(catalog, entries, check, specs, archive=archive)
     summary = run_until_done(state, ctx)
     reasons = ("plan_coverage_unestablished",) + tuple(r for r in summary.stop.reasons if r != "plan_coverage_unestablished")
+    if archive is not None:
+        archive.record_run_result(request.request_id, {
+            "schema": "qjig.fresh-result.v1", "request_id": request.request_id,
+            "status": "deferred", "reasons": list(reasons), "expression": plan.expression,
+            "observations": {key: {"outcome": value.outcome.value, "reason": value.reason}
+                             for key, value in state.observations.items()},
+            "trace_count": len(state.trace), "blocking_obligations": list(summary.stop.blocking_obligations),
+        })
     return FreshRun(
         "deferred", reasons, None, outcome.binding, state, summary, judgments, refs,
         tuple(i.entry_id for i in exc.packet.items), planning_evidence,

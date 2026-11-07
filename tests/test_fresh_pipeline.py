@@ -193,7 +193,7 @@ def test_fresh_pipeline_archives_each_model_attempt(tmp_path):
                            planner=("stand-in", "planner"), judge=("stand-in", "judge"),
                            revision_applicability=lambda rid: Applicability.MATCH, archive=archive)
         assert result.status == "deferred"
-        assert [event["kind"] for event in archive.events()] == ["request", "response", "validation"] * 3 + ["trace"]
+        assert [event["kind"] for event in archive.events()] == ["request", "response", "validation"] * 3 + ["trace", "run_result"]
         assert archive.source(REV.source_id) == TEXT.encode()
         assert archive.revision(REV.revision_id) == REV
 

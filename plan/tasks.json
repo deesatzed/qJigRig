@@ -877,7 +877,8 @@
       "depends_on": [
         "T039",
         "T048",
-        "R05"
+        "R05",
+        "R07H"
       ],
       "status": "pending",
       "files": [
@@ -1705,6 +1706,28 @@
       "acceptance": "Planner receives applicable verified source and exception passages, with omissions and untrusted-source labeling; invalid sources do not enter the prompt.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_planner_receives_bounded_verified_applicable_sources -q",
       "evidence": "Red: planner prompt contained only question and corpus hash. Green: stand-in planning receives bounded verified applicable primary/exception/contradiction candidates, records exclusions/channel omissions/truncation, labels source text untrusted, binds packet content into prompt hash, and remains deferred. Tests include applicable instruction contamination and inapplicable exclusion; no model resistance inferred. Full offline suite 343 passed. R05 and T050 retain semantic evaluation and live comparison requirements."
+    },
+    {
+      "id": "R07H",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R07G",
+        "R05B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/replay.py",
+        "src/qjig/run_archive.py",
+        "src/qjig/acquisition.py",
+        "tests/test_replay.py"
+      ],
+      "test_file": "tests/test_replay.py",
+      "test_name": "test_archive_replay_detects_changed_evidence_without_inference",
+      "action": "Add offline structural replay for archived records",
+      "acceptance": "Recorded sources, provider requests/responses and evidence spans can be checked without inference; changed or incomplete records remain explicit.",
+      "command": "python -m pytest tests/test_replay.py::test_archive_replay_detects_changed_evidence_without_inference -q",
+      "evidence": "Red: no archive replay existed and missing final result was accepted as unanchored complete. Green: synthetic replay checks bound source identities and spans, context/applicability inputs, planner request, response hashes, validated plan and final trace/result binding; missing records remain incomplete, an external digest detects changes, and monkeypatched transport confirms no inference. Full offline suite 349 passed. Judge semantics, journal reconciliation, full cross-store/resource replay and authenticity remain pending under T051/R07."
     }
   ]
 }
