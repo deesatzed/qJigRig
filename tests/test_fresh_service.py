@@ -27,7 +27,7 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
     price = {'prompt': 2, 'completion': 3}
     spec = {'provider': 'stand-in', 'model': model, 'input_tokens': 1000, 'output_tokens': 100, 'max_price': price}
     limit = Budget(30, 100000, 1)
-    total = Budget(90, 300000, 3)
+    total = Budget(120, 400000, 4)
     goal_path = tmp_path / 'goal.sqlite'
     def goal_factory():
         return GoalBudget.open(goal_path, total=total, per_request=limit, allocations={'smoke': total})
@@ -100,6 +100,24 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     change = builder.intervene(imported['revision_id'], source['text_sha256'], offset, offset + 2, '30')
                     assert change['role_id'] == 'builder' and change['parent_revision_id'] == imported['revision_id']
                     page.get_by_text('Sources changed since this fresh run. Rerun to inspect the current revision.').wait_for(timeout=7000)
+                    updated_quote = 'Refunds are accepted within 30 days.'
+                    rerun_transport = StandInTransport([raw({'predicates': [{'id': 'p', 'question': 'Refund limit?'}], 'expression': {'ref': 'p'}}),
+                        raw({'supported': True, 'quote': updated_quote, 'reason': 'fixture'}),
+                        raw({'supported': False, 'quote': '', 'reason': 'fixture'}),
+                        raw({'assessment': 'uncertain', 'reason': 'fixture review'})])
+                    backend.transport_factory = lambda: rerun_transport
+                    prior_runs = {item['run_id'] for item in client.list_fresh_runs()}
+                    form.get_by_role('button', name='Run fresh planning').click()
+                    page.locator('#fresh-result').get_by_text(updated_quote).wait_for(timeout=7000)
+                    assert quote not in page.locator('#fresh-result').inner_text()
+                    assert page.locator('#fresh-source-change').count() == 0
+                    assert 'Deferred' in page.locator('#fresh-message').inner_text()
+                    assert rerun_transport.calls_made == 4
+                    new_runs = {item['run_id'] for item in client.list_fresh_runs()} - prior_runs
+                    assert len(new_runs) == 1
+                    changed_replay = client.get_fresh_run(new_runs.pop())
+                    assert any(item['revision_id'] == change['child_revision_id'] and updated_quote in item['text']
+                               for trace in changed_replay['traces'] for item in trace['evidence'])
                 finally:
                     browser.close()
         server.shutdown(); server.server_close(); thread.join(timeout=5)
@@ -148,7 +166,8 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                 try:
                     page = browser.new_page()
                     page.goto(f'http://127.0.0.1:{server.server_address[1]}/')
-                    page.locator('#fresh-runs').get_by_role('button', name='Refund limit?', exact=False).first.click()
+                    original_index = [item['run_id'] for item in client.list_fresh_runs() if item['question']].index(result['run_id'])
+                    page.locator('#fresh-runs').get_by_role('button', name='Refund limit?', exact=False).nth(original_index).click()
                     page.get_by_text('Saved fresh run · unanchored structural replay').wait_for()
                     assert quote in page.locator('#fresh-replay').inner_text()
                     assert 'Decision correctness not assessed' in page.locator('#fresh-replay').inner_text()

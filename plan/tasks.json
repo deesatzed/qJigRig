@@ -3932,6 +3932,23 @@
       "acceptance": "Two role-defined clients run fresh planning over the same source, retain distinct role-bound reviews and inspect archived runs through the local service.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: RoleClient lacked ask_fresh. Synthetic configured pipeline exercised reviewer and builder requests, shared revision identity, distinct persisted review roles, no automatic decision and replay. A browser walkthrough also exercised a builder intervention, stale reviewer evidence and downloaded replay after restart. No hosted call or independent semantic outcome was established."
+    },
+    {
+      "id": "T062C",
+      "phase": "verification",
+      "depends_on": [
+        "T059C"
+      ],
+      "status": "complete",
+      "files": [
+        "docs/verification/2026-11-07-fresh-intervention-roundtrip.md"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Exercise the fresh browser intervention and archive round trip",
+      "acceptance": "After a role-defined source intervention, rerun synthetic fresh planning against the child revision and preserve the prior run across restart and export.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Opt-in real Chrome walkthrough with two role clients: builder changed 14 to 30 days; reviewer saw stale evidence then reran to the child passage; child revision was archived and the original run reopened and exported after restart. Focused browser/client tests 5 passed. Provider responses were synthetic; T062 hosted and interruption gates remain open."
     }
   ]
 }
