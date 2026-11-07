@@ -41,7 +41,7 @@
       "depends_on": [
         "T002"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/contracts.py"
       ],
@@ -49,7 +49,8 @@
       "test_name": "test_reject_invalid_budget",
       "action": "Validate budgets without coercing booleans or negative numbers",
       "acceptance": "True and negative limits are rejected before external work",
-      "command": "python -m pytest tests/test_contracts.py::test_reject_invalid_budget -q"
+      "command": "python -m pytest tests/test_contracts.py::test_reject_invalid_budget -q",
+      "evidence": "Red: ImportError Budget (initial contract). Green: test_reject_invalid_budget 10 parametrized cases passed; tests/test_contracts.py 12 passed; full suite 13 passed. 2026-11-06."
     },
     {
       "id": "T004",

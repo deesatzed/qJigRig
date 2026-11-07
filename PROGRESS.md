@@ -41,3 +41,10 @@ Repository checkpoint: initial qJig source/provenance commit `da1397b`. Staged p
 - Red: `ModuleNotFoundError: qjig.contracts`. Green: focused 1 passed, `tests/test_contracts.py` 1 passed, full suite 2 passed.
 - Behavior: JSON round trip equals the original; role and scope kept byte-exact (no trimming/case folding); wrong or missing schema_version, missing fields and unknown fields raise `ContractError`.
 - Limits: only the minimal fields exist; entity keys, as_of, evidence policy, corpus hash and experiment arm from docs/CONTRACTS.md are not yet modeled (later tasks).
+
+## 2026-11-06: T003 complete
+
+- Added `Budget` and optional `Request.budget`; validation runs at construction and in `from_dict`.
+- Red: `ImportError: Budget` at collection. Green: `test_reject_invalid_budget` 10 cases passed; `tests/test_contracts.py` 12 passed; full suite 13 passed.
+- Rejected: True/False, negatives, floats or strings for counts, NaN/inf/negative cost, non-object budget, unknown/missing budget fields. Accepted: zero limits.
+- Limit: this only validates shape. Nothing enforces or spends a budget yet.
