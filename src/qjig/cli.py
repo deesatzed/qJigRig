@@ -300,6 +300,7 @@ def build_parser() -> argparse.ArgumentParser:
     server.add_argument("--catalog", required=True)
     server.add_argument("--host", default="127.0.0.1")
     server.add_argument("--port", type=int, default=8766)
+    server.add_argument("--fresh-config", help="trusted local fresh backend configuration JSON")
     t = sub.add_parser("trace", help="render a saved trace for a person")
     t.add_argument("--file", required=True)
     return p
@@ -310,7 +311,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "serve":
             from .service import create_server
-            server = create_server(args.catalog, host=args.host, port=args.port)
+            if args.fresh_config:
+                from .fresh_config import load_fresh_config
+                fresh_backend = load_fresh_config(Path(args.fresh_config))
+            else:
+                fresh_backend = None
+            server = create_server(args.catalog, host=args.host, port=args.port, fresh_backend=fresh_backend)
             try:
                 print(json.dumps({"host": server.server_address[0], "port": server.server_address[1]}), flush=True)
                 server.serve_forever()

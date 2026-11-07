@@ -22,9 +22,10 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
     price = {'prompt': 2, 'completion': 3}
     spec = {'provider': 'stand-in', 'model': model, 'input_tokens': 1000, 'output_tokens': 100, 'max_price': price}
     limit = Budget(30, 100000, 1)
+    total = Budget(60, 200000, 2)
     goal_path = tmp_path / 'goal.sqlite'
     def goal_factory():
-        return GoalBudget.open(goal_path, total=limit, per_request=limit, allocations={'smoke': limit})
+        return GoalBudget.open(goal_path, total=total, per_request=limit, allocations={'smoke': total})
     usage = {'prompt_tokens': 10, 'completion_tokens': 5, 'cost_usd': 0.0001}
     quote = 'Refunds are accepted within 14 days.'
     raw = lambda value: RawResponse(200, json.dumps(value), usage)
@@ -51,6 +52,30 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert transport.calls_made == 4
         assert (tmp_path / 'fresh' / 'journal.sqlite').is_file()
         assert (tmp_path / 'fresh' / 'runs' / result['run_id'] / 'run.sqlite').is_file()
+        if os.environ.get('QJIG_CHROMIUM_PATH'):
+            playwright = pytest.importorskip('playwright.sync_api')
+            browser_transport = StandInTransport([raw({'predicates': [{'id': 'p', 'question': 'Refund limit?'}], 'expression': {'ref': 'p'}}),
+                raw({'supported': True, 'quote': quote, 'reason': 'fixture'}),
+                raw({'supported': False, 'quote': '', 'reason': 'fixture'}),
+                raw({'assessment': 'uncertain', 'reason': 'fixture review'})])
+            backend.transport_factory = lambda: browser_transport
+            with playwright.sync_playwright() as p:
+                browser = p.chromium.launch(headless=True, executable_path=os.environ['QJIG_CHROMIUM_PATH'])
+                try:
+                    page = browser.new_page()
+                    page.goto(f'http://127.0.0.1:{server.server_address[1]}/')
+                    form = page.locator('#fresh-form')
+                    form.locator('[name=question]').fill('Refund limit?')
+                    form.locator('[name=scope]').fill('project')
+                    form.locator('[name=as_of]').fill('2026-11-15')
+                    form.get_by_role('button', name='Run fresh planning').click()
+                    page.get_by_text('Deferred · coverage remains unestablished').wait_for()
+                    assert 'Conditional outcome: true' in page.locator('#fresh-result').inner_text()
+                    assert 'synthetic_unvalidated' in page.locator('#fresh-result').inner_text()
+                    assert quote in page.locator('#fresh-result').inner_text()
+                    assert browser_transport.calls_made == 4
+                finally:
+                    browser.close()
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)
 
