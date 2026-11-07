@@ -1424,7 +1424,8 @@
         "R08I",
         "R08J",
         "R08K",
-        "R08L"
+        "R08L",
+        "R08M"
       ],
       "status": "pending",
       "files": [],
@@ -3496,6 +3497,24 @@
       "acceptance": "Read only fixed OpenRouter key and credits endpoints after capturing a quiescent baseline; reject redirects, invalid or oversized responses, avoid exposing credentials and persist only sanitized constraints.",
       "command": "python -m pytest tests/test_account_limits.py::test_account_refresh_fetches_after_baseline_and_keeps_only_constraints -q",
       "evidence": "Red: no account refresh client existed. The client acquires a ledger baseline, reads the two fixed HTTPS endpoints with bounded responses and no redirects, validates both responses and applies the existing transactional restriction. Synthetic tests cover successful restriction, invalid and redirect failures, private-field exclusion, ledger changes during fetch, and a real local HTTP redirect. Tests use no provider network or model calls. Account data is not atomic across endpoints and may drift; BYOK costs and full pre-dispatch bounds remain unknown, and hosted dispatch stays gated."
+    },
+    {
+      "id": "R08M",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08L"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/account_client.py"
+      ],
+      "test_file": "tests/test_account_limits.py",
+      "test_name": "test_initial_account_snapshot_is_sanitized_and_can_bind_goal",
+      "action": "Supply sanitized initial account observations to policy initialization",
+      "acceptance": "Acquire and validate account data with the same secure read-only client used by refresh, returning only the minimal fields required to bind the initial persistent policy.",
+      "command": "python -m pytest tests/test_account_limits.py::test_initial_account_snapshot_is_sanitized_and_can_bind_goal -q",
+      "evidence": "Red: no reusable initial account snapshot acquisition existed. The client now returns only validated key/credit fields and can initialize the goal ledger; refresh reuses the same acquisition after its baseline. Synthetic tests confirm account labels and credentials are excluded. Provider observations can drift and cannot authorize hosted dispatch; BYOK and complete token/cost bounds remain open."
     }
   ]
 }

@@ -24,13 +24,11 @@ def _get(url: str, headers: dict, timeout: float) -> tuple[int, str]:
         return response.status, body.decode('utf-8')
 
 
-def refresh_account_constraints(goal, env_path: Path, *, get=_get) -> None:
-    """Fetch account data after a quiescent baseline, then persist a restriction.
+def fetch_account_snapshot(env_path: Path, *, get=_get) -> tuple[dict, dict]:
+    """Read only the fields needed to initialize an account-bound goal policy.
 
-    Account data is a time-sensitive source claim. No hosted request is authorized,
-    and separate BYOK billing and concurrent external spending remain unknown.
+    The returned observations are time-sensitive and do not authorize model calls.
     """
-    baseline = goal.account_refresh_baseline()
     key = load_env_value(Path(env_path), 'OPENROUTER_API_KEY')
     if not key:
         raise AccountRefreshError('account credential unavailable')
@@ -44,7 +42,20 @@ def refresh_account_constraints(goal, env_path: Path, *, get=_get) -> None:
             responses.append(json.loads(body, parse_float=Decimal))
         # Validate the complete pair before persisting either observation.
         account_spend_constraints(*responses, goal_ceiling_usd=25)
+        key_data, credits_data = (response['data'] for response in responses)
+        return ({'data': {name: key_data[name] for name in ('limit_remaining', 'include_byok_in_limit', 'is_free_tier')}},
+                {'data': {name: credits_data[name] for name in ('total_credits', 'total_usage')}})
     except Exception:
         # Never expose a provider body, URL exception, or credential in diagnostics.
         raise AccountRefreshError('account observations unavailable or invalid') from None
-    goal.restrict_account_snapshot(baseline, tuple(responses))
+
+
+def refresh_account_constraints(goal, env_path: Path, *, get=_get) -> None:
+    """Fetch after a quiescent baseline, then persist a restriction.
+
+    Account data is a time-sensitive source claim. No hosted request is authorized,
+    and separate BYOK billing and concurrent external spending remain unknown.
+    """
+    baseline = goal.account_refresh_baseline()
+    snapshot = fetch_account_snapshot(env_path, get=get)
+    goal.restrict_account_snapshot(baseline, snapshot)

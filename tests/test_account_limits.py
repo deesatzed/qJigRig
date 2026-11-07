@@ -124,3 +124,23 @@ def test_account_get_refuses_redirect_without_forwarding_credentials():
         assert received==['/start']
     finally:
         server.shutdown();thread.join();server.server_close()
+
+
+def test_initial_account_snapshot_is_sanitized_and_can_bind_goal(tmp_path):
+    import json
+    from qjig.account_client import fetch_account_snapshot
+    from qjig.contracts import Budget
+    from qjig.goal_budget import GoalBudget
+    env=tmp_path/'provider.env';env.write_text('OPENROUTER_API_KEY=test-secret\n')
+    def get(url, headers, timeout):
+        data=({'limit_remaining':0.6,'include_byok_in_limit':False,'is_free_tier':False,
+               'label':'private'} if url.endswith('/key') else
+              {'total_credits':1,'total_usage':0.2,'account_id':'private'})
+        return 200,json.dumps({'data':data})
+    snapshot=fetch_account_snapshot(env,get=get)
+    assert snapshot==({'data':{'limit_remaining':Decimal('0.6'),'include_byok_in_limit':False,'is_free_tier':False}},
+                      {'data':{'total_credits':1,'total_usage':Decimal('0.2')}})
+    assert 'private' not in repr(snapshot) and 'test-secret' not in repr(snapshot)
+    limit=Budget(2,100,0.6)
+    with GoalBudget.open(tmp_path/'g.sqlite',total=limit,per_request=limit,allocations={'s':limit},account_snapshot=snapshot):
+        pass
