@@ -1322,7 +1322,8 @@
       "phase": "P6",
       "depends_on": [
         "T062",
-        "T072"
+        "T072",
+        "T073A"
       ],
       "status": "pending",
       "files": [
@@ -3641,6 +3642,21 @@
       "acceptance": "A failed new run must not show the previous result as if it belonged to that question; prior saved runs remain available.",
       "command": "python -m pytest tests/test_source_browser.py::test_failed_question_does_not_present_previous_result -q",
       "evidence": "Independent local repair while the R08 provider preflight is open, as directed by GOAL.md. Red: Chrome retained Decided no and the prior evidence after a new question received an injected 503. The page now clears its current result and source-state binding when a run starts and displays a failed state on error; the prior saved run remains accessible. This is a synthetic local browser test, not full acceptance or hosted behavior."
+    },
+    {
+      "id": "T073A",
+      "phase": "verification",
+      "depends_on": [
+        "T062A"
+      ],
+      "status": "complete",
+      "files": [],
+      "test_file": "tests/test_clean_install.py",
+      "test_name": "test_clean_install_cli_and_loopback_service",
+      "action": "Exercise an isolated installed package through local CLI and service",
+      "acceptance": "Install qJig into a fresh virtual environment and run synthetic import, authored ask, trace and loopback service from outside the checkout without PYTHONPATH.",
+      "command": "python -m pytest tests/test_clean_install.py::test_clean_install_cli_and_loopback_service -q",
+      "evidence": "Independent local verification while R08 and full T073 prerequisites remain open, as directed by GOAL.md. The opt-in test builds and installs a wheel into a fresh venv, invokes isolated Python outside the checkout with PYTHONPATH and API-key environment variables removed, imports a synthetic source, produces an authored decision and trace, and starts the actual loopback service. A separate manual venv install and CLI help check also passed. This is a point-in-time smoke; full suite in the installed environment, documented commands, browser/two-client and hosted gates remain open. No model call occurred."
     }
   ]
 }

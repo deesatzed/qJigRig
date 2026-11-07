@@ -1,0 +1,7 @@
+# Fresh package installation smoke
+
+On 2026-11-07, qJig was built and installed into a new Python virtual environment. An opt-in repeatable check copies the current `pyproject.toml` and `src/qjig` package into temporary source staging, builds and installs that package with no runtime dependencies, then invokes its virtual-environment interpreter in isolated mode from outside the checkout. The subprocess environment removes `PYTHONPATH`, `PYTHONHOME`, `VIRTUAL_ENV`, and variables whose names contain `API_KEY`.
+
+The installed CLI imported a synthetic 14-day refund source, ran an authored numeric rule for day 20 and returned a recorded `decided` no with zero provider calls, and rendered the saved trace containing the source passage. The installed CLI also started the real loopback service on an ephemeral port and served its browser page. `QJIG_VERIFY_CLEAN_INSTALL=1 python -m pytest tests/test_clean_install.py -q` passed. A separate manually created virtual environment also installed the checkout and displayed CLI help from outside it.
+
+This is a point-in-time synthetic packaging and startup smoke. The build used pip's build isolation and may need access to build dependencies. It does not exercise the complete offline test suite against the installed wheel, every documented command, browser/two-client acceptance inside the fresh environment, hosted providers, distribution rights, or outcome quality. The optional test is skipped in the normal offline suite unless explicitly enabled. No model call was made.
