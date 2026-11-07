@@ -6,7 +6,7 @@
       "id": "T001",
       "phase": "P1",
       "depends_on": [],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "pyproject.toml",
         "src/qjig/__init__.py"
@@ -15,7 +15,8 @@
       "test_name": "test_import_has_no_io",
       "action": "Establish the isolated qjig package and pytest configuration",
       "acceptance": "Import succeeds without opening config, connecting or creating data",
-      "command": "python -m pytest tests/test_bootstrap.py::test_import_has_no_io -q"
+      "command": "python -m pytest tests/test_bootstrap.py::test_import_has_no_io -q",
+      "evidence": "Red: ModuleNotFoundError (initial contract). Green: tests/test_bootstrap.py::test_import_has_no_io 1 passed; full qJig suite 1 passed. Mutation (open() write at import) made the test fail. 2026-11-06, Python 3.13.9."
     },
     {
       "id": "T002",
