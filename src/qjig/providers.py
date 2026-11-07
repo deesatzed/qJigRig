@@ -249,7 +249,7 @@ def _validate(text: str, schema: dict[str, FieldSpec]) -> tuple[dict | None, str
 Validator = Callable[[str], tuple[dict | None, str | None]]
 
 
-def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequest, schema: "dict[str, FieldSpec] | Validator", *, reservation: CallReservation | None = None) -> TypedCall:
+def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequest, schema: "dict[str, FieldSpec] | Validator", *, reservation: CallReservation | None = None, archive=None) -> TypedCall:
     """One budgeted, journaled provider attempt returning a validated value or an explicit failure."""
     if reservation is not None and (not isinstance(reservation, CallReservation) or reservation.request_sha256 != request.input_sha256()):
         raise ContractError("reservation does not match provider request")
@@ -257,15 +257,37 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
         raise BudgetExceeded("preflight_unavailable", "hosted calls require complete input, cost and goal-wide reservations")
 
     def attempt():
+        call_id = ledger.last_call_id()
+        if archive is not None:
+            archive.record_request(call_id, request)
         try:
             raw = transport.send(request)
         except TimeoutError as exc:  # sent, outcome unknown
+            if archive is not None:
+                try:
+                    archive.record_failure(call_id, "uncertain_outcome")
+                except Exception:
+                    pass  # journal still records uncertainty; do not replace it with a definite failure
             raise UncertainOutcome(f"timeout: {exc}") from exc
+        except Exception:
+            if archive is not None:
+                archive.record_failure(call_id, "provider_failure")
+            raise
+        if archive is not None:
+            try:
+                archive.record_response(call_id, raw)
+            except Exception:
+                raise UncertainOutcome("response archive failed after dispatch") from None
         digest = hashlib.sha256(raw.body.encode("utf-8")).hexdigest()
         if not 200 <= raw.http_status < 300:
             value, failure = None, "http_error"
         else:
             value, failure = schema(raw.body) if callable(schema) else _validate(raw.body, schema)
+        if archive is not None:
+            try:
+                archive.record_validation(call_id, value, failure)
+            except Exception:
+                raise UncertainOutcome("validation archive failed after dispatch") from None
         extra = {"http_status": raw.http_status, "raw_sha256": digest, "transport": transport.label}
         if raw.note:
             extra["note"] = raw.note

@@ -1356,7 +1356,8 @@
       "finding": "F07",
       "depends_on": [
         "R08",
-        "R07A"
+        "R07A",
+        "R07B"
       ],
       "status": "pending",
       "files": [],
@@ -1465,6 +1466,30 @@
       "acceptance": "Incremental source snapshots and reconstructable call records survive interruption without credentials.",
       "command": "python -m pytest tests/test_run_archive.py::test_interrupted_run_retains_inputs_and_responses -q",
       "evidence": "Red: run archive module absent. Green: 3 tests cover source snapshots, reconstructable synthetic requests and raw responses across simulated interruption and child os._exit, immutable source identities and orphan response refusal; full suite 307 passed. Offline only; R07 retains full provider integration, sanitization, metadata and replay work."
+    },
+    {
+      "id": "R07B",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R07A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py",
+        "src/qjig/run_archive.py",
+        "src/qjig/planner.py",
+        "src/qjig/judge.py",
+        "src/qjig/acquisition.py",
+        "tests/test_run_archive.py",
+        "tests/test_fresh_pipeline.py"
+      ],
+      "test_file": "tests/test_run_archive.py",
+      "test_name": "test_typed_call_archives_before_dispatch",
+      "action": "Integrate incremental archive with offline provider attempts",
+      "acceptance": "Synthetic request, response and validated result persist in call order; failure and interruption remain explicit.",
+      "command": "python -m pytest tests/test_run_archive.py::test_typed_call_archives_before_dispatch -q",
+      "evidence": "Red: typed call and run_fresh lacked archive argument. Green: synthetic request recorded before dispatch, raw response and validated results recorded, malformed and timeout paths retained, post-dispatch archive failure leaves uncertain journal intent, three-call fresh pipeline archived; full offline suite 311 passed. Live harness, source/config snapshots, complete transport metadata, sanitization and replay remain R07."
     }
   ]
 }

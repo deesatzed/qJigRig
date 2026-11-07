@@ -96,6 +96,16 @@ class RunArchive:
                                            "body_sha256": hashlib.sha256(response.body.encode("utf-8")).hexdigest(),
                                            "usage": response.usage, "note": response.note})
 
+    def record_validation(self, call_id: str, value: dict | None, failure: str | None) -> None:
+        if not self._con.execute("SELECT 1 FROM events WHERE kind='response' AND call_id=?", (call_id,)).fetchone():
+            raise ContractError("validation has no recorded response")
+        self._event("validation", call_id, {"value": value, "failure": failure})
+
+    def record_failure(self, call_id: str, failure: str) -> None:
+        if not self._con.execute("SELECT 1 FROM events WHERE kind='request' AND call_id=?", (call_id,)).fetchone():
+            raise ContractError("failure has no recorded request")
+        self._event("failure", call_id, {"failure": failure})
+
     def events(self) -> list[dict]:
         rows = self._con.execute("SELECT seq,kind,call_id,data,recorded_at FROM events ORDER BY seq").fetchall()
         return [{"seq": r[0], "kind": r[1], "call_id": r[2], "data": json.loads(r[3]), "recorded_at": r[4]} for r in rows]

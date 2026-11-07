@@ -175,3 +175,17 @@ def test_reservation_refusal_defers_without_extra_provider_call(tmp_path):
         assert run.status == "deferred" and run.state.observations["p1"].outcome is Outcome.UNKNOWN
         assert transport.calls_made == 1 and goal.totals().max_calls == 1
         assert run.judgments["p1"].positive.failure == "budget_exceeded"
+
+
+def test_fresh_pipeline_archives_each_model_attempt(tmp_path):
+    from qjig.run_archive import RunArchive
+
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE)])
+    with cat, journal, RunArchive.open(tmp_path / "archive") as archive:
+        archive.add_source(REV.source_id, TEXT.encode())
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                           revision_applicability=lambda rid: Applicability.MATCH, archive=archive)
+        assert result.status == "deferred"
+        assert [event["kind"] for event in archive.events()] == ["request", "response", "validation"] * 3
+        assert archive.source(REV.source_id) == TEXT.encode()

@@ -58,3 +58,65 @@ def test_archive_refuses_source_rebinding_and_orphan_response(tmp_path):
         with pytest.raises(ContractError):
             run.record_response("missing", RawResponse(500, "error", None))
         assert run.source("source.md") == b"original" and run.events() == []
+
+
+def test_typed_call_archives_before_dispatch(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget
+    from qjig.journal import Journal
+    from qjig.providers import FieldSpec, StandInTransport, call_typed
+
+    request = ProviderRequest("planner", "stand-in", "m", "question", 20)
+    with RunArchive.open(tmp_path / "run") as archive, Journal.open(tmp_path / "journal.sqlite") as journal:
+        class ObservingTransport(StandInTransport):
+            def send(self, value):
+                assert [event["kind"] for event in archive.events()] == ["request"]
+                return super().send(value)
+        transport = ObservingTransport([RawResponse(200, '{"x":1}', {"prompt_tokens": 5, "completion_tokens": 3, "cost_usd": 0.0})])
+        ledger = BudgetLedger(Budget(2, 100, 1), journal, "r")
+        result = call_typed(ledger, transport, request, {"x": FieldSpec(int)}, archive=archive)
+        assert result.ok and result.value == {"x": 1}
+        events = archive.events()
+        assert [e["kind"] for e in events] == ["request", "response", "validation"]
+        assert all(e["call_id"] == result.call_id for e in events)
+        assert events[-1]["data"] == {"value": {"x": 1}, "failure": None}
+
+
+def test_archive_failure_after_dispatch_preserves_uncertainty(tmp_path, monkeypatch):
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget
+    from qjig.journal import Journal, UncertainOutcome
+    from qjig.providers import FieldSpec, StandInTransport, call_typed
+
+    request = ProviderRequest("planner", "stand-in", "m", "question", 20)
+    with RunArchive.open(tmp_path / "run") as archive, Journal.open(tmp_path / "journal.sqlite") as journal:
+        transport = StandInTransport([RawResponse(200, '{"x":1}', {"prompt_tokens": 5, "completion_tokens": 3, "cost_usd": 0.0})])
+        monkeypatch.setattr(archive, "record_response", lambda *args: (_ for _ in ()).throw(OSError("disk")))
+        ledger = BudgetLedger(Budget(2, 100, 1), journal, "r")
+        with pytest.raises(UncertainOutcome):
+            call_typed(ledger, transport, request, {"x": FieldSpec(int)}, archive=archive)
+        assert transport.calls_made == 1
+        assert [e["kind"] for e in archive.events()] == ["request"]
+        assert [e.kind for e in journal.events("r")] == ["intent", "uncertain"]
+        assert len(journal.pending("r")) == 1
+
+
+def test_typed_call_archives_malformed_output_and_timeout(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget
+    from qjig.journal import Journal, UncertainOutcome
+    from qjig.providers import FieldSpec, StandInTransport, call_typed
+
+    request = ProviderRequest("planner", "stand-in", "m", "question", 20)
+    with RunArchive.open(tmp_path / "run") as archive, Journal.open(tmp_path / "journal.sqlite") as journal:
+        good_usage = {"prompt_tokens": 5, "completion_tokens": 3, "cost_usd": 0.0}
+        transport = StandInTransport([RawResponse(200, "not json", good_usage), TimeoutError("timeout")])
+        ledger = BudgetLedger(Budget(2, 100, 1), journal, "r")
+        result = call_typed(ledger, transport, request, {"x": FieldSpec(int)}, archive=archive)
+        assert result.failure == "malformed_output"
+        assert archive.events()[1]["data"]["body"] == "not json"
+        assert archive.events()[2]["data"] == {"value": None, "failure": "malformed_output"}
+        with pytest.raises(UncertainOutcome):
+            call_typed(ledger, transport, request, {"x": FieldSpec(int)}, archive=archive)
+        assert archive.events()[-1]["data"] == {"failure": "uncertain_outcome"}
+        assert len(journal.pending("r")) == 1
