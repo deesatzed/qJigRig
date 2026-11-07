@@ -306,12 +306,25 @@ def build_parser() -> argparse.ArgumentParser:
     verify = sub.add_parser("verify-fresh", help="structurally replay a saved fresh archive without inference")
     verify.add_argument("--file", required=True)
     verify.add_argument("--expected-digest", help="separately retained archive digest")
+    verify_receipt = sub.add_parser("verify-fresh-receipt", help="check a fresh archive and journal receipt without inference")
+    verify_receipt.add_argument("--file", required=True)
+    verify_receipt.add_argument("--expected-digest", help="separately retained receipt digest")
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == 'verify-fresh-receipt':
+            from .fresh_receipt import verify_fresh_receipt
+            path = Path(args.file)
+            if not path.is_file() or path.is_symlink() or path.stat().st_size > 50_000_000:
+                raise ContractError('receipt file unavailable or too large')
+            if args.expected_digest is not None and not re.fullmatch(r'[0-9a-f]{64}', args.expected_digest):
+                raise ContractError('expected digest must be 64 lowercase hex characters')
+            report = verify_fresh_receipt(json.loads(path.read_text(encoding='utf-8')), expected_digest=args.expected_digest)
+            print(json.dumps(report))
+            return 0 if report['status'] in ('unanchored','structurally_verified') else 1
         if args.command == "verify-fresh":
             from contextlib import closing
             from dataclasses import asdict

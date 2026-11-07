@@ -1,5 +1,6 @@
 """Synthetic transport exercises the actual fresh pipeline through loopback HTTP."""
 import json
+import hashlib
 import threading
 import os
 import sqlite3
@@ -182,6 +183,54 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         checked = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
         assert checked.returncode != 0 and json.loads(checked.stdout)['status'] == 'invalid'
         assert transport.calls_made == 4
+        receipt = client._request('GET', '/api/fresh-runs/' + result['run_id'] + '/receipt')
+        assert {event['request_id'] for event in receipt['payload']['journal']} == {'fresh-1'}
+        from qjig.fresh_receipt import verify_fresh_receipt
+        checked_receipt = verify_fresh_receipt(receipt)
+        assert checked_receipt['status'] == 'unanchored'
+        assert verify_fresh_receipt(receipt, expected_digest=receipt['sha256'])['status'] == 'structurally_verified'
+        assert verify_fresh_receipt(receipt, expected_digest='0' * 64)['status'] == 'invalid'
+        assert checked_receipt['resources']['calls'] == 4
+        assert checked_receipt['resources']['reserved_tokens'] == 4400
+        assert checked_receipt['resources']['actual_input_tokens'] == 40
+        assert checked_receipt['resources']['actual_output_tokens'] == 20
+        assert checked_receipt['resources']['reserved_cost_usd'] == 0.014
+        assert checked_receipt['resources']['cost_status'] == 'known'
+        assert checked_receipt['resources']['known_cost_usd'] == 0.0004
+        receipt_path = tmp_path / 'fresh-receipt.json'
+        receipt_path.write_text(json.dumps(receipt))
+        receipt_command = [sys.executable, '-m', 'qjig', 'verify-fresh-receipt', '--file', str(receipt_path)]
+        receipt_check = subprocess.run(receipt_command, env=env, capture_output=True, text=True, timeout=10)
+        assert receipt_check.returncode == 0 and json.loads(receipt_check.stdout)['status'] == 'unanchored'
+        altered = json.loads(json.dumps(receipt))
+        altered['payload']['journal'][0]['stage'] = 'other'
+        assert verify_fresh_receipt(altered)['status'] == 'invalid'
+        altered = json.loads(json.dumps(receipt))
+        terminal = next(event for event in altered['payload']['journal'] if event['kind'] == 'receipt')
+        terminal['payload']['usage']['cost_usd'] = 0
+        canonical = json.dumps(altered['payload'], sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode()
+        altered['sha256'] = hashlib.sha256(canonical).hexdigest()
+        assert verify_fresh_receipt(altered)['status'] == 'invalid'
+        altered = json.loads(json.dumps(receipt))
+        altered['payload']['journal'] = []
+        canonical = json.dumps(altered['payload'], sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode()
+        altered['sha256'] = hashlib.sha256(canonical).hexdigest()
+        missing_journal = verify_fresh_receipt(altered)
+        assert missing_journal['status'] == 'incomplete' and missing_journal['resources']['calls'] is None
+        assert missing_journal['resources']['cost_status'] == 'unknown'
+        altered = json.loads(json.dumps(receipt))
+        intent = next(event for event in altered['payload']['journal'] if event['kind'] == 'intent')
+        intent['payload']['reserve_output_tokens'] += 1
+        canonical = json.dumps(altered['payload'], sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode()
+        altered['sha256'] = hashlib.sha256(canonical).hexdigest()
+        assert verify_fresh_receipt(altered)['status'] == 'invalid'
+        altered = json.loads(json.dumps(receipt))
+        intent = next(event for event in altered['payload']['journal'] if event['kind'] == 'intent')
+        intent['payload']['reserve_input_tokens'] = 0
+        intent['payload']['reserve_tokens'] = intent['payload']['reserve_output_tokens']
+        canonical = json.dumps(altered['payload'], sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode()
+        altered['sha256'] = hashlib.sha256(canonical).hexdigest()
+        assert verify_fresh_receipt(altered)['status'] == 'invalid'
         if os.environ.get('QJIG_CHROMIUM_PATH'):
             with playwright.sync_playwright() as p:
                 browser = p.chromium.launch(headless=True, executable_path=os.environ['QJIG_CHROMIUM_PATH'])
@@ -203,6 +252,11 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     info.value.save_as(download_path)
                     with sqlite3.connect(download_path) as con:
                         assert verify_archive(RunArchive(con)).status == 'unanchored'
+                    with page.expect_download() as info:
+                        page.get_by_role('link', name='Download fresh receipt').click()
+                    receipt_download = tmp_path / 'browser-receipt.json'
+                    info.value.save_as(receipt_download)
+                    assert verify_fresh_receipt(json.loads(receipt_download.read_text()))['status'] == 'unanchored'
                 finally:
                     browser.close()
         with sqlite3.connect(tmp_path / 'fresh' / 'runs' / result['run_id'] / 'run.sqlite') as con:
@@ -281,6 +335,12 @@ def test_interrupted_fresh_run_exposes_pending_attempt_after_restart(tmp_path):
         run_id = client.list_fresh_runs()[0]['run_id']
         replay = client.get_fresh_run(run_id)
         assert replay['verification']['status'] == 'incomplete'
+        from qjig.fresh_receipt import verify_fresh_receipt
+        partial_receipt = client._request('GET', '/api/fresh-runs/' + run_id + '/receipt')
+        partial_check = verify_fresh_receipt(partial_receipt)
+        assert partial_check['status'] == 'incomplete' and partial_check['resources']['cost_status'] == 'unknown'
+        assert partial_check['resources']['reserved_tokens'] == 1100
+        assert partial_check['resources']['actual_input_tokens'] is None
         assert replay['review'] is None
         assert replay['reconciliation']['status'] == 'required'
         assert replay['reconciliation']['unresolved'][0]['stage'] == 'planner'

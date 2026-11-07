@@ -84,6 +84,7 @@ request={'schema_version':'qjig.request.v1','request_id':'clean-fresh','question
 result=backend.run(root/'catalog.sqlite',{'request':request,'as_of':'2026-11-15','entities':[]})
 assert result['status']=='deferred' and result['review']['assurance']=='synthetic_review_unvalidated'
 (root/'fresh-export.sqlite').write_bytes(backend.export(result['run_id']))
+(root/'fresh-receipt.json').write_text(json.dumps(backend.receipt(result['run_id'])))
 print(json.dumps({'run_id':result['run_id']}))
 '''
     fresh = subprocess.run([str(python), '-I', '-c', fresh_script, str(tmp_path)], cwd=tmp_path,
@@ -92,6 +93,9 @@ print(json.dumps({'run_id':result['run_id']}))
     verified = cli('verify-fresh', '--file', tmp_path / 'fresh-export.sqlite')
     assert verified.returncode == 0, verified.stderr
     assert json.loads(verified.stdout)['status'] == 'unanchored'
+    receipt_verified = cli('verify-fresh-receipt', '--file', tmp_path / 'fresh-receipt.json')
+    assert receipt_verified.returncode == 0, receipt_verified.stderr
+    assert json.loads(receipt_verified.stdout)['status'] == 'unanchored'
 
     service = subprocess.Popen([str(python), '-I', '-m', 'qjig', 'serve', '--catalog', str(db), '--host', '127.0.0.1', '--port', '0'],
                                cwd=tmp_path, env=clean_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

@@ -149,6 +149,21 @@ class FreshWorkbench:
                     raise ContractError('fresh run identity mismatch')
                 return snapshot.serialize()
 
+    def receipt(self, run_id: str) -> dict:
+        """Capture one request's archive and journal; the stores are not atomic together."""
+        from .fresh_receipt import make_fresh_receipt
+        archive_bytes = self.export(run_id)
+        replay = self.replay(run_id)
+        path = self.state_dir / 'journal.sqlite'
+        if path.is_symlink() or not path.is_file():
+            raise ContractError('journal unavailable')
+        with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as con:
+            con.execute('BEGIN')
+            if con.execute('PRAGMA user_version').fetchone()[0] != 1:
+                raise ContractError('journal unavailable')
+            events = Journal(con, lambda: 0).events(replay['request']['request_id'])
+        return make_fresh_receipt(archive_bytes, events, replay['request']['request_id'])
+
     def list_runs(self) -> list[dict]:
         runs = self.state_dir / 'runs'
         if runs.is_symlink():

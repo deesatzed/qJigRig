@@ -92,6 +92,18 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(200, {'runs': runs})
             except (ContractError, OSError, sqlite3.Error):
                 self._reply(409, {'error': 'fresh archives unavailable'})
+        elif re.fullmatch(r"/api/fresh-runs/[0-9a-f]{64}/receipt", self.path):
+            if self.server.fresh_backend is None:
+                self._reply(404, {'error': 'not found'})
+                return
+            try:
+                with self.server.writer_lock:
+                    receipt = self.server.fresh_backend.receipt(self.path.split('/')[3])
+                self._reply(200, receipt)
+            except FileNotFoundError:
+                self._reply(404, {'error': 'not found'})
+            except (ContractError, ValueError, KeyError, TypeError, AttributeError, sqlite3.Error, OSError):
+                self._reply(409, {'error': 'fresh receipt unavailable or invalid'})
         elif re.fullmatch(r"/api/fresh-runs/[0-9a-f]{64}/export", self.path):
             ident = self.path.split('/')[3]
             if self.server.fresh_backend is None:

@@ -4133,6 +4133,28 @@
       "acceptance": "Expose recorded per-request calls, committed tokens and known or unknown cost from the local journal; absence or disagreement remains unknown.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: fresh replay omitted resource records. Synthetic run checks four calls and known cost; interrupted run checks unknown cost; missing journal yields unknown rather than zero. Chrome displays the journal-derived unverified record. This is not authenticated provider billing or hosted-call authorization."
+    },
+    {
+      "id": "T061E",
+      "phase": "P5",
+      "depends_on": [
+        "T061D",
+        "T056G"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_receipt.py",
+        "src/qjig/fresh_service.py",
+        "src/qjig/service.py",
+        "src/qjig/cli.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Export a per-request fresh archive and journal receipt",
+      "acceptance": "Download a portable receipt and check archived requests, responses, journal bindings and recorded costs offline; missing or pending accounting remains unknown or incomplete.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: receipt route returned 404. Synthetic service and Chrome round trips retain one request journal and archive; verifier detects altered receipt, rehashed changed cost and changed token reservation, and keeps missing or pending usage unknown/incomplete. This does not authenticate provider billing, establish atomic snapshots, or verify the goal-wide ledger."
     }
   ]
 }
