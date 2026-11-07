@@ -85,8 +85,8 @@ def _check_quote(side: SideResult, packet: EvidencePacket, applicability: Callab
     return SideResult(Support.SUPPORTED, side.reason, side.quote, None, side.call_id, assurance, ref)
 
 
-def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str) -> SideResult:
-    req = ProviderRequest(f"judge_{side}", provider, model, _PROMPT.format(claim=claim, evidence=evidence), JUDGE_MAX_TOKENS)
+def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str, max_tokens: int = JUDGE_MAX_TOKENS) -> SideResult:
+    req = ProviderRequest(f"judge_{side}", provider, model, _PROMPT.format(claim=claim, evidence=evidence), max_tokens)
     try:
         call = call_typed(ledger, transport, req, SIDE_SCHEMA)
     except BudgetExceeded:
@@ -112,12 +112,12 @@ def build_side_prompts(question: str, packet: EvidencePacket) -> tuple[ProviderR
 
 def judge_predicate(
     ledger: BudgetLedger, transport: Transport, question: str, packet: EvidencePacket, *, provider: str, model: str,
-    applicability: Callable[[str], Applicability] | None = None,
+    applicability: Callable[[str], Applicability] | None = None, max_tokens: int = JUDGE_MAX_TOKENS,
 ) -> JudgeResult:
     """Ask separately whether the evidence supports YES and whether it supports NO; combine the two."""
     evidence = render_packet(packet)
-    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model)
-    neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model)
+    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens)
+    neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens)
     pos = _check_quote(pos, packet, applicability) if pos.support is Support.SUPPORTED else pos
     neg = _check_quote(neg, packet, applicability) if neg.support is Support.SUPPORTED else neg
     outcome = combine_support(pos.support, neg.support)

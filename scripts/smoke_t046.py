@@ -24,6 +24,7 @@ from qjig.retrieval import bm25_candidates
 from qjig.sources import SourceRevision, decode_source
 
 PRIMARY = "tencent/hy4"
+CAP = 6000  # owner-approved raise for Hy4, which spends tokens on hidden reasoning
 FALLBACK = "deepseek/deepseek-v4.1-flash-1017"
 TEXT = b"# Refunds\nRefunds are accepted within 14 days of purchase.\n\n# Exceptions\nDefective items may be refunded within 30 days.\n"
 QUESTION = "Is a purchase made 20 days ago inside the standard 14 day refund window?"
@@ -37,11 +38,11 @@ def main(env_file: str, out: str) -> int:
     results = {"label": transport.label, "corpus": "SYNTHETIC authored sample", "stages": []}
     with tempfile.TemporaryDirectory() as d:
         journal = Journal.open(Path(d) / "j.sqlite")
-        ledger = BudgetLedger(Budget(12, 40000, 5.0), journal, request.request_id)
+        ledger = BudgetLedger(Budget(12, 80000, 5.0), journal, request.request_id)
         with journal:
             for stage, run in (
-                ("planner", lambda m: request_fresh_plan(ledger, transport, request, corpus_revision_ids=[rev.revision_id], provider="openrouter", model=m)),
-                ("judge", lambda m: judge_predicate(ledger, transport, QUESTION, packet, provider="openrouter", model=m)),
+                ("planner", lambda m: request_fresh_plan(ledger, transport, request, corpus_revision_ids=[rev.revision_id], provider="openrouter", model=m, max_tokens=CAP)),
+                ("judge", lambda m: judge_predicate(ledger, transport, QUESTION, packet, provider="openrouter", model=m, max_tokens=CAP)),
             ):
                 for model in (PRIMARY, FALLBACK):
                     try:

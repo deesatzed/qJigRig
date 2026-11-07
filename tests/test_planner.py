@@ -74,3 +74,20 @@ def test_bad_planner_output_gives_no_plan_but_keeps_the_receipt(tmp_path, body, 
         (receipt,) = [e for e in j.events("req-1") if e.kind == "receipt"]
         assert receipt.payload["raw_response"] == body  # nothing is silently repaired or replaced
         assert ledger.used_calls() == 1
+
+
+def test_max_tokens_override_reaches_the_request_and_default_is_unchanged(tmp_path):
+    seen = []
+
+    class Spy(StandInTransport):
+        def send(self, request):
+            seen.append(request.max_tokens)
+            return super().send(request)
+
+    j = Journal.open(tmp_path / "j.sqlite")
+    ledger = BudgetLedger(Budget(5, 20000, 1.0), j, "req-1")
+    t = Spy([RawResponse(200, json.dumps(PLAN_JSON), USAGE)] * 2)
+    with j:
+        request_fresh_plan(ledger, t, REQUEST, corpus_revision_ids=["r"], provider="stand-in", model="m")
+        request_fresh_plan(ledger, t, REQUEST, corpus_revision_ids=["r"], provider="stand-in", model="m", max_tokens=6000)
+    assert seen == [1500, 6000]

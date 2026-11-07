@@ -1,0 +1,234 @@
+{
+ "label": "LIVE: openrouter, real model call",
+ "corpus": "SYNTHETIC authored sample",
+ "stages": [
+  {
+   "stage": "planner",
+   "model": "tencent/hy4",
+   "ok": false,
+   "result": {
+    "ok": false,
+    "plan": null,
+    "binding": null,
+    "failure": "malformed_output",
+    "caveats": [
+     "completeness_not_established",
+     "model_generated_untrusted"
+    ]
+   }
+  },
+  {
+   "stage": "planner",
+   "model": "deepseek/deepseek-v4.1-flash-1017",
+   "ok": true,
+   "result": {
+    "ok": true,
+    "plan": {
+     "predicates": [
+      {
+       "id": "p1",
+       "question": "Is the customer identified as customer 42?",
+       "depends_on": [],
+       "exact_operator": null
+      },
+      {
+       "id": "p2",
+       "question": "Is the refund requested 20 days after the purchase?",
+       "depends_on": [],
+       "exact_operator": null
+      },
+      {
+       "id": "p3",
+       "question": "Does the applicable refund policy allow a refund 20 days after purchase?",
+       "depends_on": [],
+       "exact_operator": null
+      }
+     ],
+     "expression": {
+      "op": "and",
+      "args": [
+       {
+        "ref": "p1"
+       },
+       {
+        "ref": "p2"
+       },
+       {
+        "ref": "p3"
+       }
+      ]
+     },
+     "origin": "fresh"
+    },
+    "binding": {
+     "request_id": "t046-smoke",
+     "corpus_manifest_sha256": "a4463417f9d35d30eb878bc8a22492c62f285e6a0f83b9fdecbc46f0cde13e7a",
+     "provider": "openrouter",
+     "model": "deepseek/deepseek-v4.1-flash-1017",
+     "prompt_sha256": "d312d87d4b1bb5e3f02f6c5146773d85672f96286e9c0c62da3bf20af4748f3b",
+     "call_id": "t046-smoke#3",
+     "raw_sha256": "899c92cf3a71260a24af6a176cc0f021ee1c7ecf4b7b1ee4a2fd2fa945a8f9f6"
+    },
+    "failure": null,
+    "caveats": [
+     "completeness_not_established",
+     "model_generated_untrusted"
+    ]
+   }
+  },
+  {
+   "stage": "judge",
+   "model": "tencent/hy4",
+   "ok": true,
+   "result": {
+    "outcome": "Outcome.FALSE",
+    "positive": {
+     "support": "Support.UNKNOWN",
+     "reason": "The evidence says refunds are accepted within 14 days of purchase, so 20 days ago is outside the standard 14-day window; the 30-day rule is an exception for defective items and no defect is stated.",
+     "quote": "",
+     "failure": null,
+     "call_id": "t046-smoke#5",
+     "assurance": null,
+     "quote_ref": null
+    },
+    "negative": {
+     "support": "Support.SUPPORTED",
+     "reason": "The standard refund period is within 14 days of purchase; a purchase made 20 days ago is outside that period. The 30-day rule is an exception for defective items, not the standard 14-day window.",
+     "quote": "Refunds are accepted within 14 days of purchase.",
+     "failure": null,
+     "call_id": "t046-smoke#7",
+     "assurance": {
+      "span_integrity": "verified",
+      "applicability": null,
+      "semantic": "model_judged",
+      "independently_supported": false
+     },
+     "quote_ref": {
+      "entry_id": "59e173de4423eb99283763da8d58fd55911c59d528c8527954b2c869bdc26368",
+      "revision_id": "rev1:dc850b1c77bd35e85fe105def11678c22226cdb562fffc64a9f9850c8e70184f",
+      "start": 10,
+      "end": 58
+     }
+    },
+    "observation": {
+     "outcome": "Outcome.FALSE",
+     "reason": "judge_negative_supported"
+    },
+    "caveats": [
+     "applicability_not_assessed"
+    ]
+   }
+  }
+ ],
+ "events": [
+  {
+   "call_id": "t046-smoke#1",
+   "kind": "intent",
+   "stage": "planner",
+   "model": "tencent/hy4",
+   "payload": {
+    "reserve_tokens": 6000
+   }
+  },
+  {
+   "call_id": "t046-smoke#1",
+   "kind": "receipt",
+   "stage": "planner",
+   "model": "tencent/hy4",
+   "payload": {
+    "http_status": 200,
+    "note": "no_message_content; finish_reason=length",
+    "raw_response": "",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "transport": "LIVE: openrouter, real model call",
+    "usage": {
+     "completion_tokens": 6000,
+     "cost_usd": 0.007546878,
+     "prompt_tokens": 166
+    },
+    "validation": "malformed_output"
+   }
+  },
+  {
+   "call_id": "t046-smoke#3",
+   "kind": "intent",
+   "stage": "planner",
+   "model": "deepseek/deepseek-v4.1-flash-1017",
+   "payload": {
+    "reserve_tokens": 6000
+   }
+  },
+  {
+   "call_id": "t046-smoke#3",
+   "kind": "receipt",
+   "stage": "planner",
+   "model": "deepseek/deepseek-v4.1-flash-1017",
+   "payload": {
+    "http_status": 200,
+    "raw_sha256": "899c92cf3a71260a24af6a176cc0f021ee1c7ecf4b7b1ee4a2fd2fa945a8f9f6",
+    "transport": "LIVE: openrouter, real model call",
+    "usage": {
+     "completion_tokens": 805,
+     "cost_usd": 0.0004114,
+     "prompt_tokens": 178
+    },
+    "validation": "ok"
+   }
+  },
+  {
+   "call_id": "t046-smoke#5",
+   "kind": "intent",
+   "stage": "judge_positive",
+   "model": "tencent/hy4",
+   "payload": {
+    "reserve_tokens": 6000
+   }
+  },
+  {
+   "call_id": "t046-smoke#5",
+   "kind": "receipt",
+   "stage": "judge_positive",
+   "model": "tencent/hy4",
+   "payload": {
+    "http_status": 200,
+    "raw_sha256": "cdbb29c33baf1aa16a784cf5feab2ae60c0fbb6e7f5305093f84a741ff6ae0bb",
+    "transport": "LIVE: openrouter, real model call",
+    "usage": {
+     "completion_tokens": 571,
+     "cost_usd": 0.0007562455,
+     "prompt_tokens": 162
+    },
+    "validation": "ok"
+   }
+  },
+  {
+   "call_id": "t046-smoke#7",
+   "kind": "intent",
+   "stage": "judge_negative",
+   "model": "tencent/hy4",
+   "payload": {
+    "reserve_tokens": 6000
+   }
+  },
+  {
+   "call_id": "t046-smoke#7",
+   "kind": "receipt",
+   "stage": "judge_negative",
+   "model": "tencent/hy4",
+   "payload": {
+    "http_status": 200,
+    "raw_sha256": "632da4f0434cf034683701785f0ad14ee50f526258ccedd47db45a9a20b32d3e",
+    "transport": "LIVE: openrouter, real model call",
+    "usage": {
+     "completion_tokens": 1170,
+     "cost_usd": 0.001505295,
+     "prompt_tokens": 162
+    },
+    "validation": "ok"
+   }
+  }
+ ],
+ "used_calls": 4,
+ "known_cost_usd": 0.0102198185,
+ "cost_status": "known"
+}
