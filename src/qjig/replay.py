@@ -14,7 +14,7 @@ from .planner import _plan_validator, _planner_prompt, corpus_manifest_sha256
 from .plans import parse_plan
 from .providers import ProviderRequest, _validate
 from .program_review import _REVIEW_SCHEMA, _review_prompt
-from .programs import verify_review
+from .programs import make_draft, verify_review
 from .run_archive import RunArchive
 from .spans import Span, verify_span
 
@@ -283,14 +283,17 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                     raise ContractError("run result does not match recorded trace or plan")
                 review = data.get('review')
                 if 'reviewer' in context:
-                    if not isinstance(review, dict) or set(review) != {'status', 'failure', 'call_id', 'review_id'}:
+                    base_fields = {'status', 'failure', 'call_id', 'review_id'}
+                    if not isinstance(review, dict) or set(review) not in (base_fields, base_fields | {'draft_id'}):
                         raise ContractError('configured review result missing')
                     if review['status'] == 'recorded':
                         if review_record is None:
                             incomplete.append('review_record_unavailable')
-                        elif review != {'status': 'recorded', 'failure': None, 'call_id': review_call, 'review_id': review_record['sha256']}:
+                        elif review != {'status': 'recorded', 'failure': None, 'call_id': review_call, 'review_id': review_record['sha256'],
+                                        **({'draft_id': make_draft(review_record['payload']['binding'])['sha256']} if 'draft_id' in review else {})}:
                             raise ContractError('review result differs from record')
-                    elif review['status'] == 'unavailable' and review['review_id'] is None and isinstance(review['failure'], str) and review_record is None:
+                    elif (review['status'] == 'unavailable' and review['review_id'] is None and review.get('draft_id') is None
+                          and isinstance(review['failure'], str) and review_record is None):
                         incomplete.append('review_unavailable')
                     else:
                         raise ContractError('invalid review result')

@@ -698,6 +698,7 @@ def test_configured_fresh_run_records_separate_review(tmp_path, monkeypatch):
         assert [event.stage for event in journal.events('req-f') if event.kind == 'intent'] == ['planner', 'judge_positive', 'judge_negative', 'plan_review']
         result = [event['data'] for event in archive.events() if event['kind'] == 'run_result'][0]
         assert result['review']['review_id'] == run.review.record['sha256']
+        assert result['review']['draft_id'] == run.review.draft_id
         assert transport.calls_made == 4
         from qjig.replay import verify_archive
         def forbidden(*args, **kwargs):

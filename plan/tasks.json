@@ -997,7 +997,8 @@
         "T057C",
         "T057D",
         "T057E",
-        "T057F"
+        "T057F",
+        "T057G"
       ],
       "status": "pending",
       "files": [
@@ -2343,6 +2344,27 @@
       "acceptance": "Drafts and review links survive restart, reject changed request or source binding, and never activate a program.",
       "command": "python -m pytest tests/test_programs.py::test_draft_links_only_exact_review_without_activation -q",
       "evidence": "Red: no durable program draft or review-link lifecycle existed. Green: schema v8 stores immutable source-bound drafts and exact-bound review links; synthetic tests cover mismatch refusal, idempotency, restart, stale candidate, forged link and no activation. Prior migration fixtures updated and v7 migration tested. Full offline 472 passed; synthetic review Chromium walkthrough passed. This does not establish authenticated provenance, current completeness, provider quality, UI lifecycle or full T057/R01B."
+    },
+    {
+      "id": "T057G",
+      "phase": "P5",
+      "depends_on": [
+        "T057F",
+        "T057D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/store.py",
+        "src/qjig/program_review.py",
+        "src/qjig/acquisition.py",
+        "src/qjig/replay.py"
+      ],
+      "test_file": "tests/test_program_review.py",
+      "test_name": "test_budgeted_synthetic_review_is_recorded_without_activation",
+      "action": "Atomically link reviewed drafts in the fresh review path",
+      "acceptance": "A successful synthetic review stores its exact-bound draft and link atomically, preserves deferral and never activates.",
+      "command": "python -m pytest tests/test_program_review.py::test_budgeted_synthetic_review_is_recorded_without_activation -q",
+      "evidence": "Red: synthetic review did not create a linked draft. Green: source-checked catalog transaction stores draft, review and link together, preserves non-activation and exposes draft ID in fresh result; replay checks the reference. Forced link failure rolls back all three while the call receipt remains. Focused 79 passed before final restart assertion; full offline 473 passed; synthetic Chromium review walkthrough passed. Catalog and archive are separate stores, and hosted review, lifecycle UI and reuse enforcement remain open."
     }
   ]
 }

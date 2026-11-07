@@ -592,7 +592,8 @@ def run_fresh(
                              for key, value in state.observations.items()},
             "trace_count": len(state.trace), "blocking_obligations": list(summary.stop.blocking_obligations),
             **({'review': {'status': review.status, 'failure': review.failure, 'call_id': review.call_id,
-                           'review_id': review.record['sha256'] if review.record is not None else None}}
+                           'review_id': review.record['sha256'] if review.record is not None else None,
+                           'draft_id': review.draft_id}}
                if review is not None else {}),
         })
     return FreshRun(

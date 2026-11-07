@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 from dataclasses import dataclass
 
 from .applicability import Applicability, ApplicabilityInputs, scope_applicability
@@ -10,7 +11,7 @@ from .budgets import BudgetExceeded, BudgetLedger
 from .contracts import ContractError
 from .journal import ReconciliationRequired, UncertainOutcome
 from .packets import EvidencePacket, serialize_packet
-from .programs import make_review
+from .programs import make_draft, make_review
 from .providers import (FieldSpec, OpenRouterTransport, ProviderRequest, ProviderUnavailable,
                         ReservationFactory, StandInTransport, call_typed)
 from .run_archive import RunArchive
@@ -29,6 +30,7 @@ class PlanReviewOutcome:
     call_id: str | None
     failure: str | None
     activation: bool = False
+    draft_id: str | None = None
 
 
 def _review_prompt(binding: dict, packet: dict) -> str:
@@ -108,9 +110,12 @@ def review_plan(catalog: Catalog, ledger: BudgetLedger, transport, binding: dict
         return PlanReviewOutcome('unavailable', None, call.call_id, call.failure)
     result = {**call.value, 'call_id': call.call_id, 'raw_sha256': call.raw_sha256, 'usage': call.usage}
     record = make_review(canonical, actor, result)
+    draft = make_draft(canonical)
     try:
-        catalog.save_program_review(record, state)
+        catalog.save_reviewed_draft(draft, record, state)
     except CatalogStateChanged:
         return PlanReviewOutcome('unavailable', None, call.call_id, 'source_changed')
+    except (ContractError, sqlite3.Error):
+        return PlanReviewOutcome('unavailable', None, call.call_id, 'storage_failure')
     archive.record_review(call.call_id, record)
-    return PlanReviewOutcome('recorded', record, call.call_id, None)
+    return PlanReviewOutcome('recorded', record, call.call_id, None, draft_id=draft['sha256'])

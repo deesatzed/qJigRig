@@ -405,6 +405,36 @@ class Catalog:
     def program_review_ids(self) -> list[str]:
         return [row[0] for row in self._con.execute('SELECT review_id FROM program_reviews ORDER BY review_id')]
 
+    def save_reviewed_draft(self, draft: dict, review: dict, expected_source_state: str) -> tuple[str, str]:
+        """Atomically save an exact-bound draft, review and link; never activate."""
+        from .programs import verify_draft, verify_review
+        try:
+            binding = draft['payload']['binding']
+            if (verify_draft(draft, binding) != 'matching' or
+                    verify_review(review, binding, review['payload']['reviewer'])['status'] != 'matching_unvalidated'):
+                raise ContractError('draft and review binding differs')
+            draft_id, review_id = draft['sha256'], review['sha256']
+            draft_data = json.dumps(draft, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+            review_data = json.dumps(review, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ContractError('invalid draft or review') from exc
+        self._con.execute('BEGIN IMMEDIATE')
+        try:
+            if self._source_state_in_transaction() != expected_source_state:
+                raise CatalogStateChanged('catalog changed before reviewed draft storage')
+            self._check_program_sources(binding)
+            self._con.execute('INSERT OR IGNORE INTO program_drafts VALUES (?,?)', (draft_id, draft_data))
+            self._con.execute('INSERT OR IGNORE INTO program_reviews VALUES (?,?)', (review_id, review_data))
+            if (self._con.execute('SELECT record FROM program_drafts WHERE draft_id=?', (draft_id,)).fetchone()[0] != draft_data or
+                    self._con.execute('SELECT record FROM program_reviews WHERE review_id=?', (review_id,)).fetchone()[0] != review_data):
+                raise ContractError('draft or review identity collision')
+            self._con.execute('INSERT OR IGNORE INTO program_review_links VALUES (?,?)', (draft_id, review_id))
+            self._con.commit()
+            return draft_id, review_id
+        except BaseException:
+            self._con.rollback()
+            raise
+
     def save_program_draft(self, draft: dict, expected_source_state: str) -> str:
         from .programs import verify_draft
         try:
