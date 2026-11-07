@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .applicability import MemberMetadata, Interval
+from .budgets import BudgetExceeded
 from .cli import _dec, _member_from_row, _member_row, run_authored
 from .contracts import ContractError, Request
 from .claims import add_interpretation, list_interpretations
@@ -26,8 +27,9 @@ _FIELDS = {"source_id", "text", "scope", "entities", "effective_from", "effectiv
 class LocalServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, catalog: Path, address: tuple[str, int]):
+    def __init__(self, catalog: Path, address: tuple[str, int], fresh_backend=None):
         self.catalog = catalog
+        self.fresh_backend = fresh_backend
         self.writer_lock = threading.Lock()
         super().__init__(address, Handler)
 
@@ -203,7 +205,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._trusted_host() or not self._trusted_origin():
             self._reply(403, {"error": "untrusted host or origin"})
             return
-        if self.path not in ("/api/sources", "/api/ask", "/api/interpretations", "/api/interventions", "/api/programs/from-run"):
+        if self.path not in ("/api/sources", "/api/ask", "/api/fresh", "/api/interpretations", "/api/interventions", "/api/programs/from-run"):
             self._reply(404, {"error": "not found"})
             return
         lengths = self.headers.get_all("Content-Length", [])
@@ -222,6 +224,13 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/sources":
                 result, created = self._import_source(body)
                 self._reply(201 if created else 200, result)
+            elif self.path == "/api/fresh":
+                if self.server.fresh_backend is None:
+                    self._reply(503, {"error": "fresh planning is not configured"})
+                    return
+                with self.server.writer_lock:
+                    result = self.server.fresh_backend.run(self.server.catalog, body)
+                self._reply(200, result)
             elif self.path == "/api/programs/from-run":
                 if not isinstance(body, dict) or set(body) != {'run_id'} or not isinstance(body['run_id'], str) or not re.fullmatch(r'[0-9a-f]{64}', body['run_id']):
                     raise ContractError('invalid run identity')
@@ -282,6 +291,9 @@ class Handler(BaseHTTPRequestHandler):
                     result["reasons"] = list(result["reasons"]) + ["catalog_changed_during_run"]
                 self._reply(200, {"kind": "deterministic", "result": result,
                                   "source_state_before": before, "source_state_after": after, "run_id": run_id})
+        except BudgetExceeded:
+            self._reply(409, {"error": "fresh planning preflight unavailable or budget exhausted"})
+            return
         except CatalogStateChanged:
             self._reply(409, {"error": "source state changed; rerun before creating draft"})
             return
@@ -311,10 +323,14 @@ class Handler(BaseHTTPRequestHandler):
         return {"source_id": revision.source_id, "revision_id": revision.revision_id, "entries": len(entries)}, created
 
 
-def create_server(catalog: str | Path, *, host: str = "127.0.0.1", port: int = 8766) -> LocalServer:
+def create_server(catalog: str | Path, *, host: str = "127.0.0.1", port: int = 8766, fresh_backend=None) -> LocalServer:
     if host != "127.0.0.1" or type(port) is not int or not 0 <= port <= 65535:
         raise ContractError("service requires IPv4 loopback and a valid port")
     path = Path(catalog)
     with Catalog.open(path):
         pass
-    return LocalServer(path, (host, port))
+    if fresh_backend is not None:
+        from .fresh_service import FreshWorkbench
+        if not isinstance(fresh_backend, FreshWorkbench):
+            raise ContractError("invalid fresh backend")
+    return LocalServer(path, (host, port), fresh_backend)

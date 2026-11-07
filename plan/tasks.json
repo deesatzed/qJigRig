@@ -3783,6 +3783,26 @@
       "acceptance": "Recheck every declared case against its pinned design, source hashes, protected artifacts, external reference anchor and frozen applicability; missing case inputs remain incomplete.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "Independent verification work while R08 remains open. Red: campaign inspector did not check the assigned case set or isolation. Synthetic tests exercise all case locks including unstarted cases, missing case inputs, changed references and protected/source overlap, alongside scored receipts. Isolation is limited to declared exact artifacts; transformed or undeclared labels, provider authenticity and final live verification remain unproved. No model call occurred."
+    },
+    {
+      "id": "T053C",
+      "phase": "P5",
+      "depends_on": [
+        "T053B",
+        "T054A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/service.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Connect trusted configured fresh pipeline to local HTTP service and browser",
+      "acceptance": "Run fresh planning through a configured backend with durable accounting and explicit deferral; unconfigured browser requests report unavailable and hosted dispatch stays blocked.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: missing fresh_service module. Synthetic integration passes through the real planner, judges and review pipeline with four stand-in calls, source evidence, a durable journal and archive, and deferred coverage. Hosted transport remains blocked; ordinary CLI startup does not configure a backend. Browser test requires Playwright and Chromium and is not independent outcome evidence."
     }
   ]
 }
