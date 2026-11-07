@@ -8,6 +8,7 @@ import re
 
 from .contracts import ContractError, Request
 from .indexing import index_entries
+from .logic import Observation, Outcome, evaluate, expression_ids, is_material, reachable_outcomes
 from .plans import parse_plan
 from .sources import SourceRevision, decode_source
 from .spans import Span, verify_span
@@ -81,9 +82,16 @@ def verify_authored_export(bundle: object, *, expected_digest: str | None = None
             revisions[ident] = revision
             entries[ident] = {entry.entry_id: entry for entry in index_entries(revision)}
         used = set()
+        observations = {}
+        evidence_by_predicate = {}
         for seq, record in enumerate(result['records'], 1):
             if type(record['sequence']) is not int or record['sequence'] != seq or record['predicate_id'] not in {p.id for p in plan.predicates}:
                 raise ContractError('invalid trace sequence or predicate')
+            observed = record['observation']
+            if not isinstance(observed, dict) or set(observed) != {'outcome', 'reason'} or not isinstance(observed['reason'], str):
+                raise ContractError('invalid trace observation')
+            observations[record['predicate_id']] = Observation(Outcome(observed['outcome']), observed['reason'])
+            evidence_by_predicate.setdefault(record['predicate_id'], []).extend(record['evidence'])
             for evidence in record['evidence']:
                 ident = evidence['revision_id']
                 revision = revisions[ident]
@@ -97,6 +105,44 @@ def verify_authored_export(bundle: object, *, expected_digest: str | None = None
                 used.add(ident)
         if used != set(revisions):
             raise ContractError('source set mismatch')
+        recorded_observations = {key: {'outcome': value.outcome.value, 'reason': value.reason} for key, value in observations.items()}
+        if result['observations'] != recorded_observations:
+            raise ContractError('result observations differ from trace')
+        predicate_ids = {p.id for p in plan.predicates}
+        obligations = result['obligations']
+        if not isinstance(obligations, list) or len(obligations) != len(predicate_ids):
+            raise ContractError('invalid obligation set')
+        skips = result['skipped']
+        if not isinstance(skips, list) or any(not isinstance(item, dict) for item in skips):
+            raise ContractError('invalid skip records')
+        skip_by_predicate = {item['predicate_id']: item for item in skips}
+        if len(skip_by_predicate) != len(skips) or not set(skip_by_predicate).issubset(predicate_ids):
+            raise ContractError('invalid skip identities')
+        evaluation = evaluate(plan.expression, observations)
+        referenced = expression_ids(plan.expression)
+        seen = set()
+        for obligation in obligations:
+            pid = obligation['predicate_id']
+            if (pid not in predicate_ids or pid in seen or obligation['id'] != f'ob-{pid}' or
+                    obligation['material'] is not True or obligation['kind'] != ('exception' if policy['needs'][pid].get('kind') == 'exception' else 'predicate_evidence') or
+                    obligation['status'] not in ('open', 'evidence_found', 'unresolved', 'satisfied', 'skipped')):
+                raise ContractError('invalid obligation binding')
+            seen.add(pid)
+            if obligation['status'] == 'satisfied' and (pid not in observations or observations[pid].outcome not in (Outcome.TRUE, Outcome.FALSE) or not evidence_by_predicate.get(pid)):
+                raise ContractError('satisfied obligation lacks recorded evidence')
+            if obligation['status'] == 'skipped' and (pid in observations or is_material(pid, plan.expression, observations)):
+                raise ContractError('material obligation was skipped')
+            if obligation['status'] == 'skipped':
+                skip = skip_by_predicate.get(pid)
+                if not skip or (pid not in referenced and skip.get('kind') != 'unreferenced'):
+                    raise ContractError('skip lacks recorded justification')
+                if pid in referenced and (skip.get('kind') != 'witnessed' or evaluation.outcome not in (Outcome.TRUE, Outcome.FALSE)
+                                           or not evaluation.witnesses or skip.get('witnesses') != list(evaluation.witnesses)):
+                    raise ContractError('skip lacks conclusive witnesses')
+        if result['status'] == 'decided':
+            reachable = reachable_outcomes(plan.expression, observations).outcomes
+            if reachable != frozenset({result['outcome']}) or any(o['status'] not in ('satisfied', 'skipped') for o in obligations):
+                raise ContractError('decision differs from recorded composition')
     except (ContractError, KeyError, TypeError, ValueError, UnicodeError, OverflowError, AttributeError):
         return {'status': 'invalid', 'sha256': None, 'semantic_assurance': 'not_assessed'}
     return {'status': 'structurally_verified' if expected_digest is not None else 'unanchored',

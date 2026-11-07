@@ -881,7 +881,8 @@
         "T048",
         "R05",
         "R07H",
-        "T051A"
+        "T051A",
+        "T051B"
       ],
       "status": "pending",
       "files": [
@@ -2131,6 +2132,25 @@
       "acceptance": "A real browser reopens an earlier saved result after an intervention, identifies it as a historical snapshot when sources differ, and downloads its evidence bundle.",
       "command": "python -m pytest tests/test_web.py::test_browser_serves_saved_run_controls -q",
       "evidence": "Red: browser lacked saved-run controls. Green: real Chromium synthetic walkthrough created no/yes runs around an intervention, restarted service, reopened original as stale, downloaded its JSON and independently checked source bindings against the saved digest; 390px no overflow. Focused web/export/service suite 16 passed; full offline suite 419 passed. See docs/verification/2026-11-07-saved-run-browser.md. Unanchored storage, semantics, full replay, accessibility and hosted work remain open."
+    },
+    {
+      "id": "T051B",
+      "phase": "P4",
+      "depends_on": [
+        "T061A",
+        "T027",
+        "T028"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/export.py"
+      ],
+      "test_file": "tests/test_export.py",
+      "test_name": "test_authored_export_rejects_rehashed_inconsistent_outcome",
+      "action": "Verify authored export composition against recorded observations",
+      "acceptance": "Rehashed outcome or observation changes that disagree with trace and Boolean composition are rejected without inference.",
+      "command": "python -m pytest tests/test_export.py::test_authored_export_rejects_rehashed_inconsistent_outcome -q",
+      "evidence": "Red: rehashed authored export could flip the final Boolean while retaining the original trace. Green: offline verification matches final observations to trace, recomputes reachable outcomes, checks material obligations and witnessed skips, and rejects rehashed inconsistent outcome/observation/witness. Focused 30 passed; full suite 421 passed; saved-run Chromium/download walkthrough passed. This does not verify evaluator semantics, complete corpus, authenticity or full T051."
     }
   ]
 }
