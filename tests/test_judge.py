@@ -16,7 +16,7 @@ from qjig.providers import RawResponse, StandInTransport
 from qjig.retrieval import bm25_candidates
 from qjig.sources import SourceRevision, decode_source
 
-USAGE = {"prompt_tokens": 20, "completion_tokens": 5, "cost_usd": None}
+USAGE = {"prompt_tokens": 20, "completion_tokens": 5, "cost_usd": 0.0}
 QUESTION = "Is the purchase inside the 14 day refund window?"
 
 
@@ -73,7 +73,7 @@ def test_supported_without_quote_and_provider_failures_stay_unknown_with_a_reaso
     assert r.outcome is Outcome.FALSE  # the negative side is supported and the positive side only FAILED (unknown)
     assert r.positive.failure == "malformed_output"
     assert r.caveats == ("positive_side_failed:malformed_output", "applicability_not_assessed")  # the possible hidden conflict is stated
-    r, _, _ = run(tmp_path, RawResponse(500, "oops", None), RawResponse(200, "[]", USAGE))
+    r, _, _ = run(tmp_path, RawResponse(500, "oops", USAGE), RawResponse(200, "[]", USAGE))
     assert r.outcome is Outcome.UNKNOWN and r.observation.reason == "provider_http_error"
     assert (r.positive.failure, r.negative.failure) == ("http_error", "schema_violation")
 

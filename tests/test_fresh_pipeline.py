@@ -13,7 +13,7 @@ from qjig.providers import RawResponse, StandInTransport
 from qjig.sources import SourceRevision, decode_source
 from qjig.store import Catalog
 
-U = {"prompt_tokens": 20, "completion_tokens": 9, "cost_usd": None}
+U = {"prompt_tokens": 20, "completion_tokens": 9, "cost_usd": 0.0}
 TEXT = "# Refunds\nRefunds are accepted within 14 days of purchase.\n\n# Exceptions\nDefective items may be refunded within 30 days.\n"
 REV = SourceRevision.create("sample/refunds.md", "synthetic", decode_source(TEXT.encode(), encoding="utf-8"))
 REQUEST = Request("req-f", "Can customer 42 get a refund 20 days after purchase?", "reviewer", "1", "project")

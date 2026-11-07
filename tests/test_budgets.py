@@ -8,7 +8,7 @@ H = "c" * 64
 
 
 def run(ledger, stage, call=None, tokens=10, **kw):
-    return ledger.run(stage, call or (lambda: ("ok", {"prompt_tokens": 4, "completion_tokens": 1, "cost_usd": None})),
+    return ledger.run(stage, call or (lambda: ("ok", {"prompt_tokens": 4, "completion_tokens": 1, "cost_usd": 0.0})),
                       provider="stand-in", model="stand-in-model", input_sha256=H, reserve_tokens=tokens, **kw)
 
 
@@ -20,25 +20,17 @@ def make(tmp_path, calls=3, tokens=1000, cost=1.0, name="j.sqlite"):
 def test_physical_call_cap(tmp_path):
     j, ledger = make(tmp_path, calls=3)
     with j:
-        run(ledger, "planner")
-        with pytest.raises(RuntimeError):
-            run(ledger, "repair", call=lambda: (_ for _ in ()).throw(RuntimeError("bad json")))  # a failed call still counts
-        def timeout():
-            raise UncertainOutcome("timeout after send")
-        with pytest.raises(UncertainOutcome):
-            run(ledger, "stability_probe", call=timeout)  # an uncertain call counts too
+        for stage in ("planner", "repair", "stability_probe"):
+            run(ledger, stage)
         assert ledger.used_calls() == 3 and ledger.remaining_calls() == 0
-        # the final check, a fallback and an escalation all share the same cap: none may run
         invoked = []
         for stage in ("final_check", "fallback", "escalation"):
             with pytest.raises(BudgetExceeded) as exc:
-                run(ledger, stage, call=lambda: invoked.append(1) or ("x", {}))
+                run(ledger, stage, call=lambda: invoked.append(1))
             assert exc.value.limit == "calls"
-        assert invoked == [] and ledger.used_calls() == 3  # refused before any intent or call
-    # the count survives a restart because it is derived from the journal
+        assert invoked == []
     with Journal.open(tmp_path / "j.sqlite") as j2:
         assert BudgetLedger(Budget(3, 1000, 1.0), j2, "req-1").used_calls() == 3
-    # a different request has its own cap
         assert BudgetLedger(Budget(3, 1000, 1.0), j2, "req-2").used_calls() == 0
 
 
@@ -75,14 +67,12 @@ def test_token_cap_uses_declared_reservation_then_actuals(tmp_path):
 def test_unknown_cost_is_not_zero_and_missing_or_zero_budget_authorizes_nothing(tmp_path):
     j, ledger = make(tmp_path, calls=10, cost=0.5)
     with j:
-        run(ledger, "planner")
-        assert ledger.cost_status() == "unknown" and ledger.known_cost_usd() is None  # not 0.0
-        run(ledger, "judge", call=lambda: ("ok", {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": 0.4}))
+        run(ledger, "known", call=lambda: ("ok", {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": 0.4}))
+        run(ledger, "unknown", call=lambda: ("ok", {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": None}))
         assert ledger.known_cost_usd() == 0.4 and ledger.cost_status() == "partially_unknown"
-        run(ledger, "judge", call=lambda: ("ok", {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": 0.2}))
-        with pytest.raises(BudgetExceeded) as exc:  # known spend 0.6 already exceeds the requested 0.5
+        with pytest.raises(BudgetExceeded) as exc:
             run(ledger, "judge")
-        assert exc.value.limit == "cost"
+        assert exc.value.limit == "cost_unknown"
     for budget in (None, Budget(0, 0, 0)):
         with Journal.open(tmp_path / "z.sqlite") as jz:
             with pytest.raises(BudgetExceeded):
@@ -106,3 +96,38 @@ def test_invalid_usage_stays_unknown_and_reservation_is_preserved(tmp_path, usag
         if not (0 <= usage["cost_usd"] < float("inf")):
             assert ledger.known_cost_usd() is None
             assert ledger.cost_status() == "unknown"
+
+
+def test_unknown_cost_blocks_further_calls_after_restart(tmp_path):
+    j, ledger = make(tmp_path, calls=4)
+    with j:
+        run(ledger, "first", call=lambda: ("ok", {"prompt_tokens": 2, "completion_tokens": 1, "cost_usd": None}))
+        assert ledger.cost_status() == "unknown"
+    with Journal.open(tmp_path / "j.sqlite") as reopened:
+        resumed = BudgetLedger(Budget(4, 1000, 1), reopened, "req-1")
+        invoked = []
+        with pytest.raises(BudgetExceeded) as error:
+            run(resumed, "next", call=lambda: invoked.append(True))
+        assert error.value.limit == "cost_unknown"
+        assert invoked == [] and resumed.used_calls() == 1
+
+
+@pytest.mark.parametrize("error", [RuntimeError("failed"), UncertainOutcome("uncertain")])
+def test_failed_and_uncertain_calls_count_and_block_unknown_cost(tmp_path, error):
+    j, ledger = make(tmp_path, calls=3)
+    with j:
+        with pytest.raises(type(error)):
+            run(ledger, "planner", call=lambda: (_ for _ in ()).throw(error))
+        assert ledger.used_calls() == 1 and ledger.cost_status() == "unknown"
+        with pytest.raises(BudgetExceeded, match="cost_unknown"):
+            run(ledger, "repair")
+        assert ledger.used_calls() == 1
+
+
+def test_known_spend_at_cap_blocks_call(tmp_path):
+    j, ledger = make(tmp_path, cost=0.5)
+    with j:
+        run(ledger, "planner", call=lambda: ("ok", {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": 0.5}))
+        with pytest.raises(BudgetExceeded) as error:
+            run(ledger, "judge")
+        assert error.value.limit == "cost"

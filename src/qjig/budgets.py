@@ -1,7 +1,7 @@
 """Request-wide spend accounting derived from the journal. Every physical attempt counts.
 
 Planner, repair, stability probes, final checks, fallback and escalation all share one cap.
-Dollar limits are the requester's cap checked against KNOWN cost only; they are not provider-enforced.
+Unknown historical cost blocks further calls; preflight cost reservations are still required.
 """
 from __future__ import annotations
 
@@ -97,6 +97,8 @@ class BudgetLedger:
             raise BudgetExceeded("calls", f"{self.used_calls()} used of {self.budget.max_calls}; {stage} needs 1 plus {hold_back_calls} held back")
         if self.committed_tokens() + reserve_tokens + hold_back_tokens > self.budget.max_tokens:
             raise BudgetExceeded("tokens", f"{self.committed_tokens()} committed of {self.budget.max_tokens}; {stage} reserves {reserve_tokens}")
+        if self.cost_status() != "known":
+            raise BudgetExceeded("cost_unknown", "previous call has unknown cost; further calls are not authorized")
         known = self.known_cost_usd()
         if known is not None and known >= self.budget.max_cost_usd:
             raise BudgetExceeded("cost", f"known cost {known} has reached the requested cap {self.budget.max_cost_usd}")

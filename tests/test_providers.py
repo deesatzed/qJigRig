@@ -15,7 +15,7 @@ from qjig.providers import (
 SCHEMA = {"outcome": FieldSpec(str, enum=("true", "false", "unknown", "conflict")), "reason": FieldSpec(str)}
 REQ = ProviderRequest(stage="judge", provider="stand-in", model="stand-in-model", prompt="Is it?", max_tokens=50)
 GOOD = json.dumps({"outcome": "true", "reason": "quoted"})
-USAGE = {"prompt_tokens": 5, "completion_tokens": 2, "cost_usd": None}
+USAGE = {"prompt_tokens": 5, "completion_tokens": 2, "cost_usd": 0.0}
 
 
 def setup(tmp_path, responses, calls=5):
@@ -46,8 +46,8 @@ def test_other_invalid_outputs_and_the_valid_path(tmp_path):
         (RawResponse(200, json.dumps({"outcome": "true"}), USAGE), "schema_violation"),  # missing field
         (RawResponse(200, json.dumps({"outcome": "true", "reason": "x", "extra": 1}), USAGE), "schema_violation"),
         (RawResponse(200, json.dumps(["not", "an", "object"]), USAGE), "schema_violation"),
-        (RawResponse(500, "upstream error", None), "http_error"),
-        (RawResponse(429, "", None), "http_error"),
+        (RawResponse(500, "upstream error", USAGE), "http_error"),
+        (RawResponse(429, "", USAGE), "http_error"),
     ]
     j, ledger, t = setup(tmp_path, [c[0] for c in cases] + [RawResponse(200, GOOD, USAGE)], calls=10)
     with j:
@@ -68,10 +68,14 @@ def test_timeout_is_uncertain_and_refusal_to_connect_is_a_definite_failure(tmp_p
             call_typed(ledger, t, REQ, SCHEMA)
         assert [e.kind for e in j.events("req-1")] == ["intent", "uncertain"]
         other = ProviderRequest("judge", "stand-in", "stand-in-model", "different prompt", 50)
-        with pytest.raises(ProviderUnavailable):
+        from qjig.budgets import BudgetExceeded
+        with pytest.raises(BudgetExceeded):
             call_typed(ledger, t, other, SCHEMA)
-        assert [e.kind for e in j.events("req-1")][-2:] == ["intent", "failure"]
-        assert ledger.used_calls() == 2
+        other_ledger = BudgetLedger(Budget(2, 1000, 1), j, "req-2")
+        with pytest.raises(ProviderUnavailable):
+            call_typed(other_ledger, t, other, SCHEMA)
+        assert [e.kind for e in j.events("req-2")] == ["intent", "failure"]
+        assert ledger.used_calls() == 1 and other_ledger.used_calls() == 1
 
 
 def test_exhausted_stand_in_and_unbudgeted_calls_never_reach_the_transport(tmp_path):

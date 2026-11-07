@@ -84,7 +84,8 @@ def test_oversize_no_truncation(tmp_path):
     with j:
         big = LocalJudgeConfig(py, model, max_input_chars=50000, model_label="local-stand-in")
         r = run_local_judge(ledger, big, Spy(), QUESTION, pk)
-        assert r.outcome is Outcome.TRUE and len(seen) == 2 and all(QUOTE in p for p in seen)
+        assert r.outcome is Outcome.TRUE and len(seen) == 1 and all(QUOTE in p for p in seen)
+        assert r.negative.failure == "budget_exceeded"  # unmeasured cost prevents another call
         assert {e.provider for e in j.events("req-1")} == {"local"}
 
 

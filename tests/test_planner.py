@@ -17,7 +17,7 @@ PLAN_JSON = {
     ],
     "expression": {"op": "or", "args": [{"ref": "within_limit"}, {"ref": "exception"}]},
 }
-USAGE = {"prompt_tokens": 30, "completion_tokens": 40, "cost_usd": None}
+USAGE = {"prompt_tokens": 30, "completion_tokens": 40, "cost_usd": 0.0}
 
 
 def setup(tmp_path, bodies, calls=5):
