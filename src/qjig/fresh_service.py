@@ -29,6 +29,15 @@ from .run_archive import RunArchive
 from .store import Catalog
 
 
+def _judgment_view(judgment):
+    def side_view(side):
+        return {'support': side.support.value, 'reason': side.reason, 'failure': side.failure,
+                'call_id': side.call_id, 'quote': side.quote if side.quote_ref is not None else None,
+                'quote_ref': asdict(side.quote_ref) if side.quote_ref is not None else None}
+    return {'positive': side_view(judgment.positive), 'negative': side_view(judgment.negative),
+            'caveats': list(judgment.caveats)}
+
+
 class FreshWorkbench:
     """Trusted local configuration, never created from browser-supplied paths or credentials."""
 
@@ -62,8 +71,10 @@ class FreshWorkbench:
         if runs.is_symlink() or directory.is_symlink() or database.is_symlink() or not database.is_file():
             raise FileNotFoundError('fresh run unavailable')
         with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as connection:
+            connection.execute('BEGIN')
             archive = RunArchive(connection)
-            report = verify_archive(archive)
+            judgments = {}
+            report = verify_archive(archive, judgments_out=judgments)
             if report.status == 'invalid':
                 raise ContractError('fresh run failed structural replay')
             context, events = archive.context(), archive.events()
@@ -71,7 +82,9 @@ class FreshWorkbench:
             if hashlib.sha256(request.request_id.encode('utf-8')).hexdigest() != run_id:
                 raise ContractError('fresh run identity mismatch')
             results = [event['data'] for event in events if event['kind'] == 'run_result']
-            traces = [event['data'] for event in events if event['kind'] == 'trace']
+            traces = [{**event['data'], 'judgment': _judgment_view(judgments[event['data']['sequence']])
+                       if event['data']['sequence'] in judgments else None}
+                      for event in events if event['kind'] == 'trace']
             reviews = [event['data'] for event in events if event['kind'] == 'review_record']
             review = None
             if len(reviews) == 1:
@@ -205,16 +218,9 @@ class FreshWorkbench:
                     last_trace = {trace.predicate_id: index for index, trace in enumerate(run.state.trace)}
                     for index, trace in enumerate(run.state.trace):
                         judgment = run.judgments.get(trace.predicate_id) if last_trace[trace.predicate_id] == index else None
-                        def side_view(side):
-                            return {'support': side.support.value, 'reason': side.reason, 'failure': side.failure,
-                                    'call_id': side.call_id,
-                                    'quote': side.quote if side.quote_ref is not None else None,
-                                    'quote_ref': asdict(side.quote_ref) if side.quote_ref is not None else None}
                         records.append({'predicate_id': trace.predicate_id, 'outcome': trace.observation.outcome.value,
                                         'reason': trace.observation.reason,
-                                        'judgment': {'positive': side_view(judgment.positive),
-                                                     'negative': side_view(judgment.negative),
-                                                     'caveats': list(judgment.caveats)} if judgment else None,
+                                        'judgment': _judgment_view(judgment) if judgment else None,
                                         'evidence': [{'revision_id': item.revision_id, 'start': item.start, 'end': item.end,
                                                       'text': item.text, 'truncated': item.truncated} for item in trace.evidence],
                                         'exclusions': [{'reason': item.reason} for item in trace.exclusions]})

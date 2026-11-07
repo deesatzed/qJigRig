@@ -4094,6 +4094,26 @@
       "acceptance": "Expose final positive and negative model-side outcomes and source-bound cited quote separately from retrieved passages without assigning later judgments to earlier rounds.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: immediate fresh results lacked judgment and quote references. Synthetic actual-pipeline and Chrome checks show positive and negative outcomes, exact cited quote and a separate retrieved passage containing extra text. Focused Chrome/fresh/judge checks: 56 passed. Model judgment remains unvalidated; saved replay does not yet reconstruct cited-quote presentation."
+    },
+    {
+      "id": "T055G",
+      "phase": "P5",
+      "depends_on": [
+        "T055F",
+        "T056D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/replay.py",
+        "src/qjig/fresh_service.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Reconstruct cited judgments during saved fresh replay",
+      "acceptance": "After restart, show source-bound cited judgments reconstructed from structurally replayed archived responses; incomplete or invalid archives do not yield reconstructed citations.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: replay omitted judgments. Synthetic actual-pipeline and Chrome checks now show the same cited quote and source revision after restart. Incomplete review and tampered archive checks suppress reconstructed judgments. Focused Chrome/fresh/replay/judge checks: 27 passed. Unanchored structural replay does not authenticate provenance or validate model interpretation."
     }
   ]
 }

@@ -70,12 +70,17 @@ def _check_review(record, call_id, request, response, validation, context, plan)
         raise ContractError('review result differs from response')
 
 
-def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -> ReplayReport:
+def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, judgments_out: dict | None = None) -> ReplayReport:
     """Validate saved structure and optionally compare to an externally saved digest.
 
     A digest detects changes relative to the supplied anchor; it does not authenticate
     the archive, prove source authority, or establish a model's semantic correctness.
     """
+    if judgments_out is not None:
+        if not isinstance(judgments_out, dict):
+            raise ContractError('judgment output must be a dictionary')
+        judgments_out.clear()
+    checked_judgments = {}
     issues = []
     incomplete = []
     try:
@@ -314,6 +319,8 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                     expected_observation = {"outcome": judgment.observation.outcome.value, "reason": judgment.observation.reason}
                     if data["observation"] != expected_observation:
                         issues.append(f"invalid_judge_outcome:{data['predicate_id']}")
+                    else:
+                        checked_judgments[data['sequence']] = judgment
                 elif pending_judges:
                     incomplete.append(f"judge_outcome_not_replayed:{data['predicate_id']}")
                 elif str(data["observation"].get("reason", "")).startswith("judge_"):
@@ -407,4 +414,6 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
     if expected_digest is not None and digest != expected_digest:
         issues.append("archive_digest_mismatch")
     status = "invalid" if issues else "incomplete" if incomplete else "unanchored" if expected_digest is None else "structurally_verified"
+    if judgments_out is not None and status in ('unanchored', 'structurally_verified'):
+        judgments_out.update(checked_judgments)
     return ReplayReport(status, digest, tuple(issues + incomplete), len(requests), len(responses), traces)

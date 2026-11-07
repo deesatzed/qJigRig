@@ -146,6 +146,9 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert replay['result']['status'] == 'deferred'
         assert replay['review']['review_id'] == result['review']['review_id']
         assert replay['review']['assessment'] == 'uncertain' and replay['review']['reason'] == 'fixture review'
+        assert replay['traces'][0]['judgment']['positive']['quote'] == quote
+        assert replay['traces'][0]['judgment']['positive']['quote_ref']['revision_id'] == imported['revision_id']
+        assert replay['traces'][0]['judgment']['negative']['quote'] is None
         assert any(quote in item['text'] for trace in replay['traces'] for item in trace['evidence'])
         assert transport.calls_made == 4
         with urllib.request.urlopen(f'http://127.0.0.1:{server.server_address[1]}/api/fresh-runs/{result["run_id"]}/export') as response:
@@ -170,7 +173,9 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
             assert report.status == 'unanchored' and report.digest == replay['verification']['digest']
             con.execute('DROP TRIGGER event_no_update')
             con.execute("UPDATE events SET data='{}' WHERE kind='run_result'")
-            assert verify_archive(RunArchive(con)).status == 'invalid'
+            judgments = {'stale': 'must be cleared'}
+            assert verify_archive(RunArchive(con), judgments_out=judgments).status == 'invalid'
+            assert judgments == {}
         checked = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
         assert checked.returncode != 0 and json.loads(checked.stdout)['status'] == 'invalid'
         assert transport.calls_made == 4
@@ -186,6 +191,7 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     assert quote in page.locator('#fresh-replay').inner_text()
                     assert 'Decision correctness not assessed' in page.locator('#fresh-replay').inner_text()
                     assert 'fixture review' in page.locator('#fresh-replay').inner_text()
+                    assert 'Model-cited passage' in page.locator('#fresh-replay').inner_text()
                     with page.expect_download() as info:
                         page.get_by_role('link', name='Download fresh archive').click()
                     assert info.value.suggested_filename.endswith('.sqlite')
@@ -339,5 +345,8 @@ def test_failed_fresh_review_is_not_labeled_reviewed(tmp_path):
         assert result['status']=='deferred' and result['review']['status']=='unavailable'
         assert result['review']['assurance']=='not_assessed' and result['review']['review_id'] is None
         assert result['review']['assessment'] is None and result['review']['failure']=='malformed_output'
+        replay = client.get_fresh_run(result['run_id'])
+        assert replay['verification']['status'] == 'incomplete'
+        assert all(trace['judgment'] is None for trace in replay['traces'])
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)
