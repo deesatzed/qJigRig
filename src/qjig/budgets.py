@@ -110,6 +110,23 @@ class BudgetLedger:
                 return False
         return True
 
+    def judge_receipt_payloads(self, call_ids: tuple[str, ...]) -> tuple[dict, ...]:
+        """Read uniquely bound receipts; never infer missing results."""
+        events = self._journal.events(self._request_id)
+        payloads = []
+        for call_id in call_ids:
+            intents = [e for e in events if e.call_id == call_id and e.kind == "intent"]
+            terminals = [e for e in events if e.call_id == call_id and e.kind != "intent"]
+            if len(intents) != 1 or len(terminals) != 1 or terminals[0].kind != "receipt":
+                raise ContractError("standalone receipt unavailable")
+            intent, receipt = intents[0], terminals[0]
+            if ((intent.request_id, intent.stage, intent.provider, intent.model, intent.input_sha256) !=
+                    (receipt.request_id, receipt.stage, receipt.provider, receipt.model, receipt.input_sha256)
+                    or not isinstance(receipt.payload, dict)):
+                raise ContractError("standalone receipt binding differs")
+            payloads.append(receipt.payload)
+        return tuple(payloads)
+
     def run(
         self, stage: str, call: Callable[[], Any], *, provider: str, model: str, input_sha256: str,
         reserve_tokens: int, reserve_input_tokens: int | None = None, hold_back_calls: int = 0, hold_back_tokens: int = 0,

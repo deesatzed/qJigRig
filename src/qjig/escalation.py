@@ -1,13 +1,15 @@
 """Separate, explicitly requested paired-judge escalation; never replaces the original."""
 from dataclasses import dataclass
+import json
 from typing import Callable
 
 from .applicability import Applicability
 from .budgets import BudgetLedger
 from .contracts import ContractError
-from .judge import JUDGE_MAX_TOKENS, JudgeResult, build_side_prompts, judge_predicate, snapshot_judge_context
+from .judge import JUDGE_MAX_TOKENS, SIDE_SCHEMA, JudgeResult, SideResult, _combine_sides, _side_from_value, build_side_prompts, judge_predicate, snapshot_judge_context
+from .logic import Support
 from .packets import EvidencePacket
-from .providers import ReservationFactory, Transport
+from .providers import ReservationFactory, Transport, _validate
 
 HY4_MODEL = 'tencent/hy4'
 
@@ -41,6 +43,26 @@ def escalate_predicate(standalone: JudgeResult, ledger: BudgetLedger, transport:
     binding, applicability = snapshot_judge_context(packet, applicability)
     if not ledger.has_judge_calls(calls, binding):
         raise ContractError('standalone ledger binding differs from question or evidence packet')
+    if len(calls) != 2:
+        raise ContractError('standalone receipts are incomplete')
+    recovered = []
+    for call, receipt in zip(calls, ledger.judge_receipt_payloads(tuple(call[0] for call in calls))):
+        status = receipt.get('validation')
+        if status == 'ok':
+            value = receipt.get('validated_value')
+            try:
+                parsed, failure = _validate(json.dumps(value), SIDE_SCHEMA)
+            except (TypeError, ValueError):
+                parsed, failure = None, 'invalid'
+            if failure:
+                raise ContractError('standalone validated result unavailable')
+            recovered.append(_side_from_value(parsed, call[0]))
+        elif isinstance(status, str) and status:
+            recovered.append(SideResult(Support.UNKNOWN, f'provider_{status}', '', status, call[0]))
+        else:
+            raise ContractError('standalone validation unavailable')
+    if _combine_sides(recovered[0], recovered[1], packet, applicability) != standalone:
+        raise ContractError('standalone result differs from recorded sides')
     result = judge_predicate(ledger, transport, question, packet, provider=provider, model=HY4_MODEL,
                              applicability=applicability, max_tokens=max_tokens,
                              reservation_factory=reservation_factory, stage_prefix='escalation')
