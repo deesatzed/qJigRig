@@ -92,7 +92,7 @@
       "depends_on": [
         "T004"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/spans.py"
       ],
@@ -100,7 +100,8 @@
       "test_name": "test_verify_unicode_span",
       "action": "Verify end-exclusive Unicode text offsets and reject forged body",
       "acceptance": "A multibyte string slice matches exactly and an altered quote fails",
-      "command": "python -m pytest tests/test_spans.py::test_verify_unicode_span -q"
+      "command": "python -m pytest tests/test_spans.py::test_verify_unicode_span -q",
+      "evidence": "Red: ModuleNotFoundError qjig.spans (initial contract). Green: focused 1 passed in 0.08s; tests/test_spans.py 7 passed in 0.04s; full suite 31 passed in 0.10s. 2026-11-06."
     },
     {
       "id": "T007",
