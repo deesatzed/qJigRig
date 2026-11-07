@@ -3895,6 +3895,24 @@
       "acceptance": "Download a consistent SQLite snapshot from a saved fresh run and replay it without inference; reject structurally invalid source archives.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: fresh export URL returned 404. Synthetic service and Chrome downloaded a saved run; replay of the downloaded SQLite archive matched the prior unanchored digest and detected altered result, while export of an invalid original was refused. Source text and prompts remain in the download; replay does not authenticate content or establish semantic correctness."
+    },
+    {
+      "id": "T056G",
+      "phase": "P5",
+      "depends_on": [
+        "T056F"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/cli.py",
+        "docs/workflows/fresh-configuration.md"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Verify a downloaded fresh archive from the CLI",
+      "acceptance": "Replay a downloaded archive read-only without inference, distinguish unanchored and digest-matched status, and return failure for invalid or incomplete records.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: verify-fresh command was absent. Synthetic archive round-trip exercises the CLI without a provider, matching and mismatched supplied digests, and a modified archive. A matching caller-supplied digest is not an authenticated source or semantic outcome."
     }
   ]
 }

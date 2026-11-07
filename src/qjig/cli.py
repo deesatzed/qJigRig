@@ -303,12 +303,36 @@ def build_parser() -> argparse.ArgumentParser:
     server.add_argument("--fresh-config", help="trusted local fresh backend configuration JSON")
     t = sub.add_parser("trace", help="render a saved trace for a person")
     t.add_argument("--file", required=True)
+    verify = sub.add_parser("verify-fresh", help="structurally replay a saved fresh archive without inference")
+    verify.add_argument("--file", required=True)
+    verify.add_argument("--expected-digest", help="separately retained archive digest")
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "verify-fresh":
+            from contextlib import closing
+            from dataclasses import asdict
+            import sqlite3
+            from .run_archive import RunArchive
+            from .replay import verify_archive
+            path = Path(args.file)
+            if not path.is_file() or path.is_symlink():
+                raise ContractError('archive file unavailable')
+            if args.expected_digest is not None and not re.fullmatch(r'[0-9a-f]{64}', args.expected_digest):
+                raise ContractError('expected digest must be 64 lowercase hex characters')
+            try:
+                with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as connection:
+                    connection.execute('PRAGMA query_only=ON')
+                    connection.execute('PRAGMA trusted_schema=OFF')
+                    report = verify_archive(RunArchive(connection), expected_digest=args.expected_digest)
+                print(json.dumps(asdict(report)))
+                return 0 if report.status in ('unanchored', 'structurally_verified') else 1
+            except sqlite3.Error:
+                print(json.dumps({'status': 'invalid', 'issues': ['archive_unreadable'], 'semantic_assurance': 'not_assessed'}))
+                return 1
         if args.command == "serve":
             from .service import create_server
             if args.fresh_config:

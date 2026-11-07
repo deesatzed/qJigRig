@@ -4,6 +4,9 @@ import threading
 import os
 import sqlite3
 import urllib.request
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -105,12 +108,25 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         path = tmp_path / 'export.sqlite'; path.write_bytes(exported)
         from qjig.run_archive import RunArchive
         from qjig.replay import verify_archive
+        env = {**os.environ, 'PYTHONPATH': str(Path(__file__).resolve().parents[1] / 'src')}
+        command = [sys.executable, '-m', 'qjig', 'verify-fresh', '--file', str(path)]
+        checked = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
+        assert checked.returncode == 0, checked.stderr
+        assert json.loads(checked.stdout)['status'] == 'unanchored'
+        anchored = subprocess.run(command + ['--expected-digest', replay['verification']['digest']],
+                                  env=env, capture_output=True, text=True, timeout=10)
+        assert anchored.returncode == 0 and json.loads(anchored.stdout)['status'] == 'structurally_verified'
+        mismatch = subprocess.run(command + ['--expected-digest', '0' * 64],
+                                  env=env, capture_output=True, text=True, timeout=10)
+        assert mismatch.returncode != 0 and json.loads(mismatch.stdout)['status'] == 'invalid'
         with sqlite3.connect(path) as con:
             report = verify_archive(RunArchive(con))
             assert report.status == 'unanchored' and report.digest == replay['verification']['digest']
             con.execute('DROP TRIGGER event_no_update')
             con.execute("UPDATE events SET data='{}' WHERE kind='run_result'")
             assert verify_archive(RunArchive(con)).status == 'invalid'
+        checked = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
+        assert checked.returncode != 0 and json.loads(checked.stdout)['status'] == 'invalid'
         assert transport.calls_made == 4
         if os.environ.get('QJIG_CHROMIUM_PATH'):
             with playwright.sync_playwright() as p:
