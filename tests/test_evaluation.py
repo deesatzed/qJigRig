@@ -1532,7 +1532,8 @@ def test_factorial_allocation_enumerates_real_arm_work_before_reservation(tmp_pa
         assert goal._con.execute('SELECT COUNT(*) FROM evaluation_plans').fetchone()[0]==0
 
 
-def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path):
+@pytest.mark.parametrize('driver',['manual','runner'])
+def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,driver):
     import json
     from contextlib import ExitStack
     from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
@@ -1542,7 +1543,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path):
     from qjig.evaluation import load_isolated_sources,validate_evaluation_design
     from qjig.evaluation_budget import build_factorial_allocation,reserve_evaluation_plan
     from qjig.evaluation_cases import case_lock_digest
-    from qjig.evaluation_campaign import EvaluationCampaign
+    from qjig.evaluation_campaign import EvaluationCampaign,run_campaign_assignment
     from qjig.evaluation_direct import run_locked_direct
     from qjig.evaluation_fresh import run_locked_fresh
     from qjig.evaluation_replay import verify_direct_archive
@@ -1587,6 +1588,33 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path):
         for arm in design['arms']:
             assignment=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==arm and a['repeat']==1)
             rid=assignment['request_id'];ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout')
+            if driver=='runner':
+                archive=stack.enter_context(RunArchive.open(tmp_path/('archive-'+arm)))
+                if arm in ('combined','decomposition_only'):
+                    responses=[raw({'predicates':[{'id':'p','question':'Do tests pass?'}],'expression':{'ref':'p'}}),
+                        raw({'supported':True,'quote':'Tests must pass.','reason':'synthetic'}),
+                        raw({'supported':False,'quote':'','reason':'synthetic'}),raw({'assessment':'uncertain','reason':'synthetic'})]
+                else:
+                    responses=[raw({'action':'answer','query':None,'answer':'unknown','citations':[]})]
+                transport=StandInTransport(responses)
+                bad_config={k:dict(spec) for k in ('direct','planner','judge','reviewer')}
+                changed='planner' if arm in ('combined','decomposition_only') else 'direct'
+                bad_config[changed]['input_tokens']=99
+                with pytest.raises(ContractError):
+                    run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
+                        applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
+                        config=bad_config,want=1,max_bytes=5000)
+                assert campaign.status()['in_progress']==[] and journal.events(rid)==[] and transport.calls_made==0
+                receipt=run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
+                    applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
+                    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000)
+                assert receipt['status']=='scored' and transport.calls_made==(4 if arm in ('combined','decomposition_only') else 1)
+                prompts=[e['data']['prompt'] for e in archive.events() if e['kind']=='request']
+                assert all(gold.decode() not in p and rid not in p and arm not in p for p in prompts)
+                entries[arm]={'archive':archive,'journal':journal,'reference':ref,'run_sha256':receipt['run_sha256'],
+                              'reference_sha256':reference_digest(ref),'journal_sha256':receipt['journal_sha256']}
+                with pytest.raises(ContractError):campaign.claim(rid)
+                continue
             claim=campaign.claim(rid)
             assert claim['case_id']=='holdout' and claim['arm']==arm and claim['repeat']==1
             archive=stack.enter_context(RunArchive.open(tmp_path/('archive-'+arm)))
@@ -1636,8 +1664,17 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path):
             report=build_reserved_holdout_comparison(goal,design,[entries['direct_retrieval'],entries[arm]],plan_id='factorial',
                 expected_plan_sha256=plan['sha256'],expected_design_sha256=digest,baseline_arm='direct_retrieval',candidate_arm=arm)
             assert report['recorded_pairs']==1 and report['missing_pairs']==5 and report['outcome_support'] is None
-        pending=next(a for a in plan['manifest']['assignments'] if a['request_id'] not in {e['archive'].context()['request']['request_id'] for e in entries.values()})
-        campaign.claim(pending['request_id'])
+        pending=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['repeat']==2 and a['arm']=='direct_retrieval')
+        if driver=='runner':
+            interrupted=stack.enter_context(RunArchive.open(tmp_path/'interrupted'))
+            timed_out=StandInTransport([TimeoutError('synthetic timeout')])
+            with pytest.raises(ContractError):
+                run_campaign_assignment(campaign,pending['request_id'],tmp_path,design,lock,ref,protected,
+                    applicability_inputs=inputs,transport=timed_out,archive=interrupted,journal=journal,
+                    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000)
+            assert timed_out.calls_made==1 and journal.pending(pending['request_id'])
+        else:
+            campaign.claim(pending['request_id'])
         restarted=EvaluationCampaign(goal,'factorial',expected_plan_sha256=plan['sha256'])
         assert restarted.status()['in_progress']==[pending['request_id']]
         other=next(a for a in plan['manifest']['assignments'] if a['request_id']!=pending['request_id'] and a['request_id'] not in {e['archive'].context()['request']['request_id'] for e in entries.values()})

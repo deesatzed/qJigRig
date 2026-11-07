@@ -122,6 +122,8 @@ class EvaluationCampaign:
             expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256)
         if (score['score']['case_id'],score['arm'],score['repeat']) != (assignment['case_id'],assignment['arm'],assignment['repeat']):
             raise ContractError('scored assignment differs from claim')
+        if score['score'].get('reconciliation_required') is True:
+            raise ContractError('campaign reconciliation required before completion')
         encoded = json.dumps(score,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
         score_hash = hashlib.sha256(encoded).hexdigest()
         payload = {'plan_sha256':self._digest,'run_sha256':expected_run_sha256,'reference_sha256':expected_reference_sha256,
@@ -139,3 +141,119 @@ class EvaluationCampaign:
             con.execute('ROLLBACK')
             raise
         return {'status':'scored','request_id':request_id,'score_sha256':score_hash}
+
+
+def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root, design: dict,
+                            lock: dict, reference: dict, protected: list[dict], *,
+                            applicability_inputs, transport, archive, journal, config: dict,
+                            want: int, max_bytes: int) -> dict:
+    """Run and score one claimed factorial assignment; never retry an interrupted claim.
+
+    Input/price bounds, evidence configuration and external anchors are caller
+    assertions. Hosted transport remains subject to its existing refusal gate.
+    """
+    from .applicability import ApplicabilityInputs
+    from .budgets import BudgetLedger
+    from .direct_preflight import direct_run_allocations, direct_slot_reservation
+    from .evaluation_cases import prepare_evaluation_case
+    from .evaluation_direct import run_locked_direct
+    from .evaluation_fresh import run_locked_fresh
+    from .evaluation_replay import verify_direct_archive
+    from .evaluation_scoring import fresh_journal_digest, reference_digest
+    from .fresh_preflight import fresh_run_allocations, fresh_slot_reservation
+    from .journal import Journal
+    from .replay import verify_archive
+    from .run_archive import RunArchive
+    if (not isinstance(campaign,EvaluationCampaign) or not isinstance(archive,RunArchive)
+            or not isinstance(journal,Journal) or not isinstance(applicability_inputs,ApplicabilityInputs)
+            or type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024):
+        raise ContractError('invalid campaign run inputs')
+    manifest,assignments,started,_ = campaign._snapshot()
+    if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
+        raise ContractError('campaign assignment unavailable')
+    assignment=assignments[request_id];arm=assignment['arm'];case_id=assignment['case_id']
+    if design != manifest['design'] or not isinstance(lock,dict) or lock.get('case_id') != case_id:
+        raise ContractError('campaign case or design differs')
+    prepared=prepare_evaluation_case(root,design,lock,reference,protected,
+        expected_design_sha256=manifest['design_sha256'],expected_case_sha256=manifest['case_hashes'][case_id])
+    if (applicability_inputs.as_of != prepared.as_of or applicability_inputs.request_entities != frozenset(prepared.entities)
+            or applicability_inputs.historical_as_known != prepared.historical_as_known):
+        raise ContractError('campaign applicability differs')
+    from .sources import SourceRevision,decode_source
+    revisions=[SourceRevision.create(source.path,'evaluation_allowlist',decode_source(source.raw,encoding='utf-8'))
+               for source in prepared.sources]
+    if {revision.revision_id for revision in revisions} != {member.revision_id for member in applicability_inputs.collection.members}:
+        raise ContractError('campaign applicability source set differs')
+    if arm in ('direct_full_evidence','decomposition_only'):
+        from .evaluation import _full_source_entries,_full_source_packet
+        _full_source_packet(_full_source_entries(revisions),max_bytes)
+        if arm == 'decomposition_only':
+            from .applicability import Applicability,combine_applicability,scope_applicability
+            if any(combine_applicability(applicability_inputs.verdict(revision.revision_id),
+                    scope_applicability(prepared.scope,applicability_inputs.collection.member(revision.revision_id).scope))
+                    is not Applicability.MATCH for revision in revisions):
+                raise ContractError('campaign full source applicability differs')
+    if (not isinstance(config,dict) or set(config) != {'direct','planner','judge','reviewer'}
+            or any(not isinstance(spec,dict) or set(spec) != {'provider','model','input_tokens','output_tokens','max_price'}
+                   for spec in config.values())):
+        raise ContractError('invalid campaign stage configuration')
+    direct,planner,judge,reviewer=(config[k] for k in ('direct','planner','judge','reviewer'))
+    partition=assignment['work'][0]['partition']
+    if arm in ('combined','decomposition_only'):
+        if planner['provider'] != judge['provider']:
+            raise ContractError('fresh planner and judge providers must match')
+        expected=fresh_run_allocations(request_id=request_id,partition=partition,provider=planner['provider'],
+            planner_model=planner['model'],judge_model=judge['model'],planner_input=planner['input_tokens'],
+            planner_output=planner['output_tokens'],judge_input=judge['input_tokens'],judge_output=judge['output_tokens'],
+            planner_price=planner['max_price'],judge_price=judge['max_price'],reviewer=reviewer)
+    elif arm in ('direct_full_evidence','direct_retrieval','retrieval_only'):
+        expected=direct_run_allocations(request_id=request_id,partition=partition,provider=direct['provider'],model=direct['model'],
+            input_tokens=direct['input_tokens'],output_tokens=direct['output_tokens'],max_price=direct['max_price'],
+            followups=0 if arm=='direct_full_evidence' else 1)
+    else:
+        raise ContractError('unsupported campaign arm')
+    if sorted(expected,key=lambda x:x['work_id']) != assignment['work']:
+        raise ContractError('campaign configuration differs from reserved work')
+    if (archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0] or archive.events()
+            or archive.revision_ids() or archive.source_ids() or journal.events(request_id)):
+        raise ContractError('campaign requires a new archive and unused request')
+    if campaign._goal.audit_journal(journal)['status'] != 'verified':
+        raise ContractError('campaign goal and journal accounting differ')
+    claim=campaign.claim(request_id)
+    ledger=BudgetLedger(campaign._goal._per_request,journal,request_id,goal_budget=campaign._goal,partition=partition)
+    binding={'plan_id':campaign._plan_id,'plan_sha256':campaign._digest,'arm':arm,'repeat':claim['repeat']}
+    set_id='evaluation:'+campaign._plan_id
+    if arm in ('combined','decomposition_only'):
+        def factory(req):
+            spec = planner if req.stage=='planner' else reviewer if req.stage=='plan_review' else judge
+            return fresh_slot_reservation(campaign._goal,set_id,request_id=request_id,partition=partition,
+                request=req,model=spec['model'],input_tokens=spec['input_tokens'],input_bound_provenance='declared campaign bound')
+        run_locked_fresh(root,design,lock,reference,protected,expected_design_sha256=manifest['design_sha256'],
+            expected_case_sha256=claim['case_sha256'],applicability_inputs=applicability_inputs,ledger=ledger,transport=transport,
+            archive=archive,planner=(planner['provider'],planner['model']['id']),judge=(judge['provider'],judge['model']['id']),
+            reviewer=(reviewer['provider'],reviewer['model']['id']),planner_max_tokens=planner['output_tokens'],
+            judge_max_tokens=judge['output_tokens'],reviewer_max_tokens=reviewer['output_tokens'],
+            planner_max_price=planner['max_price'],judge_max_price=judge['max_price'],reviewer_max_price=reviewer['max_price'],
+            reservation_factory=factory,review_reservation_factory=factory,want=want,max_bytes=max_bytes,
+            assignment_binding=binding,evidence_mode='full' if arm=='decomposition_only' else 'catalog')
+        replay=verify_archive(archive)
+        if replay.status not in ('unanchored','incomplete') or replay.digest is None:
+            raise ContractError('campaign fresh archive is not replayable')
+        run_hash,journal_hash=replay.digest,fresh_journal_digest(journal,request_id)
+    else:
+        def factory(req):
+            return direct_slot_reservation(campaign._goal,set_id,request_id=request_id,partition=partition,
+                request=req,model=direct['model'],input_tokens=direct['input_tokens'],input_bound_provenance='declared campaign bound')
+        mode={'direct_full_evidence':'full','direct_retrieval':'retrieved','retrieval_only':'catalog'}[arm]
+        run_locked_direct(root,design,lock,reference,protected,expected_design_sha256=manifest['design_sha256'],
+            expected_case_sha256=claim['case_sha256'],ledger=ledger,transport=transport,archive=archive,
+            provider=direct['provider'],model=direct['model']['id'],max_tokens=direct['output_tokens'],
+            want=want,max_bytes=max_bytes,followups=0 if mode=='full' else 1,evidence_mode=mode,
+            applicability_inputs=applicability_inputs,reservation_factory=factory,max_price=direct['max_price'],assignment_binding=binding)
+        replay=verify_direct_archive(archive,journal)
+        if replay['status'] not in ('unanchored','incomplete') or replay['sha256'] is None:
+            raise ContractError('campaign direct archive is not replayable')
+        run_hash,journal_hash=replay['sha256'],None
+    receipt=campaign.finish(request_id,archive,journal,reference,expected_run_sha256=run_hash,
+        expected_reference_sha256=reference_digest(reference),expected_journal_sha256=journal_hash)
+    return {**receipt,'run_sha256':run_hash,'journal_sha256':journal_hash}
