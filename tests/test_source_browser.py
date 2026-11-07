@@ -144,3 +144,45 @@ def test_browser_distinguishes_unknown_from_source_conflict(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_failed_question_does_not_present_previous_result(tmp_path):
+    playwright = pytest.importorskip('playwright.sync_api')
+    executable = os.environ.get('QJIG_CHROMIUM_PATH')
+    if not executable:
+        pytest.skip('QJIG_CHROMIUM_PATH is required for browser verification')
+    revision = SourceRevision.create('policy.md', 'synthetic', decode_source(
+        b'# Refund policy\nRefunds are accepted within 14 days.\n', encoding='utf-8'))
+    path = tmp_path / 'catalog.sqlite'
+    with Catalog.open(path) as catalog:
+        catalog.import_snapshot(revision, index_entries(revision),
+                                (revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+    server = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with playwright.sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, executable_path=executable)
+            try:
+                page = browser.new_page()
+                page.goto(f'http://127.0.0.1:{server.server_address[1]}/', wait_until='networkidle')
+                fields = {'question': 'Refund after 20 days?', 'scope': 'project', 'as_of': '2026-11-15',
+                          'value': '20', 'query': 'refund days policy', 'pattern': r'within (\d+) days'}
+                for field, value in fields.items():
+                    page.locator(f'#question-form [name="{field}"]').fill(value)
+                page.locator('#question-form button[type="submit"]').click()
+                page.get_by_text('Decided · no').wait_for()
+                assert '14 days' in page.locator('#result').inner_text()
+                page.route('**/api/ask', lambda route: route.fulfill(status=503, body='unavailable'))
+                page.locator('#question-form [name="question"]').fill('A different question?')
+                page.locator('#question-form button[type="submit"]').click()
+                page.get_by_text('Could not run question:', exact=False).wait_for()
+                assert page.locator('#result-status').inner_text() == 'Run failed'
+                assert '14 days' not in page.locator('#result').inner_text()
+                assert page.locator('#saved-runs button').count() == 1
+            finally:
+                browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

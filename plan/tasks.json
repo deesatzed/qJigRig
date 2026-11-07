@@ -955,7 +955,8 @@
       "depends_on": [
         "T054",
         "T055A",
-        "T055B"
+        "T055B",
+        "T055C"
       ],
       "status": "pending",
       "files": [
@@ -3623,6 +3624,23 @@
       "acceptance": "An authored no-hit case remains visibly unknown and overlapping applicable sources produce a deferred conflict showing both passages.",
       "command": "python -m pytest tests/test_source_browser.py::test_browser_distinguishes_unknown_from_source_conflict -q",
       "evidence": "Independent local verification while R08 remains open, as GOAL.md requires. Chromium showed a no-hit synthetic authored question as deferred with unknown, then two overlapping synthetic policies as deferred conflict with multiple_applicable_policies and both source passages. The conflict remained within a 390px viewport. This is one deterministic path and not full accessibility, semantic correctness or hosted behavior; no provider calls occurred."
+    },
+    {
+      "id": "T055C",
+      "phase": "repair",
+      "depends_on": [
+        "T055A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_source_browser.py",
+      "test_name": "test_failed_question_does_not_present_previous_result",
+      "action": "Clear the displayed result when a new authored question starts",
+      "acceptance": "A failed new run must not show the previous result as if it belonged to that question; prior saved runs remain available.",
+      "command": "python -m pytest tests/test_source_browser.py::test_failed_question_does_not_present_previous_result -q",
+      "evidence": "Independent local repair while the R08 provider preflight is open, as directed by GOAL.md. Red: Chrome retained Decided no and the prior evidence after a new question received an injected 503. The page now clears its current result and source-state binding when a run starts and displays a failed state on error; the prior saved run remains accessible. This is a synthetic local browser test, not full acceptance or hosted behavior."
     }
   ]
 }
