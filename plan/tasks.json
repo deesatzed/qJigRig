@@ -4002,6 +4002,24 @@
       "acceptance": "When accounting is incomplete because a previous provider attempt is pending, defer a new request as reconciliation required without dispatch; preserve distinct invalid-accounting and exhausted-budget refusals.",
       "command": "python -m pytest tests/test_fresh_process_crash.py::test_process_exit_leaves_incomplete_fresh_run_without_retry -q",
       "evidence": "Red: a new request after a synthetic process crash was labeled budget_exceeded. It now returns reconciliation_required and makes no provider call; existing accounting/budget, fresh pipeline and evaluation regressions passed. This does not reconcile the attempt, establish hosted cost bounds or open R08."
+    },
+    {
+      "id": "T057L",
+      "phase": "P5",
+      "depends_on": [
+        "T053D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Display the actual unvalidated fresh review and its assurance",
+      "acceptance": "Return the stored review assurance, assessment, reason and identity; label an unavailable review not assessed.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: service returned a noncanonical assurance and omitted review assessment and reason. Synthetic actual-pipeline and Chrome tests display the stored review record; malformed review returns not_assessed without a review identity. Focused browser/fresh/review tests: 57 passed. Review remains unvalidated and no hosted call occurred."
     }
   ]
 }

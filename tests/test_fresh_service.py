@@ -50,7 +50,9 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         result = client.ask_fresh('fresh-1', 'Refund limit?', 'project', as_of='2026-11-15', entities=[])
         assert result['kind'] == 'fresh' and result['status'] == 'deferred' and result['answer'] is None
         assert result['conditional_outcome'] == 'true' and 'plan_coverage_unestablished' in result['reasons']
-        assert result['review']['status'] == 'recorded' and result['review']['assurance'] == 'synthetic_unvalidated'
+        assert result['review']['status'] == 'recorded' and result['review']['assurance'] == 'synthetic_review_unvalidated'
+        assert result['review']['assessment'] == 'uncertain' and result['review']['reason'] == 'fixture review'
+        assert result['review']['review_id']
         assert any(quote in item['text'] for record in result['records'] for item in record['evidence'])
         assert transport.calls_made == 4
         assert (tmp_path / 'fresh' / 'journal.sqlite').is_file()
@@ -88,7 +90,8 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     form.get_by_role('button', name='Run fresh planning').click()
                     page.get_by_text('Deferred · coverage remains unestablished').wait_for()
                     assert 'Conditional outcome: true' in page.locator('#fresh-result').inner_text()
-                    assert 'synthetic_unvalidated' in page.locator('#fresh-result').inner_text()
+                    assert 'synthetic_review_unvalidated' in page.locator('#fresh-result').inner_text()
+                    assert 'fixture review' in page.locator('#fresh-result').inner_text()
                     assert quote in page.locator('#fresh-result').inner_text()
                     assert browser_transport.calls_made == 4
                     page.route('**/api/catalog-state', lambda route: route.fulfill(status=503, json={'error': 'unavailable'}))
@@ -280,6 +283,38 @@ def test_interrupted_fresh_run_exposes_pending_attempt_after_restart(tmp_path):
         second = {'request': {**request, 'request_id': 'after-interruption'}, 'as_of':'2026-11-15', 'entities':[]}
         followup = backend.run(path, second)
         assert followup['status'] == 'deferred' and followup['plan_failure'] == 'reconciliation_required'
+        assert followup['review']['status'] == 'unavailable' and followup['review']['assurance'] == 'not_assessed'
+        assert followup['review']['assessment'] is None and followup['review']['review_id'] is None
         assert transport.calls_made == 1
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=5)
+
+
+def test_failed_fresh_review_is_not_labeled_reviewed(tmp_path):
+    from qjig.fresh_service import FreshWorkbench
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    spec={'provider':'stand-in','model':model,'input_tokens':1000,'output_tokens':100,
+          'max_price':{'prompt':2,'completion':3}}
+    limit=Budget(30,100000,1)
+    usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
+    raw=lambda value: RawResponse(200,json.dumps(value),usage)
+    transport=StandInTransport([raw({'predicates':[{'id':'p','question':'Refund limit?'}],'expression':{'ref':'p'}}),
+        raw({'supported':True,'quote':'Refunds within 14 days.','reason':'fixture'}),
+        raw({'supported':False,'quote':'','reason':'fixture'}),
+        RawResponse(200,'not json',usage)])
+    backend=FreshWorkbench(tmp_path/'fresh',goal_factory=lambda:GoalBudget.open(tmp_path/'goal.sqlite',
+        total=limit,per_request=limit,allocations={'smoke':limit}),transport_factory=lambda:transport,
+        partition='smoke',planner=spec,judge=spec,reviewer=spec,budget=limit)
+    server=create_server(tmp_path/'catalog.sqlite',port=0,fresh_backend=backend)
+    thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+    try:
+        client=RoleClient(server.server_address[1],RoleDefinition('reviewer','1','Review'))
+        client.import_source({'source_id':'policy.md','text':'# Policy\nRefunds within 14 days.\n','scope':'project',
+            'entities':[],'effective_from':'2026-01-01','effective_to':'open','observed_at':None,'authority':None})
+        result=client.ask_fresh('failed-review','Refund limit?','project',as_of='2026-11-15',entities=[])
+        assert result['status']=='deferred' and result['review']['status']=='unavailable'
+        assert result['review']['assurance']=='not_assessed' and result['review']['review_id'] is None
+        assert result['review']['assessment'] is None and result['review']['failure']=='malformed_output'
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)

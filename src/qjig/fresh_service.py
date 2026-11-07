@@ -202,8 +202,14 @@ class FreshWorkbench:
                                                       'text': item.text, 'truncated': item.truncated} for item in trace.evidence],
                                         'exclusions': [{'reason': item.reason} for item in trace.exclusions]})
                 conditional = evaluate(run.state.plan.expression, run.state.observations).outcome.value if run.state else None
-                review = {'status': run.review.status, 'failure': run.review.failure,
-                          'assurance': 'synthetic_unvalidated' if isinstance(transport, StandInTransport) else 'ai_unvalidated'} if run.review else {'status': 'unavailable', 'failure': run.plan_failure, 'assurance': 'not_assessed'}
+                review_record = run.review.record if run.review else None
+                review_payload = review_record['payload'] if review_record is not None else None
+                review_result = review_payload['result'] if review_payload is not None else {}
+                review = {'status': run.review.status if run.review else 'unavailable',
+                          'failure': run.review.failure if run.review else run.plan_failure,
+                          'assurance': review_payload['assurance'] if review_payload else 'not_assessed',
+                          'assessment': review_result.get('assessment'), 'reason': review_result.get('reason'),
+                          'review_id': review_record['sha256'] if review_record else None}
                 return {'kind': 'fresh', 'status': 'deferred', 'answer': None, 'conditional_outcome': conditional,
                         'reasons': list(run.reasons) + (['catalog_changed_during_run'] if before != after else []),
                         'plan_failure': run.plan_failure, 'records': records, 'review': review,
