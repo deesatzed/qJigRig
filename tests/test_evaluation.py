@@ -74,7 +74,10 @@ def _sample_design():
                            evidence_requirements=['identify decisive source'], parent=None),
                       dict(id=partition+'-changed', family=partition+'0', categories=['changed_decisive'],
                            evidence_requirements=['inspect changed source'], parent=partition)])
-    design = {'families': families, 'related_families': [['development0', 'development1']],
+    for partition in ('development', 'pilot', 'holdout'):
+        cases.append(dict(id=partition+'-independent', family=partition+'1', categories=['supported_yes'],
+                          evidence_requirements=['inspect independent source'], parent=None))
+    design = {'families': families, 'related_families': [],
               'cases': cases,
               'arms': ['direct_full_evidence', 'direct_retrieval', 'retrieval_only',
                        'decomposition_only', 'combined'],
@@ -125,7 +128,7 @@ def test_every_declared_assignment_and_unknown_resource_is_reported():
             'resources': {'calls': 1, 'input_tokens': 12, 'output_tokens': None, 'cost_usd': None, 'latency_ms': 10}}
     result = {**base, 'case_id': 'holdout', 'arm': 'combined', 'repeat': 1}
     summary = summarize_evaluation_assignments(design, [result], expected_digest=digest)
-    assert summary['assigned'] == 40 and summary['recorded'] == 1 and len(summary['missing']) == 39
+    assert summary['assigned'] == 60 and summary['recorded'] == 1 and len(summary['missing']) == 59
     assert summary['status_counts'] == {'timeout': 1}
     assert summary['assignments_complete'] is False and summary['resources_complete'] is False
     assert summary['resources']['calls'] is None and summary['resources']['known_calls'] == 1
@@ -145,7 +148,7 @@ def test_every_declared_assignment_and_unknown_resource_is_reported():
                          for item in missing]
     complete = summarize_evaluation_assignments(design, filled, expected_digest=digest)
     assert complete['assignments_complete'] is True and complete['resources_complete'] is False
-    assert complete['status_counts']['unknown_review'] == 39
+    assert complete['status_counts']['unknown_review'] == 59
     assert complete['resources']['cost_usd'] is None
     filled[0] = {**filled[0], 'resources': {'calls': 1, 'input_tokens': 12, 'output_tokens': 3, 'cost_usd': 0.2, 'latency_ms': 10}}
     complete = summarize_evaluation_assignments(design, filled, expected_digest=digest)
@@ -876,3 +879,27 @@ def test_full_evidence_baseline_sends_every_source_or_refuses(tmp_path):
         archive._con.execute('DROP TRIGGER event_no_update')
         archive._con.execute("UPDATE events SET data=? WHERE seq=?",(json.dumps(altered),event['seq']))
         assert verify_direct_archive(archive,journal)['status']=='invalid'
+
+
+def test_design_requires_two_case_bearing_unrelated_families_per_partition():
+    import copy
+    from qjig.evaluation import validate_evaluation_design
+    design=_sample_design()
+    # Merely declaring a second family, including one declared related, is insufficient.
+    unused=copy.deepcopy(design)
+    unused['cases']=[case for case in unused['cases'] if not case['family'].endswith('1')]
+    unused['related_families']=[['development0','development1']]
+    with pytest.raises(ContractError):
+        validate_evaluation_design(unused)
+    validate_evaluation_design(design)
+    related=copy.deepcopy(design); related['related_families']=[['pilot0','pilot1']]
+    with pytest.raises(ContractError):
+        validate_evaluation_design(related)
+    duplicate=copy.deepcopy(design); duplicate['families'][3]['source_hashes']=duplicate['families'][2]['source_hashes']
+    with pytest.raises(ContractError):
+        validate_evaluation_design(duplicate)
+    transitive=copy.deepcopy(design)
+    transitive['families'].append({'id':'pilot2','partition':'pilot','source_hashes':[hashlib.sha256(b'pilot2').hexdigest()]})
+    transitive['related_families']=[['pilot0','pilot2'],['pilot2','pilot1']]
+    with pytest.raises(ContractError):
+        validate_evaluation_design(transitive)

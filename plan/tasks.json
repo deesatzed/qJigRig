@@ -1137,7 +1137,8 @@
       "depends_on": [
         "T063",
         "T064A",
-        "T064B"
+        "T064B",
+        "T064C"
       ],
       "status": "pending",
       "files": [
@@ -2879,6 +2880,23 @@
       "acceptance": "The direct full-evidence arm supplies every pinned source text or refuses before provider dispatch when the bounded packet cannot fit.",
       "command": "python -m pytest tests/test_evaluation.py::test_full_evidence_baseline_sends_every_source_or_refuses -q",
       "evidence": "Red: no full-source direct baseline existed. Green: checked case sends every complete pinned source text in one bounded packet or refuses before dispatch if omitted/truncated; empty sources and retrieval followup are refused. V4 archives replay whole-source packets and source-bound quotations. Synthetic tests cover full text, protected markers, small budgets, replay and tampering; focused 39 and full offline 526 passed. No token bound, matched work, provider guarantee, hosted inference or actual comparison is established."
+    },
+    {
+      "id": "T064C",
+      "phase": "P6",
+      "depends_on": [
+        "T064B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_design_requires_two_case_bearing_unrelated_families_per_partition",
+      "action": "Require two distinct case-bearing family groups in each split",
+      "acceptance": "Each partition has cases from at least two declared-unrelated, nonidentical source-family groups; shared hashes and transitive relations cannot inflate the count.",
+      "command": "python -m pytest tests/test_evaluation.py::test_design_requires_two_case_bearing_unrelated_families_per_partition -q",
+      "evidence": "Red: design validation counted unused or declared-related families as independent. Green: each partition must have cases in two connected-component groups after unioning declared relationships and exact duplicate hashes; cross-split duplicates still reject. Tests cover unused, related, exact duplicate and transitive links. Local draft passes with two case-bearing declared groups per partition; focused 33 and full offline 527 passed. Undeclared near-duplicates and genuine independent origin remain unverified."
     }
   ]
 }

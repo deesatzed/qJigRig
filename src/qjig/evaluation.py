@@ -157,7 +157,16 @@ def validate_evaluation_design(design: dict, *, expected_digest: str | None = No
                 rule['metric'] not in design['metrics'] or rule['operator'] not in ('<', '<=', '>', '>=', '==') or
                 type(rule['threshold']) not in (int, float) or not math.isfinite(rule['threshold'])):
             fail()
-    families, hashes = {}, {}
+    families, hashes, groups = {}, {}, {}
+    def find(key):
+        while groups[key] != key:
+            groups[key] = groups[groups[key]]
+            key = groups[key]
+        return key
+    def union(a, b):
+        a, b = find(a), find(b)
+        if a != b:
+            groups[b] = a
     if not isinstance(design['families'], list):
         fail()
     for family in design['families']:
@@ -166,10 +175,15 @@ def validate_evaluation_design(design: dict, *, expected_digest: str | None = No
                 not strings(family['source_hashes']) or any(not _SHA.fullmatch(x) for x in family['source_hashes'])):
             fail()
         families[family['id']] = family['partition']
+        groups[family['id']] = family['id']
         for digest in family['source_hashes']:
-            if digest in hashes and hashes[digest] != family['partition']:
-                fail()
-            hashes[digest] = family['partition']
+            if digest in hashes:
+                previous_partition, previous_family = hashes[digest]
+                if previous_partition != family['partition']:
+                    fail()
+                union(family['id'], previous_family)
+            else:
+                hashes[digest] = (family['partition'], family['id'])
     if any(list(families.values()).count(p) < 2 for p in partitions):
         fail()
     if not isinstance(design['related_families'], list):
@@ -178,6 +192,7 @@ def validate_evaluation_design(design: dict, *, expected_digest: str | None = No
         if (not isinstance(pair, list) or len(pair) != 2 or not all(string(x) and x in families for x in pair)
                 or pair[0] == pair[1] or families[pair[0]] != families[pair[1]]):
             fail()
+        union(pair[0], pair[1])
     cases = {}
     if not isinstance(design['cases'], list):
         fail()
@@ -193,6 +208,10 @@ def validate_evaluation_design(design: dict, *, expected_digest: str | None = No
         cases[case['id']] = case
     if covered != categories:
         fail()
+    for partition in partitions:
+        case_groups = {find(case['family']) for case in cases.values() if families[case['family']] == partition}
+        if len(case_groups) < 2:
+            fail()
     paired = set()
     for case in cases.values():
         parent = case['parent']
