@@ -4039,6 +4039,24 @@
       "acceptance": "After service restart, show the archived review assessment and reason with its assurance separately from source evidence; absent review remains unavailable.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: replay did not return the archived review. Synthetic actual-pipeline replay and Chrome now show the matching review identity, assessment, reason and unvalidated assurance after restart; interrupted run retains no review. Browser/fresh/replay/review checks: 28 passed. Structural replay is not authentication, semantic correctness or independent review."
+    },
+    {
+      "id": "T055E",
+      "phase": "P5",
+      "depends_on": [
+        "T062D",
+        "R08Q"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_interrupted_fresh_run_exposes_pending_attempt_after_restart",
+      "action": "Show saved fresh planning failure and deferral reasons",
+      "acceptance": "When reopening a saved failed fresh run, display the recorded planning failure distinctly from the deferred status.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_interrupted_fresh_run_exposes_pending_attempt_after_restart -q",
+      "evidence": "Red: Chrome reopened a saved synthetic reconciliation-required failure but showed only deferred. The saved view now shows the recorded failure and any deferral reasons. Browser/fresh/crash/web checks 12 passed. This is synthetic operational-path evidence; hosted execution and reconciliation remain open."
     }
   ]
 }

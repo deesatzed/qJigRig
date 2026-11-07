@@ -290,6 +290,16 @@ def test_interrupted_fresh_run_exposes_pending_attempt_after_restart(tmp_path):
         assert followup['review']['status'] == 'unavailable' and followup['review']['assurance'] == 'not_assessed'
         assert followup['review']['assessment'] is None and followup['review']['review_id'] is None
         assert transport.calls_made == 1
+        if os.environ.get('QJIG_CHROMIUM_PATH'):
+            with playwright.sync_playwright() as p:
+                browser = p.chromium.launch(headless=True, executable_path=os.environ['QJIG_CHROMIUM_PATH'])
+                try:
+                    page = browser.new_page(); page.goto(f'http://127.0.0.1:{server.server_address[1]}/')
+                    index = [item['run_id'] for item in client.list_fresh_runs() if item['question']].index(followup['run_id'])
+                    page.locator('#fresh-runs').get_by_role('button', name='Refund limit?', exact=False).nth(index).click()
+                    page.get_by_text('Planning unavailable: reconciliation_required').wait_for(timeout=5000)
+                finally:
+                    browser.close()
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)
 
