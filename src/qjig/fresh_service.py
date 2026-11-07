@@ -92,20 +92,22 @@ class FreshWorkbench:
                 payload = record['payload']
                 review = {'review_id': record['sha256'], 'assurance': payload['assurance'],
                           'assessment': payload['result'].get('assessment'), 'reason': payload['result'].get('reason')}
+            reconciliation, resources = self._journal_status(request.request_id, events)
             return {'run_id': run_id, 'request': request.to_dict(),
                     'result': results[0] if len(results) == 1 else None,
                     'traces': traces, 'review': review, 'verification': asdict(report),
-                    'reconciliation': self._reconciliation(request.request_id, events),
+                    'reconciliation': reconciliation, 'resources': resources,
                     'source_freshness': 'not_assessed'}
 
-    def _reconciliation(self, request_id: str, archive_events: list[dict]) -> dict:
-        """Read pending journal intents; absence or disagreement is unknown, not clear."""
+    def _journal_status(self, request_id: str, archive_events: list[dict]) -> tuple[dict, dict]:
+        """Read journal accounting; absence or disagreement is unknown, not clear."""
         path = self.state_dir / 'journal.sqlite'
-        unknown = {'status': 'unknown', 'unresolved': []}
+        unknown = ({'status': 'unknown', 'unresolved': []}, {'status': 'unknown'})
         if path.is_symlink() or not path.is_file():
             return unknown
         try:
             with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as connection:
+                connection.execute('BEGIN')
                 if connection.execute('PRAGMA user_version').fetchone()[0] != 1:
                     return unknown
                 journal = Journal(connection, lambda: 0)
@@ -115,8 +117,13 @@ class FreshWorkbench:
                 if not intents or not archived <= intents:
                     return unknown
                 pending = journal.pending(request_id)
-                return {'status': 'required' if pending else 'clear',
-                        'unresolved': [{'call_id': event.call_id, 'stage': event.stage} for event in pending]}
+                ledger = BudgetLedger(None, journal, request_id)
+                reconciliation = {'status': 'required' if pending else 'clear',
+                                  'unresolved': [{'call_id': event.call_id, 'stage': event.stage} for event in pending]}
+                resources = {'status': 'recorded_unverified', 'calls': ledger.used_calls(),
+                             'committed_tokens': ledger.committed_tokens(), 'cost_status': ledger.cost_status(),
+                             'known_cost_usd': ledger.known_cost_usd()}
+                return reconciliation, resources
         except (OSError, sqlite3.Error, ValueError, TypeError, KeyError):
             return unknown
 

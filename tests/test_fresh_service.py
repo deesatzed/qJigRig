@@ -146,6 +146,9 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert replay['result']['status'] == 'deferred'
         assert replay['review']['review_id'] == result['review']['review_id']
         assert replay['review']['assessment'] == 'uncertain' and replay['review']['reason'] == 'fixture review'
+        assert replay['resources']['status'] == 'recorded_unverified'
+        assert replay['resources']['calls'] == 4 and replay['resources']['cost_status'] == 'known'
+        assert replay['resources']['known_cost_usd'] == 0.0004
         assert replay['traces'][0]['judgment']['positive']['quote'] == quote
         assert replay['traces'][0]['judgment']['positive']['quote_ref']['revision_id'] == imported['revision_id']
         assert replay['traces'][0]['judgment']['negative']['quote'] is None
@@ -191,6 +194,7 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     assert quote in page.locator('#fresh-replay').inner_text()
                     assert 'Decision correctness not assessed' in page.locator('#fresh-replay').inner_text()
                     assert 'fixture review' in page.locator('#fresh-replay').inner_text()
+                    assert 'Recorded calls: 4' in page.locator('#fresh-replay').inner_text()
                     assert 'Model-cited passage' in page.locator('#fresh-replay').inner_text()
                     with page.expect_download() as info:
                         page.get_by_role('link', name='Download fresh archive').click()
@@ -280,6 +284,8 @@ def test_interrupted_fresh_run_exposes_pending_attempt_after_restart(tmp_path):
         assert replay['review'] is None
         assert replay['reconciliation']['status'] == 'required'
         assert replay['reconciliation']['unresolved'][0]['stage'] == 'planner'
+        assert replay['resources']['calls'] == 1 and replay['resources']['cost_status'] == 'unknown'
+        assert replay['resources']['known_cost_usd'] is None
         with pytest.raises(ContractError): backend.run(path, body)
         assert transport.calls_made == 1
         if os.environ.get('QJIG_CHROMIUM_PATH'):
@@ -296,7 +302,8 @@ def test_interrupted_fresh_run_exposes_pending_attempt_after_restart(tmp_path):
         moved = tmp_path / 'fresh' / 'journal-held.sqlite'
         journal.rename(moved)
         try:
-            assert client.get_fresh_run(run_id)['reconciliation']['status'] == 'unknown'
+            missing = client.get_fresh_run(run_id)
+            assert missing['reconciliation']['status'] == 'unknown' and missing['resources']['status'] == 'unknown'
         finally:
             moved.rename(journal)
         second = {'request': {**request, 'request_id': 'after-interruption'}, 'as_of':'2026-11-15', 'entities':[]}

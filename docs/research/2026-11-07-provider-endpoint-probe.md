@@ -14,3 +14,16 @@ A separate fresh endpoint read fed each endpoint's listed pricing and context/ou
 The Hy4 endpoint reported `discount: 0.5`; observed DeepSeek discounts varied by endpoint. OpenRouter states that its [discounted-model listings show discounted prices and promotions can change without notice](https://openrouter.ai/collections/discounted-models). That page does not establish the exact semantics of every endpoint JSON field or a safe undiscounted bound. The existing pricing helper correctly refuses nonzero discount rather than inferring a stable upper price. The selected Hy4 path therefore cannot currently pass its arithmetic preflight even if an input-token bound were supplied. Terra additionally exposes a `web_search` category the helper refuses; its presence is not evidence the current request would invoke web search.
 
 This public snapshot is neither a price lock nor a guarantee of routing, tokenizer framing, provider billing, or BYOK configuration. The configured key's BYOK spend exclusion, full input-token bound, dynamic endpoint prices, all assigned work and paid-dispatch authorization remain open. No account credential or hosted model call was used in this probe.
+
+## Endpoint context-bound check
+
+At approximately 22:24 UTC on 2026-11-07, a new unauthenticated read of the [endpoint-list API](https://openrouter.ai/docs/api/api-reference/endpoints/list-all-endpoints-for-a-model) returned these catalog claims:
+
+| Model | Endpoints | Minimum listed context | `max_prompt_tokens` |
+|---|---:|---:|---|
+| DeepSeek Flash | 51 | 1,000,000 | absent on all 51 |
+| Hy4 | 1 | 1,048,576 | absent |
+| Muse Spark | 7 | 1,000,000 | absent on all 7 |
+| Terra | 7 | 1,050,000 | 922,000 on 5; absent on 2 |
+
+No listed context or reported prompt limit is within the 160,000-token ceiling for an entire qJig request. Restricting routing to one of these endpoints therefore does not make reserving its whole advertised context a feasible replacement for a proven framed-input bound. An advertised context limit is itself a provider claim, not proof of billing treatment or a guarantee that every endpoint is available. The query did not send credentials, source text or a model request. Complete input, current price, BYOK and assigned-work bounds remain unresolved.

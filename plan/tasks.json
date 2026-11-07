@@ -4114,6 +4114,25 @@
       "acceptance": "After restart, show source-bound cited judgments reconstructed from structurally replayed archived responses; incomplete or invalid archives do not yield reconstructed citations.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: replay omitted judgments. Synthetic actual-pipeline and Chrome checks now show the same cited quote and source revision after restart. Incomplete review and tampered archive checks suppress reconstructed judgments. Focused Chrome/fresh/replay/judge checks: 27 passed. Unanchored structural replay does not authenticate provenance or validate model interpretation."
+    },
+    {
+      "id": "T061D",
+      "phase": "P5",
+      "depends_on": [
+        "T056D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/web.py",
+        "docs/workflows/fresh-configuration.md"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Show saved fresh run resource records",
+      "acceptance": "Expose recorded per-request calls, committed tokens and known or unknown cost from the local journal; absence or disagreement remains unknown.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: fresh replay omitted resource records. Synthetic run checks four calls and known cost; interrupted run checks unknown cost; missing journal yields unknown rather than zero. Chrome displays the journal-derived unverified record. This is not authenticated provider billing or hosted-call authorization."
     }
   ]
 }
