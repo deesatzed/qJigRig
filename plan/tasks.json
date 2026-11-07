@@ -522,7 +522,7 @@
         "T012",
         "T025"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/exact.py"
       ],
@@ -530,7 +530,8 @@
       "test_name": "test_dated_numeric_rule",
       "action": "Evaluate one exact numeric rule under the applicable policy",
       "acceptance": "Same observation passes old threshold and fails new threshold",
-      "command": "python -m pytest tests/test_exact.py::test_dated_numeric_rule -q"
+      "command": "python -m pytest tests/test_exact.py::test_dated_numeric_rule -q",
+      "evidence": "Red: ModuleNotFoundError qjig.exact (initial contract). Green: focused 1 passed in 0.03s; tests/test_exact.py 18 passed in 0.03s; full suite 174 passed in 0.19s. 2026-11-06."
     },
     {
       "id": "T032",
