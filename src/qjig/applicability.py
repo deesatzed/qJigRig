@@ -76,6 +76,11 @@ class MemberMetadata:
     effective: Interval
     authority_id: str | None = None
     entity_keys: frozenset[str] = field(default_factory=frozenset)
+    observed_at: str | None = None  # when this source was first recorded; None = unknown
+
+    def __post_init__(self) -> None:
+        if self.observed_at is not None:
+            parse_date(self.observed_at)
 
 
 @dataclass(frozen=True)
@@ -118,3 +123,38 @@ def entity_applicability(member: MemberMetadata, request_entities: frozenset[str
     if source & request_entities:
         return Verdict(Applicability.MATCH, "entity_match")
     return Verdict(Applicability.NO_MATCH, "entity_mismatch")
+
+
+@dataclass(frozen=True)
+class DateVerdict:
+    effective: Verdict
+    observation: Verdict
+    overall: Applicability
+
+
+def date_applicability(
+    member: MemberMetadata, as_of: str, *, historical_as_known: bool
+) -> DateVerdict:
+    """Effective-date and observation-date checks, kept separate and then combined.
+
+    The observation check applies only to historical-as-known requests, which require
+    observed_at <= as_of. An unknown observation date stays UNKNOWN there.
+    """
+    eff = member.effective.contains(as_of)
+    effective = Verdict(eff, f"effective_{eff.value}")
+    if not historical_as_known:
+        observation = Verdict(Applicability.MATCH, "observation_not_required")
+    elif member.observed_at is None:
+        observation = Verdict(Applicability.UNKNOWN, "observation_date_unknown")
+    elif parse_date(member.observed_at) > parse_date(as_of):
+        observation = Verdict(Applicability.NO_MATCH, "observed_after_request")
+    else:
+        observation = Verdict(Applicability.MATCH, "observed_by_request")
+    values = {effective.value, observation.value}
+    if Applicability.NO_MATCH in values:
+        overall = Applicability.NO_MATCH
+    elif Applicability.UNKNOWN in values:
+        overall = Applicability.UNKNOWN
+    else:
+        overall = Applicability.MATCH
+    return DateVerdict(effective, observation, overall)

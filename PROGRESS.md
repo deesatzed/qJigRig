@@ -96,3 +96,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `entity_applicability` returns a `Verdict(value, reason)`: unrecorded source subject or missing request subject -> UNKNOWN (reasons source_entity_unrecorded / request_entity_missing); disjoint recorded subjects -> NO_MATCH; overlap -> MATCH; exact, case-sensitive keys. Limit: a source deliberately written for all subjects also reads as UNKNOWN until a way to declare that is added.
 - Red: ImportError entity_applicability (initial contract). Green: focused 1 passed in 0.04s; tests/test_applicability.py 12 passed in 0.04s; full suite 53 passed in 0.11s. 2026-11-06.
+
+## 2026-11-06: T012 complete
+
+- `date_applicability` returns separate effective-date and observation-date verdicts plus a combined result (NO_MATCH beats UNKNOWN beats MATCH). A review observed 2026-12-01 is effective for a 2026-06-01 request but is rejected under historical-as-known (reason observed_after_request); unknown observation date is UNKNOWN only for historical requests. `MemberMetadata.observed_at` added, validated as ISO date. Limit: dates are recorded claims, not authenticated; effective_to/observed_at are not persisted in the catalog yet.
+- Red: ImportError date_applicability (initial contract). Green: focused 1 passed in 0.03s; tests/test_applicability.py 14 passed in 0.03s; full suite 55 passed in 0.10s. 2026-11-06.

@@ -194,7 +194,7 @@
       "depends_on": [
         "T010"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/applicability.py"
       ],
@@ -202,7 +202,8 @@
       "test_name": "test_historical_observation",
       "action": "Apply effective and observation dates independently",
       "acceptance": "A review observed after the historical request cannot settle it",
-      "command": "python -m pytest tests/test_applicability.py::test_historical_observation -q"
+      "command": "python -m pytest tests/test_applicability.py::test_historical_observation -q",
+      "evidence": "Red: ImportError date_applicability (initial contract). Green: focused 1 passed in 0.03s; tests/test_applicability.py 14 passed in 0.03s; full suite 55 passed in 0.10s. 2026-11-06."
     },
     {
       "id": "T013",

@@ -86,3 +86,42 @@ def test_entity_match_and_explicit_mismatch():
     assert entity_applicability(ent(), frozenset()).value is Applicability.MATCH
     # keys are compared exactly, not case-folded
     assert entity_applicability(ent("Customer:42"), frozenset({"customer:42"})).value is Applicability.NO_MATCH
+
+
+from qjig.applicability import date_applicability
+
+
+def dated(observed_at, start="2026-01-01", end=OPEN):
+    return member("r", start, end, observed_at=observed_at)
+
+
+def test_historical_observation():
+    as_of = "2026-06-01"
+    review = dated("2026-12-01")  # effective in June, but only recorded in December
+    # as-currently-known: the late observation is fine
+    assert date_applicability(review, as_of, historical_as_known=False).overall is Applicability.MATCH
+    # as-known-then: a review observed after the request cannot settle it
+    v = date_applicability(review, as_of, historical_as_known=True)
+    assert v.overall is Applicability.NO_MATCH
+    assert v.effective.value is Applicability.MATCH  # the two checks stay separate
+    assert v.observation.value is Applicability.NO_MATCH and v.observation.reason == "observed_after_request"
+    # observed on or before the request date is fine
+    assert date_applicability(dated("2026-06-01"), as_of, historical_as_known=True).overall is Applicability.MATCH
+
+
+def test_dates_are_applied_independently():
+    as_of = "2026-06-01"
+    # observed in time but not yet in effect: still no match, for the effective reason
+    early = dated("2026-01-05", start="2026-09-01")
+    v = date_applicability(early, as_of, historical_as_known=True)
+    assert v.overall is Applicability.NO_MATCH
+    assert v.effective.value is Applicability.NO_MATCH and v.observation.value is Applicability.MATCH
+    # unknown observation date stays unresolved for historical requests, irrelevant otherwise
+    unseen = dated(None)
+    assert date_applicability(unseen, as_of, historical_as_known=True).overall is Applicability.UNKNOWN
+    assert date_applicability(unseen, as_of, historical_as_known=False).overall is Applicability.MATCH
+    # a definite NO_MATCH wins over an UNKNOWN
+    both = dated(None, start="2026-09-01")
+    assert date_applicability(both, as_of, historical_as_known=True).overall is Applicability.NO_MATCH
+    with pytest.raises(ContractError):
+        dated("12/01/2026")
