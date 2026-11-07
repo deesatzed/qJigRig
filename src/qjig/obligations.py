@@ -19,7 +19,7 @@ class Obligation:
     predicate_id: str
     description: str
     material: bool
-    status: str = "open"  # open | evidence_found | unresolved | satisfied
+    status: str = "open"  # open | evidence_found | unresolved | satisfied | skipped
     reason: str = ""
     evidence_entry_ids: tuple[str, ...] = ()
 
@@ -75,10 +75,26 @@ class ObligationLedger:
         ob = self._items[obligation_id]
         self._items[obligation_id] = replace(ob, status="satisfied", reason="", evidence_entry_ids=tuple(evidence_entry_ids))
 
+    def skip(self, obligation_id: str, *, reason: str) -> None:
+        """Record that a predicate-level obligation was deliberately not pursued, with the reason.
+
+        Entity and applicability obligations are request-level and can never be skipped.
+        """
+        ob = self._items[obligation_id]
+        if ob.kind in ("entity", "applicability"):
+            raise ContractError(f"{ob.kind} obligations cannot be skipped")
+        if not reason.strip():
+            raise ContractError("a skip needs a recorded reason")
+        if ob.status != "satisfied":
+            self._items[obligation_id] = replace(ob, status="skipped", reason=reason)
+
+    def for_predicate(self, predicate_id: str) -> list[Obligation]:
+        return [o for o in self._items.values() if o.predicate_id == predicate_id]
+
     def absence_established(self, obligation_id: str) -> bool:
         """Retrieval cannot establish that an exception does not exist, so this is always False."""
         self._items[obligation_id]
         return False
 
     def blocking(self) -> list[str]:
-        return sorted(i for i, o in self._items.items() if o.material and o.status != "satisfied")
+        return sorted(i for i, o in self._items.items() if o.material and o.status not in ("satisfied", "skipped"))

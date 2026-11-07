@@ -7,7 +7,7 @@ from typing import Callable
 from .applicability import Applicability
 from .indexing import IndexEntry
 from .contracts import ContractError
-from .logic import Observation, Outcome, is_material
+from .logic import Observation, Outcome, evaluate, expression_ids, is_material
 from .obligations import ObligationLedger
 from .packets import EvidencePacket
 from .plans import Plan
@@ -15,6 +15,7 @@ from .contracts import Request
 from .recovery import Exclusion, RecoveryResult, recover_packet
 from .retrieval import Candidate, bm25_candidates
 from .scheduler import next_need
+from .stopping import StopDecision, check_stop
 from .store import Catalog
 
 
@@ -57,6 +58,22 @@ class Refusal:
     reason: str  # round_limit | no_targeted_followup
 
 
+@dataclass(frozen=True)
+class Skip:
+    """A predicate that was deliberately not worked on, and why."""
+
+    predicate_id: str
+    kind: str  # witnessed | unwitnessed | unreferenced
+    witnesses: tuple[str, ...]  # predicate ids whose known values fixed the outcome
+    reason: str
+
+
+@dataclass(frozen=True)
+class RunSummary:
+    stop: StopDecision
+    skipped: tuple[Skip, ...]
+
+
 @dataclass
 class RunState:
     request: Request
@@ -66,6 +83,7 @@ class RunState:
     attempts: dict[str, int] = field(default_factory=dict)
     trace: list["TraceRecord"] = field(default_factory=list)
     refusals: list[Refusal] = field(default_factory=list)
+    skipped: list[Skip] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -145,3 +163,35 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
     )
     state.trace.append(record)
     return record
+
+
+def run_until_done(state: RunState, ctx: Context) -> RunSummary:
+    """Run rounds until no material need remains, then record stop status and every skip."""
+    guard = len(state.plan.predicates) * ctx.max_rounds + 1
+    for _ in range(guard):
+        if run_round(state, ctx) is None:
+            break
+    referenced = expression_ids(state.plan.expression)
+    result = evaluate(state.plan.expression, state.observations)
+    skips: list[Skip] = []
+    for p in state.plan.predicates:
+        if state.attempts.get(p.id, 0) or p.id in state.observations:
+            continue
+        if p.id not in referenced:
+            skips.append(Skip(p.id, "unreferenced", (), "not_in_expression"))
+        elif result.outcome in (Outcome.TRUE, Outcome.FALSE) and result.witnesses:
+            why = "; ".join(
+                f"{w}={state.observations[w].outcome.value} ({state.observations[w].reason})" for w in result.witnesses
+            )
+            skips.append(Skip(p.id, "witnessed", result.witnesses, why))
+        else:
+            skips.append(Skip(p.id, "unwitnessed", (), "immaterial_without_conclusive_witness"))
+    for sk in skips:
+        if sk.kind == "unwitnessed":
+            continue  # nothing conclusive justifies dropping its obligations
+        for ob in state.ledger.for_predicate(sk.predicate_id):
+            if ob.kind not in ("entity", "applicability"):
+                state.ledger.skip(ob.obligation_id, reason=f"skipped: {sk.reason}")
+    state.skipped = skips
+    stop = check_stop(state.plan.expression, state.observations, state.ledger)
+    return RunSummary(stop, tuple(skips))

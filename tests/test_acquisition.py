@@ -158,3 +158,68 @@ def test_max_rounds_is_configurable_but_never_above_two(tmp_path):
         one = replace(ctx, max_rounds=1)
         assert run_round(state, one).round_number == 1
         assert run_round(state, one) is None and state.refusals == [Refusal("waiver", "round_limit")]
+
+
+from qjig.acquisition import Skip, run_until_done
+
+
+BLOCK = rev("# Eligibility\nThe order is outside the refund window and ineligible.\n", "policy/elig.md")
+
+
+def multi_run(tmp_path, expression, ids=("a", "b", "c"), a_outcome=Outcome.FALSE):
+    cat = Catalog.open(tmp_path / "m.sqlite")
+    cat.add_revision(BLOCK)
+    save_entries(cat, index_entries(BLOCK))
+    entries = current_entries(cat, BLOCK.source_id, BLOCK.revision_id)
+    called = []
+
+    def make(pid, outcome):
+        def evaluate(packet, recovery):
+            called.append(pid)
+            return EvalResult(outcome, f"{pid}_reason", tuple(i.entry_id for i in packet.items))
+        return evaluate
+
+    specs = {pid: NeedSpec("refund window ineligible", 1, 3000, make(pid, a_outcome if pid == "a" else Outcome.TRUE)) for pid in ids}
+    plan = parse_plan({"origin": "authored", "predicates": [{"id": i, "question": f"is {i}?"} for i in ids], "expression": expression})
+    ledger = ObligationLedger()
+    for i in ids:
+        ledger.open(Obligation(f"ob-{i}", "predicate_evidence", i, f"{i} evidence", material=True))
+    return cat, RunState(Request("req-3", "q", "reviewer", "1", "project"), plan, ledger), Context(cat, entries, None, specs), called
+
+
+def test_stop_after_blocker(tmp_path):
+    expr = {"op": "and", "args": [{"ref": "a"}, {"ref": "b"}, {"ref": "c"}]}
+    cat, state, ctx, called = multi_run(tmp_path, expr)
+    with cat:
+        summary = run_until_done(state, ctx)
+    assert called == ["a"]  # b and c were never worked on
+    assert summary.stop.stop is True and summary.stop.outcome is False
+    # the skips carry the stopping witness and the preserved reason of the blocking fact
+    assert summary.skipped == (
+        Skip("b", "witnessed", ("a",), "a=false (a_reason)"),
+        Skip("c", "witnessed", ("a",), "a=false (a_reason)"),
+    )
+    assert state.skipped == list(summary.skipped)
+    # skipped predicates have no observation and no attempts: they are not silently "false"
+    assert "b" not in state.observations and state.attempts == {"a": 1}
+
+
+def test_or_blocker_and_nothing_skipped_when_all_needed(tmp_path):
+    cat, state, ctx, called = multi_run(tmp_path, {"op": "or", "args": [{"ref": "a"}, {"ref": "b"}]}, ids=("a", "b"), a_outcome=Outcome.TRUE)
+    with cat:
+        s = run_until_done(state, ctx)
+    assert called == ["a"] and s.stop.outcome is True and [x.predicate_id for x in s.skipped] == ["b"]
+    cat, state, ctx, called = multi_run(tmp_path, {"op": "and", "args": [{"ref": "a"}, {"ref": "b"}]}, ids=("a", "b"), a_outcome=Outcome.TRUE)
+    with cat:
+        s = run_until_done(state, ctx)
+    assert called == ["a", "b"] and s.skipped == () and s.stop.outcome is True
+
+
+def test_unreferenced_predicate_is_unwitnessed_not_claimed_as_skipped_by_blocker(tmp_path):
+    # a predicate outside the expression is immaterial but no known value fixed the result because of it
+    expr = {"ref": "a"}
+    cat, state, ctx, called = multi_run(tmp_path, expr)
+    with cat:
+        s = run_until_done(state, ctx)
+    assert called == ["a"]
+    assert {x.predicate_id: x.kind for x in s.skipped} == {"b": "unreferenced", "c": "unreferenced"}

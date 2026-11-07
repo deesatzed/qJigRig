@@ -594,7 +594,7 @@
         "T034",
         "T030"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/acquisition.py"
       ],
@@ -602,7 +602,8 @@
       "test_name": "test_stop_after_blocker",
       "action": "Skip immaterial facts only with a recorded stopping witness",
       "acceptance": "A conclusive AND blocker skips unrelated work with preserved reason",
-      "command": "python -m pytest tests/test_acquisition.py::test_stop_after_blocker -q"
+      "command": "python -m pytest tests/test_acquisition.py::test_stop_after_blocker -q",
+      "evidence": "Red: ImportError Skip (initial contract); first green attempt exposed that a skipped predicate's open obligation still blocked the stop, fixed by adding a recorded 'skipped' obligation status. Green: focused 1 passed in 0.05s; tests/test_acquisition.py 8 passed in 0.07s; full suite 187 passed in 0.23s. 2026-11-06."
     },
     {
       "id": "T036",

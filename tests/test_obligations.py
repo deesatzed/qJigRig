@@ -82,3 +82,16 @@ def test_duplicate_and_unknown_ids_rejected():
         ledger.record_retrieval("nope", hit_count=0, result=empty_result())
     with pytest.raises(ContractError):
         Obligation("o", "not-a-kind", "p", "d", material=True)
+
+
+def test_skip_is_recorded_and_never_applies_to_request_level_obligations():
+    ledger = ObligationLedger()
+    ledger.open(Obligation("ob-p", "predicate_evidence", "p", "d", material=True))
+    ledger.open(Obligation("ob-app", "applicability", "p", "d", material=True))
+    ledger.skip("ob-p", reason="a=false (outside_window)")
+    assert ledger.get("ob-p").status == "skipped" and "outside_window" in ledger.get("ob-p").reason
+    assert ledger.blocking() == ["ob-app"]
+    with pytest.raises(ContractError):
+        ledger.skip("ob-app", reason="because")
+    with pytest.raises(ContractError):
+        ledger.skip("ob-p", reason="  ")

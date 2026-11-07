@@ -152,3 +152,8 @@ def is_material(predicate_id: str, expression: Mapping[str, Any], observations: 
         if _bool_eval(expression, {**base, predicate_id: False}) != _bool_eval(expression, {**base, predicate_id: True}):
             return True
     return False
+
+
+def expression_ids(expression: Mapping[str, Any]) -> frozenset[str]:
+    """Predicate ids referenced anywhere in an expression."""
+    return frozenset(_refs(expression))
