@@ -106,3 +106,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `index_markdown_headings`, `save_entries`, `load_entries`, `resolve_entry` in `src/qjig/indexing.py`; catalog schema v2 adds `index_entries` (migration from v1 tested). Refunds section resolves after close/reopen to the exact CRLF slice '## Refunds\\r\\nRefund within 30 days.' and re-verifies against the stored revision; fenced/indented/hashtag lines ignored; entries for unstored revisions refused. Limits: ATX headings only; a 'heading' entry's accepted state is structural, not a relevance claim.
 - Red: ModuleNotFoundError qjig.indexing (initial contract). Green: focused 1 passed in 0.07s; tests/test_indexing.py 4 passed in 0.05s; full suite 60 passed in 0.14s. 2026-11-06.
+
+## 2026-11-06: T014 complete
+
+- `index_entries` adds a proposed, title-less `extractive_fallback` entry for unheaded text (whole doc, or text before the first heading); documents whose text is all under headings are unchanged; blank documents give none. Limit: text between or after sections is already inside heading sections, so only leading text is a fallback case; fallback method name is a provisional label.
+- Red: ImportError index_entries (initial contract). Green: focused 1 passed in 0.04s; tests/test_indexing.py 7 passed in 0.05s; full suite 63 passed in 0.13s. 2026-11-06.

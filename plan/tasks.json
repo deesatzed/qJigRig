@@ -228,7 +228,7 @@
       "depends_on": [
         "T013"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/indexing.py"
       ],
@@ -236,7 +236,8 @@
       "test_name": "test_missing_heading_fallback",
       "action": "Create an explicitly generated extractive fallback span",
       "acceptance": "Unheaded text stays searchable without invented authoritative headings",
-      "command": "python -m pytest tests/test_indexing.py::test_missing_heading_fallback -q"
+      "command": "python -m pytest tests/test_indexing.py::test_missing_heading_fallback -q",
+      "evidence": "Red: ImportError index_entries (initial contract). Green: focused 1 passed in 0.04s; tests/test_indexing.py 7 passed in 0.05s; full suite 63 passed in 0.13s. 2026-11-06."
     },
     {
       "id": "T015",

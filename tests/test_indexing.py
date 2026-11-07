@@ -1,7 +1,7 @@
 import pytest
 
 from qjig.contracts import ContractError
-from qjig.indexing import index_markdown_headings, load_entries, resolve_entry, save_entries
+from qjig.indexing import index_entries, index_markdown_headings, load_entries, resolve_entry, save_entries
 from qjig.sources import SourceRevision, decode_source
 from qjig.spans import verify_span
 from qjig.store import Catalog
@@ -52,3 +52,30 @@ def test_saving_entries_for_unstored_revision_is_refused(tmp_path):
     with Catalog.open(tmp_path / "c.sqlite") as cat:
         with pytest.raises(ContractError):
             save_entries(cat, index_markdown_headings(rev(DOC)))
+
+
+def test_missing_heading_fallback():
+    revision = rev("Refunds are allowed within 30 days.\r\nExceptions apply.\r\n")
+    assert index_markdown_headings(revision) == []
+    entries = index_entries(revision)
+    assert len(entries) == 1
+    e = entries[0]
+    assert e.kind == "extractive_fallback" and e.state == "proposed"
+    assert e.title is None  # no heading is invented
+    assert e.span.text == "Refunds are allowed within 30 days.\r\nExceptions apply."
+    assert e.method != "markdown_atx_heading_v1"
+
+
+def test_text_before_first_heading_is_covered_and_headed_docs_are_unchanged():
+    revision = rev("Intro note.\n\n# Title\nBody\n")
+    entries = index_entries(revision)
+    assert [(e.kind, e.title, e.span.text) for e in entries] == [
+        ("extractive_fallback", None, "Intro note."),
+        ("heading", "Title", "# Title\nBody"),
+    ]
+    plain = rev(DOC)
+    assert index_entries(plain) == index_markdown_headings(plain)  # no fallback when nothing is unheaded
+
+
+def test_blank_document_has_no_entries():
+    assert index_entries(rev("  \r\n\n")) == []

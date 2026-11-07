@@ -14,6 +14,7 @@ from .spans import Span, make_span, verify_span
 from .store import Catalog
 
 HEADING_METHOD = "markdown_atx_heading_v1"
+FALLBACK_METHOD = "extractive_unheaded_v1"
 
 _HEADING = re.compile(r" {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*\r?\n?$")
 _FENCE = re.compile(r" {0,3}(```|~~~)")
@@ -112,3 +113,23 @@ def resolve_entry(catalog: Catalog, entry_id: str) -> tuple[IndexEntry, Span, So
     entry, revision = _entry_from_row(catalog, row)
     verify_span(revision, entry.span)
     return entry, entry.span, revision
+
+
+def index_entries(revision: SourceRevision) -> list[IndexEntry]:
+    """Heading entries plus a proposed, title-less extractive entry for any unheaded leading text."""
+    text = revision.decoded.text
+    headings = index_markdown_headings(revision)
+    limit = headings[0].span.start if headings else len(text)
+    lead = text[:limit]
+    entries: list[IndexEntry] = []
+    if lead.strip():
+        start = len(lead) - len(lead.lstrip())
+        end = len(lead.rstrip())
+        span = make_span(revision, start, end)
+        entries.append(
+            IndexEntry(
+                make_entry_id(revision.revision_id, "extractive_fallback", FALLBACK_METHOD, start, end),
+                revision.revision_id, span, "extractive_fallback", None, FALLBACK_METHOD, "proposed",
+            )
+        )
+    return entries + headings
