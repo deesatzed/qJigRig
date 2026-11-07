@@ -717,7 +717,7 @@
       "depends_on": [
         "T041"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/providers.py"
       ],
@@ -725,7 +725,8 @@
       "test_name": "test_malformed_is_unknown",
       "action": "Validate typed responses and preserve invalid HTTP-success output",
       "acceptance": "Malformed output creates failure/unknown with a retained receipt",
-      "command": "python -m pytest tests/test_providers.py::test_malformed_is_unknown -q"
+      "command": "python -m pytest tests/test_providers.py::test_malformed_is_unknown -q",
+      "evidence": "Red: ModuleNotFoundError qjig.providers (initial contract). Green: focused 1 passed in 0.04s; tests/test_providers.py 4 passed in 0.05s; full suite 211 passed in 1.23s. 2026-11-06."
     },
     {
       "id": "T043",

@@ -145,7 +145,7 @@ def run_journaled(
     journal: Journal, *, call: Callable[[], Any], request_id: str, stage: str, provider: str, model: str, input_sha256: str,
     intent_payload: dict | None = None,
 ) -> Any:
-    """Write the intent, then call. `call` returns (result, usage). A crash leaves the intent pending."""
+    """Write the intent, then call. `call` returns (result, usage[, extra]); extra is kept in the receipt."""
     blocking = [e for e in journal.pending(request_id) if (e.stage, e.provider, e.model, e.input_sha256) == (stage, provider, model, input_sha256)]
     if blocking:
         raise ReconciliationRequired(
@@ -154,14 +154,16 @@ def run_journaled(
         )
     intent = journal.record_intent(request_id=request_id, stage=stage, provider=provider, model=model, input_sha256=input_sha256, payload=intent_payload)
     try:
-        result, usage = call()
+        out = call()
+        result, usage = out[0], out[1]
+        extra = out[2] if len(out) > 2 else {}
     except UncertainOutcome as exc:  # sent, outcome unknown: stays unresolved
         journal.record_terminal(intent, "uncertain", {"detail": str(exc)})
         raise
     except Exception as exc:  # a definite failure; BaseException (a crash) deliberately leaves it pending
         journal.record_terminal(intent, "failure", {"error": type(exc).__name__, "detail": str(exc)})
         raise
-    journal.record_terminal(intent, "receipt", {"usage": usage})
+    journal.record_terminal(intent, "receipt", {"usage": usage, **extra})
     return result
 
 

@@ -73,6 +73,10 @@ class BudgetLedger:
             return "known"
         return "unknown" if known == 0 else "partially_unknown"
 
+    def last_call_id(self) -> str:
+        """Call id of the most recent journaled event for this request (single writer)."""
+        return self._journal.events(self._request_id)[-1].call_id
+
     def run(
         self, stage: str, call: Callable[[], Any], *, provider: str, model: str, input_sha256: str,
         reserve_tokens: int, hold_back_calls: int = 0, hold_back_tokens: int = 0,
