@@ -301,3 +301,9 @@ Full qJig suite after T024: see the T024 receipt above. All P2 behavior is offli
 - LIVE rerun, Hy4 first at 6000 tokens (reports/t046-smoke-receipts-hy4-6000.json, same SYNTHETIC refund corpus, 4 calls, known cost 0.0102 USD): judge on tencent/hy4 now succeeded on both sides (571 and 1170 completion tokens), outcome FALSE with the exact 14-day quote, same as deepseek's earlier result. Planner on tencent/hy4 still failed: all 6000 completion tokens went to reasoning, no content (finish_reason=length), so deepseek planned (valid 3-question plan).
 - So raising the cap fixed the judge path for Hy4 but not the planner path. Cause of the planner's long reasoning is not established (one run only); not raised further.
 - Limits: one question, one synthetic corpus, one run per configuration; says nothing about quality or reproducibility.
+
+## 2026-11-07: planner model order (owner instruction)
+
+- Order requested: deepseek/deepseek-v4.1-flash-1017, then meta/muse-spark-open, then openai/gpt-6.1-terra (all three listed on the public OpenRouter model list today). Hy4 stays judge/escalation.
+- LIVE, same synthetic refund question, deepseek flash as planner at 6000 tokens: 3 of 3 more runs returned a valid plan (3-4 yes/no questions joined by AND), 6 of 6 across all smoke runs today; known cost 0.0012 USD for the 3. So the next models were not called: the stated condition (deepseek not sufficient) was not met on validity.
+- Limit that no model swap fixes: the planner prompt carries only the question and a corpus hash, not the documents, so every plan joins its questions with AND and none asks about exceptions (the sample corpus has a 30-day defective-item exception). Plan completeness stays unestablished; the obligation ledger and mandatory exception channels must supply what the plan omits.
