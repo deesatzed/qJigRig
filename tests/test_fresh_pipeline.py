@@ -644,3 +644,37 @@ def test_fresh_followup_does_not_repeat_judgment_failure_or_conflict(tmp_path, r
     assert len(run.state.trace) == 1
     assert run.state.observations['p1'].outcome is expected
     assert used == 3 and transport.calls_made == 3
+
+
+def test_fresh_pipeline_consumes_preflight_slots(tmp_path):
+    from qjig.fresh_preflight import fresh_run_allocations
+    from qjig.goal_budget import GoalBudget
+    from qjig.providers import make_call_reservation
+    cat, entries, journal, _, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE)])
+    def model(ident):
+        return {'id': ident, 'context_length': 10000, 'top_provider': {'max_completion_tokens': 1000},
+                'pricing': {'prompt': '0.000001', 'completion': '0.000002'}}
+    planner, judge = model('planner'), model('judge')
+    cap = {'prompt': 2, 'completion': 3}
+    slots = fresh_run_allocations(request_id=REQUEST.request_id, partition='smoke', provider='stand-in',
+                                  planner_model=planner, judge_model=judge,
+                                  planner_input=1000, planner_output=50, judge_input=1000, judge_output=50,
+                                  planner_price=cap, judge_price=cap)
+    by_stage = {stage: [slot['work_id'] for slot in slots if slot['stage'] == stage]
+                for stage in ('planner', 'judge_positive', 'judge_negative')}
+    def reserve(request):
+        return make_call_reservation(request, planner if request.stage == 'planner' else judge,
+                                     input_tokens=1000, input_bound_provenance='synthetic fixture',
+                                     required_id=by_stage[request.stage].pop(0))
+    limit = Budget(30, 50000, 1)
+    with cat, journal, GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
+        goal.reserve_run_set('fresh-run', slots)
+        ledger = BudgetLedger(limit, journal, REQUEST.request_id, goal_budget=goal, partition='smoke')
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=('stand-in', 'planner'), judge=('stand-in', 'judge'),
+                           revision_applicability=lambda _: Applicability.MATCH, reservation_factory=reserve,
+                           planner_max_tokens=50, judge_max_tokens=50, planner_max_price=cap, judge_max_price=cap)
+        assert result.state.observations['p1'].outcome is Outcome.FALSE
+        assert transport.calls_made == 3
+        assert goal._con.execute('SELECT COUNT(*) FROM required_work WHERE attempt_id IS NOT NULL').fetchone()[0] == 3
+        assert goal.audit_journal(journal)['status'] == 'verified'
