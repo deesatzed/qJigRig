@@ -882,7 +882,8 @@
         "R05",
         "R07H",
         "T051A",
-        "T051B"
+        "T051B",
+        "T051C"
       ],
       "status": "pending",
       "files": [
@@ -2151,6 +2152,25 @@
       "acceptance": "Rehashed outcome or observation changes that disagree with trace and Boolean composition are rejected without inference.",
       "command": "python -m pytest tests/test_export.py::test_authored_export_rejects_rehashed_inconsistent_outcome -q",
       "evidence": "Red: rehashed authored export could flip the final Boolean while retaining the original trace. Green: offline verification matches final observations to trace, recomputes reachable outcomes, checks material obligations and witnessed skips, and rejects rehashed inconsistent outcome/observation/witness. Focused 30 passed; full suite 421 passed; saved-run Chromium/download walkthrough passed. This does not verify evaluator semantics, complete corpus, authenticity or full T051."
+    },
+    {
+      "id": "T051C",
+      "phase": "P4",
+      "depends_on": [
+        "T051B",
+        "T053B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/export.py",
+        "src/qjig/evaluator_replay.py"
+      ],
+      "test_file": "tests/test_export.py",
+      "test_name": "test_authored_export_rechecks_deterministic_evaluator",
+      "action": "Recheck deterministic evidence evaluations in authored exports",
+      "acceptance": "A coordinated, rehashed false observation and outcome is rejected when the recorded source and deterministic evaluator disagree; older exports remain explicitly limited.",
+      "command": "python -m pytest tests/test_export.py::test_authored_export_rechecks_deterministic_evaluator -q",
+      "evidence": "Red: coordinated rehashed false evaluator observation and final outcome passed. Green: v2 exports recheck conclusive deterministic observations and applicability in a time-bounded subprocess; v1 reports not assessed and timeout reports incomplete. Focused 22 passed; full offline suite 423 passed; synthetic Chromium saved-run and download passed. This does not establish retrieval completeness, source authority, authenticity, or evaluator semantic validity; full T051 remains pending."
     }
   ]
 }

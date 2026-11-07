@@ -5,6 +5,9 @@ import base64
 import hashlib
 import json
 import re
+import subprocess
+import sys
+from pathlib import Path
 
 from .contracts import ContractError, Request
 from .indexing import index_entries
@@ -27,12 +30,14 @@ def export_authored(catalog: Catalog, result: dict, policy: dict, source_state: 
         raise CatalogStateChanged('catalog changed before export')
     try:
         revision_ids = {e['revision_id'] for record in result['records'] for e in record['evidence']}
+        metadata = {row[0]: list(row) for row in catalog.metadata_rows()}
         sources = {}
         for ident in sorted(revision_ids):
             revision = catalog.get_revision(ident)
             sources[ident] = {'source_id': revision.source_id, 'encoding': revision.decoded.encoding,
-                              'raw_base64': base64.b64encode(revision.decoded.raw).decode('ascii')}
-        payload = {'schema': 'qjig.authored-export.v1', 'source_state': source_state, 'policy': policy,
+                              'raw_base64': base64.b64encode(revision.decoded.raw).decode('ascii'),
+                              'metadata': metadata[ident]}
+        payload = {'schema': 'qjig.authored-export.v2', 'source_state': source_state, 'policy': policy,
                    'result': result, 'sources': sources,
                    'resources': {'provider_calls_reported': result['providers_called'], 'cost_usd': None,
                                  'cost_status': 'not_reported'}}
@@ -58,7 +63,7 @@ def verify_authored_export(bundle: object, *, expected_digest: str | None = None
         digest = hashlib.sha256(_canonical(payload)).hexdigest()
         if recorded != digest or (expected_digest is not None and expected_digest != digest):
             raise ContractError('export digest mismatch')
-        if payload['schema'] != 'qjig.authored-export.v1' or not isinstance(payload['source_state'], str) or not re.fullmatch(r'[0-9a-f]{64}', payload['source_state']):
+        if payload['schema'] not in ('qjig.authored-export.v1', 'qjig.authored-export.v2') or not isinstance(payload['source_state'], str) or not re.fullmatch(r'[0-9a-f]{64}', payload['source_state']):
             raise ContractError('invalid export schema or catalog state')
         result, policy, sources = payload['result'], payload['policy'], payload['sources']
         if not isinstance(result, dict) or not isinstance(policy, dict) or not isinstance(sources, dict):
@@ -73,8 +78,11 @@ def verify_authored_export(bundle: object, *, expected_digest: str | None = None
             raise ContractError('invalid result status')
         revisions, entries = {}, {}
         for ident, source in sources.items():
-            if not isinstance(source, dict) or set(source) != {'source_id', 'encoding', 'raw_base64'}:
+            expected_fields = {'source_id', 'encoding', 'raw_base64'} | ({'metadata'} if payload['schema'].endswith('.v2') else set())
+            if not isinstance(source, dict) or set(source) != expected_fields:
                 raise ContractError('invalid exported source')
+            if 'metadata' in source and (not isinstance(source['metadata'], list) or len(source['metadata']) != 7 or source['metadata'][0] != ident):
+                raise ContractError('invalid source metadata binding')
             raw = base64.b64decode(source['raw_base64'], validate=True)
             revision = SourceRevision.create(source['source_id'], 'export', decode_source(raw, encoding=source['encoding']))
             if revision.revision_id != ident:
@@ -143,7 +151,35 @@ def verify_authored_export(bundle: object, *, expected_digest: str | None = None
             reachable = reachable_outcomes(plan.expression, observations).outcomes
             if reachable != frozenset({result['outcome']}) or any(o['status'] not in ('satisfied', 'skipped') for o in obligations):
                 raise ContractError('decision differs from recorded composition')
+        evaluator_assurance = 'not_assessed'
+        if payload['schema'].endswith('.v2'):
+            conclusive = sum(record['observation']['outcome'] in ('true', 'false') for record in result['records'])
+            if conclusive:
+                worker = _run_evaluator_check(payload)
+                if worker is None:
+                    return {'status': 'incomplete', 'sha256': digest, 'semantic_assurance': 'not_assessed',
+                            'evaluator_assurance': 'incomplete'}
+                if worker != {'status': 'ok', 'checked': conclusive}:
+                    raise ContractError('recorded evaluator result differs')
+                evaluator_assurance = 'checked_conclusive_observations'
+            else:
+                evaluator_assurance = 'no_conclusive_observations'
     except (ContractError, KeyError, TypeError, ValueError, UnicodeError, OverflowError, AttributeError):
         return {'status': 'invalid', 'sha256': None, 'semantic_assurance': 'not_assessed'}
     return {'status': 'structurally_verified' if expected_digest is not None else 'unanchored',
-            'sha256': digest, 'semantic_assurance': 'not_assessed'}
+            'sha256': digest, 'semantic_assurance': 'not_assessed', 'evaluator_assurance': evaluator_assurance}
+
+
+def _run_evaluator_check(payload: dict) -> dict | None:
+    """Bound regex execution in a child process; unavailable checks remain incomplete."""
+    script = "import sys; sys.path.insert(0, sys.argv[1]); from qjig.evaluator_replay import main; main()"
+    try:
+        child = subprocess.run([sys.executable, '-I', '-c', script, str(Path(__file__).resolve().parents[1])],
+                               input=_canonical(payload), capture_output=True, timeout=3,
+                               env={'PYTHONIOENCODING': 'utf-8'})
+        if child.returncode != 0:
+            return None
+        result = json.loads(child.stdout)
+        return result if isinstance(result, dict) else None
+    except (OSError, subprocess.TimeoutExpired, ValueError, UnicodeError):
+        return None

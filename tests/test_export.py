@@ -239,3 +239,72 @@ def test_authored_export_rechecks_skipped_obligation_witness(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_authored_export_rechecks_deterministic_evaluator(tmp_path):
+    path = tmp_path / 'catalog.sqlite'
+    server = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '1', 'Review'))
+        source = {'source_id': 'policy.md', 'text': '# Rule\nRefunds are accepted within 14 days.\n', 'scope': 'project',
+                  'entities': [], 'effective_from': '2026-01-01', 'effective_to': 'open', 'observed_at': None, 'authority': None}
+        client.import_source(source)
+        policy = {'label': 'AUTHORED CONTROL', 'entities': [], 'as_of': '2026-11-15', 'mode': 'snapshot', 'facts': {'days': 20},
+                  'plan': {'origin': 'authored', 'predicates': [{'id': 'p', 'question': 'Within limit?'}], 'expression': {'ref': 'p'}},
+                  'needs': {'p': {'query': 'refunds days', 'want': 1, 'max_bytes': 4000,
+                                  'evaluator': {'kind': 'numeric_threshold', 'field': 'days', 'pattern': r'within (\d+) days', 'operator': 'lte'}}}}
+        response = client.ask('r', 'Refund?', 'project', policy)
+        bundle = client.get_run(response['run_id'])['bundle']
+        assert bundle['payload']['result']['outcome'] is False
+        assert verify_authored_export(bundle)['evaluator_assurance'] == 'checked_conclusive_observations'
+        legacy = copy.deepcopy(bundle)
+        legacy['payload']['schema'] = 'qjig.authored-export.v1'
+        for source_record in legacy['payload']['sources'].values():
+            del source_record['metadata']
+        legacy['sha256'] = hashlib.sha256(json.dumps(legacy['payload'], sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+        assert verify_authored_export(legacy)['evaluator_assurance'] == 'not_assessed'
+        forged = copy.deepcopy(bundle)
+        result = forged['payload']['result']
+        result['outcome'] = True
+        result['observations']['p']['outcome'] = 'true'
+        result['records'][0]['observation']['outcome'] = 'true'
+        forged['sha256'] = hashlib.sha256(json.dumps(forged['payload'], sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+        assert verify_authored_export(forged)['status'] == 'invalid'
+        wrong_scope = copy.deepcopy(bundle)
+        next(iter(wrong_scope['payload']['sources'].values()))['metadata'][1] = 'another-project'
+        wrong_scope['sha256'] = hashlib.sha256(json.dumps(wrong_scope['payload'], sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+        assert verify_authored_export(wrong_scope)['status'] == 'invalid'
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_evaluator_timeout_is_incomplete_not_verified(tmp_path, monkeypatch):
+    import subprocess
+    import qjig.export as export_module
+    path = tmp_path / 'catalog.sqlite'
+    server = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '1', 'Review'))
+        source = {'source_id': 'rule.md', 'text': '# Rule\nRefunds apply.\n', 'scope': 'project', 'entities': [],
+                  'effective_from': '2026-01-01', 'effective_to': 'open', 'observed_at': None, 'authority': None}
+        client.import_source(source)
+        policy = {'label': 'AUTHORED CONTROL', 'entities': [], 'as_of': '2026-11-15', 'mode': 'snapshot',
+                  'plan': {'origin': 'authored', 'predicates': [{'id': 'p', 'question': 'Refunds?'}], 'expression': {'ref': 'p'}},
+                  'needs': {'p': {'query': 'refunds', 'want': 1, 'max_bytes': 4000, 'evaluator': {'kind': 'phrase_present', 'pattern': 'Refunds apply'}}}}
+        response = client.ask('r', 'Refunds?', 'project', policy)
+        bundle = client.get_run(response['run_id'])['bundle']
+        def timeout(*args, **kwargs):
+            raise subprocess.TimeoutExpired('evaluator', 3)
+        monkeypatch.setattr(export_module.subprocess, 'run', timeout)
+        report = verify_authored_export(bundle, expected_digest=bundle['sha256'])
+        assert report['status'] == 'incomplete' and report['evaluator_assurance'] == 'incomplete'
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
