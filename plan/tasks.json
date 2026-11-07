@@ -1343,7 +1343,8 @@
         "T073",
         "R09",
         "R01B",
-        "G01"
+        "G01",
+        "G02"
       ],
       "status": "pending",
       "files": [
@@ -3692,6 +3693,23 @@
       "acceptance": "Inventory F01-F09, all repair tasks, and T049-T074 from the current queue, bind source hashes, and refuse to treat queue assertions as completion evidence.",
       "command": "python -m pytest tests/test_gates.py::test_inventory_covers_goal_findings_repairs_and_original_tasks_without_claiming_proof -q",
       "evidence": "Independent inventory while R08 remains open, as directed by GOAL.md. Red: no gate inventory module existed. The initial machine-readable inventory records queue assertions as unverified and hashes current goal and task queue; tests reject missing/duplicate tasks, stale inputs and attempted promotion. It does not validate receipts or prove completion, and later batches must regenerate it."
+    },
+    {
+      "id": "G02",
+      "phase": "verification",
+      "depends_on": [
+        "G01"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/gates.py"
+      ],
+      "test_file": "tests/test_gates.py",
+      "test_name": "test_check_receipt_verifies_artifacts_without_claiming_gate_completion",
+      "action": "Validate linked local check records without promoting gates",
+      "acceptance": "Verify local command-record schema, gate references, input/output hashes, path containment, counts and exit status without treating caller-reported execution as gate completion.",
+      "command": "python -m pytest tests/test_gates.py::test_check_receipt_verifies_artifacts_without_claiming_gate_completion -q",
+      "evidence": "Independent verification foundation while R08 remains open. Red: no linked check-receipt inspector existed. Synthetic tests cover success, failure, changed inputs, path escape, malformed counts and unknown gates. A real local queue-audit pytest receipt is recorded separately with command, exit code, counts and hashes. These are caller-reported and hash checks do not authenticate execution or prove F09 completion."
     }
   ]
 }

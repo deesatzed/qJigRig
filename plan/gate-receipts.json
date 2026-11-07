@@ -1,0 +1,40 @@
+{
+  "schema": "qjig.check-receipts.v1",
+  "receipts": [
+    {
+      "schema": "qjig.check-receipt.v1",
+      "gate_ids": [
+        "F09"
+      ],
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_repo_audit.py",
+        "-q"
+      ],
+      "exit_code": 0,
+      "observed_at_utc": "2026-11-07T21:18:48.302344+00:00",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "output": {
+        "path": "docs/verification/receipts/queue-audit-pytest.txt",
+        "sha256": "149e983c325e1215d8fe411fd58fb9c0fa38bc5dfa119c4a6a92d44ee61e3e10"
+      },
+      "inputs": [
+        {
+          "path": "scripts/verify_repo.py",
+          "sha256": "87913aaf77e887c9faba81e975255d32dce37d2eea9321a67b542c028bcfcaf6"
+        },
+        {
+          "path": "tests/test_repo_audit.py",
+          "sha256": "37f15037eefe03242480dd6667a964604c2fdc3145c932f53d13d212253cb89b"
+        }
+      ],
+      "assurance": "caller_reported_execution"
+    }
+  ]
+}
