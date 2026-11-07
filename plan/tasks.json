@@ -1413,7 +1413,8 @@
       "phase": "repair",
       "finding": "F05",
       "depends_on": [
-        "R04"
+        "R04",
+        "R05A"
       ],
       "status": "pending",
       "files": [],
@@ -1663,6 +1664,25 @@
       "acceptance": "Source spans, channel results, exclusions and observations survive interruption before subsequent predicate calls.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_trace_is_durable_before_next_predicate -q",
       "evidence": "Red: earlier predicate trace was absent when the next judge call began. Green: each synthetic acquisition trace, including source spans, channel status, exclusions and observation, is persisted before the next predicate; simulated interruption preserves the first trace and a pending later intent. Focused fresh/acquisition/archive suite 42 passed; full suite 337 passed. Integrity verification and full replay remain pending."
+    },
+    {
+      "id": "R05A",
+      "phase": "repair",
+      "finding": "F05",
+      "depends_on": [
+        "R04A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/assurance.py",
+        "tests/test_assurance.py"
+      ],
+      "test_file": "tests/test_assurance.py",
+      "test_name": "test_saved_expression_fails_enabling_exception_control",
+      "action": "Exercise saved planning expression against explicit authored controls",
+      "acceptance": "Saved incorrect expression and enabling/restricting exception controls produce attributed counterexample results without semantic assurance claims.",
+      "command": "python -m pytest tests/test_assurance.py::test_saved_expression_fails_enabling_exception_control -q",
+      "evidence": "Red: no authored counterexample checker existed. Green: saved second-run expression evaluates FALSE under an explicitly hypothetical enabling assignment expected TRUE; separate authored enabling, restricting, missing and conflict controls distinguish matched, contradicted and inconclusive outcomes. Focused assurance/logic/plans 56 passed; full suite 339 passed. Attribution is authored and independent=false; source-grounded planning and contamination attacks remain under R05/T050."
     }
   ]
 }
