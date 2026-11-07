@@ -8,7 +8,8 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-from decimal import Decimal
+from contextlib import closing
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from .budgets import BudgetExceeded, _valid_cost, _valid_tokens
@@ -29,6 +30,38 @@ class GoalBudget:
     def __init__(self, con: sqlite3.Connection, total: Budget, per_request: Budget, allocations: dict[str, Budget], account_bound: bool):
         self._con, self._total, self._per_request, self._allocations = con, total, per_request, allocations
         self._account_bound = account_bound
+
+    @classmethod
+    def resume_account_bound(cls, path: str | Path, *, total: Budget, per_request: Budget,
+                             allocations: dict[str, Budget]) -> "GoalBudget":
+        """Reopen an existing account-bound policy using its stored derived constraints.
+
+        This does not authenticate the ledger or establish current account balance.
+        The usual immutable policy comparison is repeated during the write transaction.
+        """
+        try:
+            uri = Path(path).resolve().as_uri() + '?mode=ro'
+            with closing(sqlite3.connect(uri, uri=True)) as read_con:
+                row = read_con.execute('SELECT value FROM policy WHERE id=1').fetchone()
+            data = json.loads(row[0])['account_snapshot']
+            expected = {'openrouter_credit_ceiling_usd', 'key_limit_remaining_usd', 'credit_remaining_usd',
+                        'is_free_tier', 'byok_spend_assurance', 'source_assurance', 'hosted_authorized'}
+            if (not isinstance(data, dict) or set(data) != expected or type(data['is_free_tier']) is not bool
+                    or data['source_assurance'] != 'caller_supplied_snapshot' or data['hosted_authorized'] is not False
+                    or data['byok_spend_assurance'] not in ('unknown', 'provider_claimed_key_limit')):
+                raise ValueError('invalid stored account binding')
+            remaining = data['key_limit_remaining_usd']
+            if remaining is not None and not isinstance(remaining, str):
+                raise ValueError('invalid key limit')
+            if not isinstance(data['credit_remaining_usd'], str):
+                raise ValueError('invalid credit limit')
+            snapshot = ({'data': {'limit_remaining': Decimal(remaining) if remaining is not None else None,
+                                  'include_byok_in_limit': data['byok_spend_assurance'] == 'provider_claimed_key_limit',
+                                  'is_free_tier': data['is_free_tier']}},
+                        {'data': {'total_credits': Decimal(data['credit_remaining_usd']), 'total_usage': 0}})
+        except (OSError, sqlite3.Error, ValueError, TypeError, KeyError, IndexError, InvalidOperation):
+            raise ContractError('stored account policy unavailable or invalid') from None
+        return cls.open(path, total=total, per_request=per_request, allocations=allocations, account_snapshot=snapshot)
 
     @classmethod
     def open(cls, path: str | Path, *, total: Budget, per_request: Budget, allocations: dict[str, Budget],

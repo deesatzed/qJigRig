@@ -1425,7 +1425,8 @@
         "R08J",
         "R08K",
         "R08L",
-        "R08M"
+        "R08M",
+        "R08N"
       ],
       "status": "pending",
       "files": [],
@@ -3515,6 +3516,24 @@
       "acceptance": "Acquire and validate account data with the same secure read-only client used by refresh, returning only the minimal fields required to bind the initial persistent policy.",
       "command": "python -m pytest tests/test_account_limits.py::test_initial_account_snapshot_is_sanitized_and_can_bind_goal -q",
       "evidence": "Red: no reusable initial account snapshot acquisition existed. The client now returns only validated key/credit fields and can initialize the goal ledger; refresh reuses the same acquisition after its baseline. Synthetic tests confirm account labels and credentials are excluded. Provider observations can drift and cannot authorize hosted dispatch; BYOK and complete token/cost bounds remain open."
+    },
+    {
+      "id": "R08N",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08M"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/goal_budget.py"
+      ],
+      "test_file": "tests/test_goal_budget.py",
+      "test_name": "test_resume_account_bound_policy_from_persisted_constraints",
+      "action": "Resume an account-bound goal from its persisted sanitized constraints",
+      "acceptance": "Reopen an existing bound ledger without the original raw snapshot while preserving usage and restrictions, refusing missing, unbound, malformed or policy-mismatched stores.",
+      "command": "python -m pytest tests/test_goal_budget.py::test_resume_account_bound_policy_from_persisted_constraints -q",
+      "evidence": "Red: account-bound policy required the original snapshot to reopen. Resume now reads existing derived constraints through a read-only connection, reconstructs only the equivalent sanitized binding, and reuses transactional immutable-policy comparison. Tests preserve decimal precision, prior usage and lower restrictions and reject missing, unbound, invalid and mismatched policies. The ledger is not authenticated, and stored observations are historical rather than proof of current balance or authorization."
     }
   ]
 }

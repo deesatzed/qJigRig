@@ -30,6 +30,54 @@ from qjig.budgets import BudgetExceeded
 from qjig.goal_budget import GoalBudget
 
 
+def test_resume_account_bound_policy_from_persisted_constraints(tmp_path):
+    from decimal import Decimal
+    snapshot = ({'data': {'limit_remaining': Decimal('0.60000000000000001'),
+                          'include_byok_in_limit': False, 'is_free_tier': False, 'label': 'private'}},
+                {'data': {'total_credits': Decimal('1.00000000000000001'), 'total_usage': Decimal('0.2')}})
+    limit = Budget(3, 500, 0.6)
+    path = tmp_path / 'goal.sqlite'
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'s': limit}, account_snapshot=snapshot) as goal:
+        goal.reserve('a', 'r', 's', tokens=10, cost_usd=0.1)
+        goal.record_usage('a', input_tokens=2, output_tokens=2, cost_usd=0.05)
+        baseline = goal.account_refresh_baseline()
+        reduced = ({'data': {**snapshot[0]['data'], 'limit_remaining': Decimal('0.1')}}, snapshot[1])
+        goal.restrict_account_snapshot(baseline, reduced)
+    with GoalBudget.resume_account_bound(path, total=limit, per_request=limit, allocations={'s': limit}) as goal:
+        assert goal.actual_usage()['cost_usd'] == 0.05
+        with pytest.raises(BudgetExceeded):
+            goal.reserve('b', 'r', 's', tokens=10, cost_usd=0.11)
+        assert 'private' not in goal._con.execute('SELECT value FROM policy').fetchone()[0]
+    with pytest.raises(ContractError):
+        GoalBudget.resume_account_bound(path, total=Budget(3, 500, 0.5), per_request=limit, allocations={'s': limit})
+    missing = tmp_path / 'missing.sqlite'
+    with pytest.raises(ContractError):
+        GoalBudget.resume_account_bound(missing, total=limit, per_request=limit, allocations={'s': limit})
+    assert not missing.exists()
+
+
+def test_resume_rejects_unbound_or_invalid_stored_account_policy(tmp_path):
+    import json
+    import sqlite3
+    limit = Budget(2, 100, 0.5)
+    path = tmp_path / 'goal.sqlite'
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'s': limit}):
+        pass
+    with pytest.raises(ContractError):
+        GoalBudget.resume_account_bound(path, total=limit, per_request=limit, allocations={'s': limit})
+    snapshot = ({'data': {'limit_remaining': 1, 'include_byok_in_limit': False, 'is_free_tier': False}},
+                {'data': {'total_credits': 1, 'total_usage': 0}})
+    path = tmp_path / 'bound.sqlite'
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'s': limit}, account_snapshot=snapshot):
+        pass
+    with sqlite3.connect(path) as con:
+        policy = json.loads(con.execute('SELECT value FROM policy').fetchone()[0])
+        policy['account_snapshot']['hosted_authorized'] = True
+        con.execute('UPDATE policy SET value=?', (json.dumps(policy),))
+    with pytest.raises(ContractError):
+        GoalBudget.resume_account_bound(path, total=limit, per_request=limit, allocations={'s': limit})
+
+
 def test_refresh_restricts_remaining_account_budget_without_reset(tmp_path):
     initial = ({'data': {'limit_remaining': 1, 'include_byok_in_limit': False, 'is_free_tier': False}},
                {'data': {'total_credits': 1, 'total_usage': 0}})
