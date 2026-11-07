@@ -8,6 +8,8 @@ Six source families are assigned to development (release, cache), pilot (deploy,
 
 The labels are `authored_unvalidated`. The checked-in design digest identifies a local draft, not independent labels or a completed evaluation. Current retain/revise/remove thresholds are placeholders, overlap, and must be replaced with exact, non-overlapping, predeclared criteria before any freeze. Complete price/token preflight, matching of arm access and work, review provenance, leakage checks and the full-run allocation remain open.
 
+For one synthetic fresh-run mechanics check, source metadata was explicitly set to scope `project`, no entity binding, and an open-ended interval beginning `0001-01-01`. This is an authored fixture assumption about the snapshot, not verified source authority or a frozen applicability policy. The evaluation runner uses an isolated in-memory catalog; its review record is archived but that catalog is not retained.
+
 Sixteen private case bindings now pin the case question, source paths and hashes, and reference identity to the draft design. All 16 were checked against their declared family and source-bound reference. These digests do not establish that the protected manifest is complete or that the design is frozen.
 
 Sixteen private source-bound reference records contain 17 exact evidence quotations, all present in locally indexed passages. A synthetic-only check produced `matches_reference` for one cited case and `unknown_review` for one missing-source case without a citation; these are mechanics, not model results.

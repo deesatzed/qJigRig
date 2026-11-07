@@ -368,6 +368,7 @@ def run_fresh(
     review_reservation_factory: ReservationFactory | None = None,
     require_complete_reservations: bool = False,
     reservation_factory: ReservationFactory | None = None, archive=None,
+    evaluation_case_binding: dict | None = None,
     applicability_inputs: ApplicabilityInputs | None = None,
     role_priors: dict[str, float] | None = None,
     want: int = 3,
@@ -379,6 +380,16 @@ def run_fresh(
     model-written, a material plan-coverage obligation is always opened; retrieval can offer exception
     passages for review but can never close it, so the result is a deferral that names the gap.
     """
+    if evaluation_case_binding is not None:
+        import re
+        b = evaluation_case_binding
+        if (not isinstance(b, dict) or set(b) != {'case_id', 'design_sha256', 'case_sha256', 'reference_sha256'}
+                or not isinstance(b['case_id'], str) or not b['case_id'].strip()
+                or any(not isinstance(b[k], str) or not re.fullmatch(r'[0-9a-f]{64}', b[k])
+                       for k in ('design_sha256', 'case_sha256', 'reference_sha256'))):
+            raise ContractError('invalid evaluation case binding')
+        if archive is None:
+            raise ContractError('evaluation case binding requires an archive')
     _check_role_priors({} if role_priors is None else role_priors)
     if type(require_complete_reservations) is not bool or (require_complete_reservations and ledger._goal_budget is None):
         raise ContractError('complete fresh preflight requires a goal ledger')
@@ -468,6 +479,7 @@ def run_fresh(
         # Bind the exact verdicts, effective settings and corpus before any planner call.
         archive.record_context({
             "schema": "qjig.fresh-context.v1", "request": request.to_dict(),
+            **({"evaluation_case_binding": evaluation_case_binding} if evaluation_case_binding is not None else {}),
             "budget": ledger.budget.to_dict() if ledger.budget else None,
             "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS, **({"max_price": planner_max_price} if planner_max_price is not None else {})},
             "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS, **({"max_price": judge_max_price} if judge_max_price is not None else {})},

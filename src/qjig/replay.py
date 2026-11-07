@@ -83,6 +83,14 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
         events = archive.events()
         if context.get("schema") != "qjig.fresh-context.v1" or not isinstance(context.get("corpus"), dict):
             raise ContractError("unsupported or missing context schema")
+        if 'evaluation_case_binding' in context:
+            import re
+            b = context['evaluation_case_binding']
+            if (not isinstance(b, dict) or set(b) != {'case_id', 'design_sha256', 'case_sha256', 'reference_sha256'}
+                    or not isinstance(b['case_id'], str) or not b['case_id'].strip()
+                    or any(not isinstance(b[k], str) or not re.fullmatch(r'[0-9a-f]{64}', b[k])
+                           for k in ('design_sha256', 'case_sha256', 'reference_sha256'))):
+                raise ContractError('invalid evaluation case binding')
         revisions = {revision_id: archive.revision(revision_id) for revision_id in archive.revision_ids()}
         if set(revisions) != set(context["corpus"]):
             raise ContractError("corpus revision set differs from context")

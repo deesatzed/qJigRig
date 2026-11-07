@@ -659,3 +659,59 @@ def test_locked_direct_run_binds_case_without_exposing_reference(tmp_path):
         swapped = dict(ref, case_id='another-case')
         with pytest.raises(ContractError, match='case binding'):
             score_direct_archive(archive,journal,swapped,expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(swapped))
+
+
+def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path):
+    import json
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import load_isolated_sources, validate_evaluation_design
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_fresh import run_locked_fresh
+    from qjig.evaluation_scoring import make_reference, reference_digest
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.replay import verify_archive
+    from qjig.run_archive import RunArchive
+    code, gold = b'# Checks\nTests must pass.', b'PRIVATE_REFERENCE_LABEL'
+    (tmp_path/'code').write_bytes(code); (tmp_path/'label').write_bytes(gold)
+    item = lambda path, raw: {'path':path,'sha256':hashlib.sha256(raw).hexdigest()}
+    sources, protected = [item('code',code)], [item('label',gold)]
+    design = _sample_design(); design['families'][0]['source_hashes'] = [sources[0]['sha256']]
+    d = validate_evaluation_design(design)
+    ref = make_reference(case_id='dev',request=Request('hidden','Do tests pass?','reviewer','1','project'),
+                         sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],
+                         historical_as_known=False,expected_answer='yes',provenance='authored_unvalidated',
+                         evidence=[{'path':'code','quote':'Tests must pass.'}])
+    lock = {'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':d,'question':'Do tests pass?',
+            'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
+            'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
+    lock_hash = case_lock_digest(lock); rev = ref['source_revisions'][0]
+    inputs = ApplicabilityInputs(Collection((MemberMetadata(rev,'project',Interval('2020-01-01',OPEN)),)),
+                                 frozenset(),'2026-11-07',False)
+    usage = {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}
+    def raw(data): return RawResponse(200,json.dumps(data),usage)
+    responses = [raw({'predicates':[{'id':'p','question':'Do tests pass?'}],'expression':{'ref':'p'}}),
+                 raw({'supported':True,'quote':'Tests must pass.','reason':'synthetic'}),
+                 raw({'supported':False,'quote':'','reason':'synthetic'}),
+                 raw({'assessment':'uncertain','reason':'synthetic'})]
+    with Journal.open(tmp_path/'j.sqlite') as journal, RunArchive.open(tmp_path/'archive') as archive:
+        ledger = BudgetLedger(Budget(8,50000,1),journal,'PRIVATE_ARM_MAPPING')
+        bad_inputs = ApplicabilityInputs(Collection(()),frozenset(),'2026-11-07',False)
+        with pytest.raises(ContractError):
+            run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=lock_hash,
+                             applicability_inputs=bad_inputs,ledger=ledger,transport=StandInTransport(responses),archive=archive,
+                             planner=('stand-in','planner'),judge=('stand-in','judge'),reviewer=('stand-in','reviewer'))
+        assert journal.events('PRIVATE_ARM_MAPPING') == [] and archive.events() == []
+        transport = StandInTransport(responses)
+        result = run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=lock_hash,
+                                  applicability_inputs=inputs,ledger=ledger,transport=transport,archive=archive,
+                                  planner=('stand-in','planner'),judge=('stand-in','judge'),reviewer=('stand-in','reviewer'))
+        assert result.status=='deferred' and 'plan_coverage_unestablished' in result.reasons
+        assert result.review.status=='recorded' and transport.calls_made==4
+        assert archive.revision_ids()==(rev,)
+        assert archive.context()['evaluation_case_binding']['case_sha256']==lock_hash
+        prompts = [e['data']['prompt'] for e in archive.events() if e['kind']=='request']
+        assert all('PRIVATE_ARM_MAPPING' not in p and gold.decode() not in p and reference_digest(ref) not in p for p in prompts)
+        assert verify_archive(archive).status=='unanchored'

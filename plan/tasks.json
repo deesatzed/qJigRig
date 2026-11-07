@@ -1118,7 +1118,8 @@
         "T063A",
         "T063B",
         "T063C",
-        "T063D"
+        "T063D",
+        "T063E"
       ],
       "status": "pending",
       "files": [
@@ -2757,6 +2758,26 @@
       "acceptance": "New review prompts omit request IDs while local review records retain exact binding and prior prompt versions remain replayable.",
       "command": "python -m pytest tests/test_program_review.py::test_review_prompt_excludes_internal_request_identity -q",
       "evidence": "Red: optional review prompt exposed internal request identity. Green: review prompt v2 omits request_id while full local review binding retains it; actor and archive context record the prompt version. Synthetic fresh review replay passes, and an emulated legacy prompt archive remains replayable. Focused 64 and full offline 513 passed. Source content, other request fields, protected-manifest completeness and full evaluation isolation remain unverified."
+    },
+    {
+      "id": "T063E",
+      "phase": "P6",
+      "depends_on": [
+        "T063D",
+        "T064B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_fresh.py",
+        "src/qjig/acquisition.py",
+        "src/qjig/replay.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_locked_fresh_run_uses_only_checked_sources_and_hides_reference",
+      "action": "Run checked case snapshots through an isolated fresh pipeline",
+      "acceptance": "Fresh execution uses only the checked case sources and explicit applicability inputs; case binding stays local and references never enter provider prompts.",
+      "command": "python -m pytest tests/test_evaluation.py::test_locked_fresh_run_uses_only_checked_sources_and_hides_reference -q",
+      "evidence": "Red: checked evaluation cases could not run through an isolated fresh catalog. Green: runner builds an in-memory catalog solely from pinned case sources, requires explicit applicability metadata for the exact revisions and records the private case binding outside provider prompts. Synthetic planner/judge/review run defers for plan coverage and replays. Focused 88 and full offline 514 passed. Metadata provenance, persistent evaluation catalog, full label isolation, matched arm work, hosted calls and full experiment remain open."
     }
   ]
 }
