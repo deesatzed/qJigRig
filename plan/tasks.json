@@ -469,7 +469,7 @@
       "depends_on": [
         "T027"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/logic.py"
       ],
@@ -477,7 +477,8 @@
       "test_name": "test_reachable_outcomes",
       "action": "Enumerate consistent completions by unique predicate ID",
       "acceptance": "Repeated references share one assignment across the expression",
-      "command": "python -m pytest tests/test_logic.py::test_reachable_outcomes -q"
+      "command": "python -m pytest tests/test_logic.py::test_reachable_outcomes -q",
+      "evidence": "Red: ImportError reachable_outcomes (initial contract). Green: focused 1 passed in 0.03s; tests/test_logic.py 33 passed in 0.04s; full suite 150 passed in 0.18s. 2026-11-06."
     },
     {
       "id": "T029",

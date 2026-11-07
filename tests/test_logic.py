@@ -85,3 +85,41 @@ def test_unknown_and_conflict_reasons_are_preserved():
     # a missing observation is an explicit unknown with its own reason
     r3 = evaluate({"ref": "ghost"}, {})
     assert r3.outcome is U and r3.unresolved[0].reason == "no_observation"
+
+
+from qjig.logic import reachable_outcomes
+
+
+def ref(n):
+    return {"ref": n}
+
+
+def test_reachable_outcomes():
+    unknown_a = obs(a=U)
+    # repeated references share one assignment: A OR NOT A is true under every completion
+    taut = {"op": "or", "args": [ref("a"), {"op": "not", "args": [ref("a")]}]}
+    r = reachable_outcomes(taut, unknown_a)
+    assert r.outcomes == frozenset({True}) and r.completions == 2 and r.unresolved_ids == ("a",)
+    assert evaluate(taut, unknown_a).outcome is U  # independent-leaf evaluation cannot see this
+    contra = {"op": "and", "args": [ref("a"), {"op": "not", "args": [ref("a")]}]}
+    assert reachable_outcomes(contra, unknown_a).outcomes == frozenset({False})
+    # two different unresolved facts can swing the answer both ways
+    free = {"op": "or", "args": [ref("a"), ref("b")]}
+    r2 = reachable_outcomes(free, obs(a=U, b=C))
+    assert r2.outcomes == frozenset({True, False}) and r2.completions == 4
+    # known values are fixed, not enumerated; conflict and missing count as unresolved
+    r3 = reachable_outcomes(free, obs(a=T, b=C))
+    assert r3.outcomes == frozenset({True}) and r3.completions == 2 and r3.unresolved_ids == ("b",)
+    assert reachable_outcomes(ref("ghost"), {}).unresolved_ids == ("ghost",)
+    # nothing unresolved: exactly one completion
+    r4 = reachable_outcomes(free, obs(a=F, b=F))
+    assert r4.outcomes == frozenset({False}) and r4.completions == 1
+
+
+def test_more_than_six_unresolved_ids_refused():
+    names = [f"p{i}" for i in range(7)]
+    expr = {"op": "or", "args": [ref(n) for n in names]}
+    with pytest.raises(ContractError):
+        reachable_outcomes(expr, {})
+    six = {"op": "or", "args": [ref(n) for n in names[:6]]}
+    assert reachable_outcomes(six, {}).completions == 64

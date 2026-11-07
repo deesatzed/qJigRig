@@ -180,3 +180,8 @@ Full qJig suite after T024: see the T024 receipt above. All P2 behavior is offli
 
 - `Observation`, `Evaluation`, `evaluate` in `src/qjig/logic.py`. Hand-written 16-row AND and OR tables and the 4-row NOT table all match (30 parametrized cases plus a reasons test). Unknown/conflict leaves are returned with predicate id, state and reason; a conclusive operand drops irrelevant unresolved siblings and records the witness; a missing observation is unknown with reason `no_observation`. Limits: leaves are independent here (e.g. A OR NOT A with A unknown stays unknown until T028); precedence choice is recorded as D016.
 - Red: ImportError Observation (initial contract). Green: focused 16 passed in 0.03s; tests/test_logic.py 31 passed in 0.03s; full suite 148 passed in 0.19s. 2026-11-06.
+
+## 2026-11-06: T028 complete
+
+- `reachable_outcomes` enumerates every assignment of unresolved ids (unknown, conflict, missing) with known ids fixed and one shared value per id. A OR NOT A with A unknown gives {True} over 2 completions while plain `evaluate` stays unknown; A AND NOT A gives {False}; two free facts give {True,False} over 4; 6 unresolved ids = 64 completions allowed, 7 refused. Limit: it treats unresolved facts as independent free variables (no known logical relationships between distinct predicates).
+- Red: ImportError reachable_outcomes (initial contract). Green: focused 1 passed in 0.03s; tests/test_logic.py 33 passed in 0.04s; full suite 150 passed in 0.18s. 2026-11-06.

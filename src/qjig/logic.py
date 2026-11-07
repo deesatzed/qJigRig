@@ -1,6 +1,7 @@
 """Pure decision logic over explicit true/false/unknown/conflict states."""
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping
@@ -87,3 +88,45 @@ def evaluate(expression: Mapping[str, Any], observations: Mapping[str, Observati
     Repeated references are not tied together here; use reachable outcomes (T028) for that.
     """
     return _eval(expression, observations)
+
+
+MAX_UNRESOLVED = 6  # at most 2**6 = 64 completions
+
+
+@dataclass(frozen=True)
+class Reachable:
+    outcomes: frozenset[bool]  # distinct expression values over all consistent completions
+    completions: int
+    unresolved_ids: tuple[str, ...]
+
+
+def _refs(node: Mapping[str, Any]) -> set[str]:
+    if "ref" in node:
+        return {node["ref"]}
+    return set().union(*(_refs(a) for a in node["args"]))
+
+
+def _bool_eval(node: Mapping[str, Any], values: Mapping[str, bool]) -> bool:
+    if "ref" in node:
+        return values[node["ref"]]
+    vals = [_bool_eval(a, values) for a in node["args"]]
+    return (not vals[0]) if node["op"] == "not" else (all(vals) if node["op"] == "and" else any(vals))
+
+
+def reachable_outcomes(expression: Mapping[str, Any], observations: Mapping[str, Observation]) -> Reachable:
+    """Every Boolean value the expression can take, assigning each unresolved id once.
+
+    UNKNOWN, CONFLICT and missing observations are free variables; TRUE/FALSE are fixed.
+    A reference that appears several times shares one value.
+    """
+    ids = sorted(_refs(expression))
+    fixed = {i: observations[i].outcome is Outcome.TRUE for i in ids if i in observations and observations[i].outcome in (Outcome.TRUE, Outcome.FALSE)}
+    free = [i for i in ids if i not in fixed]
+    if len(free) > MAX_UNRESOLVED:
+        raise ContractError(f"{len(free)} unresolved predicates exceeds the cap of {MAX_UNRESOLVED}")
+    results = set()
+    count = 0
+    for combo in itertools.product((False, True), repeat=len(free)):
+        count += 1
+        results.add(_bool_eval(expression, {**fixed, **dict(zip(free, combo))}))
+    return Reachable(frozenset(results), count, tuple(free))
