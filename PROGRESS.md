@@ -76,3 +76,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `translate_quix_lines` in `src/qjig/legacy_quix.py` maps legacy 1-based inclusive line spans over universal-newline text to a canonical raw-text `Span`. Test pins the real QUIXER hash (2fcfb783...) and JIG raw hash (6a3b3844...) recorded in reports/compatibility-probes.json for b'One\\r\\nTwo\\r\\n' — they stay distinct. Handles CRLF, lone CR and LF; wrong legacy hash, bad line numbers raise. Limits: blank-line-only spans are rejected as empty; no QUIXER import (legacy code not run in this test); PDF page anchors not translated.
 - Red: ModuleNotFoundError qjig.legacy_quix (initial contract). Green: focused 1 passed in 0.04s; tests/test_legacy_quix.py 3 passed in 0.05s; full suite 34 passed in 0.11s. 2026-11-06.
+
+## 2026-11-06: T008 complete
+
+- `translate_jig_offsets` and `translate_jig_quote` in `src/qjig/legacy_jig.py`. JIG's hash must equal the revision's `text_sha256` (real JIG hash 6a3b3844... pinned in the test); a changed revision that still contains the same quote at the same offsets is rejected; mismatched, missing, ambiguous and blank quotes are rejected. Limits: JIG's collection/source-boundary check (span_ref) is not translated; JIG code is not imported.
+- Red: ModuleNotFoundError qjig.legacy_jig (initial contract). Green: focused 1 passed in 0.03s; tests/test_legacy_jig.py 3 passed in 0.03s; full suite 37 passed in 0.14s. 2026-11-06.

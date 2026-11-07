@@ -126,7 +126,7 @@
       "depends_on": [
         "T006"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/legacy_jig.py"
       ],
@@ -134,7 +134,8 @@
       "test_name": "test_translate_raw_offsets",
       "action": "Translate a JIG snapshot quote into canonical span",
       "acceptance": "The same text cannot bind to another revision with changed content",
-      "command": "python -m pytest tests/test_legacy_jig.py::test_translate_raw_offsets -q"
+      "command": "python -m pytest tests/test_legacy_jig.py::test_translate_raw_offsets -q",
+      "evidence": "Red: ModuleNotFoundError qjig.legacy_jig (initial contract). Green: focused 1 passed in 0.03s; tests/test_legacy_jig.py 3 passed in 0.03s; full suite 37 passed in 0.14s. 2026-11-06."
     },
     {
       "id": "T009",
