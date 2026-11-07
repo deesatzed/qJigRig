@@ -1036,3 +1036,94 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
         assert verify_direct_archive(archive,journal)['status']=='unanchored'
         prompt=next(e['data']['prompt'] for e in archive.events() if e['kind']=='request')
         assert plan['sha256'] not in prompt and rid not in prompt and 'direct_full_evidence' not in prompt
+
+
+def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(tmp_path):
+    import json
+    from collections import Counter
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.direct_preflight import direct_run_allocations
+    from qjig.evaluation import load_isolated_sources, validate_evaluation_design
+    from qjig.evaluation_budget import make_evaluation_plan, reserve_evaluation_plan
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_fresh import run_locked_fresh
+    from qjig.evaluation_scoring import make_reference, reference_digest, score_fresh_archive
+    from qjig.fresh_preflight import fresh_run_allocations, fresh_slot_reservation
+    from qjig.goal_budget import GoalBudget
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.replay import verify_archive
+    from qjig.run_archive import RunArchive
+
+    code, gold = b'Tests must pass.', b'PRIVATE_REFERENCE_LABEL'
+    (tmp_path/'code').write_bytes(code); (tmp_path/'label').write_bytes(gold)
+    item = lambda p, v: {'path':p, 'sha256':hashlib.sha256(v).hexdigest()}
+    sources, protected = [item('code',code)], [item('label',gold)]
+    design = _sample_design(); design['families'][0]['source_hashes'] = [sources[0]['sha256']]
+    digest = validate_evaluation_design(design)
+    ref = make_reference(case_id='dev', request=Request('hidden','Do tests pass?','reviewer','1','project'),
+        sources=load_isolated_sources(tmp_path,sources,protected), as_of='2026-11-07', entities=[],
+        historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
+        evidence=[{'path':'code','quote':'Tests must pass.'}])
+    lock = {'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':digest,'question':'Do tests pass?',
+        'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
+        'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
+    case_hashes = {c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']}
+    case_hashes['dev'] = case_lock_digest(lock)
+    model = {'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+             'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    cap = {'prompt':2,'completion':3}
+    family_partitions = {f['id']:f['partition'] for f in design['families']}
+    assignments, templates = [], {}
+    for case in design['cases']:
+        partition = family_partitions[case['family']]
+        for arm in design['arms']:
+            for repeat in range(1,design['repeats'][partition]+1):
+                rid = 'private-'+str(len(assignments))
+                if arm == 'combined':
+                    work = fresh_run_allocations(request_id=rid,partition=partition,provider='stand-in',
+                        planner_model=model,judge_model=model,planner_input=100,planner_output=100,
+                        judge_input=100,judge_output=100,planner_price=cap,judge_price=cap)
+                else:
+                    work = direct_run_allocations(request_id=rid,partition=partition,provider='stand-in',model=model,
+                        input_tokens=100,output_tokens=100,max_price=cap,followups=0)
+                templates[arm] = dict(Counter(x['stage'] for x in work))
+                assignments.append({'case_id':case['id'],'arm':arm,'repeat':repeat,'request_id':rid,'work':work})
+    plan = make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=digest)
+    target = next(a for a in assignments if a['case_id']=='dev' and a['arm']=='combined' and a['repeat']==1)
+    rid = target['request_id']; per = Budget(30,6000,1)
+    allocations = {p:Budget(500,150000,6) for p in ('development','pilot','holdout')}
+    total = Budget(1500,450000,18)
+    inputs = ApplicabilityInputs(Collection((MemberMetadata(ref['source_revisions'][0],'project',Interval('2020-01-01',OPEN)),)),
+                                 frozenset(),'2026-11-07',False)
+    usage = {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
+    raw = lambda data: RawResponse(200,json.dumps(data),usage)
+    responses = [raw({'predicates':[{'id':'p','question':'Do tests pass?'}],'expression':{'ref':'p'}}),
+                 raw({'supported':True,'quote':'Tests must pass.','reason':'synthetic'}),
+                 raw({'supported':False,'quote':'','reason':'synthetic'})]
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal, \
+         Journal.open(tmp_path/'journal.sqlite') as journal, RunArchive.open(tmp_path/'archive') as archive:
+        reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])
+        ledger = BudgetLedger(per,journal,rid,goal_budget=goal,partition='development')
+        def factory(req):
+            return fresh_slot_reservation(goal,'evaluation:study',request_id=rid,partition='development',
+                request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
+        binding = {'plan_id':'study','plan_sha256':plan['sha256'],'arm':'combined','repeat':1}
+        transport = StandInTransport(responses)
+        result = run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=digest,
+            expected_case_sha256=case_lock_digest(lock),applicability_inputs=inputs,ledger=ledger,
+            transport=transport,archive=archive,planner=('stand-in',model['id']),judge=('stand-in',model['id']),
+            planner_max_tokens=100,judge_max_tokens=100,planner_max_price=cap,judge_max_price=cap,
+            reservation_factory=factory,assignment_binding=binding)
+        assert result.status == 'deferred' and transport.calls_made == 3
+        assert archive.context()['evaluation_assignment'] == binding
+        prompts = [e['data']['prompt'] for e in archive.events() if e['kind']=='request']
+        assert all(rid not in p and plan['sha256'] not in p and gold.decode() not in p for p in prompts)
+        replay = verify_archive(archive)
+        assert replay.status == 'unanchored'
+        score = score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
+                                    expected_reference_sha256=reference_digest(ref))
+        assert score['request_status'] == 'deferred' and score['request_answer'] is None
+        assert goal.audit_journal(journal)['status'] == 'verified'
