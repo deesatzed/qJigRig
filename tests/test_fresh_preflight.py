@@ -57,7 +57,8 @@ def test_frozen_slot_selection_survives_restart_and_rejects_mismatch(tmp_path):
     with GoalBudget.open(path, total=limit, per_request=limit, allocations={'pilot': limit}) as goal:
         goal.reserve_run_set('pilot-set', slots)
         first = goal.select_required_work('pilot-set', **args)
-        goal.reserve('attempt-1', required_id=first, **args)
+        binding = next(slot['work_binding_sha256'] for slot in slots if slot['work_id'] == first)
+        goal.reserve('attempt-1', required_id=first, work_binding_sha256=binding, **args)
         goal.record_usage('attempt-1', input_tokens=10, output_tokens=5, cost_usd=0.0001)
     with GoalBudget.open(path, total=limit, per_request=limit, allocations={'pilot': limit}) as goal:
         second = goal.select_required_work('pilot-set', **args)
@@ -95,3 +96,51 @@ def test_fresh_slot_rejects_changed_configuration_even_when_cheaper(tmp_path):
         with pytest.raises(ContractError):
             fresh_slot_reservation(goal, 'frozen', request_id='r', partition='pilot', request=request,
                                    model=changed_model, input_tokens=100, input_bound_provenance='fixture')
+
+
+def test_bound_fresh_slot_cannot_be_consumed_without_configuration(tmp_path):
+    from qjig.fresh_preflight import fresh_run_allocations
+    model = {'id': 'synthetic/model', 'context_length': 10000,
+             'top_provider': {'max_completion_tokens': 1000},
+             'pricing': {'prompt': '0.000001', 'completion': '0.000002'}}
+    slots = fresh_run_allocations(request_id='r', partition='pilot', provider='stand-in',
+                                  planner_model=model, judge_model=model, planner_input=100, planner_output=50,
+                                  judge_input=100, judge_output=50, planner_price={'prompt': 2, 'completion': 3},
+                                  judge_price={'prompt': 2, 'completion': 3})
+    planner = next(slot for slot in slots if slot['stage'] == 'planner')
+    limit = Budget(30, 10000, 1)
+    with GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'pilot': limit}) as goal:
+        goal.reserve_run_set('frozen', slots)
+        with pytest.raises(ContractError):
+            goal.reserve('attempt', 'r', 'pilot', tokens=planner['tokens'], cost_usd=planner['cost_usd'],
+                         stage='planner', provider='stand-in', model=model['id'], required_id=planner['work_id'])
+        assert goal.totals().max_calls == 0
+
+
+def test_typed_call_rejects_rebound_request_before_dispatch(tmp_path):
+    from dataclasses import replace
+    from qjig.budgets import BudgetLedger
+    from qjig.fresh_preflight import fresh_run_allocations, fresh_slot_reservation
+    from qjig.journal import Journal
+    from qjig.providers import ProviderRequest, StandInTransport, call_typed
+    model = {'id': 'synthetic/model', 'context_length': 10000,
+             'top_provider': {'max_completion_tokens': 1000},
+             'pricing': {'prompt': '0.000001', 'completion': '0.000002'}}
+    cap = {'prompt': 2, 'completion': 3}
+    slots = fresh_run_allocations(request_id='r', partition='pilot', provider='stand-in',
+                                  planner_model=model, judge_model=model, planner_input=100, planner_output=50,
+                                  judge_input=100, judge_output=50, planner_price=cap, judge_price=cap)
+    limit = Budget(30, 10000, 1)
+    with GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'pilot': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        goal.reserve_run_set('frozen', slots)
+        original = ProviderRequest('planner', 'stand-in', model['id'], 'question', 50, max_price=cap)
+        bound = fresh_slot_reservation(goal, 'frozen', request_id='r', partition='pilot', request=original,
+                                       model=model, input_tokens=100, input_bound_provenance='fixture')
+        changed = ProviderRequest('planner', 'stand-in', model['id'], 'question', 50,
+                                  max_price={'prompt': 1, 'completion': 1})
+        forged = replace(bound, request_sha256=changed.input_sha256())
+        transport = StandInTransport([])
+        with pytest.raises(ContractError, match='configuration'):
+            call_typed(BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='pilot'),
+                       transport, changed, {}, reservation=forged)
+        assert journal.events('r') == [] and transport.calls_made == 0

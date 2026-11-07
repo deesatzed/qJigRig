@@ -54,7 +54,7 @@ class GoalBudget:
             con.execute("CREATE TABLE IF NOT EXISTS recoveries (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), call_id TEXT NOT NULL, receipt_sha256 TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS required_work (work_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, partition TEXT NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL, attempt_id TEXT UNIQUE)")
             columns = {row[1] for row in con.execute("PRAGMA table_info(required_work)")}
-            for column in ("stage", "provider", "model"):
+            for column in ("stage", "provider", "model", "work_binding_sha256"):
                 if column not in columns:
                     con.execute(f"ALTER TABLE required_work ADD COLUMN {column} TEXT")
             con.execute("CREATE TABLE IF NOT EXISTS run_sets (set_id TEXT PRIMARY KEY, manifest TEXT NOT NULL, sha256 TEXT NOT NULL)")
@@ -143,8 +143,9 @@ class GoalBudget:
         if (not _valid_tokens(bound_tokens) or not _valid_cost(bound_cost) or bound_tokens != row[1]
                 or _cost(bound_cost) != Decimal(row[2])):
             raise ContractError("journal reservation differs from goal reservation")
-        required = self._con.execute("SELECT work_id,stage,provider,model FROM required_work WHERE attempt_id=?", (attempt_id,)).fetchone()
-        if required is not None and (intent.payload.get("required_id"), intent.stage, intent.provider, intent.model) != required:
+        required = self._con.execute("SELECT work_id,stage,provider,model,work_binding_sha256 FROM required_work WHERE attempt_id=?", (attempt_id,)).fetchone()
+        if required is not None and ((intent.payload.get("required_id"), intent.stage, intent.provider, intent.model) != required[:4]
+                                     or (required[4] is not None and intent.payload.get("work_binding_sha256") != required[4])):
             raise ContractError("journal required reservation binding differs")
         terminal = [e for e in events if e.call_id == intent.call_id and e.kind in ("receipt", "failure", "uncertain", "reconciled")]
         if len(terminal) != 1 or terminal[0].kind != "receipt":
@@ -235,8 +236,9 @@ class GoalBudget:
             if (not _valid_tokens(input_bound) or not _valid_tokens(output_bound)
                     or input_bound + output_bound != bound_tokens):
                 invalid.append(f"token_bounds_mismatch:{attempt}")
-            required = self._con.execute("SELECT work_id,stage,provider,model FROM required_work WHERE attempt_id=?", (attempt,)).fetchone()
-            if required is not None and (intent.payload.get("required_id"), intent.stage, intent.provider, intent.model) != required:
+            required = self._con.execute("SELECT work_id,stage,provider,model,work_binding_sha256 FROM required_work WHERE attempt_id=?", (attempt,)).fetchone()
+            if required is not None and ((intent.payload.get("required_id"), intent.stage, intent.provider, intent.model) != required[:4]
+                                         or (required[4] is not None and intent.payload.get("work_binding_sha256") != required[4])):
                 invalid.append(f"required_binding_mismatch:{attempt}")
             terminals = terminals_by_call.get(intent.call_id, [])
             if len(terminals) > 1 and [e.kind for e in terminals] != ["uncertain", "reconciled"]:
@@ -315,10 +317,10 @@ class GoalBudget:
             raise ContractError("run set digest differs from manifest")
         try:
             items = json.loads(manifest)
-            expected = [(x["work_id"], x["request_id"], x["partition"], x["tokens"], x["cost_usd"], x["stage"], x["provider"], x["model"]) for x in items]
+            expected = [(x["work_id"], x["request_id"], x["partition"], x["tokens"], x["cost_usd"], x["stage"], x["provider"], x["model"], x.get("work_binding_sha256")) for x in items]
         except (ValueError, TypeError, KeyError):
             raise ContractError("run set manifest is invalid") from None
-        rows = self._con.execute("SELECT w.work_id,w.request_id,w.partition,w.tokens,w.cost,w.stage,w.provider,w.model FROM run_set_work s JOIN required_work w ON w.work_id=s.work_id WHERE s.set_id=? ORDER BY w.work_id", (set_id,)).fetchall()
+        rows = self._con.execute("SELECT w.work_id,w.request_id,w.partition,w.tokens,w.cost,w.stage,w.provider,w.model,w.work_binding_sha256 FROM run_set_work s JOIN required_work w ON w.work_id=s.work_id WHERE s.set_id=? ORDER BY w.work_id", (set_id,)).fetchall()
         if rows != expected:
             raise ContractError("run set allocations differ from frozen manifest")
 
@@ -333,8 +335,11 @@ class GoalBudget:
         keys = {"work_id", "request_id", "partition", "tokens", "cost_usd", "stage", "provider", "model"}
         normalized = []
         for item in assignments:
-            if not isinstance(item, dict) or set(item) != keys:
+            if not isinstance(item, dict) or set(item) not in (keys, keys | {"work_binding_sha256"}):
                 raise ContractError("invalid run set assignment fields")
+            binding = item.get("work_binding_sha256")
+            if binding is not None and (not isinstance(binding, str) or len(binding) != 64 or any(c not in '0123456789abcdef' for c in binding)):
+                raise ContractError("invalid work binding")
             if any(not isinstance(item[k], str) or not item[k].strip() for k in ("work_id", "request_id", "partition", "stage", "provider", "model")):
                 raise ContractError("invalid run set assignment identity")
             if item["partition"] not in self._allocations or not _valid_tokens(item["tokens"]) or not _valid_cost(item["cost_usd"]):
@@ -359,8 +364,8 @@ class GoalBudget:
                 if self._con.execute("SELECT 1 FROM required_work WHERE work_id=?", (x["work_id"],)).fetchone():
                     raise ContractError("required work already exists")
                 self._check_capacity(x["request_id"], x["partition"], 1, x["tokens"], Decimal(x["cost_usd"]))
-                self._con.execute("INSERT INTO required_work (work_id,request_id,partition,tokens,cost,stage,provider,model) VALUES(?,?,?,?,?,?,?,?)",
-                                  tuple(x[k] for k in ("work_id", "request_id", "partition", "tokens", "cost_usd", "stage", "provider", "model")))
+                self._con.execute("INSERT INTO required_work (work_id,request_id,partition,tokens,cost,stage,provider,model,work_binding_sha256) VALUES(?,?,?,?,?,?,?,?,?)",
+                                  tuple(x[k] for k in ("work_id", "request_id", "partition", "tokens", "cost_usd", "stage", "provider", "model")) + (x.get("work_binding_sha256"),))
                 self._con.execute("INSERT INTO run_set_work VALUES(?,?)", (set_id, x["work_id"]))
             self._con.execute("COMMIT")
             return digest
@@ -393,7 +398,7 @@ class GoalBudget:
     def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float,
                 hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0,
                 required_id: str | None = None, stage: str | None = None, provider: str | None = None,
-                model: str | None = None) -> None:
+                model: str | None = None, work_binding_sha256: str | None = None) -> None:
         if any(not isinstance(v, str) or not v.strip() for v in (attempt_id, request_id, partition)):
             raise ContractError("reservation identities must be non-empty")
         if (partition not in self._allocations or not _valid_tokens(tokens) or not _valid_cost(cost_usd)
@@ -408,10 +413,11 @@ class GoalBudget:
             if required_id is not None:
                 if not isinstance(required_id, str) or not required_id.strip():
                     raise ContractError("invalid required work identity")
-                required = self._con.execute("SELECT request_id,partition,tokens,cost,attempt_id,stage,provider,model FROM required_work WHERE work_id=?", (required_id,)).fetchone()
+                required = self._con.execute("SELECT request_id,partition,tokens,cost,attempt_id,stage,provider,model,work_binding_sha256 FROM required_work WHERE work_id=?", (required_id,)).fetchone()
                 if (required is None or required[0] != request_id or required[1] != partition or required[4] is not None
                         or any(not isinstance(v, str) or not v.strip() for v in (stage, provider, model))
                         or (stage, provider, model) != required[5:8]
+                        or (required[8] is not None and work_binding_sha256 != required[8])
                         or tokens > required[2] or _cost(cost_usd) > Decimal(required[3])):
                     raise ContractError("required work does not match reservation")
             previous = self._con.execute("SELECT r.tokens, r.cost, u.input_tokens, u.output_tokens, u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()

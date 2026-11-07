@@ -65,6 +65,15 @@ class CallReservation:
     hold_back_tokens: int = 0
     hold_back_cost_usd: float = 0
     required_id: str | None = None
+    work_binding_sha256: str | None = None
+
+
+def fresh_work_binding(request: ProviderRequest, input_tokens: int, pricing_sha256: str) -> str:
+    if request.max_price is None:
+        raise ContractError("fresh work requires a routing price ceiling")
+    data = ['qjig.fresh-work-config.v1', request.stage, request.provider, request.model,
+            input_tokens, request.max_tokens, dict(request.max_price), pricing_sha256]
+    return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')).hexdigest()
 
 
 def _ceiling_token_cost(request: ProviderRequest, input_tokens: int) -> Decimal:
@@ -319,6 +328,9 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
         if (not _valid_cost(reservation.cost_usd) or
                 Decimal(str(reservation.cost_usd)) < _ceiling_token_cost(request, reservation.input_tokens)):
             raise ContractError("reservation does not cover routing ceiling")
+    if reservation is not None and reservation.work_binding_sha256 is not None:
+        if reservation.work_binding_sha256 != fresh_work_binding(request, reservation.input_tokens, reservation.pricing_sha256):
+            raise ContractError("reservation work configuration differs")
     if isinstance(transport, OpenRouterTransport):
         raise BudgetExceeded("preflight_unavailable", "hosted calls require complete input, cost and goal-wide reservations")
 
@@ -375,6 +387,7 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
         "hold_back_calls": reservation.hold_back_calls, "hold_back_tokens": reservation.hold_back_tokens,
         "hold_back_cost_usd": reservation.hold_back_cost_usd,
         "required_id": reservation.required_id,
+        "work_binding_sha256": reservation.work_binding_sha256,
         "reservation_binding": {"request_sha256": reservation.request_sha256, "pricing_sha256": reservation.pricing_sha256,
                                 "input_bound_provenance": reservation.input_bound_provenance},
     }

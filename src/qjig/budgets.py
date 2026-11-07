@@ -137,6 +137,7 @@ class BudgetLedger:
         reserve_tokens: int, reserve_input_tokens: int | None = None, hold_back_calls: int = 0, hold_back_tokens: int = 0,
         reserve_cost_usd: float | None = None, hold_back_cost_usd: float = 0, reservation_binding: dict | None = None,
         required_id: str | None = None, context_binding: dict | None = None, request_max_price: dict | None = None,
+        work_binding_sha256: str | None = None,
     ) -> Any:
         """Check every cap, then journal the intent and make the call. Refusals happen before any intent."""
         if self._goal_budget is not None and (reserve_input_tokens is None or reserve_cost_usd is None):
@@ -179,7 +180,7 @@ class BudgetLedger:
                                       tokens=reserve_input_tokens + reserve_tokens, cost_usd=reserve_cost_usd,
                                       hold_back_calls=hold_back_calls, hold_back_tokens=hold_back_tokens,
                                       hold_back_cost_usd=hold_back_cost_usd, required_id=required_id,
-                                      stage=stage, provider=provider, model=model)
+                                      stage=stage, provider=provider, model=model, work_binding_sha256=work_binding_sha256)
         result = run_journaled(
             self._journal, call=call, request_id=self._request_id, stage=stage, provider=provider, model=model,
             input_sha256=input_sha256, intent_payload={"reserve_tokens": reserve_input_tokens + reserve_tokens,
@@ -187,7 +188,8 @@ class BudgetLedger:
                                                        "reserve_cost_usd": reserve_cost_usd,
                                                        "hold_back_cost_usd": hold_back_cost_usd, "goal_attempt_id": goal_attempt_id,
                                                        "reservation_binding": reservation_binding, "required_id": required_id,
-                                                       "context_binding": context_binding, "request_max_price": request_max_price},
+                                                       "context_binding": context_binding, "request_max_price": request_max_price,
+                                                       "work_binding_sha256": work_binding_sha256},
         )
         if goal_attempt_id is not None:
             receipt = self._journal.events(self._request_id)[-1]

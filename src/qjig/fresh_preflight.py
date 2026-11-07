@@ -12,11 +12,11 @@ from dataclasses import replace
 from .acquisition import MAX_ROUNDS
 from .contracts import ContractError
 from .plans import MAX_PREDICATES
-from .providers import ProviderRequest, make_call_reservation
+from .providers import ProviderRequest, fresh_work_binding, make_call_reservation
 
 
 def _slot_id(request_id, partition, request, input_tokens, pricing_sha256, index):
-    identity = ['qjig.fresh-slot.v2', request_id, partition, request.stage, index,
+    identity = ['qjig.fresh-slot.v3', request_id, partition, request.stage, index,
                 request.provider, request.model, input_tokens, request.max_tokens,
                 dict(request.max_price), pricing_sha256]
     encoded = json.dumps(identity, ensure_ascii=False, separators=(',', ':'), sort_keys=True, allow_nan=False).encode('utf-8')
@@ -51,7 +51,8 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
         ident = _slot_id(request_id, partition, request, input_tokens, bound.pricing_sha256, index)
         result.append({'work_id': ident, 'request_id': request_id,
                        'partition': partition, 'tokens': input_tokens + output_tokens,
-                       'cost_usd': bound.cost_usd, 'stage': stage, 'provider': provider, 'model': model['id']})
+                       'cost_usd': bound.cost_usd, 'stage': stage, 'provider': provider, 'model': model['id'],
+                       'work_binding_sha256': fresh_work_binding(request, input_tokens, bound.pricing_sha256)})
     return result
 
 
@@ -75,4 +76,5 @@ def fresh_slot_reservation(goal, set_id: str, *, request_id: str, partition: str
                                       stage=request.stage, provider=request.provider, model=request.model,
                                       tokens=input_tokens + request.max_tokens, cost_usd=bound.cost_usd,
                                       allowed_work_ids=allowed)
-    return replace(bound, required_id=ident)
+    return replace(bound, required_id=ident,
+                   work_binding_sha256=fresh_work_binding(request, input_tokens, bound.pricing_sha256))
