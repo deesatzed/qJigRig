@@ -1378,7 +1378,8 @@
       "finding": "F03",
       "depends_on": [
         "R07",
-        "R03A"
+        "R03A",
+        "R03B"
       ],
       "status": "pending",
       "files": [],
@@ -1597,6 +1598,27 @@
       "acceptance": "All three saved zero-hit questions recover relevant candidate access while preserving lexical baseline and disclosing distractors.",
       "command": "python -m pytest tests/test_retrieval.py::test_recorded_live_query_variants -q",
       "evidence": "Red: versioned expanded retrieval absent. Green: all three no_retrieval_hit questions are read from the saved live receipt; unchanged BM25 returns zero, controlled expansion retrieves relevant synthetic candidates, and an irrelevant exception passage is also retrieved. Retrieval/recovery/packet tests 18 passed; full suite 324 passed. Expansion is not integrated into fresh acquisition; R03 remains pending."
+    },
+    {
+      "id": "R03B",
+      "phase": "repair",
+      "finding": "F03",
+      "depends_on": [
+        "R03A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/acquisition.py",
+        "src/qjig/cli.py",
+        "tests/test_fresh_pipeline.py",
+        "tests/test_cli.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_recorded_zero_hit_reaches_fresh_judge",
+      "action": "Integrate versioned expansion into fresh predicate acquisition",
+      "acceptance": "Recorded zero-hit question reaches a stand-in judge with verified source spans and versioned acquisition trace; authored baseline remains unchanged.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_recorded_zero_hit_reaches_fresh_judge -q",
+      "evidence": "Red: first saved zero-hit predicate made only the planner call. Green: all three saved zero-hit questions reach the stand-in judge with verified spans and expanded-method trace; authored CLI trace retains baseline method. Focused CLI/fresh/retrieval 27 passed before expanding the parametrized cases; full suite 327 passed. Full R03 and live comparison remain pending."
     }
   ]
 }

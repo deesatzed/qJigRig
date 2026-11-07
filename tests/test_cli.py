@@ -85,6 +85,7 @@ def test_fixture_end_to_end(tmp_path):
     assert out["observations"]["within_limit"]["outcome"] == "false"
     assert out["observations"]["exception"] == {"outcome": "unknown", "reason": "no_retrieval_hit"}
     assert out["providers_called"] == 0 and out["policy_label"] == "SYNTHETIC FIXTURE"
+    assert all(r["retrieval_method"] == "bm25_okapi_v1" for r in out["records"])
     assert out["plan_origin"] == "authored" and "not established" in out["plan_caveat"]
     assert "outcome_not_determined" in out["reasons"]
 

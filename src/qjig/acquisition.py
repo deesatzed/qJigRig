@@ -13,7 +13,7 @@ from .packets import EvidencePacket
 from .plans import Plan
 from .contracts import Request
 from .recovery import Exclusion, RecoveryResult, recover_packet
-from .retrieval import Candidate, bm25_candidates
+from .retrieval import BM25_METHOD, EXPANDED_BM25_METHOD, Candidate, bm25_candidates, bm25_expanded_candidates
 from .scheduler import next_need
 from .stopping import StopDecision, check_stop
 from .budgets import BudgetExceeded, BudgetLedger
@@ -42,6 +42,11 @@ class NeedSpec:
     max_bytes: int
     evaluate: Callable[[EvidencePacket, RecoveryResult], EvalResult]
     followup: "NeedSpec | None" = None  # the single targeted second attempt, if any
+    retrieval_method: str = BM25_METHOD
+
+    def __post_init__(self) -> None:
+        if self.retrieval_method not in (BM25_METHOD, EXPANDED_BM25_METHOD):
+            raise ContractError("unknown retrieval method")
 
 MAX_ROUNDS = 2  # baseline cap per predicate: the first attempt plus one targeted followup
 
@@ -116,6 +121,7 @@ class TraceRecord:
     evidence: tuple[TraceEvidence, ...]
     exclusions: tuple[Exclusion, ...]
     observation: Observation
+    retrieval_method: str = BM25_METHOD
 
 
 def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
@@ -139,7 +145,8 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
         return None
     base = ctx.specs[pid]
     spec = base if state.attempts.get(pid, 0) == 0 else base.followup
-    candidates = bm25_candidates(ctx.entries, spec.query)
+    search = bm25_expanded_candidates if spec.retrieval_method == EXPANDED_BM25_METHOD else bm25_candidates
+    candidates = search(ctx.entries, spec.query)
     recovery = recover_packet(
         ctx.catalog, candidates, want=spec.want, max_bytes=spec.max_bytes, applicability=ctx.applicability
     )
@@ -168,6 +175,7 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
         ),
         exclusions=recovery.exclusions,
         observation=observation,
+        retrieval_method=spec.retrieval_method,
     )
     state.trace.append(record)
     return record
@@ -272,7 +280,7 @@ def run_fresh(
             "budget": ledger.budget.to_dict() if ledger.budget else None,
             "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS},
             "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS},
-            "transport": transport.label, "want": want, "max_bytes": max_bytes,
+            "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": EXPANDED_BM25_METHOD,
             "reservation_factory_configured": reservation_factory is not None,
             "corpus": {key: value.value for key, value in applicability.items()},
             "applicability_provenance": "recorded_inputs" if applicability_inputs is not None else "verdict_only",
@@ -319,7 +327,8 @@ def run_fresh(
         return evaluate
 
     check = lambda c: bound_applicability(c.revision_id)  # noqa: E731
-    specs = {p.id: NeedSpec(p.question, want, max_bytes, make_evaluator(p.question, p.id)) for p in plan.predicates}
+    specs = {p.id: NeedSpec(p.question, want, max_bytes, make_evaluator(p.question, p.id),
+                            retrieval_method=EXPANDED_BM25_METHOD) for p in plan.predicates}
     obligations = ObligationLedger()
     for p in plan.predicates:
         obligations.open(Obligation(f"ob-{p.id}", "predicate_evidence", p.id, p.question, material=True))

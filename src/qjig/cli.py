@@ -180,6 +180,7 @@ def cmd_ask(a: argparse.Namespace) -> tuple[dict[str, Any], int]:
                             for o in (ledger.get(f"ob-{p.id}") for p in plan.predicates)],
             "records": [{
                 "sequence": r.sequence, "predicate_id": r.predicate_id, "round": r.round_number, "query": r.query, "hit_count": r.hit_count,
+                "retrieval_method": r.retrieval_method,
                 "evidence": [{"entry_id": e.entry_id, "revision_id": e.revision_id, "source_id": cat.revision_source_id(e.revision_id),
                               "start": e.start, "end": e.end, "text_sha256": e.text_sha256, "text": e.text, "truncated": e.truncated} for e in r.evidence],
                 "exclusions": [{"entry_id": x.entry_id, "reason": x.reason, "detail": x.detail} for x in r.exclusions],

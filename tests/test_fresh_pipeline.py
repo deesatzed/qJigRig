@@ -1,6 +1,7 @@
 """STAND-IN transport only (D018): authored planner and judge answers drive the pipeline mechanics.
 Nothing here shows how a real model plans or judges; see reports/t046-smoke-receipts*.json for live paths."""
 import json
+import pytest
 
 from qjig.acquisition import run_fresh
 from qjig.applicability import Applicability
@@ -278,3 +279,21 @@ def test_conflicting_applicability_inputs_refuse_before_dispatch(tmp_path):
                       planner=("stand-in", "planner"), judge=("stand-in", "judge"),
                       revision_applicability=lambda rid: Applicability.MATCH, applicability_inputs=inputs, archive=archive)
         assert transport.calls_made == 0 and journal.events(REQUEST.request_id) == []
+
+
+@pytest.mark.parametrize("run_index,predicate_id", [(0, "p1"), (1, "p3"), (1, "p4")])
+def test_recorded_zero_hit_reaches_fresh_judge(tmp_path, run_index, predicate_id):
+    """Historical predicate with stand-in answers; candidate access is not semantic correctness."""
+    from pathlib import Path
+    from qjig.retrieval import EXPANDED_BM25_METHOD
+
+    report = json.loads((Path(__file__).resolve().parents[1] / "reports/t048-fresh-live.json").read_text())
+    question = dict(report["runs"][run_index]["predicates"])[predicate_id]
+    plan = {"predicates": [{"id": "p1", "question": question}], "expression": {"ref": "p1"}}
+    run, calls, _ = go(tmp_path, [raw(plan), side(False), side(False)])
+    assert calls == 3
+    assert run.state.observations["p1"].reason == "judge_no_support"
+    trace = run.state.trace[0]
+    assert trace.query == question and trace.hit_count > 0 and trace.evidence
+    assert trace.retrieval_method == EXPANDED_BM25_METHOD
+    assert run.status == "deferred" and "plan_coverage_unestablished" in run.reasons
