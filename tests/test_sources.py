@@ -3,7 +3,7 @@ import hashlib
 import pytest
 
 from qjig.contracts import ContractError
-from qjig.sources import decode_source
+from qjig.sources import SourceRevision, decode_source
 
 
 def sha(b: bytes) -> str:
@@ -37,3 +37,39 @@ def test_encoding_must_be_named():
         decode_source(b"abc", encoding="no-such-codec")
     with pytest.raises(ContractError):
         decode_source("abc", encoding="utf-8")  # type: ignore[arg-type]
+
+
+def make_revision(origin, raw=b"rule: ship on green\r\n", source_id="alpha/docs/policy.md"):
+    return SourceRevision.create(source_id, origin, decode_source(raw, encoding="utf-8"))
+
+
+def test_portable_source_identity():
+    here = make_revision("/Volumes/WS4TB/QUIX/docs/policy.md")
+    moved = make_revision("/Users/other/checkout/docs/policy.md")
+    # relocating the origin leaves the pinned revision identity unchanged
+    assert here.origin != moved.origin
+    assert here.revision_id == moved.revision_id
+    assert here.source_id == moved.source_id
+    # the origin is still recorded, not discarded
+    assert moved.origin == "/Users/other/checkout/docs/policy.md"
+    # but any change of content, encoding choice or logical source changes the identity
+    assert make_revision("/x", raw=b"rule: ship on green\n").revision_id != here.revision_id
+    assert make_revision("/x", source_id="alpha/docs/other.md").revision_id != here.revision_id
+    latin = SourceRevision.create("alpha/docs/policy.md", "/x", decode_source(b"abc", encoding="latin-1"))
+    utf = SourceRevision.create("alpha/docs/policy.md", "/x", decode_source(b"abc", encoding="utf-8"))
+    assert latin.revision_id != utf.revision_id
+
+
+def test_pin_check_fails_on_changed_content_not_on_move():
+    pinned = make_revision("/a").revision_id
+    make_revision("/b").require_pin(pinned)
+    with pytest.raises(ContractError):
+        make_revision("/b", raw=b"changed").require_pin(pinned)
+
+
+@pytest.mark.parametrize(
+    "bad", ["/abs/path.md", "C:\\docs\\p.md", "../escape.md", "a/../b.md", "", "~/x.md"]
+)
+def test_source_id_must_not_be_a_workstation_path(bad):
+    with pytest.raises(ContractError):
+        make_revision("/x", source_id=bad)

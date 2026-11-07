@@ -75,7 +75,7 @@
       "depends_on": [
         "T004"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/sources.py"
       ],
@@ -83,7 +83,8 @@
       "test_name": "test_portable_source_identity",
       "action": "Separate source identity from workstation path",
       "acceptance": "Relocating an origin does not silently change a pinned revision identity",
-      "command": "python -m pytest tests/test_sources.py::test_portable_source_identity -q"
+      "command": "python -m pytest tests/test_sources.py::test_portable_source_identity -q",
+      "evidence": "Red: ImportError SourceRevision (initial contract). Green: test_portable_source_identity passed; tests/test_sources.py 11 passed; full suite 24 passed. 2026-11-06."
     },
     {
       "id": "T006",

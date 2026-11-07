@@ -55,3 +55,14 @@ Repository checkpoint: initial qJig source/provenance commit `da1397b`. Staged p
 - Red: `ModuleNotFoundError: qjig.sources`. Green: focused test passed; `tests/test_sources.py` 3 passed; full suite 16 passed.
 - Test uses latin-1 `café` + CRLF so the two hashes differ; strict decoding raises `ContractError` rather than substituting characters; the encoding argument is required.
 - Limits: in-memory only. No blob storage, no revision record, no BOM handling policy (a UTF-8 BOM would stay as U+FEFF in text under `utf-8`), no PDF extractor.
+
+## 2026-11-06: T005 complete
+
+- Added `SourceRevision.create(source_id, origin, decoded)` and `require_pin(...)` in `src/qjig/sources.py`.
+- Red: `ImportError: SourceRevision`. Green: focused test passed; `tests/test_sources.py` 11 passed; full suite 24 passed.
+- Shown: the same content read from two different absolute origins gives the same `revision_id`; changed bytes, a different encoding choice or a different `source_id` give a different one; `require_pin` fails on changed content but not on a move; path-like source ids are rejected.
+- Limits: the id attests content identity only, not authority or semantics. There is no store, no entity/scope/date fields and no check that an origin really holds these bytes (later P1 tasks). Hash scheme is a new qJig contract and is not yet reconciled with QUIXER/JIG hashes (T007+).
+
+## Phase note (T001-T005)
+
+Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T006-T012 remain in P1. `reports/verify_packet.py` still asserts all tasks pending, so it fails by design now; an implementation-aware check has not been written.
