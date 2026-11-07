@@ -96,6 +96,15 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
         trace['packet'] = json.loads(serialize_packet(found['packet']))
         archive.record_trace(request.request_id, len(packets), trace)
     retrieve(request.question)
+    if ledger._goal_budget is not None:
+        from .direct_preflight import check_direct_slots
+        try:
+            check_direct_slots(ledger._goal_budget, request_id=request.request_id, partition=ledger._partition,
+                               provider=provider, model=model, output_tokens=max_tokens, max_price=max_price,
+                               followups=search._max_rounds - 1, reservation_factory=reservation_factory)
+        except (BudgetExceeded, ContractError):
+            return finish({'status': 'unavailable', 'failure': 'preflight_unavailable', 'answer': None,
+                           'call_ids': calls, 'searches': list(search.trace)})
     for step in range(search._max_rounds):
         prompt = _prompt(request, context, packets, step + 1 < search._max_rounds)
         pr = ProviderRequest('direct_initial' if step == 0 else 'direct_final', provider, model, prompt, max_tokens, max_price=max_price)

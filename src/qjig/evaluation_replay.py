@@ -148,7 +148,7 @@ def _verify_failure(context, events, journal_events, revisions, request, digest)
             raise ContractError('failure search differs')
         cursor += 1
         if step >= len(calls):
-            if result['failure'] not in ('BudgetExceeded', 'ReconciliationRequired') or cursor != len(events) - 1:
+            if result['failure'] not in ('BudgetExceeded', 'ReconciliationRequired', 'preflight_unavailable') or cursor != len(events) - 1:
                 raise ContractError('missing direct attempt')
             break  # policy and prior unresolved calls are not fully archived here
         call_id = calls[step]

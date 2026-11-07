@@ -1384,7 +1384,8 @@
       "finding": "F08",
       "depends_on": [
         "R06",
-        "R08A"
+        "R08A",
+        "R08B"
       ],
       "status": "pending",
       "files": [],
@@ -2673,6 +2674,27 @@
       "acceptance": "Every declared parent/intervention arm and repeat remains visible; missing assignments or decisive evidence remain unknown, and reference and run identities remain distinct.",
       "command": "python -m pytest tests/test_evaluation.py::test_paired_interventions_keep_missing_and_evidence_gaps_visible -q",
       "evidence": "Red: no paired report enumerated intervention assignments. Green: scored records retain observed and expected answers, and the report compares each parent/intervention by arm and repeat, requiring both answers and exact evidence coverage. Missing or incomplete pairs stay unknown; duplicate runs and inconsistent case references reject. Synthetic evaluation tests 21 passed; full offline 508 passed. The local draft has 45 paired assignments, all unknown with zero runs. Arm mappings and scores remain caller assertions; full experiment verification and semantic adjudication remain open."
+    },
+    {
+      "id": "R08B",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08A",
+        "T065B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/direct_preflight.py",
+        "src/qjig/evaluation_direct.py",
+        "src/qjig/evaluation_replay.py"
+      ],
+      "test_file": "tests/test_fresh_preflight.py",
+      "test_name": "test_direct_preflight_requires_all_possible_slots_before_dispatch",
+      "action": "Hold both direct baseline call slots before goal-budgeted dispatch",
+      "acceptance": "The initial and possible followup calls have matching bound reservations in one frozen set before any direct provider attempt.",
+      "command": "python -m pytest tests/test_fresh_preflight.py::test_direct_preflight_requires_all_possible_slots_before_dispatch -q",
+      "evidence": "Red: goal-budgeted direct runs had no complete initial/followup allocation. Green: declared bounds build configuration-bound slots; direct preflight requires both in one frozen set before dispatch. Synthetic missing/split set tests make zero calls; complete two-call case consumes slots and passes journal audit; changed routing ceiling rejects. Focused 66 passed before final ceiling case, final focused passed; full offline 509 passed. Caller bounds, provider price enforcement, retries, complete experiment and hosted authorization remain unverified."
     }
   ]
 }

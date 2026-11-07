@@ -170,3 +170,63 @@ def test_configured_review_has_separate_frozen_slot(tmp_path):
         assert bound.required_id == review_slot['work_id']
     with pytest.raises(ContractError):
         fresh_run_allocations(**options, reviewer={**reviewer, 'max_price': None})
+
+
+def test_direct_preflight_requires_all_possible_slots_before_dispatch(tmp_path):
+    import hashlib
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Request
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_direct import run_direct
+    from qjig.direct_preflight import direct_run_allocations, direct_slot_reservation
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    model = {'id': 'synthetic/model', 'context_length': 10000, 'top_provider': {'max_completion_tokens': 1000},
+             'pricing': {'prompt': '0.000001', 'completion': '0.000002'}}
+    cap = {'prompt': 2, 'completion': 3}
+    slots = direct_run_allocations(request_id='r', partition='pilot', provider='stand-in', model=model,
+                                   input_tokens=1000, output_tokens=100, max_price=cap, followups=1)
+    assert [x['stage'] for x in slots] == ['direct_initial', 'direct_final']
+    code, gold = b'Checks must pass.', b'private labels'
+    (tmp_path/'code').write_bytes(code); (tmp_path/'label').write_bytes(gold)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    def search():
+        return DirectRetrieval(tmp_path, [item('code', code)], [item('label', gold)], want=1, max_bytes=3000, followups=1)
+    limit = Budget(3, 10000, 1)
+    for scenario in ('missing', 'complete', 'split'):
+        suffix = scenario
+        with GoalBudget.open(tmp_path / ('goal'+suffix+'.sqlite'), total=limit, per_request=limit, allocations={'pilot':limit}) as goal, \
+                Journal.open(tmp_path / ('j'+suffix+'.sqlite')) as journal, RunArchive.open(tmp_path / ('archive'+suffix)) as archive:
+            goal.reserve_run_set('set', slots if scenario == 'complete' else slots[:1])
+            if scenario == 'split':
+                goal.reserve_run_set('other-set', slots[1:])
+            def factory(request):
+                set_id = 'other-set' if scenario == 'split' and request.stage == 'direct_final' else 'set'
+                return direct_slot_reservation(goal, set_id, request_id='r', partition='pilot', request=request,
+                                               model=model, input_tokens=1000, input_bound_provenance='synthetic assertion')
+            if scenario == 'complete':
+                from qjig.providers import ProviderRequest
+                cheaper = ProviderRequest('direct_initial', 'stand-in', model['id'], '', 100,
+                                          max_price={'prompt': 1, 'completion': 1})
+                with pytest.raises(ContractError):
+                    direct_slot_reservation(goal, 'set', request_id='r', partition='pilot', request=cheaper,
+                                            model=model, input_tokens=1000, input_bound_provenance='synthetic assertion')
+            usage = {'prompt_tokens': 10, 'completion_tokens': 5, 'cost_usd': 0.0001}
+            first = RawResponse(200, json.dumps({'action':'search','query':'Checks','answer':None,'citations':[]}), usage)
+            final = RawResponse(200, json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}), usage)
+            transport = StandInTransport([first, final])
+            result = run_direct(search(), Request('r','Checks?','reviewer','1','project'),
+                                BudgetLedger(limit,journal,'r',goal_budget=goal,partition='pilot'), transport,
+                                archive=archive, provider='stand-in', model=model['id'], max_tokens=100,
+                                as_of='2026-11-07', entities=[], max_price=cap, reservation_factory=factory)
+            from qjig.evaluation_replay import verify_direct_archive
+            replay = verify_direct_archive(archive, journal)
+            if scenario == 'complete':
+                assert result['status'] == 'recorded_unvalidated' and transport.calls_made == 2
+                assert goal.audit_journal(journal)['status'] == 'verified' and replay['status'] == 'unanchored'
+            else:
+                assert result['status'] == 'unavailable' and result['failure'] == 'preflight_unavailable'
+                assert transport.calls_made == 0 and journal.events('r') == []
+                assert replay['status'] == 'incomplete' and replay['classification'] == 'unknown_review'
