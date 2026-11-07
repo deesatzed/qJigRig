@@ -119,7 +119,7 @@ def test_real_adapter_smoke_contract(tmp_path):
     t = OpenRouterTransport(_env(tmp_path), post=fake_post)
     # successful path: labeled live, content extracted, usage reported with its source fields
     assert t.label == "LIVE: openrouter, real model call"
-    raw = t.send(ProviderRequest("judge", "openrouter", "vendor/model-x", "Is it?", 50))
+    raw = t._send_unchecked(ProviderRequest("judge", "openrouter", "vendor/model-x", "Is it?", 50))
     assert raw.http_status == 200 and raw.body == GOOD
     assert raw.usage == {"prompt_tokens": 11, "completion_tokens": 7, "cost_usd": 0.0002}
     assert seen["url"] == "https://openrouter.ai/api/v1/chat/completions"
@@ -130,36 +130,36 @@ def test_real_adapter_smoke_contract(tmp_path):
 
     # cost not reported -> unknown, never zero
     t2 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (200, json.dumps({"choices": [{"message": {"content": "x"}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1}})))
-    assert t2.send(REQ).usage["cost_usd"] is None
+    assert t2._send_unchecked(REQ).usage["cost_usd"] is None
     # non-2xx is returned as a failure response, with no usage invented
     t3 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (429, "rate limited"))
-    r = t3.send(REQ)
+    r = t3._send_unchecked(REQ)
     assert (r.http_status, r.body, r.usage) == (429, "rate limited", None)
     # a 200 whose envelope has no choices is kept as raw text so the typed layer records the failure
     # a 200 with no message content (e.g. a reasoning model that spent its whole token cap) is an empty body
     # with the observed cause recorded, so the typed layer fails it as malformed rather than mislabeling it
     empty = json.dumps({"choices": [{"finish_reason": "length", "message": {"content": None}}], "usage": {"prompt_tokens": 3, "completion_tokens": 50}})
-    r4 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (200, empty)).send(REQ)
+    r4 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (200, empty))._send_unchecked(REQ)
     assert r4.body == "" and r4.note == "no_message_content; finish_reason=length" and r4.usage["completion_tokens"] == 50
 
     # unavailable path: no key means the request never leaves; the HTTP layer is not touched
     called = []
     t5 = OpenRouterTransport(_env(tmp_path, "BASE_URL=x\n"), post=lambda *a: called.append(1))
     with pytest.raises(ProviderUnavailable, match="OPENROUTER_API_KEY"):
-        t5.send(REQ)
+        t5._send_unchecked(REQ)
     assert called == []
     with pytest.raises(ProviderUnavailable):
-        OpenRouterTransport(tmp_path / "missing.env", post=lambda *a: called.append(1)).send(REQ)
+        OpenRouterTransport(tmp_path / "missing.env", post=lambda *a: called.append(1))._send_unchecked(REQ)
     # connection refused happens before anything is sent
     def refuse(*a):
         raise ConnectionRefusedError("no route")
     with pytest.raises(ProviderUnavailable):
-        OpenRouterTransport(_env(tmp_path), post=refuse).send(REQ)
+        OpenRouterTransport(_env(tmp_path), post=refuse)._send_unchecked(REQ)
     # a timeout after sending is outcome-unknown and is left for the journal to treat as uncertain
     def slow(*a):
         raise TimeoutError("read timed out")
     with pytest.raises(TimeoutError):
-        OpenRouterTransport(_env(tmp_path), post=slow).send(REQ)
+        OpenRouterTransport(_env(tmp_path), post=slow)._send_unchecked(REQ)
     assert load_env_value(_env(tmp_path), "BASE_URL") == "https://openrouter.ai/api/v1"
     assert load_env_value(_env(tmp_path), "NOPE") is None
 
@@ -212,7 +212,7 @@ def test_reject_untrusted_provider_endpoint(tmp_path, base):
     sent = []
     transport = OpenRouterTransport(_env(tmp_path, f"OPENROUTER_API_KEY=dummy\nBASE_URL={base}\n"), post=lambda *args: sent.append(args))
     with pytest.raises(ProviderUnavailable):
-        transport.send(REQ)
+        transport._send_unchecked(REQ)
     assert not sent
 
 
@@ -233,7 +233,7 @@ def test_provider_secrets_do_not_reach_journal_or_errors(tmp_path, kind):
     class FakeHTTPAdapter:
         label = "STAND_IN: injected fake HTTP"
         def send(self, request):
-            return adapter.send(request)
+            return adapter._send_unchecked(request)
     transport = FakeHTTPAdapter()
     with Journal.open(tmp_path / "receipt.sqlite") as journal:
         ledger = BudgetLedger(Budget(2, 1000, 1), journal, "safety")
@@ -295,7 +295,7 @@ def test_response_metadata_is_retained_without_credentials(tmp_path):
                            "choices": [{"finish_reason": "stop", "message": {"content": GOOD}}],
                            "usage": {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.01}})
     adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))
-    response = adapter.send(REQ)
+    response = adapter._send_unchecked(REQ)
     assert response.metadata == {"response_id": "generation-123", "model": "vendor/model", "provider": "Example", "finish_reason": "stop"}
     with RunArchive.open(tmp_path / "run") as archive:
         archive.record_request("r#1", REQ)
@@ -312,17 +312,17 @@ def test_escaped_dummy_key_is_redacted_from_response_and_metadata(tmp_path):
     envelope = ('{"id":"' + escaped + '","model":"vendor/model",'
                 '"choices":[{"finish_reason":"stop","message":{"content":"' + escaped + '"}}]}')
     adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))
-    response = adapter.send(REQ)
+    response = adapter._send_unchecked(REQ)
     assert secret not in repr(response)
     assert response.body == "[REDACTED]" and response.metadata["response_id"] == "[REDACTED]"
-    error = OpenRouterTransport(_env(tmp_path), post=lambda *args: (429, envelope)).send(REQ)
+    error = OpenRouterTransport(_env(tmp_path), post=lambda *args: (429, envelope))._send_unchecked(REQ)
     assert secret not in error.body and secret not in repr(error.metadata)
 
 
 def test_no_content_keeps_finish_reason_and_request_id(tmp_path):
     envelope = json.dumps({"id": "generation-length", "model": "vendor/model",
                            "choices": [{"finish_reason": "length", "message": {"content": None}}]})
-    response = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope)).send(REQ)
+    response = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))._send_unchecked(REQ)
     assert response.body == "" and response.metadata["response_id"] == "generation-length"
     assert response.metadata["finish_reason"] == "length"
 
@@ -349,7 +349,7 @@ def test_http_error_preserves_reported_usage_for_budget_and_journal(tmp_path):
     envelope = json.dumps({'error': {'message': 'upstream failed'}, 'usage': {
         'prompt_tokens': 11, 'completion_tokens': 7, 'cost': 0.02}})
     adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (502, envelope))
-    raw = adapter.send(REQ)
+    raw = adapter._send_unchecked(REQ)
     assert raw.http_status == 502
     assert raw.usage == {'prompt_tokens': 11, 'completion_tokens': 7, 'cost_usd': 0.02}
     limit = Budget(2, 500, 1)
@@ -379,7 +379,7 @@ def test_routing_price_ceiling_is_bound_sent_and_archived(tmp_path):
         archive.record_request('call', request)
         stored = archive.events()[0]['data']
         assert stored['max_price'] == ceiling and stored['input_sha256'] == request.input_sha256()
-    OpenRouterTransport(_env(tmp_path), post=fake_post).send(request)
+    OpenRouterTransport(_env(tmp_path), post=fake_post)._send_unchecked(request)
     assert seen['provider']['max_price'] == ceiling
     ceiling['prompt'] = 999
     assert request.input_sha256() == stored['input_sha256']
@@ -407,3 +407,14 @@ def test_capped_request_refuses_fabricated_underreservation_before_call(tmp_path
         with pytest.raises(ContractError, match='ceiling'):
             call_typed(ledger, transport, req, SCHEMA, reservation=forged)
         assert journal.events('r') == [] and transport.calls_made == 0
+
+
+def test_direct_openrouter_send_cannot_bypass_preflight(tmp_path, monkeypatch):
+    """Even direct adapter use must not send while hosted preflight is unavailable."""
+    from qjig.budgets import BudgetExceeded
+    sent = []
+    adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: sent.append(args))
+    monkeypatch.setattr("qjig.providers.load_env_value", lambda *args: pytest.fail("credential read"))
+    with pytest.raises(BudgetExceeded, match='preflight'):
+        adapter.send(REQ)
+    assert sent == []

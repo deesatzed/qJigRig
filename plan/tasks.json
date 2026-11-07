@@ -1372,7 +1372,8 @@
       "phase": "repair",
       "finding": "F08",
       "depends_on": [
-        "R06"
+        "R06",
+        "R08A"
       ],
       "status": "pending",
       "files": [],
@@ -2442,6 +2443,24 @@
       "acceptance": "Declared family splits, interventions, categories, arms, repeats, metrics and decision criteria are internally consistent.",
       "command": "python -m pytest tests/test_evaluation.py::test_evaluation_design_checks_splits_and_requirements -q",
       "evidence": "Red: no design checker existed. Green: synthetic design checks declared partitions, exact cross-split source hashes, related-family declarations, parent chains, coverage categories, arm and outcome names, repeat minima, metric names, numeric criteria and canonical digest. Focused 2 passed; full offline suite 486 passed. Declarations do not prove relatedness completeness, semantic evidence quality, metric definitions, unambiguous decision criteria, provider isolation or an actual frozen corpus."
+    },
+    {
+      "id": "R08A",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R06"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_direct_openrouter_send_cannot_bypass_preflight",
+      "action": "Refuse direct hosted adapter dispatch while preflight is unavailable",
+      "acceptance": "Direct public adapter sends refuse before reading credentials or touching the transport while hosted preflight is unavailable.",
+      "command": "python -m pytest tests/test_providers.py::test_direct_openrouter_send_cannot_bypass_preflight -q",
+      "evidence": "Red: public direct adapter send reached injected HTTP despite missing complete preflight. Green: public send refuses before credential access and injected HTTP; fake-only adapter mechanics remain separately tested. Focused provider suite 35 passed; full offline suite 487 passed. The internal unchecked helper and arbitrary Python/network access are not sandboxed. Full R08 and actual hosted preflight remain open."
     }
   ]
 }

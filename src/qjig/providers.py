@@ -199,6 +199,11 @@ class OpenRouterTransport:
         return f"OpenRouterTransport(env={self._env_path.name!r})"
 
     def send(self, request: ProviderRequest) -> RawResponse:
+        """Refuse public hosted dispatch until full preflight is implemented."""
+        raise BudgetExceeded("preflight_unavailable", "hosted calls require complete input, cost and goal-wide reservations")
+
+    def _send_unchecked(self, request: ProviderRequest) -> RawResponse:
+        """Adapter mechanics only; never call for hosted work without preflight."""
         key = load_env_value(self._env_path, "OPENROUTER_API_KEY")
         if not key:
             raise ProviderUnavailable("OPENROUTER_API_KEY not available; nothing was sent")
