@@ -87,3 +87,74 @@ def test_exhausted_stand_in_and_unbudgeted_calls_never_reach_the_transport(tmp_p
         with pytest.raises(BudgetExceeded):
             call_typed(BudgetLedger(None, j2, "req-2"), t2, REQ, SCHEMA)
         assert t2.calls_made == 0 and j2.events("req-2") == []
+
+
+# --- T046: the real adapter. The HTTP layer below is a labeled FAKE used only to test request shaping, parsing and
+# labeling offline; the actual network path is exercised by scripts/smoke_t046.py, which is opt-in and live. ---
+from qjig.providers import OpenRouterTransport, load_env_value  # noqa: E402
+
+LIVE_BODY = json.dumps({
+    "choices": [{"message": {"content": GOOD}}],
+    "usage": {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.0002},
+})
+
+
+def _env(tmp_path, text="OPENROUTER_API_KEY=sk-test-SECRET\nBASE_URL=https://example.invalid/api/v1\n"):
+    p = tmp_path / ".env"
+    p.write_text(text)
+    return p
+
+
+def test_real_adapter_smoke_contract(tmp_path):
+    seen = {}
+
+    def fake_post(url, headers, payload, timeout):
+        seen.update(url=url, headers=headers, payload=json.loads(payload), timeout=timeout)
+        return 200, LIVE_BODY
+
+    t = OpenRouterTransport(_env(tmp_path), post=fake_post)
+    # successful path: labeled live, content extracted, usage reported with its source fields
+    assert t.label == "LIVE: openrouter, real model call"
+    raw = t.send(ProviderRequest("judge", "openrouter", "vendor/model-x", "Is it?", 50))
+    assert raw.http_status == 200 and raw.body == GOOD
+    assert raw.usage == {"prompt_tokens": 11, "completion_tokens": 7, "cost_usd": 0.0002}
+    assert seen["url"] == "https://example.invalid/api/v1/chat/completions"
+    assert seen["payload"]["model"] == "vendor/model-x" and seen["payload"]["max_tokens"] == 50
+    assert seen["payload"]["messages"] == [{"role": "user", "content": "Is it?"}]
+    assert seen["headers"]["Authorization"] == "Bearer sk-test-SECRET"
+    assert "SECRET" not in repr(t)
+
+    # cost not reported -> unknown, never zero
+    t2 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (200, json.dumps({"choices": [{"message": {"content": "x"}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1}})))
+    assert t2.send(REQ).usage["cost_usd"] is None
+    # non-2xx is returned as a failure response, with no usage invented
+    t3 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (429, "rate limited"))
+    r = t3.send(REQ)
+    assert (r.http_status, r.body, r.usage) == (429, "rate limited", None)
+    # a 200 whose envelope has no choices is kept as raw text so the typed layer records the failure
+    # a 200 with no message content (e.g. a reasoning model that spent its whole token cap) is an empty body
+    # with the observed cause recorded, so the typed layer fails it as malformed rather than mislabeling it
+    empty = json.dumps({"choices": [{"finish_reason": "length", "message": {"content": None}}], "usage": {"prompt_tokens": 3, "completion_tokens": 50}})
+    r4 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (200, empty)).send(REQ)
+    assert r4.body == "" and r4.note == "no_message_content; finish_reason=length" and r4.usage["completion_tokens"] == 50
+
+    # unavailable path: no key means the request never leaves; the HTTP layer is not touched
+    called = []
+    t5 = OpenRouterTransport(_env(tmp_path, "BASE_URL=x\n"), post=lambda *a: called.append(1))
+    with pytest.raises(ProviderUnavailable, match="OPENROUTER_API_KEY"):
+        t5.send(REQ)
+    assert called == []
+    with pytest.raises(ProviderUnavailable):
+        OpenRouterTransport(tmp_path / "missing.env", post=lambda *a: called.append(1)).send(REQ)
+    # connection refused happens before anything is sent
+    def refuse(*a):
+        raise ConnectionRefusedError("no route")
+    with pytest.raises(ProviderUnavailable):
+        OpenRouterTransport(_env(tmp_path), post=refuse).send(REQ)
+    # a timeout after sending is outcome-unknown and is left for the journal to treat as uncertain
+    def slow(*a):
+        raise TimeoutError("read timed out")
+    with pytest.raises(TimeoutError):
+        OpenRouterTransport(_env(tmp_path), post=slow).send(REQ)
+    assert load_env_value(_env(tmp_path), "BASE_URL") == "https://example.invalid/api/v1"
+    assert load_env_value(_env(tmp_path), "NOPE") is None

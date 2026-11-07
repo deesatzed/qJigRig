@@ -789,7 +789,7 @@
         "T043",
         "T044"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/providers.py"
       ],
@@ -797,7 +797,8 @@
       "test_name": "test_real_adapter_smoke_contract",
       "action": "Add opt-in real planner/judge smoke entrypoint and receipts",
       "acceptance": "Successful real path and unavailable path are explicitly labeled with usage",
-      "command": "python -m pytest tests/test_providers.py::test_real_adapter_smoke_contract -q"
+      "command": "python -m pytest tests/test_providers.py::test_real_adapter_smoke_contract -q",
+      "evidence": "Red: ImportError: OpenRouterTransport did not exist. Green: focused 1 passed in 0.04s; tests/test_providers.py 5 passed in 0.06s; full suite 231 passed in 1.35s. 2026-11-06."
     },
     {
       "id": "T047",
