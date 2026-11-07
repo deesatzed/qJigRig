@@ -991,7 +991,8 @@
       "depends_on": [
         "T051",
         "T056",
-        "R01"
+        "R01",
+        "T057A"
       ],
       "status": "pending",
       "files": [
@@ -2208,6 +2209,23 @@
       "acceptance": "Replay accepts a legitimate bounded followup and rejects a changed query or followup without an initial no-hit result.",
       "command": "python -m pytest tests/test_replay.py::test_replay_validates_fresh_retrieval_followup -q",
       "evidence": "Red: replay accepted a changed followup query. Green: synthetic two-round archive reopens and verifies; replay checks policy, query, round sequence and no-hit predecessor, rejecting a changed followup or invalid predecessor. Focused 56 passed before a fixture-only extension; full offline suite 443 passed after correcting the test fixture trigger. This checks recorded trace consistency, not retrieval completeness, source authenticity or model semantics; full R07/T051 remain open."
+    },
+    {
+      "id": "T057A",
+      "phase": "P5",
+      "depends_on": [
+        "R01"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/programs.py"
+      ],
+      "test_file": "tests/test_programs.py",
+      "test_name": "test_review_record_exact_binding",
+      "action": "Create non-activating exact-bound AI review records",
+      "acceptance": "Changes to request, graph, corpus, applicability or reviewer provenance invalidate the recorded match; AI review never activates a program.",
+      "command": "python -m pytest tests/test_programs.py::test_review_record_exact_binding -q",
+      "evidence": "Red: no exact-bound review record existed. Green: canonical synthetic records bind request/role/scope, graph, revisions and applicability metadata, planner/reviewer prompt/configuration and result; changes are stale, altered records invalid, and matching cannot activate. Synthetic and asserted AI labels are distinct. Focused 23 passed; full offline 452 passed. No persistence, provider execution, authenticated provenance, source completeness, or full T057/R01B is established."
     }
   ]
 }
