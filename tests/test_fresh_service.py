@@ -489,7 +489,67 @@ def test_mandatory_only_exception_reaches_service_and_replays(tmp_path):
                     area=page.locator('#fresh-replay')
                     area.get_by_text('Model-cited passage',exact=False).wait_for()
                     assert quote in area.inner_text() and 'A missing hit does not establish absence.' in area.inner_text()
-                    assert 'Material obligations remain open: ob-plan-coverage' in area.inner_text()
+                    assert 'Material obligations remain open:' in area.inner_text()
+                    assert 'ob-plan-coverage' in area.inner_text()
+                finally:
+                    browser.close()
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=5)
+
+
+def test_mandatory_only_contradiction_remains_conflict_in_service_and_replay(tmp_path):
+    from qjig.fresh_service import FreshWorkbench
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    spec={'provider':'stand-in','model':model,'input_tokens':1000,'output_tokens':100,
+          'max_price':{'prompt':2,'completion':3}}
+    limit=Budget(30,100000,1); usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
+    raw=lambda value: RawResponse(200,json.dumps(value),usage)
+    positive='Veterans are eligible.'; negative='Veterans are not eligible.'
+    transport=StandInTransport([
+        raw({'predicates':[{'id':'p1','question':'Does a former soldier satisfy this condition?'}],'expression':{'ref':'p1'}}),
+        raw({'supported':True,'quote':positive,'reason':'synthetic'}),
+        raw({'supported':True,'quote':negative,'reason':'synthetic'}),
+        raw({'assessment':'uncertain','reason':'synthetic review'})])
+    backend=FreshWorkbench(tmp_path/'fresh',goal_factory=lambda:GoalBudget.open(tmp_path/'goal.sqlite',
+        total=limit,per_request=limit,allocations={'smoke':limit}),transport_factory=lambda:transport,
+        partition='smoke',planner=spec,judge=spec,reviewer=spec,budget=limit)
+    server=create_server(tmp_path/'catalog.sqlite',port=0,fresh_backend=backend)
+    thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+    try:
+        client=RoleClient(server.server_address[1],RoleDefinition('reviewer','1','Review'))
+        client.import_source({'source_id':'conflict.md','text':'# Contradiction\n'+positive+' '+negative+'\n',
+            'scope':'project','entities':[],'effective_from':'2026-01-01','effective_to':'open',
+            'observed_at':None,'authority':None})
+        result=client.ask_fresh('contradiction-only','Does a military member qualify?','project',
+                                as_of='2026-11-15',entities=[])
+        assert result['status']=='deferred' and result['answer'] is None
+        assert result['conditional_outcome']=='conflict' and 'ob-plan-coverage' in result['blocking_obligations']
+        assert len(result['records'])==2 and result['records'][0]['reason']=='no_retrieval_hit'
+        final=result['records'][1]
+        assert final['channels']['hits']['primary']==0 and 'contradiction' in final['channels']['delivered']
+        assert final['outcome']=='conflict' and final['judgment']['positive']['quote']==positive
+        assert final['judgment']['negative']['quote']==negative and transport.calls_made==4
+        replay=client.get_fresh_run(result['run_id'])
+        assert replay['verification']['status']=='unanchored'
+        assert replay['traces'][1]['observation']['outcome']=='conflict'
+        assert replay['traces'][1]['judgment']['positive']['quote']==positive
+        assert replay['traces'][1]['judgment']['negative']['quote']==negative
+        from qjig.fresh_receipt import verify_fresh_receipt
+        receipt=client._request('GET','/api/fresh-runs/'+result['run_id']+'/receipt')
+        assert verify_fresh_receipt(receipt)['status']=='unanchored'
+        if os.environ.get('QJIG_CHROMIUM_PATH'):
+            playwright=pytest.importorskip('playwright.sync_api')
+            with playwright.sync_playwright() as p:
+                browser=p.chromium.launch(headless=True,executable_path=os.environ['QJIG_CHROMIUM_PATH'])
+                try:
+                    page=browser.new_page(); page.goto(f'http://127.0.0.1:{server.server_address[1]}/')
+                    page.locator('#fresh-runs').get_by_role('button',name='Does a military member qualify?',exact=False).click()
+                    area=page.locator('#fresh-replay')
+                    area.get_by_text('p1: conflict').wait_for()
+                    assert positive in area.inner_text() and negative in area.inner_text()
+                    assert 'Material obligations remain open:' in area.inner_text()
+                    assert 'ob-plan-coverage' in area.inner_text()
                 finally:
                     browser.close()
     finally:

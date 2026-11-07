@@ -4226,6 +4226,25 @@
       "acceptance": "A role client and browser preserve the no-hit fallback, source-bound exception judgment, open coverage obligation and receipt through the configured synthetic fresh pipeline.",
       "command": "python -m pytest tests/test_fresh_service.py::test_mandatory_only_exception_reaches_service_and_replays -q",
       "evidence": "Synthetic actual-service and Chrome walkthrough exercised primary and fallback misses, applicable exception sent to both stand-in judges, deferred result, unvalidated review, cited replay and structurally checked four-call receipt. Focused Chrome/service/engine cases: 3 passed. This is not hosted or independent semantic outcome evidence; R04/R05 remain open."
+    },
+    {
+      "id": "R04F",
+      "phase": "verification",
+      "depends_on": [
+        "R04D",
+        "R04E"
+      ],
+      "status": "complete",
+      "files": [
+        "tests/test_fresh_pipeline.py",
+        "tests/test_fresh_service.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_mandatory_only_contradiction_remains_conflict_in_service_and_replay",
+      "action": "Exercise mandatory-only contradiction and truncation boundaries",
+      "acceptance": "Retain a conflict and both cited sides through service and replay, and defer without judging a truncated mandatory-only packet.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_mandatory_only_contradiction_remains_conflict_in_service_and_replay -q",
+      "evidence": "Synthetic actual-service and Chrome walkthrough retained both cited sides as CONFLICT with coverage open after primary/fallback misses; replay and receipt remained structural only. A separate truncated mandatory-only packet remained UNKNOWN with no judge call. Browser/fresh/replay regression: 71 passed. Stand-in responses do not establish semantic or hosted model quality."
     }
   ]
 }

@@ -940,3 +940,24 @@ def test_mandatory_only_inapplicable_evidence_is_not_judged(tmp_path):
         assert result.state.trace[-1].observation.reason == 'only_inapplicable_candidates'
         assert 'exception' in result.state.trace[-1].channels.excluded
         assert result.status == 'deferred'
+
+
+def test_mandatory_only_truncated_evidence_is_not_judged(tmp_path):
+    revision = SourceRevision.create('exception.md','synthetic',decode_source(
+        ('# Exceptions\nSpecial case: veterans are eligible. '+('x'*1800)).encode(),encoding='utf-8'))
+    request = Request('truncated-exception','Does a military member qualify?','reviewer','1','project')
+    plan = {'predicates':[{'id':'p1','question':'Does a former soldier satisfy this condition?'}], 'expression':{'ref':'p1'}}
+    with Catalog.open(tmp_path/'c.sqlite') as cat, Journal.open(tmp_path/'j.sqlite') as journal:
+        add_fixture_revision(cat,revision); save_entries(cat,index_entries(revision))
+        entries=current_entries(cat,revision.source_id,revision.revision_id)
+        transport=StandInTransport([raw(plan)])
+        ledger=BudgetLedger(Budget(6,50000,1),journal,request.request_id)
+        result=run_fresh(request=request,catalog=cat,entries=entries,ledger=ledger,transport=transport,
+            planner=('stand-in','planner'),judge=('stand-in','judge'),want=2,max_bytes=600,
+            revision_applicability=lambda rid: Applicability.MATCH)
+        assert transport.calls_made==1 and len(result.state.trace)==2
+        final=result.state.trace[-1]
+        assert final.hit_count==0 and (final.channels.packet_truncations or final.channels.packet_omissions)
+        assert final.observation.outcome is Outcome.UNKNOWN
+        assert final.observation.reason in ('truncated','budget_omission')
+        assert 'ob-plan-coverage' in result.summary.stop.blocking_obligations

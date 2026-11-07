@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "06b304728a2dd9f465a4089d0e79d9f4d505a302db5d6d62f5b5cd54f491a905",
-  "queue_sha256": "e1b84ec627339c1c6d5600654a688a71318ee65b00a8ca026a8b822d0576a732",
+  "queue_sha256": "963f794dcc142b72e3874373f7fbd70ad92e2d0889810390e6a33dbb25dee829",
   "gates": [
     {
       "id": "F01",
@@ -39,7 +39,8 @@
         "R04B",
         "R04C",
         "R04D",
-        "R04E"
+        "R04E",
+        "R04F"
       ],
       "evidence": []
     },
@@ -244,6 +245,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_fresh_service.py::test_mandatory_only_exception_reaches_service_and_replays -q",
       "queue_evidence_assertion": "Synthetic actual-service and Chrome walkthrough exercised primary and fallback misses, applicable exception sent to both stand-in judges, deferred result, unvalidated review, cited replay and structurally checked four-call receipt. Focused Chrome/service/engine cases: 3 passed. This is not hosted or independent semantic outcome evidence; R04/R05 remain open."
+    },
+    {
+      "id": "R04F",
+      "status": "unverified",
+      "task_ids": [
+        "R04F"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_service.py::test_mandatory_only_contradiction_remains_conflict_in_service_and_replay -q",
+      "queue_evidence_assertion": "Synthetic actual-service and Chrome walkthrough retained both cited sides as CONFLICT with coverage open after primary/fallback misses; replay and receipt remained structural only. A separate truncated mandatory-only packet remained UNKNOWN with no judge call. Browser/fresh/replay regression: 71 passed. Stand-in responses do not establish semantic or hosted model quality."
     },
     {
       "id": "R05",
