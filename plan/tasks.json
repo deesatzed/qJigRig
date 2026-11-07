@@ -1419,7 +1419,8 @@
         "R08D",
         "R08E",
         "R08F",
-        "R08G"
+        "R08G",
+        "R08H"
       ],
       "status": "pending",
       "files": [],
@@ -3401,6 +3402,24 @@
       "acceptance": "The OpenRouter wire payload requests usage details; missing or invalid cost remains unknown and hosted dispatch stays gated.",
       "command": "python -m pytest tests/test_providers.py::test_real_adapter_smoke_contract -q",
       "evidence": "Red: the fake-HTTP OpenRouter adapter omitted the documented usage.include request. The adapter now requests usage details; missing cost remains unknown and the public hosted gate remains closed. Focused provider/pricing/goal suite 79 passed; full offline suite 555 passed. Documentation: https://openrouter.ai/support/ . No live request occurred; response availability, complete provider input/cost bounds, and archived wire-configuration binding remain unverified."
+    },
+    {
+      "id": "R08H",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08G"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/account_limits.py"
+      ],
+      "test_file": "tests/test_account_limits.py",
+      "test_name": "test_account_ceiling_uses_strictest_remaining_limit_without_claiming_authorization",
+      "action": "Derive conservative account credit constraints from current-key metadata",
+      "acceptance": "Use the lowest declared goal, key and credit limits, reject malformed values and keep excluded BYOK spend and provider enforcement unknown.",
+      "command": "python -m pytest tests/test_account_limits.py::test_account_ceiling_uses_strictest_remaining_limit_without_claiming_authorization -q",
+      "evidence": "Red: no parser derived a conservative account credit ceiling from current-key and credits responses. The parser now chooses the lowest goal, finite key and remaining-credit cap, rejects missing/nonfinite/malformed values, does not treat excluded BYOK as bounded, and never authorizes hosted work. A second red test exposed upward decimal rounding near a cap; bounded high-precision floor arithmetic now preserves the lower value. Authenticated read-only no-redirect key/credits checks succeeded; the key excludes BYOK from its limit. Sanitized ignored receipt: .local/verification/account-constraints-d20599ib.json. Focused account/goal/provider 76 passed; full offline 558 passed. This snapshot can drift, is not yet wired into the persisted GoalBudget policy, does not verify account-side enforcement or complete token/billing bounds, and made no model call."
     }
   ]
 }
