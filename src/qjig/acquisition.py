@@ -22,7 +22,7 @@ from .budgets import BudgetExceeded, BudgetLedger
 from .judge import JUDGE_MAX_TOKENS, JudgeResult, QuoteRef, judge_predicate
 from .obligations import Obligation
 from .planner import PLANNER_MAX_TOKENS, PlanBinding, request_fresh_plan
-from .providers import ProviderUnavailable, ReservationFactory, Transport
+from .providers import ProviderRequest, ProviderUnavailable, ReservationFactory, Transport
 from .journal import ReconciliationRequired, UncertainOutcome
 from .plans import Plan as _Plan  # noqa: F401
 from .store import Catalog
@@ -356,6 +356,8 @@ def run_fresh(
     revision_applicability: Callable[[str], Applicability],
     planner_max_tokens: int | None = None,
     judge_max_tokens: int | None = None,
+    planner_max_price: dict | None = None,
+    judge_max_price: dict | None = None,
     reservation_factory: ReservationFactory | None = None, archive=None,
     applicability_inputs: ApplicabilityInputs | None = None,
     role_priors: dict[str, float] | None = None,
@@ -369,6 +371,12 @@ def run_fresh(
     passages for review but can never close it, so the result is a deferral that names the gap.
     """
     _check_role_priors({} if role_priors is None else role_priors)
+    # Freeze and validate both limits before archive writes or provider calls.
+    def freeze_price(value):
+        if value is None:
+            return None
+        return dict(ProviderRequest('', '', '', '', 1, max_price=value).max_price)
+    planner_max_price, judge_max_price = freeze_price(planner_max_price), freeze_price(judge_max_price)
     revision_ids = sorted({entry.span.revision_id for entry in entries})
     entity_date = {revision_id: revision_applicability(revision_id) for revision_id in revision_ids}
     if any(not isinstance(value, Applicability) for value in entity_date.values()):
@@ -394,8 +402,8 @@ def run_fresh(
         archive.record_context({
             "schema": "qjig.fresh-context.v1", "request": request.to_dict(),
             "budget": ledger.budget.to_dict() if ledger.budget else None,
-            "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS},
-            "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS},
+            "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS, **({"max_price": planner_max_price} if planner_max_price is not None else {})},
+            "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS, **({"max_price": judge_max_price} if judge_max_price is not None else {})},
             "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": EXPANDED_BM25_METHOD,
             "reservation_factory_configured": reservation_factory is not None, "role_priors": role_priors or {},
             "corpus": {key: value.value for key, value in applicability.items()},
@@ -413,7 +421,7 @@ def run_fresh(
         outcome = request_fresh_plan(
             ledger, transport, request, corpus_revision_ids=sorted({e.span.revision_id for e in entries}),
             provider=planner[0], model=planner[1], reservation_factory=reservation_factory, archive=archive,
-            planning_evidence=planning_evidence, **kw,
+            planning_evidence=planning_evidence, max_price=planner_max_price, **kw,
         )
     except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
         failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
@@ -436,7 +444,7 @@ def run_fresh(
                 return EvalResult(Outcome.UNKNOWN, "reconciliation_required")
             result = judge_predicate(
                 ledger, transport, question, packet, provider=judge[0], model=judge[1],
-                applicability=bound_applicability, reservation_factory=reservation_factory, archive=archive, **jkw,
+                applicability=bound_applicability, reservation_factory=reservation_factory, archive=archive, max_price=judge_max_price, **jkw,
             )
             halted = any(side.failure in ("uncertain_outcome", "reconciliation_required")
                          for side in (result.positive, result.negative))

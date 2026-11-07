@@ -77,10 +77,10 @@ def _plan_validator(text: str) -> tuple[dict | None, str | None]:
 def request_fresh_plan(
     ledger: BudgetLedger, transport: Transport, request: Request, *, corpus_revision_ids: Iterable[str], provider: str, model: str,
     max_tokens: int = PLANNER_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None,
-    planning_evidence: dict | None = None,
+    planning_evidence: dict | None = None, max_price: dict | None = None,
 ) -> PlannerOutcome:
     corpus_sha = corpus_manifest_sha256(corpus_revision_ids)
-    pr = ProviderRequest("planner", provider, model, _planner_prompt(request, corpus_sha, planning_evidence), max_tokens)
+    pr = ProviderRequest("planner", provider, model, _planner_prompt(request, corpus_sha, planning_evidence), max_tokens, max_price=max_price)
     reservation = reservation_factory(pr) if reservation_factory else None
     call = call_typed(ledger, transport, pr, _plan_validator, reservation=reservation, archive=archive)
     if not call.ok:

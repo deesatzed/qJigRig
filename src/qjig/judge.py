@@ -88,8 +88,8 @@ def _check_quote(side: SideResult, packet: EvidencePacket, applicability: Callab
     return SideResult(Support.SUPPORTED, side.reason, side.quote, None, side.call_id, assurance, ref)
 
 
-def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str, max_tokens: int = JUDGE_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge", context_binding: dict | None = None) -> SideResult:
-    req = ProviderRequest(f"{stage_prefix}_{side}", provider, model, _PROMPT.format(claim=claim, evidence=evidence), max_tokens)
+def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str, max_tokens: int = JUDGE_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge", context_binding: dict | None = None, max_price: dict | None = None) -> SideResult:
+    req = ProviderRequest(f"{stage_prefix}_{side}", provider, model, _PROMPT.format(claim=claim, evidence=evidence), max_tokens, max_price=max_price)
     try:
         reservation = reservation_factory(req) if reservation_factory else None
         call = call_typed(ledger, transport, req, SIDE_SCHEMA, reservation=reservation, archive=archive,
@@ -138,18 +138,18 @@ def snapshot_judge_context(packet: EvidencePacket, applicability: Callable[[str]
 def judge_predicate(
     ledger: BudgetLedger, transport: Transport, question: str, packet: EvidencePacket, *, provider: str, model: str,
     applicability: Callable[[str], Applicability] | None = None, max_tokens: int = JUDGE_MAX_TOKENS,
-    reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge",
+    reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge", max_price: dict | None = None,
 ) -> JudgeResult:
     """Ask separately whether the evidence supports YES and whether it supports NO; combine the two."""
     if stage_prefix not in ("judge", "escalation"):
         raise ContractError("invalid judge stage prefix")
     evidence = render_packet(packet)
     binding, applicability = snapshot_judge_context(packet, applicability)
-    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens, reservation_factory, archive, stage_prefix, binding)
+    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens, reservation_factory, archive, stage_prefix, binding, max_price)
     if pos.failure in ("uncertain_outcome", "reconciliation_required"):
         neg = SideResult(Support.UNKNOWN, "reconciliation_required", "", "reconciliation_required", None)
     else:
-        neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens, reservation_factory, archive, stage_prefix, binding)
+        neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens, reservation_factory, archive, stage_prefix, binding, max_price)
     return _combine_sides(pos, neg, packet, applicability)
 
 

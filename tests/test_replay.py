@@ -14,7 +14,7 @@ from qjig.store import Catalog
 from qjig.replay import verify_archive
 
 
-def make_archive(tmp_path, positive=None, negative=None):
+def make_archive(tmp_path, positive=None, negative=None, **run_options):
     source = SourceRevision.create("synthetic/rules.md", "synthetic", decode_source(b"# Rules\nRefunds within fourteen days.\n", encoding="utf-8"))
     request = Request("r", "refund fourteen?", "reviewer", "1", "project")
     usage = {"prompt_tokens": 5, "completion_tokens": 3, "cost_usd": 0.0}
@@ -30,9 +30,32 @@ def make_archive(tmp_path, positive=None, negative=None):
         inputs = ApplicabilityInputs(Collection((MemberMetadata(source.revision_id, "project", Interval("2026-01-01", OPEN)),)), frozenset(), "2026-11-15", False)
         result = run_fresh(request=request, catalog=catalog, entries=current_entries(catalog, source.source_id, source.revision_id),
                            ledger=ledger, transport=transport, planner=("stand-in", "planner"), judge=("stand-in", "judge"),
-                           revision_applicability=lambda _: Applicability.MATCH, applicability_inputs=inputs, archive=archive)
+                           revision_applicability=lambda _: Applicability.MATCH, applicability_inputs=inputs, archive=archive, **run_options)
         assert result.status == "deferred"
     return directory, transport.calls_made
+
+
+def test_fresh_run_binds_routing_ceilings_to_requests_and_replay(tmp_path):
+    planner_cap = {'prompt': 1.0, 'completion': 2.0}
+    judge_cap = {'prompt': 3.0, 'completion': 4.0}
+    directory, calls = make_archive(tmp_path, planner_max_price=planner_cap, judge_max_price=judge_cap)
+    assert calls == 3
+    with RunArchive.open(directory) as archive:
+        requests = [e['data'] for e in archive.events() if e['kind'] == 'request']
+        assert [r['max_price'] for r in requests] == [planner_cap, judge_cap, judge_cap]
+        assert verify_archive(archive).status == 'unanchored'
+    import json
+    from qjig.providers import ProviderRequest
+    with sqlite3.connect(directory / 'run.sqlite') as con:
+        con.execute('DROP TRIGGER event_no_update')
+        seq, raw = con.execute("SELECT seq,data FROM events WHERE kind='request' ORDER BY seq LIMIT 1").fetchone()
+        changed = json.loads(raw)
+        changed['max_price']['prompt'] = 9
+        changed['input_sha256'] = ProviderRequest(changed['stage'], changed['provider'], changed['model'],
+                                                  changed['prompt'], changed['max_tokens'], max_price=changed['max_price']).input_sha256()
+        con.execute('UPDATE events SET data=? WHERE seq=?', (json.dumps(changed), seq))
+    with RunArchive.open(directory) as archive:
+        assert verify_archive(archive).status == 'invalid'
 
 
 def test_archive_replay_detects_changed_evidence_without_inference(tmp_path, monkeypatch):

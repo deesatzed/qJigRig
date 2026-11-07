@@ -114,7 +114,8 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                                                           corpus_manifest_sha256(context["corpus"]),
                                                           context["planning_evidence"])
                         if (request.prompt != expected_prompt or request.model != settings["model"] or
-                            request.provider != settings["provider"] or request.max_tokens != settings["max_tokens"]):
+                            request.provider != settings["provider"] or request.max_tokens != settings["max_tokens"] or
+                            request.max_price != settings.get("max_price")):
                             raise ContractError("planner request does not match recorded context")
             elif kind == "response":
                 if call_id not in requests or requests[call_id] >= event["seq"]:
@@ -168,7 +169,8 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                     expected = _PROMPT.format(claim=f"The answer to '{plan_questions[data['predicate_id']]}' is {'YES' if side == 'positive' else 'NO'}.", evidence=rendered)
                     settings = context["judge"]
                     if (side in seen_sides or judge_request.prompt != expected or judge_request.model != settings["model"] or
-                        judge_request.provider != settings["provider"] or judge_request.max_tokens != settings["max_tokens"]):
+                        judge_request.provider != settings["provider"] or judge_request.max_tokens != settings["max_tokens"] or
+                        judge_request.max_price != settings.get("max_price")):
                         issues.append(f"invalid_judge_binding:{judge_id}")
                     seen_sides.add(side)
                     side_ids[side] = judge_id
