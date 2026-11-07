@@ -226,9 +226,14 @@ class GoalBudget:
                 continue
             intent = matches[0]
             token_bound, cost_bound = intent.payload.get("reserve_tokens"), intent.payload.get("reserve_cost_usd")
+            input_bound = intent.payload.get("reserve_input_tokens")
+            output_bound = intent.payload.get("reserve_output_tokens")
             if (intent.request_id != request_id or not _valid_tokens(token_bound) or not _valid_cost(cost_bound)
                     or token_bound != bound_tokens or _cost(cost_bound) != Decimal(bound_cost)):
                 invalid.append(f"reservation_mismatch:{attempt}")
+            if (not _valid_tokens(input_bound) or not _valid_tokens(output_bound)
+                    or input_bound + output_bound != bound_tokens):
+                invalid.append(f"token_bounds_mismatch:{attempt}")
             required = self._con.execute("SELECT work_id,stage,provider,model FROM required_work WHERE attempt_id=?", (attempt,)).fetchone()
             if required is not None and (intent.payload.get("required_id"), intent.stage, intent.provider, intent.model) != required:
                 invalid.append(f"required_binding_mismatch:{attempt}")
@@ -252,6 +257,9 @@ class GoalBudget:
                 invalid.append(f"usage_mismatch:{attempt}")
             elif a + b > bound_tokens or _cost(c) > Decimal(bound_cost):
                 invalid.append(f"reservation_exceeded:{attempt}")
+            elif (_valid_tokens(input_bound) and _valid_tokens(output_bound)
+                  and (a > input_bound or b > output_bound)):
+                invalid.append(f"token_bound_exceeded:{attempt}")
         issues = sorted(invalid) + sorted(incomplete)
         return {"status": "invalid" if invalid else "incomplete" if incomplete else "verified",
                 "checked_attempts": len(rows), "issues": issues}

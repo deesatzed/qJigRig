@@ -537,3 +537,23 @@ def test_budgeted_dispatch_refuses_malformed_untracked_intent(tmp_path):
                 'judge', lambda: seen.append('called'), provider='stand-in', model='m', input_sha256='b'*64,
                 reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.2)
         assert seen == [] and goal.totals().max_calls == 0
+
+
+@pytest.mark.parametrize('input_tokens,output_tokens', [(61, 10), (10, 41)])
+def test_audit_rejects_individual_token_bound_overruns(tmp_path, input_tokens, output_tokens):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+
+    limit = Budget(3, 1000, 1)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        first = BudgetLedger(limit, journal, 'r1', goal_budget=goal, partition='smoke')
+        first.run('judge', lambda: ('ok', {'prompt_tokens': input_tokens, 'completion_tokens': output_tokens, 'cost_usd': 0.1}),
+                  provider='stand-in', model='m', input_sha256='a'*64,
+                  reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.2)
+        assert goal.audit_journal(journal)['status'] == 'invalid'
+        seen = []
+        second = BudgetLedger(limit, journal, 'r2', goal_budget=goal, partition='smoke')
+        with pytest.raises(BudgetExceeded, match='accounting'):
+            second.run('judge', lambda: seen.append('called'), provider='stand-in', model='m', input_sha256='b'*64,
+                       reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.2)
+        assert seen == [] and journal.events('r2') == [] and goal.totals().max_calls == 1
