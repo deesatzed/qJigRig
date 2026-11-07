@@ -3968,6 +3968,23 @@
       "acceptance": "Reopen an interrupted synthetic run after restart, show pending reconciliation, preserve unknown when journal is unavailable, and avoid a further attempt while usage remains unresolved.",
       "command": "python -m pytest tests/test_fresh_service.py::test_interrupted_fresh_run_exposes_pending_attempt_after_restart -q",
       "evidence": "Red: replay omitted reconciliation status. A synthetic KeyboardInterrupt during planner dispatch left a durable pending intent; service restart and Chrome displayed the unknown provider outcome, missing journal produced unknown, and repeated or new requests made no second provider attempt. Browser/journal/replay checks 26 passed. This simulates interruption in process and does not establish real hosted-provider reconciliation or full T062."
+    },
+    {
+      "id": "T062E",
+      "phase": "verification",
+      "depends_on": [
+        "T062D"
+      ],
+      "status": "complete",
+      "files": [
+        "tests/test_fresh_process_crash.py"
+      ],
+      "test_file": "tests/test_fresh_process_crash.py",
+      "test_name": "test_process_exit_leaves_incomplete_fresh_run_without_retry",
+      "action": "Exercise fresh archive recovery after subprocess termination",
+      "acceptance": "Abruptly terminate a synthetic fresh planner attempt, reopen persistent files in a service, retain unknown usage, and prevent a further provider attempt.",
+      "command": "python -m pytest tests/test_fresh_process_crash.py::test_process_exit_leaves_incomplete_fresh_run_without_retry -q",
+      "evidence": "A subprocess exited with code 72 inside a synthetic planner transport after durable intent and archive request; a newly started service reopened the incomplete archive with reconciliation required. The persisted ledger retained one unknown-cost call; a new request deferred before dispatch. Focused fresh/journal/budget checks: 54 passed, 1 skipped. This does not prove real provider execution or reconciliation, or complete T062."
     }
   ]
 }
