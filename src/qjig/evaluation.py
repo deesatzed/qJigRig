@@ -218,3 +218,75 @@ def validate_evaluation_design(design: dict, *, expected_digest: str | None = No
     if expected_digest is not None and (not isinstance(expected_digest, str) or not _SHA.fullmatch(expected_digest) or not hmac.compare_digest(digest, expected_digest)):
         raise ContractError('evaluation design digest differs')
     return digest
+
+
+def summarize_evaluation_assignments(design: dict, results: list[dict], *, expected_digest: str) -> dict:
+    """Account for a frozen design's assignments without scoring or inferring outcomes.
+
+    Result status, provenance and resources are recorded assertions; receipts,
+    label isolation and semantic correctness must be verified separately.
+    """
+    import math
+    if not isinstance(expected_digest, str) or not _SHA.fullmatch(expected_digest):
+        raise ContractError('frozen design digest required')
+    validate_evaluation_design(design, expected_digest=expected_digest)
+    families = {family['id']: family['partition'] for family in design['families']}
+    count = sum(design['repeats'][families[case['family']]] for case in design['cases']) * len(design['arms'])
+    if count > 100_000:
+        raise ContractError('evaluation assignment set exceeds limit')
+    assigned = {(case['id'], arm, repeat)
+                for case in design['cases'] for arm in design['arms']
+                for repeat in range(1, design['repeats'][families[case['family']]] + 1)}
+    if not isinstance(results, list):
+        raise ContractError('results must be a list')
+    statuses = {'completed', 'timeout', 'malformed', 'unsupported', 'justified_deferral',
+                'unjustified_deferral', 'unknown_review', 'provider_failure', 'retrieval_failure', 'conflict', 'unknown'}
+    fields = ('calls', 'input_tokens', 'output_tokens', 'cost_usd', 'latency_ms')
+    totals = {name: [] for name in fields}
+    counts, seen = {}, set()
+    for result in results:
+        if not isinstance(result, dict) or set(result) != {'case_id', 'arm', 'repeat', 'status', 'provenance', 'resources'}:
+            raise ContractError('invalid assignment result')
+        case, arm, repeat = result['case_id'], result['arm'], result['repeat']
+        if not isinstance(case, str) or not isinstance(arm, str) or type(repeat) is not int:
+            raise ContractError('invalid assignment identity')
+        key = (case, arm, repeat)
+        if key not in assigned or key in seen:
+            raise ContractError('duplicate or unassigned result')
+        seen.add(key)
+        if (not isinstance(result['status'], str) or result['status'] not in statuses or
+                not isinstance(result['provenance'], str) or not result['provenance'].strip()):
+            raise ContractError('invalid result status or provenance')
+        resource = result['resources']
+        if not isinstance(resource, dict) or set(resource) != set(fields):
+            raise ContractError('invalid resource record')
+        for name in fields:
+            value = resource[name]
+            if value is not None:
+                if name in ('calls', 'input_tokens', 'output_tokens'):
+                    if type(value) is not int or value < 0:
+                        raise ContractError('invalid resource value')
+                elif type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+                    raise ContractError('invalid resource value')
+            totals[name].append(value)
+        counts[result['status']] = counts.get(result['status'], 0) + 1
+    missing = sorted(assigned - seen)
+    complete = not missing
+    resources, all_known = {}, complete
+    for name, values in totals.items():
+        unknown = sum(v is None for v in values)
+        try:
+            known = (sum(v for v in values if v is not None) if name in ('calls', 'input_tokens', 'output_tokens')
+                     else math.fsum(v for v in values if v is not None))
+        except OverflowError as exc:
+            raise ContractError('resource total overflow') from exc
+        if isinstance(known, float) and not math.isfinite(known):
+            raise ContractError('resource total overflow')
+        resources['known_' + name] = known
+        resources['unknown_' + name + '_records'] = unknown
+        resources[name] = known if complete and not unknown else None
+        all_known = all_known and not unknown
+    return {'design_sha256': expected_digest, 'assigned': len(assigned), 'recorded': len(seen),
+            'missing': [{'case_id': case, 'arm': arm, 'repeat': repeat} for case, arm, repeat in missing],
+            'assignments_complete': complete, 'resources_complete': all_known,
+            'status_counts': dict(sorted(counts.items())), 'resources': resources}

@@ -57,10 +57,7 @@ def test_allowlisted_evaluation_sources_exclude_reference_artifacts(tmp_path):
         load_isolated_sources(tmp_path, sources, protected)
 
 
-def test_evaluation_design_checks_splits_and_requirements():
-    import copy
-    from qjig.evaluation import validate_evaluation_design
-
+def _sample_design():
     categories = ['supported_yes', 'supported_no', 'genuine_unknown', 'wrong_entity',
                   'wrong_date', 'conflicting_versions', 'enabling_exception',
                   'restricting_exception', 'missing_decisive', 'changed_decisive',
@@ -92,6 +89,13 @@ def test_evaluation_design_checks_splits_and_requirements():
                            for key, op, value in [('retain', '>=', 0.8), ('revise', '>=', 0.5),
                                                   ('remove', '<', 0.5)]},
               'evaluation_provenance': 'synthetic fixture only'}
+    return design
+
+
+def test_evaluation_design_checks_splits_and_requirements():
+    import copy
+    from qjig.evaluation import validate_evaluation_design
+    design = _sample_design()
     digest = validate_evaluation_design(design)
     assert len(digest) == 64
     assert validate_evaluation_design(design, expected_digest=digest) == digest
@@ -111,3 +115,45 @@ def test_evaluation_design_checks_splits_and_requirements():
     changed = copy.deepcopy(design); changed['evaluation_provenance'] = 'changed'
     with pytest.raises(ContractError):
         validate_evaluation_design(changed, expected_digest=digest)
+
+
+def test_every_declared_assignment_and_unknown_resource_is_reported():
+    from qjig.evaluation import summarize_evaluation_assignments, validate_evaluation_design
+    design = _sample_design()
+    digest = validate_evaluation_design(design)
+    base = {'status': 'timeout', 'provenance': 'synthetic',
+            'resources': {'calls': 1, 'input_tokens': 12, 'output_tokens': None, 'cost_usd': None, 'latency_ms': 10}}
+    result = {**base, 'case_id': 'holdout', 'arm': 'combined', 'repeat': 1}
+    summary = summarize_evaluation_assignments(design, [result], expected_digest=digest)
+    assert summary['assigned'] == 40 and summary['recorded'] == 1 and len(summary['missing']) == 39
+    assert summary['status_counts'] == {'timeout': 1}
+    assert summary['assignments_complete'] is False and summary['resources_complete'] is False
+    assert summary['resources']['calls'] is None and summary['resources']['known_calls'] == 1
+    assert summary['resources']['cost_usd'] is None and summary['resources']['known_cost_usd'] == 0
+    assert summary['resources']['unknown_cost_usd_records'] == 1
+    with pytest.raises(ContractError):
+        summarize_evaluation_assignments(design, [result, result], expected_digest=digest)
+    with pytest.raises(ContractError):
+        summarize_evaluation_assignments(design, [{**result, 'repeat': 3}], expected_digest=digest)
+    with pytest.raises(ContractError):
+        summarize_evaluation_assignments(design, [result], expected_digest='0'*64)
+    with pytest.raises(ContractError):
+        summarize_evaluation_assignments(design, [{**result, 'resources': {**base['resources'], 'cost_usd': float('nan')}}], expected_digest=digest)
+    missing = summary['missing']
+    filled = [result] + [{**base, **item, 'status': 'unknown_review',
+                          'resources': {'calls': 0, 'input_tokens': 0, 'output_tokens': 0, 'cost_usd': 0, 'latency_ms': 0}}
+                         for item in missing]
+    complete = summarize_evaluation_assignments(design, filled, expected_digest=digest)
+    assert complete['assignments_complete'] is True and complete['resources_complete'] is False
+    assert complete['status_counts']['unknown_review'] == 39
+    assert complete['resources']['cost_usd'] is None
+    filled[0] = {**filled[0], 'resources': {'calls': 1, 'input_tokens': 12, 'output_tokens': 3, 'cost_usd': 0.2, 'latency_ms': 10}}
+    complete = summarize_evaluation_assignments(design, filled, expected_digest=digest)
+    assert complete['resources_complete'] is True and complete['resources']['cost_usd'] == 0.2
+    assert complete['resources']['calls'] == 1 and complete['resources']['input_tokens'] == 12
+    with pytest.raises(ContractError):
+        summarize_evaluation_assignments(design, [{**result, 'status': 'invented'}], expected_digest=digest)
+    import copy
+    huge = copy.deepcopy(design); huge['repeats']['holdout'] = 1000000
+    with pytest.raises(ContractError, match='exceeds limit'):
+        summarize_evaluation_assignments(huge, [], expected_digest=validate_evaluation_design(huge))

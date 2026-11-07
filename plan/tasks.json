@@ -1199,7 +1199,8 @@
       "phase": "P6",
       "depends_on": [
         "T066",
-        "T052"
+        "T052",
+        "T068A"
       ],
       "status": "pending",
       "files": [
@@ -2502,6 +2503,23 @@
       "acceptance": "Draft binds the complete authored policy, request and current source snapshot; stale runs refuse and no activation is implied.",
       "command": "python -m pytest tests/test_service.py::test_saved_authored_run_creates_exact_bound_nonactive_draft -q",
       "evidence": "Red: no route created a draft from a saved authored run. Green: local route verifies saved bundle and unchanged catalog, binds the full authored policy and run identity plus current live source revisions, and persists a nonactive draft. Tests cover idempotency, changed policy binding and rejection after source change. Chromium created an authored draft, observed it stale after an intervention, and reopened/exported the original run after restart. Focused suite 35 passed before final extra assertion; full offline 489 passed. No fresh hosted inference, semantic validation, activation or general program reuse is established."
+    },
+    {
+      "id": "T068A",
+      "phase": "P6",
+      "depends_on": [
+        "T064A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_every_declared_assignment_and_unknown_resource_is_reported",
+      "action": "Account for all declared evaluation assignments and unknown resources",
+      "acceptance": "Every declared case, arm and repeat appears in the denominator; duplicate, unexpected and malformed results are rejected and missing usage stays unknown.",
+      "command": "python -m pytest tests/test_evaluation.py::test_every_declared_assignment_and_unknown_resource_is_reported -q",
+      "evidence": "Red: no complete assignment accounting existed. Green: synthetic frozen design expands case/arm/repeat combinations, exposes missing identities and status counts, rejects duplicates/unassigned/invalid results, and preserves unknown costs and other resources. Focused evaluation/goal-budget/preflight suite 47 passed; full offline 490 passed. Status, provenance and resource values are assertions; no receipt verification, scoring, actual frozen corpus or provider evaluation is established."
     }
   ]
 }
