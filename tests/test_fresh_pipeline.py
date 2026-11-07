@@ -756,3 +756,47 @@ def test_fresh_review_does_not_follow_uncertain_judge_call(tmp_path):
         assert run.status == 'deferred' and run.review.failure == 'reconciliation_required'
         assert transport.calls_made == 3 and journal.pending('req-f')
         assert all(event.stage != 'plan_review' for event in journal.events('req-f'))
+
+
+@pytest.mark.parametrize('include_review', [True, False])
+def test_fresh_review_consumes_separately_reserved_slot(tmp_path, include_review):
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.fresh_preflight import fresh_run_allocations, fresh_slot_reservation
+    from qjig.goal_budget import GoalBudget
+    from qjig.run_archive import RunArchive
+    responses = [raw(PLAN), side(False), side(True, QUOTE), raw({'assessment': 'no_gap_found', 'reason': 'synthetic'})]
+    cat, entries, journal, _, transport = build(tmp_path, responses)
+    def model(ident):
+        return {'id': ident, 'context_length': 10000, 'top_provider': {'max_completion_tokens': 1000},
+                'pricing': {'prompt': '0.000001', 'completion': '0.000002'}}
+    models = {name: model(name) for name in ('planner', 'judge', 'reviewer')}
+    cap = {'prompt': 2, 'completion': 3}
+    review = {'provider': 'stand-in', 'model': models['reviewer'], 'input_tokens': 1000, 'output_tokens': 50, 'max_price': cap}
+    slots = fresh_run_allocations(request_id=REQUEST.request_id, partition='smoke', provider='stand-in',
+                                  planner_model=models['planner'], judge_model=models['judge'],
+                                  planner_input=1000, planner_output=50, judge_input=1000, judge_output=50,
+                                  planner_price=cap, judge_price=cap, reviewer=review if include_review else None)
+    inputs = ApplicabilityInputs(Collection((MemberMetadata(REV.revision_id, 'project', Interval('2026-01-01', OPEN)),)),
+                                 frozenset(), '2026-11-07', False)
+    limit = Budget(30, 50000, 1)
+    with cat, journal, RunArchive.open(tmp_path / 'archive') as archive, GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
+        goal.reserve_run_set('fresh-run', slots)
+        def reserve(request):
+            return fresh_slot_reservation(goal, 'fresh-run', request_id=REQUEST.request_id, partition='smoke',
+                                          request=request, model=models[request.model], input_tokens=1000,
+                                          input_bound_provenance='synthetic fixture')
+        ledger = BudgetLedger(limit, journal, REQUEST.request_id, goal_budget=goal, partition='smoke')
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=('stand-in', 'planner'), judge=('stand-in', 'judge'), reviewer=('stand-in', 'reviewer'),
+                           revision_applicability=lambda _: Applicability.MATCH, applicability_inputs=inputs, archive=archive,
+                           reservation_factory=reserve, review_reservation_factory=reserve,
+                           planner_max_tokens=50, judge_max_tokens=50, reviewer_max_tokens=50,
+                           planner_max_price=cap, judge_max_price=cap, reviewer_max_price=cap)
+        assert result.status == 'deferred' and 'plan_coverage_unestablished' in result.reasons
+        if include_review:
+            assert result.review.status == 'recorded' and transport.calls_made == 4
+            assert goal._con.execute("SELECT COUNT(*) FROM required_work WHERE stage='plan_review' AND attempt_id IS NOT NULL").fetchone()[0] == 1
+        else:
+            assert result.review.status == 'unavailable' and result.review.failure == 'review_preflight_unavailable'
+            assert transport.calls_made == 0 and journal.events('req-f') == []
+        assert goal.audit_journal(journal)['status'] == 'verified'

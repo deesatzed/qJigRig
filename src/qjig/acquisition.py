@@ -391,6 +391,30 @@ def run_fresh(
                 type(reviewer_max_tokens) is not int or reviewer_max_tokens < 1 or
                 archive is None or applicability_inputs is None):
             raise ContractError("configured review requires reviewer identity, archive and applicability inputs")
+        if ledger._goal_budget is not None:
+            from .program_review import PlanReviewOutcome
+            from decimal import Decimal
+            from .budgets import _valid_cost
+            from .providers import CallReservation, _ceiling_token_cost, fresh_work_binding
+            try:
+                if review_reservation_factory is None:
+                    raise ContractError('review reservation is required')
+                probe = ProviderRequest('plan_review', reviewer[0], reviewer[1], '', reviewer_max_tokens, max_price=reviewer_max_price)
+                held = review_reservation_factory(probe)
+                if (not isinstance(held, CallReservation) or held.request_sha256 != probe.input_sha256()
+                        or held.required_id is None or held.work_binding_sha256 is None
+                        or not _valid_cost(held.cost_usd)
+                        or Decimal(str(held.cost_usd)) < _ceiling_token_cost(probe, held.input_tokens)
+                        or held.work_binding_sha256 != fresh_work_binding(probe, held.input_tokens, held.pricing_sha256)):
+                    raise ContractError('review reservation is not bound')
+                ledger._goal_budget.check_required_work(held.required_id, request_id=request.request_id,
+                    partition=ledger._partition, stage=probe.stage, provider=probe.provider, model=probe.model,
+                    tokens=held.input_tokens + probe.max_tokens, cost_usd=held.cost_usd,
+                    work_binding_sha256=held.work_binding_sha256)
+            except (ContractError, BudgetExceeded):
+                unavailable = PlanReviewOutcome('unavailable', None, None, 'review_preflight_unavailable')
+                return FreshRun('deferred', ('plan_coverage_unestablished', 'review_preflight_unavailable'),
+                                'review_preflight_unavailable', None, None, None, {}, {}, (), None, unavailable)
     revision_ids = sorted({entry.span.revision_id for entry in entries})
     entity_date = {revision_id: revision_applicability(revision_id) for revision_id in revision_ids}
     if any(not isinstance(value, Applicability) for value in entity_date.values()):

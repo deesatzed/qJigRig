@@ -94,6 +94,11 @@ def review_plan(catalog: Catalog, ledger: BudgetLedger, transport, binding: dict
     actor['prompt_sha256'] = hashlib.sha256(prompt.encode('utf-8')).hexdigest()
     try:
         reservation = reservation_factory(request) if reservation_factory is not None else None
+    except BudgetExceeded:
+        return PlanReviewOutcome('unavailable', None, None, 'budget_exceeded')
+    except ContractError:
+        return PlanReviewOutcome('unavailable', None, None, 'reservation_unavailable')
+    try:
         call = call_typed(ledger, transport, request, _REVIEW_SCHEMA, reservation=reservation, archive=archive)
     except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
         failure = {BudgetExceeded: 'budget_exceeded', ProviderUnavailable: 'provider_unavailable',

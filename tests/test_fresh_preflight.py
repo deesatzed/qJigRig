@@ -144,3 +144,29 @@ def test_typed_call_rejects_rebound_request_before_dispatch(tmp_path):
             call_typed(BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='pilot'),
                        transport, changed, {}, reservation=forged)
         assert journal.events('r') == [] and transport.calls_made == 0
+
+
+def test_configured_review_has_separate_frozen_slot(tmp_path):
+    from qjig.fresh_preflight import fresh_run_allocations, fresh_slot_reservation
+    from qjig.providers import ProviderRequest
+    model = {'id': 'synthetic/model', 'context_length': 10000,
+             'top_provider': {'max_completion_tokens': 1000},
+             'pricing': {'prompt': '0.000001', 'completion': '0.000002'}}
+    cap = {'prompt': 2, 'completion': 3}
+    options = dict(request_id='r', partition='pilot', provider='stand-in', planner_model=model, judge_model=model,
+                   planner_input=100, planner_output=50, judge_input=100, judge_output=50,
+                   planner_price=cap, judge_price=cap)
+    reviewer = {'provider': 'stand-in', 'model': model, 'input_tokens': 200, 'output_tokens': 60, 'max_price': cap}
+    slots = fresh_run_allocations(**options, reviewer=reviewer)
+    assert len(slots) == 2 + 2 * MAX_PREDICATES * MAX_ROUNDS
+    review_slot = next(slot for slot in slots if slot['stage'] == 'plan_review')
+    assert review_slot['tokens'] == 260
+    limit = Budget(30, 10000, 1)
+    with GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'pilot': limit}) as goal:
+        goal.reserve_run_set('frozen', slots)
+        request = ProviderRequest('plan_review', 'stand-in', model['id'], 'review prompt', 60, max_price=cap)
+        bound = fresh_slot_reservation(goal, 'frozen', request_id='r', partition='pilot', request=request,
+                                       model=model, input_tokens=200, input_bound_provenance='synthetic')
+        assert bound.required_id == review_slot['work_id']
+    with pytest.raises(ContractError):
+        fresh_run_allocations(**options, reviewer={**reviewer, 'max_price': None})

@@ -1,7 +1,7 @@
 """Build conservative fresh-run slot allocations from explicit caller bounds.
 
 This enumerates work; it does not authenticate prices or input-token bounds,
-cover retries, review or escalation, or authorize provider dispatch.
+cover retries or escalation, or authorize provider dispatch.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
                           planner_model: dict, judge_model: dict,
                           planner_input: int, planner_output: int,
                           judge_input: int, judge_output: int,
-                          planner_price: dict, judge_price: dict) -> list[dict]:
+                          planner_price: dict, judge_price: dict, reviewer: dict | None = None) -> list[dict]:
     """Enumerate one planner and a pair of judges per possible predicate/round.
 
     The upper bound intentionally holds slots even when a no-hit round makes no
@@ -35,23 +35,29 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
     """
     if any(not isinstance(v, str) or not v.strip() for v in (request_id, partition, provider)):
         raise ContractError('invalid fresh allocation identity')
-    slots = [('planner', 0, planner_model, planner_input, planner_output, planner_price)]
+    slots = [('planner', 0, provider, planner_model, planner_input, planner_output, planner_price)]
     for index in range(MAX_PREDICATES * MAX_ROUNDS):
-        slots.extend((stage, index, judge_model, judge_input, judge_output, judge_price)
+        slots.extend((stage, index, provider, judge_model, judge_input, judge_output, judge_price)
                      for stage in ('judge_positive', 'judge_negative'))
+    if reviewer is not None:
+        if (not isinstance(reviewer, dict) or set(reviewer) != {'provider', 'model', 'input_tokens', 'output_tokens', 'max_price'}
+                or not isinstance(reviewer['provider'], str) or not reviewer['provider'].strip()):
+            raise ContractError('invalid review allocation')
+        slots.append(('plan_review', 0, reviewer['provider'], reviewer['model'], reviewer['input_tokens'],
+                      reviewer['output_tokens'], reviewer['max_price']))
     result = []
-    for stage, index, model, input_tokens, output_tokens, price in slots:
+    for stage, index, slot_provider, model, input_tokens, output_tokens, price in slots:
         if not isinstance(model, dict) or not isinstance(model.get('id'), str) or not model['id']:
             raise ContractError('missing model identity')
         if price is None:
             raise ContractError('routing price ceiling required')
-        request = ProviderRequest(stage, provider, model['id'], '', output_tokens, max_price=price)
+        request = ProviderRequest(stage, slot_provider, model['id'], '', output_tokens, max_price=price)
         bound = make_call_reservation(request, model, input_tokens=input_tokens,
                                       input_bound_provenance='declared allocation bound; not verified')
         ident = _slot_id(request_id, partition, request, input_tokens, bound.pricing_sha256, index)
         result.append({'work_id': ident, 'request_id': request_id,
                        'partition': partition, 'tokens': input_tokens + output_tokens,
-                       'cost_usd': bound.cost_usd, 'stage': stage, 'provider': provider, 'model': model['id'],
+                       'cost_usd': bound.cost_usd, 'stage': stage, 'provider': slot_provider, 'model': model['id'],
                        'work_binding_sha256': fresh_work_binding(request, input_tokens, bound.pricing_sha256)})
     return result
 
@@ -65,11 +71,11 @@ def fresh_slot_reservation(goal, set_id: str, *, request_id: str, partition: str
     """
     if not isinstance(request, ProviderRequest) or request.max_price is None:
         raise ContractError('capped provider request required')
-    if request.stage not in ('planner', 'judge_positive', 'judge_negative'):
+    if request.stage not in ('planner', 'judge_positive', 'judge_negative', 'plan_review'):
         raise ContractError('unsupported fresh request stage')
     bound = make_call_reservation(request, model, input_tokens=input_tokens,
                                   input_bound_provenance=input_bound_provenance)
-    count = 1 if request.stage == 'planner' else MAX_PREDICATES * MAX_ROUNDS
+    count = 1 if request.stage in ('planner', 'plan_review') else MAX_PREDICATES * MAX_ROUNDS
     allowed = {_slot_id(request_id, partition, request, input_tokens, bound.pricing_sha256, index)
                for index in range(count)}
     ident = goal.select_required_work(set_id, request_id=request_id, partition=partition,
