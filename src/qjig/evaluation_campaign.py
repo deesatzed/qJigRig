@@ -25,6 +25,33 @@ def applicability_digest(inputs) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def check_archive_config(frozen: dict, context: dict, assignment: dict) -> None:
+    """Check archive settings against frozen campaign settings, not their truth."""
+    stages=frozen['stages'];arm=assignment['arm']
+    if context.get('want') != frozen['want'] or context.get('max_bytes') != frozen['max_bytes']:
+        raise ContractError('archive packet configuration differs')
+    metadata = context.get('applicability_inputs') if arm in ('combined','decomposition_only') else context.get('catalog_applicability') if arm=='retrieval_only' else None
+    if arm in ('combined','decomposition_only','retrieval_only') and metadata is None:
+        raise ContractError('archive applicability binding missing')
+    if metadata is not None:
+        from .applicability import ApplicabilityInputs
+        if applicability_digest(ApplicabilityInputs.from_dict(metadata)) != frozen['case_applicability'][assignment['case_id']]:
+            raise ContractError('archive applicability binding differs')
+    if arm in ('combined','decomposition_only'):
+        for name in ('planner','judge','reviewer'):
+            actual=context.get(name);spec=stages[name]
+            if (not isinstance(actual,dict) or actual.get('provider') != spec['provider']
+                    or actual.get('model') != spec['model']['id'] or actual.get('max_tokens') != spec['output_tokens']
+                    or actual.get('max_price') != spec['max_price']):
+                raise ContractError('archive stage configuration differs')
+    else:
+        spec=stages['direct']
+        if (context.get('provider') != spec['provider'] or context.get('model') != spec['model']['id']
+                or context.get('max_tokens') != spec['output_tokens'] or context.get('max_price') != spec['max_price']
+                or context.get('followups') != (0 if arm=='direct_full_evidence' else 1)):
+            raise ContractError('archive direct configuration differs')
+
+
 class EvaluationCampaign:
     def __init__(self, goal: GoalBudget, plan_id: str, *, expected_plan_sha256: str):
         if not isinstance(goal, GoalBudget):
@@ -219,29 +246,7 @@ class EvaluationCampaign:
             raise ContractError('archive request differs from claim')
         config_row=self._goal._con.execute('SELECT value FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
         if config_row is not None:
-            frozen=json.loads(config_row[0]);context=archive.context();stages=frozen['stages'];arm=assignment['arm']
-            if context.get('want') != frozen['want'] or context.get('max_bytes') != frozen['max_bytes']:
-                raise ContractError('archive packet configuration differs')
-            metadata = context.get('applicability_inputs') if arm in ('combined','decomposition_only') else context.get('catalog_applicability') if arm=='retrieval_only' else None
-            if arm in ('combined','decomposition_only','retrieval_only') and metadata is None:
-                raise ContractError('archive applicability binding missing')
-            if metadata is not None:
-                from .applicability import ApplicabilityInputs
-                if applicability_digest(ApplicabilityInputs.from_dict(metadata)) != frozen['case_applicability'][assignment['case_id']]:
-                    raise ContractError('archive applicability binding differs')
-            if arm in ('combined','decomposition_only'):
-                for name in ('planner','judge','reviewer'):
-                    actual=context.get(name);spec=stages[name]
-                    if (not isinstance(actual,dict) or actual.get('provider') != spec['provider']
-                            or actual.get('model') != spec['model']['id'] or actual.get('max_tokens') != spec['output_tokens']
-                            or actual.get('max_price') != spec['max_price']):
-                        raise ContractError('archive stage configuration differs')
-            else:
-                spec=stages['direct']
-                if (context.get('provider') != spec['provider'] or context.get('model') != spec['model']['id']
-                        or context.get('max_tokens') != spec['output_tokens'] or context.get('max_price') != spec['max_price']
-                        or context.get('followups') != (0 if arm=='direct_full_evidence' else 1)):
-                    raise ContractError('archive direct configuration differs')
+            check_archive_config(json.loads(config_row[0]), archive.context(), assignment)
         family = next(c['family'] for c in manifest['design']['cases'] if c['id']==assignment['case_id'])
         partition = next(f['partition'] for f in manifest['design']['families'] if f['id']==family)
         score = score_reserved_assignment(self._goal,archive,journal,reference,partition=partition,

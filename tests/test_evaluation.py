@@ -1811,7 +1811,19 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
         report=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()})
         assert report['status']=='incomplete' and report['checked']==4 and report['scored']==4
         assert 'unstarted_assignments' in report['issues'] and 'provider_attribution_not_live' in report['issues']
+        assert 'configuration_anchor_unavailable' in report['issues'] and 'run_anchor_unavailable' in report['issues']
         assert report['provider_authenticity']=='not_established'
+        anchors={rid:json.loads(payload)['run_sha256'] for rid,payload in goal._con.execute(
+            "SELECT request_id,payload FROM evaluation_campaign_events WHERE plan_id=? AND kind='scored'",('batch',))}
+        anchored=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()},
+                                           expected_config_sha256=config_hash,expected_run_sha256=anchors)
+        assert anchored['checked']==4 and 'configuration_anchor_unavailable' not in anchored['issues']
+        assert 'run_anchor_unavailable' not in anchored['issues']
+        wrong=dict(anchors);wrong[calls[0]]='0'*64
+        assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()},
+                                         expected_config_sha256=config_hash,expected_run_sha256=wrong)['status']=='invalid'
+        assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()},
+                                         expected_config_sha256='0'*64,expected_run_sha256=anchors)['status']=='invalid'
         absent=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={})
         assert absent['status']=='incomplete' and 'reference_unavailable' in absent['issues'] and absent['checked']==0
         import sqlite3

@@ -1345,7 +1345,8 @@
         "R01B",
         "G01",
         "G02",
-        "G03"
+        "G03",
+        "G04"
       ],
       "status": "pending",
       "files": [
@@ -3728,6 +3729,24 @@
       "acceptance": "Inspect the assigned denominator, journal accounting, recorded usage, provider labels and scored archives with anchored references; report missing work or attribution as incomplete and changed evidence as invalid without creating archives.",
       "command": "python -m pytest tests/test_evaluation.py::test_retained_campaign_inspection_refuses_unstarted_work_without_creating_archives -q",
       "evidence": "Independent structural verification foundation while R08 remains open. Red: no no-call campaign receipt inspection existed. Synthetic tests cover 60 unstarted assignments, four reconstructed scored archives, stand-in attribution, missing references, altered archive and altered journal. Archive connections use SQLite read-only mode. This does not authenticate provider labels or references, prove full campaign semantic validity, or provide the required final live-receipt CLI. No provider call occurred."
+    },
+    {
+      "id": "G04",
+      "phase": "verification",
+      "depends_on": [
+        "G03"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/live_receipts.py",
+        "src/qjig/evaluation_campaign.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Bind campaign inspection to external run and configuration anchors",
+      "acceptance": "Mark missing external anchors incomplete, reject changed anchors, and recheck archived stage and applicability settings against the frozen configuration.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Independent verification repair while R08 remains open. Red: inspector silently treated locally stored run and config digests as sufficient. Synthetic campaign tests now check missing and wrong external config/run anchors and existing score/archive/journal tampering, while a shared archive-config checker revalidates frozen stage and applicability settings. External anchors are caller-supplied; their provenance and provider execution are not authenticated. No provider calls occurred."
     }
   ]
 }

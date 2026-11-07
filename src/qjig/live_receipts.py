@@ -12,13 +12,14 @@ from pathlib import Path
 
 from .contracts import ContractError
 from .costs import summarize_resources
-from .evaluation_campaign import EvaluationCampaign
+from .evaluation_campaign import EvaluationCampaign, check_archive_config
 from .evaluation_scoring import reference_digest, score_reserved_assignment
 from .journal import Journal
 from .run_archive import RunArchive
 
 
-def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, archive_root: Path, *, references: dict) -> dict:
+def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, archive_root: Path, *, references: dict,
+                              expected_config_sha256: str | None = None, expected_run_sha256: dict | None = None) -> dict:
     """Inspect assigned work and retained scores without creating archives or calling providers.
 
     Callers must quiesce the separate stores and supply trusted external plan and
@@ -32,8 +33,24 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
         issues.append('unstarted_assignments')
     if started - scored:
         issues.append('unfinished_assignments')
-    if campaign._goal._con.execute('SELECT 1 FROM evaluation_campaign_config WHERE plan_id=?', (campaign._plan_id,)).fetchone() is None:
+    config_row = campaign._goal._con.execute('SELECT value,sha256 FROM evaluation_campaign_config WHERE plan_id=?', (campaign._plan_id,)).fetchone()
+    frozen = None
+    if config_row is None:
         issues.append('campaign_configuration_unavailable')
+    else:
+        frozen = json.loads(config_row[0])
+    if expected_config_sha256 is None:
+        issues.append('configuration_anchor_unavailable')
+    elif (not isinstance(expected_config_sha256, str) or not re.fullmatch(r'[0-9a-f]{64}', expected_config_sha256)
+          or config_row is None or expected_config_sha256 != config_row[1]):
+        invalid.append('configuration_anchor_invalid')
+    if expected_run_sha256 is None:
+        expected_run_sha256 = {}
+    if (not isinstance(expected_run_sha256, dict) or any(key not in assignments for key in expected_run_sha256)
+            or any(not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value) for value in expected_run_sha256.values())):
+        raise ContractError('invalid external run anchors')
+    if scored - set(expected_run_sha256):
+        issues.append('run_anchor_unavailable')
     audit = campaign._goal.audit_journal(journal)
     if audit['status'] == 'invalid':
         invalid.append('goal_journal_invalid')
@@ -68,10 +85,14 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
         row = campaign._goal._con.execute("SELECT payload FROM evaluation_campaign_events WHERE plan_id=? AND request_id=? AND kind='scored'", (campaign._plan_id, request_id)).fetchone()
         try:
             receipt = json.loads(row[0])
+            if request_id in expected_run_sha256 and receipt['run_sha256'] != expected_run_sha256[request_id]:
+                raise ContractError('external run anchor differs')
             if reference_digest(reference) != receipt['reference_sha256']:
                 raise ContractError('reference digest differs')
             con = sqlite3.connect(db.resolve().as_uri() + '?mode=ro', uri=True, isolation_level=None)
             with RunArchive(con) as archive:
+                if frozen is not None:
+                    check_archive_config(frozen, archive.context(), assignment)
                 score = score_reserved_assignment(campaign._goal, archive, journal, reference,
                     partition=assignment['work'][0]['partition'], expected_plan_sha256=campaign._digest,
                     expected_run_sha256=receipt['run_sha256'], expected_reference_sha256=receipt['reference_sha256'],
