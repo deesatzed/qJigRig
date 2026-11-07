@@ -190,3 +190,8 @@ Full qJig suite after T024: see the T024 receipt above. All P2 behavior is offli
 
 - `is_material(predicate_id, expression, observations)`: true iff flipping that unresolved predicate changes the result under some completion of the other unresolved ones. Ordinary=false with exception unknown under OR is material; ordinary=true under OR, a known-false AND blocker, a tautology and an already-resolved predicate are not; conflict and missing observations count as unresolved. Limit: shares the independence assumption and 6-unresolved cap of T028.
 - Red: ImportError is_material (initial contract). Green: focused 1 passed in 0.03s; tests/test_logic.py 35 passed in 0.04s; full suite 152 passed in 0.19s. 2026-11-06.
+
+## 2026-11-06: T030 complete
+
+- `check_stop(expression, observations, ledger)` in `src/qjig/stopping.py` returns a `StopDecision`. Stop requires one reachable outcome AND no material unresolved obligation: an expression made stable by ordinary=true under OR still cannot stop while a material applicability obligation is open, and can once it is satisfied with evidence. Unstable expressions give `outcome_not_determined`; immaterial obligations do not block; a tautology (A OR NOT A) stops but carries caveat `stable_despite_unresolved_predicates`, as does any stop that leaves unresolved predicates. Limit: which obligations exist and are marked material is decided by the caller; this does not judge completeness of the plan.
+- Red: ModuleNotFoundError qjig.stopping (initial contract). Green: focused 1 passed in 0.03s; tests/test_stopping.py 4 passed in 0.04s; full suite 156 passed in 0.20s. 2026-11-06.

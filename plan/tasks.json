@@ -504,7 +504,7 @@
         "T029",
         "T024"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/stopping.py"
       ],
@@ -512,7 +512,8 @@
       "test_name": "test_coverage_blocks_stop",
       "action": "Check evidence obligations before accepting graph stability",
       "acceptance": "A stable expression cannot bypass an unresolved material applicability obligation",
-      "command": "python -m pytest tests/test_stopping.py::test_coverage_blocks_stop -q"
+      "command": "python -m pytest tests/test_stopping.py::test_coverage_blocks_stop -q",
+      "evidence": "Red: ModuleNotFoundError qjig.stopping (initial contract). Green: focused 1 passed in 0.03s; tests/test_stopping.py 4 passed in 0.04s; full suite 156 passed in 0.20s. 2026-11-06."
     },
     {
       "id": "T031",
