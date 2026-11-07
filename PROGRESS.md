@@ -165,3 +165,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 ## Phase note: P1-P2 (T006-T024)
 
 Full qJig suite after T024: see the T024 receipt above. All P2 behavior is offline and deterministic; test inputs are a few authored strings in test files, not services or datasets. Phase P3 (T025-T038) follows.
+
+## 2026-11-06: T025 complete
+
+- `Support`, `Outcome`, `combine_support` in `src/qjig/logic.py`: (supported,unknown)->TRUE, (unknown,supported)->FALSE, (unknown,unknown)->UNKNOWN, (supported,supported)->CONFLICT, all four distinct; booleans, strings, None and numbers are rejected. Limit: this is the mapping only; nothing yet decides when a side counts as supported (T044/T045).
+- Red: ModuleNotFoundError qjig.logic (initial contract). Green: focused 4 passed in 0.03s; tests/test_logic.py 10 passed in 0.03s; full suite 108 passed in 0.16s. 2026-11-06.

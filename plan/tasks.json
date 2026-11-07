@@ -418,7 +418,7 @@
       "depends_on": [
         "T002"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/logic.py"
       ],
@@ -426,7 +426,8 @@
       "test_name": "test_support_state_table",
       "action": "Implement the four explicit paired-support states",
       "acceptance": "The four distinct support combinations yield true false unknown conflict",
-      "command": "python -m pytest tests/test_logic.py::test_support_state_table -q"
+      "command": "python -m pytest tests/test_logic.py::test_support_state_table -q",
+      "evidence": "Red: ModuleNotFoundError qjig.logic (initial contract). Green: focused 4 passed in 0.03s; tests/test_logic.py 10 passed in 0.03s; full suite 108 passed in 0.16s. 2026-11-06."
     },
     {
       "id": "T026",
