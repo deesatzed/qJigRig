@@ -1,0 +1,5 @@
+# Cross-client source-state check, 2026-11-07
+
+A local service was started with `PYTHONPATH=src python -m qjig serve --catalog .local/verification/cross-client-browser.sqlite --port 0`. In headless Chromium, a synthetic 20-day question against a 14-day source returned `Decided · no`. A separate `RoleClient` process imported a 30-day revision of the same logical source. The browser marked the old result `Source changed · rerun`; rerunning returned `Decided · yes` with the new source passage. Stopping the service then caused the page to display `Source status unknown`.
+
+A focused real-service test also causes a second service instance to import a source between the before/after catalog checks; the authored result defers with `catalog_changed_during_run`. These checks cover the stored catalog snapshot and a polling/focus check while the page is open. They do not monitor external files, provide an atomic multi-store snapshot, authenticate catalog contents, or establish full browser, accessibility, hosted-model or independent outcome acceptance. All content was synthetic; no hosted call was made. Local SQLite data are not committed.

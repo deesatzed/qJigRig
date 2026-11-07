@@ -71,6 +71,13 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif self.path == "/api/health":
             self._reply(200, {"ok": True, "service": "qjig"})
+        elif self.path == "/api/catalog-state":
+            try:
+                with Catalog.open(self.server.catalog) as catalog:
+                    state = catalog.source_state()
+                self._reply(200, {"source_state": state})
+            except sqlite3.Error:
+                self._reply(500, {"error": "local storage failure"})
         elif self.path == "/api/interpretations":
             try:
                 with Catalog.open(self.server.catalog) as catalog:
@@ -151,8 +158,16 @@ class Handler(BaseHTTPRequestHandler):
                     raise ContractError("request and policy must be objects")
                 request = Request.from_dict(body["request"])
                 with self.server.writer_lock:
+                    with Catalog.open(self.server.catalog) as catalog:
+                        before = catalog.source_state()
                     result, _ = run_authored(self.server.catalog, request, body["policy"])
-                self._reply(200, {"kind": "deterministic", "result": result})
+                    with Catalog.open(self.server.catalog) as catalog:
+                        after = catalog.source_state()
+                if before != after:
+                    result["status"], result["outcome"] = "deferred", None
+                    result["reasons"] = list(result["reasons"]) + ["catalog_changed_during_run"]
+                self._reply(200, {"kind": "deterministic", "result": result,
+                                  "source_state_before": before, "source_state_after": after})
         except (ValueError, TypeError, KeyError, UnicodeError, ContractError, ArithmeticError, re.error):
             self._reply(400, {"error": "invalid request"})
             return

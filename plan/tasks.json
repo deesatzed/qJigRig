@@ -970,7 +970,8 @@
         "T055",
         "T037",
         "T056A",
-        "T056B"
+        "T056B",
+        "T056C"
       ],
       "status": "pending",
       "files": [
@@ -2047,6 +2048,27 @@
       "acceptance": "A real browser edits a uniquely selected passage, retains parent provenance, marks the previous result as needing rerun, and displays the changed authored outcome.",
       "command": "python -m pytest tests/test_web.py::test_browser_serves_controlled_intervention_controls -q",
       "evidence": "Red: browser lacked intervention controls. Green: headless Chromium selected synthetic source, changed 14 to 30, displayed parent and child and marked earlier no result for rerun, then showed yes against new passage. Narrow viewport overflow found and fixed, with persisted edit visible after server restart. Focused 11 passed; full suite 410 passed. See docs/verification/2026-11-07-browser-intervention.md. External changes, accessibility, replay, hosted and full T056 remain open."
+    },
+    {
+      "id": "T056C",
+      "phase": "P5",
+      "depends_on": [
+        "T056B",
+        "T058A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/service.py",
+        "src/qjig/web.py",
+        "src/qjig/store.py",
+        "docs/verification/2026-11-07-cross-client-freshness.md"
+      ],
+      "test_file": "tests/test_service.py",
+      "test_name": "test_catalog_change_during_authored_run_defers",
+      "action": "Detect cross-client source changes in local results",
+      "acceptance": "A catalog change during a run defers the result, and a browser detects a second client source change and marks the previous result for rerun.",
+      "command": "python -m pytest tests/test_service.py::test_catalog_change_during_authored_run_defers -q",
+      "evidence": "Red: authored service returned decided after a second service changed the catalog during the run. Green: source-state snapshots before/after force deferral on change; browser polls/focus-checks the catalog, marks an external client update for rerun, and displays unknown if check fails. Actual Chromium plus separate client verified no-to-yes rerun; focused 16 passed; full suite 412 passed. See docs/verification/2026-11-07-cross-client-freshness.md. External files, authenticity, replay and full T056 remain open."
     }
   ]
 }

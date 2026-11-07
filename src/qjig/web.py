@@ -18,7 +18,7 @@ HTML = '''<!doctype html>
 <form id="question-form"><label>Question<input name="question" required></label><div class="grid"><label>Scope<input name="scope" required placeholder="project"></label><label>Entities <span class="muted">comma-separated</span><input name="entities"></label><label>As of<input name="as_of" type="date" required></label><label>Measured value<input name="value" type="number" step="any" required></label><label>Role<input name="role" value="reviewer" required></label><label>Role version<input name="role_version" value="1" required></label></div>
 <label>Search terms<input name="query" required></label><label>Threshold pattern <span class="muted">regular expression with one numeric capture group</span><input name="pattern" required placeholder="within (\\d+) days"></label><label>Comparison<select name="operator"><option value="lte">Value is at most the threshold</option><option value="lt">Value is below the threshold</option><option value="gte">Value is at least the threshold</option><option value="gt">Value is above the threshold</option><option value="eq">Value equals the threshold</option></select></label>
 <button type="submit">Run authored rule <span aria-hidden="true">↗</span></button><p id="question-message" role="status" aria-live="polite"></p></form>
-<section class="result" aria-labelledby="result-title"><div class="list-head"><h3 id="result-title">Result &amp; evidence</h3><span id="result-status" class="badge">Not run</span></div><div id="result" aria-live="polite"><p class="muted">Your result, evidence and open questions will appear here.</p></div></section></section></div>
+<section class="result" aria-labelledby="result-title"><div class="list-head"><h3 id="result-title">Result &amp; evidence</h3><span id="result-status" class="badge">Not run</span></div><p class="muted">Catalog changes are checked while this page is open; external files are not monitored.</p><div id="result" aria-live="polite"><p class="muted">Your result, evidence and open questions will appear here.</p></div></section></section></div>
 <footer>Sources and interpretations stay distinct. Unknown information remains unknown.</footer></main></body></html>'''
 
 CSS = '''
@@ -30,11 +30,12 @@ JS = r'''
 "use strict";
 const byId = id => document.getElementById(id);
 const splitEntities = value => value.split(",").map(x => x.trim()).filter(Boolean);
-let selectedSource = null, selectionSerial = 0, sourceEpoch = 0;
+let selectedSource = null, selectionSerial = 0, sourceEpoch = 0, resultSourceState = null;
 function line(parent, tag, text, cls) { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; parent.append(node); return node; }
 async function api(path, options = {}) { const response = await fetch(path, options); const data = await response.json(); if (!response.ok) throw new Error(data.error || "Request failed"); return data; }
 async function openSource(revisionId) { const serial = ++selectionSerial; selectedSource = null; byId("selected-source").textContent = "Loading source…"; try { const detail = await api(`/api/sources/${encodeURIComponent(revisionId).replace("%3A", ":")}`); if (serial !== selectionSerial) return; selectedSource = detail; const preview = byId("source-preview"); preview.textContent = detail.text; preview.hidden = false; byId("selected-source").textContent = `Selected: ${detail.source_id} · ${detail.revision_id}`; } catch (error) { if (serial === selectionSerial) { byId("selected-source").textContent = "Could not load source."; byId("source-message").textContent = error.message; } } }
 function markSourceChanged() { if (byId("result-status").textContent === "Not run") return; byId("result-status").textContent = "Source changed · rerun"; if (!byId("source-change-note")) { const note = line(byId("result"), "p", "Sources changed after this result. Run the question again to inspect the current revision.", "note"); note.id = "source-change-note"; } }
+async function checkSourceState() { const expected = resultSourceState; if (!expected) return; try { const state = await api("/api/catalog-state"); if (resultSourceState !== expected) return; if (state.source_state !== expected) markSourceChanged(); } catch (_) { if (resultSourceState === expected && byId("result-status").textContent !== "Source changed · rerun") { byId("result-status").textContent = "Source status unknown"; if (!byId("source-check-note")) { const note = line(byId("result"), "p", "Could not check the catalog. Reconnect and rerun the question.", "note"); note.id = "source-check-note"; } } } }
 async function refreshSources() {
   const list = byId("sources"); list.replaceChildren();
   try { const data = await api("/api/sources"); if (!data.sources.length) { line(list, "li", "No sources yet.", "muted"); return; }
@@ -78,7 +79,7 @@ byId("question-form").addEventListener("submit", async event => { event.preventD
   const question = form.get("question").trim(), entities = splitEntities(form.get("entities"));
   const request = {schema_version:"qjig.request.v1", request_id:crypto.randomUUID(), question, role:form.get("role").trim(), role_version:form.get("role_version").trim(), scope:form.get("scope").trim()};
   const policy = {label:"AUTHORED CONTROL", entities, as_of:form.get("as_of"), mode:"snapshot", facts:{measured_value:form.get("value")}, plan:{origin:"authored",predicates:[{id:"rule",question}],expression:{ref:"rule"}}, needs:{rule:{query:form.get("query"),want:3,max_bytes:12000,evaluator:{kind:"numeric_threshold",field:"measured_value",pattern:form.get("pattern"),operator:form.get("operator")}}}};
-  try { const data = await api("/api/ask", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request,policy})}); renderResult(data.result); if (epoch !== sourceEpoch) markSourceChanged(); message.textContent = "Run complete."; } catch (error) { message.textContent = `Could not run question: ${error.message}`; }
+  try { const data = await api("/api/ask", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({request,policy})}); resultSourceState = data.source_state_before; renderResult(data.result); if (epoch !== sourceEpoch || data.source_state_before !== data.source_state_after) markSourceChanged(); else await checkSourceState(); message.textContent = "Run complete."; } catch (error) { message.textContent = `Could not run question: ${error.message}`; }
 });
 function renderResult(result) { const area = byId("result"); area.replaceChildren(); byId("result-status").textContent = result.status === "decided" ? (result.outcome ? "Decided · yes" : "Decided · no") : "Deferred";
   line(area,"p",result.plan_caveat,"note"); if (result.reasons.length) line(area,"p",`Why deferred: ${result.reasons.join(", ")}`);
@@ -91,4 +92,6 @@ function renderResult(result) { const area = byId("result"); area.replaceChildre
 refreshSources();
 refreshInterpretations();
 refreshInterventions();
+window.setInterval(checkSourceState, 3000);
+window.addEventListener("focus", checkSourceState);
 '''

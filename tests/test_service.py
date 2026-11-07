@@ -212,3 +212,66 @@ def test_authored_question_uses_catalog_and_preserves_fresh_deferral(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_catalog_change_during_authored_run_defers(tmp_path, monkeypatch):
+    import qjig.service as service
+    from qjig.agents import RoleClient
+    from qjig.roles import RoleDefinition
+
+    path = tmp_path / 'catalog.sqlite'
+    servers = [create_server(path, host='127.0.0.1', port=0) for _ in range(2)]
+    threads = [threading.Thread(target=s.serve_forever, daemon=True) for s in servers]
+    for thread in threads:
+        thread.start()
+    try:
+        a, b = [RoleClient(s.server_address[1], RoleDefinition('reviewer', '1', 'Review')) for s in servers]
+        source = {'source_id': 'policy.md', 'text': '# Refund limit\nRefunds are accepted within 14 days.\n',
+                  'scope': 'project', 'entities': [], 'effective_from': '2026-01-01', 'effective_to': 'open', 'observed_at': None, 'authority': None}
+        a.import_source(source)
+        policy = {'label': 'AUTHORED CONTROL', 'entities': [], 'as_of': '2026-11-15', 'mode': 'snapshot', 'facts': {'days': 20},
+                  'plan': {'origin': 'authored', 'predicates': [{'id': 'p', 'question': 'Within limit?'}], 'expression': {'ref': 'p'}},
+                  'needs': {'p': {'query': 'refund days limit', 'want': 1, 'max_bytes': 4000,
+                                  'evaluator': {'kind': 'numeric_threshold', 'field': 'days', 'pattern': r'within (\d+) days', 'operator': 'lte'}}}}
+        original = service.run_authored
+        def change_between_reads(*args, **kwargs):
+            result = original(*args, **kwargs)
+            b.import_source({**source, 'source_id': 'another.md', 'text': '# Rule\nNew source.\n'})
+            return result
+        monkeypatch.setattr(service, 'run_authored', change_between_reads)
+        result = a.ask('r', 'Refund?', 'project', policy)['result']
+        assert result['status'] == 'deferred' and result['outcome'] is None
+        assert 'catalog_changed_during_run' in result['reasons']
+    finally:
+        for server in servers:
+            server.shutdown()
+            server.server_close()
+        for thread in threads:
+            thread.join(timeout=5)
+
+
+def test_catalog_state_changes_only_when_source_catalog_changes(tmp_path):
+    from qjig.agents import RoleClient
+    from qjig.roles import RoleDefinition
+    server = create_server(tmp_path / 'catalog.sqlite', host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '1', 'Review'))
+        initial = client._request('GET', '/api/catalog-state')['source_state']
+        source = {'source_id': 'rule.md', 'text': '# Rule\nA source.\n', 'scope': 'project', 'entities': [],
+                  'effective_from': '2026-01-01', 'effective_to': 'open', 'observed_at': None, 'authority': None}
+        revision = client.import_source(source)['revision_id']
+        after_import = client._request('GET', '/api/catalog-state')['source_state']
+        assert initial != after_import
+        client.import_source(source)
+        assert client._request('GET', '/api/catalog-state')['source_state'] == after_import
+        detail = client.get_source(revision)
+        client.add_interpretation('A finding.', {'revision_id': revision, 'text_sha256': detail['text_sha256'], 'start': 0, 'end': 6})
+        assert client._request('GET', '/api/catalog-state')['source_state'] == after_import
+        client.import_source({**source, 'source_id': 'another.md'})
+        assert client._request('GET', '/api/catalog-state')['source_state'] != after_import
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

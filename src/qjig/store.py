@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import sqlite3
+import hashlib
+import json
 from pathlib import Path
 
 from .contracts import ContractError
@@ -266,6 +268,21 @@ class Catalog:
 
     def revision_ids(self) -> list[str]:
         return [r[0] for r in self._con.execute("SELECT revision_id FROM revisions ORDER BY revision_id")]
+
+    def source_state(self) -> str:
+        """Hash a consistent catalog snapshot of source, index and metadata rows."""
+        self._con.execute("BEGIN")
+        try:
+            revisions = self._con.execute("SELECT revision_id,source_id FROM revisions ORDER BY revision_id").fetchall()
+            entries = self._con.execute(f"SELECT {self._ENTRY_COLS} FROM index_entries ORDER BY entry_id").fetchall()
+            metadata = self._con.execute("SELECT * FROM member_metadata ORDER BY revision_id").fetchall()
+            data = json.dumps({"revisions": revisions, "entries": entries, "metadata": metadata},
+                              sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            self._con.commit()
+        except BaseException:
+            self._con.rollback()
+            raise
+        return hashlib.sha256(data.encode('utf-8')).hexdigest()
 
     def put_interpretation(self, claim_id: str, payload: str) -> bool:
         with self._con:
