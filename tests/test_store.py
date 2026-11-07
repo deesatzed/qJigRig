@@ -70,3 +70,19 @@ def test_unknown_catalog_version_refused(tmp_path):
     con.close()
     with pytest.raises(ContractError):
         Catalog.open(db)
+
+
+def test_version_1_catalog_migrates_to_add_index_table(tmp_path):
+    db = tmp_path / "catalog.sqlite"
+    r = rev(b"limit 10\n")
+    with Catalog.open(db) as cat:
+        cat.add_revision(r)
+    con = sqlite3.connect(db)
+    con.execute("DROP TABLE index_entries")
+    con.execute("PRAGMA user_version = 1")
+    con.commit()
+    con.close()
+    with Catalog.open(db) as cat:
+        assert cat.get_revision(r.revision_id) == r  # old data intact
+        assert cat.index_rows(r.revision_id) == []  # new table present
+    assert sqlite3.connect(db).execute("PRAGMA user_version").fetchone()[0] == 2

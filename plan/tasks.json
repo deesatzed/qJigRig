@@ -211,7 +211,7 @@
       "depends_on": [
         "T009"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/indexing.py"
       ],
@@ -219,7 +219,8 @@
       "test_name": "test_heading_span",
       "action": "Index one Markdown heading as a source-derived view",
       "acceptance": "The stored heading section resolves to exact pinned text",
-      "command": "python -m pytest tests/test_indexing.py::test_heading_span -q"
+      "command": "python -m pytest tests/test_indexing.py::test_heading_span -q",
+      "evidence": "Red: ModuleNotFoundError qjig.indexing (initial contract). Green: focused 1 passed in 0.07s; tests/test_indexing.py 4 passed in 0.05s; full suite 60 passed in 0.14s. 2026-11-06."
     },
     {
       "id": "T014",

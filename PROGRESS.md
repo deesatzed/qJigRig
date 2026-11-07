@@ -101,3 +101,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `date_applicability` returns separate effective-date and observation-date verdicts plus a combined result (NO_MATCH beats UNKNOWN beats MATCH). A review observed 2026-12-01 is effective for a 2026-06-01 request but is rejected under historical-as-known (reason observed_after_request); unknown observation date is UNKNOWN only for historical requests. `MemberMetadata.observed_at` added, validated as ISO date. Limit: dates are recorded claims, not authenticated; effective_to/observed_at are not persisted in the catalog yet.
 - Red: ImportError date_applicability (initial contract). Green: focused 1 passed in 0.03s; tests/test_applicability.py 14 passed in 0.03s; full suite 55 passed in 0.10s. 2026-11-06.
+
+## 2026-11-06: T013 complete
+
+- `index_markdown_headings`, `save_entries`, `load_entries`, `resolve_entry` in `src/qjig/indexing.py`; catalog schema v2 adds `index_entries` (migration from v1 tested). Refunds section resolves after close/reopen to the exact CRLF slice '## Refunds\\r\\nRefund within 30 days.' and re-verifies against the stored revision; fenced/indented/hashtag lines ignored; entries for unstored revisions refused. Limits: ATX headings only; a 'heading' entry's accepted state is structural, not a relevance claim.
+- Red: ModuleNotFoundError qjig.indexing (initial contract). Green: focused 1 passed in 0.07s; tests/test_indexing.py 4 passed in 0.05s; full suite 60 passed in 0.14s. 2026-11-06.
