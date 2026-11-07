@@ -401,7 +401,7 @@
         "T011",
         "T012"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/obligations.py"
       ],
@@ -409,7 +409,8 @@
       "test_name": "test_no_hit_is_unknown",
       "action": "Track unresolved evidence obligations after no retrieval hit",
       "acceptance": "No hit cannot become a negative fact or proof that no exception exists",
-      "command": "python -m pytest tests/test_obligations.py::test_no_hit_is_unknown -q"
+      "command": "python -m pytest tests/test_obligations.py::test_no_hit_is_unknown -q",
+      "evidence": "Red: ModuleNotFoundError qjig.obligations (initial contract). Green: focused 1 passed in 0.03s; tests/test_obligations.py 4 passed in 0.03s; full suite 98 passed in 0.16s. 2026-11-06."
     },
     {
       "id": "T025",

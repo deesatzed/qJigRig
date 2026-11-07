@@ -156,3 +156,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `recover_packet` now takes an optional `applicability` check; `applicability_filter` combines per-source entity and date verdicts. A different-customer source is excluded as `inapplicable`, a source with no recorded subject or no metadata as `applicability_unknown`, a not-yet-effective one as `inapplicable`; none fills the slot, so the packet is empty and `unfilled` reports the shortfall. A correct-subject alternative is still used. Limits: `applicability` is optional and defaults to accepting everything (T022 behavior), so callers must pass it; relevance of text to the question is not judged, only subject/date applicability.
 - Red: ImportError applicability_filter (initial contract). Green: focused 1 passed in 0.04s; tests/test_recovery.py 7 passed in 0.06s; full suite 94 passed in 0.16s. 2026-11-06.
+
+## 2026-11-06: T024 complete
+
+- `Obligation` and `ObligationLedger` in `src/qjig/obligations.py`. A retrieval with zero hits leaves a material exception obligation `unresolved` with reason `no_retrieval_hit` and it keeps blocking; `absence_established` is always False; only `satisfy` with evidence references closes it. Distinct reasons recorded: no_retrieval_hit, source_unavailable, only_inapplicable_candidates, applicability_unknown, truncated, budget_omission. Evidence found is `evidence_found`, not satisfied. Limits: in-memory ledger; 'satisfied' semantics (what counts as proof) are left to later evaluation tasks; `absence_established` is a contract marker, not a computation.
+- Red: ModuleNotFoundError qjig.obligations (initial contract). Green: focused 1 passed in 0.03s; tests/test_obligations.py 4 passed in 0.03s; full suite 98 passed in 0.16s. 2026-11-06.
