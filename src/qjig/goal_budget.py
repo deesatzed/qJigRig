@@ -368,6 +368,23 @@ class GoalBudget:
             self._con.execute("ROLLBACK")
             raise
 
+    def select_required_work(self, set_id: str, *, request_id: str, partition: str, stage: str,
+                             provider: str, model: str, tokens: int, cost_usd: float) -> str:
+        """Select a matching unconsumed frozen slot; reserve() atomically rechecks it."""
+        if (any(not isinstance(v, str) or not v.strip() for v in (set_id, request_id, partition, stage, provider, model))
+                or not _valid_tokens(tokens) or not _valid_cost(cost_usd)):
+            raise ContractError("invalid required work selection")
+        frozen = self._con.execute("SELECT manifest,sha256 FROM run_sets WHERE set_id=?", (set_id,)).fetchone()
+        if frozen is None:
+            raise ContractError("required run set is unavailable")
+        self._verify_run_set(set_id, *frozen)
+        rows = self._con.execute("SELECT w.work_id,w.tokens,w.cost FROM run_set_work s JOIN required_work w ON w.work_id=s.work_id WHERE s.set_id=? AND w.request_id=? AND w.partition=? AND w.stage=? AND w.provider=? AND w.model=? AND w.attempt_id IS NULL ORDER BY w.work_id",
+                                 (set_id, request_id, partition, stage, provider, model)).fetchall()
+        for ident, bound_tokens, bound_cost in rows:
+            if tokens <= bound_tokens and _cost(cost_usd) <= Decimal(bound_cost):
+                return ident
+        raise ContractError("no matching unconsumed required work")
+
     def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float,
                 hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0,
                 required_id: str | None = None, stage: str | None = None, provider: str | None = None,

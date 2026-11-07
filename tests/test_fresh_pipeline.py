@@ -647,9 +647,8 @@ def test_fresh_followup_does_not_repeat_judgment_failure_or_conflict(tmp_path, r
 
 
 def test_fresh_pipeline_consumes_preflight_slots(tmp_path):
-    from qjig.fresh_preflight import fresh_run_allocations
+    from qjig.fresh_preflight import fresh_run_allocations, fresh_slot_reservation
     from qjig.goal_budget import GoalBudget
-    from qjig.providers import make_call_reservation
     cat, entries, journal, _, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE)])
     def model(ident):
         return {'id': ident, 'context_length': 10000, 'top_provider': {'max_completion_tokens': 1000},
@@ -660,12 +659,10 @@ def test_fresh_pipeline_consumes_preflight_slots(tmp_path):
                                   planner_model=planner, judge_model=judge,
                                   planner_input=1000, planner_output=50, judge_input=1000, judge_output=50,
                                   planner_price=cap, judge_price=cap)
-    by_stage = {stage: [slot['work_id'] for slot in slots if slot['stage'] == stage]
-                for stage in ('planner', 'judge_positive', 'judge_negative')}
     def reserve(request):
-        return make_call_reservation(request, planner if request.stage == 'planner' else judge,
-                                     input_tokens=1000, input_bound_provenance='synthetic fixture',
-                                     required_id=by_stage[request.stage].pop(0))
+        return fresh_slot_reservation(goal, 'fresh-run', request_id=REQUEST.request_id, partition='smoke',
+                                      request=request, model=planner if request.stage == 'planner' else judge,
+                                      input_tokens=1000, input_bound_provenance='synthetic fixture')
     limit = Budget(30, 50000, 1)
     with cat, journal, GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
         goal.reserve_run_set('fresh-run', slots)
