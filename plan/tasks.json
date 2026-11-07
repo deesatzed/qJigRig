@@ -806,7 +806,7 @@
         "T041",
         "T044"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/local_judge.py"
       ],
@@ -814,7 +814,8 @@
       "test_name": "test_oversize_no_truncation",
       "action": "Validate optional local judge environment and input envelope",
       "acceptance": "Oversize input is rejected before inference and no automatic environment copy occurs",
-      "command": "python -m pytest tests/test_local_judge.py::test_oversize_no_truncation -q"
+      "command": "python -m pytest tests/test_local_judge.py::test_oversize_no_truncation -q",
+      "evidence": "Red: ModuleNotFoundError qjig.local_judge (initial contract). Green: focused 1 passed in 0.05s; tests/test_local_judge.py 4 passed in 0.05s; full suite 230 passed in 1.31s. 2026-11-06."
     },
     {
       "id": "T048",

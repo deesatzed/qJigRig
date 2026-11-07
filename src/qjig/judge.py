@@ -100,6 +100,16 @@ def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str,
     return SideResult(Support.SUPPORTED if v["supported"] else Support.UNKNOWN, v["reason"], v["quote"], None, call.call_id)
 
 
+def build_side_prompts(question: str, packet: EvidencePacket) -> tuple[ProviderRequest, ProviderRequest]:
+    """The exact two requests judge_predicate will send, so callers can check them before any call."""
+    evidence = render_packet(packet)
+    out = []
+    for side, answer in (("positive", "YES"), ("negative", "NO")):
+        claim = f"The answer to '{question}' is {answer}."
+        out.append(ProviderRequest(f"judge_{side}", "", "", _PROMPT.format(claim=claim, evidence=evidence), JUDGE_MAX_TOKENS))
+    return out[0], out[1]
+
+
 def judge_predicate(
     ledger: BudgetLedger, transport: Transport, question: str, packet: EvidencePacket, *, provider: str, model: str,
     applicability: Callable[[str], Applicability] | None = None,
