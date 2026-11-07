@@ -503,3 +503,37 @@ def test_audit_journal_treats_malformed_attempt_identity_as_invalid(tmp_path):
                               payload={'goal_attempt_id': ['not-a-string']})
         report = goal.audit_journal(journal)
         assert report['status'] == 'invalid' and 'untracked_intent:r#1' in report['issues']
+
+
+def test_budgeted_dispatch_refuses_cross_store_mismatch_before_reservation(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+
+    limit = Budget(3, 1000, 1)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        first = BudgetLedger(limit, journal, 'r1', goal_budget=goal, partition='smoke')
+        first.run('judge', lambda: ('ok', {'prompt_tokens': 20, 'completion_tokens': 10, 'cost_usd': 0.1}),
+                  provider='stand-in', model='m', input_sha256='a'*64,
+                  reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.2)
+        goal._con.execute("UPDATE usage SET cost='0.11'")
+        seen = []
+        second = BudgetLedger(limit, journal, 'r2', goal_budget=goal, partition='smoke')
+        with pytest.raises(BudgetExceeded, match='accounting'):
+            second.run('judge', lambda: seen.append('called'), provider='stand-in', model='m', input_sha256='b'*64,
+                       reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.2)
+        assert seen == [] and journal.events('r2') == [] and goal.totals().max_calls == 1
+
+
+def test_budgeted_dispatch_refuses_malformed_untracked_intent(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+    limit = Budget(2, 500, 0.5)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        journal.record_intent(request_id='other', stage='judge', provider='stand-in', model='m', input_sha256='a'*64,
+                              payload=['bad-payload'])
+        seen = []
+        with pytest.raises(BudgetExceeded, match='accounting'):
+            BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='smoke').run(
+                'judge', lambda: seen.append('called'), provider='stand-in', model='m', input_sha256='b'*64,
+                reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.2)
+        assert seen == [] and goal.totals().max_calls == 0

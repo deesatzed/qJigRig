@@ -130,6 +130,9 @@ class BudgetLedger:
                 raise BudgetExceeded("cost", "reserved work exceeds cost cap")
         goal_attempt_id = None
         if self._goal_budget is not None:
+            audit = self._goal_budget.audit_journal(self._journal)
+            if audit["status"] != "verified":
+                raise BudgetExceeded("accounting", f"goal and journal accounting is {audit['status']}; reconcile before dispatch")
             goal_attempt_id = uuid.uuid4().hex
             self._goal_budget.reserve(goal_attempt_id, self._request_id, self._partition,
                                       tokens=reserve_input_tokens + reserve_tokens, cost_usd=reserve_cost_usd,

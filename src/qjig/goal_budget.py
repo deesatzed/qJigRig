@@ -199,19 +199,25 @@ class GoalBudget:
         intents = [e for e in events if e.kind == "intent"]
         invalid, incomplete = [], []
         seen = set()
+        intents_by_attempt, terminals_by_call = {}, {}
         for event in events:
             if event.kind == "intent":
                 if event.call_id in seen:
                     invalid.append(f"duplicate_call_id:{event.call_id}")
                 seen.add(event.call_id)
-            elif event.call_id not in seen:
-                invalid.append(f"orphan_terminal:{event.call_id}")
+                identity = event.payload.get("goal_attempt_id") if isinstance(event.payload, dict) else None
+                if isinstance(identity, str):
+                    intents_by_attempt.setdefault(identity, []).append(event)
+            else:
+                terminals_by_call.setdefault(event.call_id, []).append(event)
+                if event.call_id not in seen:
+                    invalid.append(f"orphan_terminal:{event.call_id}")
         for intent in intents:
-            identity = intent.payload.get("goal_attempt_id")
+            identity = intent.payload.get("goal_attempt_id") if isinstance(intent.payload, dict) else None
             if not isinstance(identity, str) or identity not in reservations:
                 invalid.append(f"untracked_intent:{intent.call_id}")
         for attempt, request_id, bound_tokens, bound_cost, inp, out, cost in rows:
-            matches = [e for e in intents if e.payload.get("goal_attempt_id") == attempt]
+            matches = intents_by_attempt.get(attempt, [])
             if not matches:
                 incomplete.append(f"missing_intent:{attempt}")
                 continue
@@ -226,7 +232,7 @@ class GoalBudget:
             required = self._con.execute("SELECT work_id,stage,provider,model FROM required_work WHERE attempt_id=?", (attempt,)).fetchone()
             if required is not None and (intent.payload.get("required_id"), intent.stage, intent.provider, intent.model) != required:
                 invalid.append(f"required_binding_mismatch:{attempt}")
-            terminals = [e for e in events if e.call_id == intent.call_id and e.kind != "intent"]
+            terminals = terminals_by_call.get(intent.call_id, [])
             if len(terminals) > 1 and [e.kind for e in terminals] != ["uncertain", "reconciled"]:
                 invalid.append(f"duplicate_terminal:{attempt}")
             if len(terminals) != 1 or terminals[0].kind != "receipt":
@@ -235,7 +241,7 @@ class GoalBudget:
             receipt = terminals[0]
             if (receipt.request_id, receipt.stage, receipt.provider, receipt.model, receipt.input_sha256) != (intent.request_id, intent.stage, intent.provider, intent.model, intent.input_sha256):
                 invalid.append(f"receipt_binding_mismatch:{attempt}")
-            usage = receipt.payload.get("usage")
+            usage = receipt.payload.get("usage") if isinstance(receipt.payload, dict) else None
             if not isinstance(usage, dict):
                 incomplete.append(f"usage_unavailable:{attempt}")
                 continue
