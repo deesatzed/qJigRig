@@ -144,3 +144,38 @@ def test_invalid_reservations_never_dispatch(tmp_path, kwargs):
         with pytest.raises(ContractError):
             run(ledger, "planner", call=lambda: invoked.append(True), **kwargs)
         assert invoked == [] and j.events("req-1") == []
+
+
+def test_cost_reservation_includes_required_held_back_work(tmp_path):
+    j, ledger = make(tmp_path, calls=5, cost=0.5)
+    with j:
+        run(ledger, "first", call=lambda: ("ok", {"prompt_tokens": 1, "completion_tokens": 1, "cost_usd": 0.2}), reserve_cost_usd=0.2)
+        invoked = []
+        with pytest.raises(BudgetExceeded) as exc:
+            run(ledger, "planner", call=lambda: invoked.append(True), reserve_cost_usd=0.2, hold_back_cost_usd=0.11)
+        assert exc.value.limit == "cost"
+        assert not invoked and ledger.used_calls() == 1
+        run(ledger, "planner", reserve_cost_usd=0.2, hold_back_cost_usd=0.1)
+        intent = [e for e in j.events("req-1") if e.kind == "intent"][-1]
+        assert intent.payload["reserve_cost_usd"] == 0.2
+        assert intent.payload["hold_back_cost_usd"] == 0.1
+
+
+@pytest.mark.parametrize("reservation", [-1, True, float("nan"), float("inf")])
+def test_invalid_cost_reservation_never_dispatches(tmp_path, reservation):
+    from qjig.contracts import ContractError
+    j, ledger = make(tmp_path)
+    with j:
+        invoked = []
+        with pytest.raises(ContractError):
+            run(ledger, "planner", call=lambda: invoked.append(True), reserve_cost_usd=reservation)
+        assert not invoked and j.events("req-1") == []
+
+
+def test_held_back_cost_requires_call_cost_bound(tmp_path):
+    from qjig.contracts import ContractError
+    j, ledger = make(tmp_path)
+    with j:
+        with pytest.raises(ContractError):
+            run(ledger, "planner", hold_back_cost_usd=0.1)
+        assert j.events("req-1") == []

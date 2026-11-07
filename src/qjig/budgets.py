@@ -6,6 +6,7 @@ Unknown historical cost blocks further calls; preflight cost reservations are st
 from __future__ import annotations
 
 import math
+from decimal import Decimal
 from typing import Any, Callable
 
 from .contracts import Budget, ContractError
@@ -89,11 +90,18 @@ class BudgetLedger:
     def run(
         self, stage: str, call: Callable[[], Any], *, provider: str, model: str, input_sha256: str,
         reserve_tokens: int, hold_back_calls: int = 0, hold_back_tokens: int = 0,
+        reserve_cost_usd: float | None = None, hold_back_cost_usd: float = 0,
     ) -> Any:
         """Check every cap, then journal the intent and make the call. Refusals happen before any intent."""
         for name, value in (("reserve_tokens", reserve_tokens), ("hold_back_calls", hold_back_calls), ("hold_back_tokens", hold_back_tokens)):
             if not _valid_tokens(value):
                 raise ContractError(f"{name} must be a non-negative integer")
+        if reserve_cost_usd is not None and not _valid_cost(reserve_cost_usd):
+            raise ContractError("reserve_cost_usd must be finite and non-negative")
+        if not _valid_cost(hold_back_cost_usd):
+            raise ContractError("hold_back_cost_usd must be finite and non-negative")
+        if reserve_cost_usd is None and hold_back_cost_usd:
+            raise ContractError("held-back cost requires a call cost bound")
         if self.budget is None:
             raise BudgetExceeded("calls", "no budget was provided, so no external work is authorized")
         if self.used_calls() + 1 + hold_back_calls > self.budget.max_calls:
@@ -105,7 +113,13 @@ class BudgetLedger:
         known = self.known_cost_usd()
         if known is not None and known >= self.budget.max_cost_usd:
             raise BudgetExceeded("cost", f"known cost {known} has reached the requested cap {self.budget.max_cost_usd}")
+        if reserve_cost_usd is not None:
+            spent = sum((Decimal(str(e.payload.get("usage", {}).get("cost_usd")))
+                         for _, rest in self._calls() for e in rest if e.kind == "receipt"), Decimal(0))
+            if spent + Decimal(str(reserve_cost_usd)) + Decimal(str(hold_back_cost_usd)) > Decimal(str(self.budget.max_cost_usd)):
+                raise BudgetExceeded("cost", "reserved work exceeds cost cap")
         return run_journaled(
             self._journal, call=call, request_id=self._request_id, stage=stage, provider=provider, model=model,
-            input_sha256=input_sha256, intent_payload={"reserve_tokens": reserve_tokens},
+            input_sha256=input_sha256, intent_payload={"reserve_tokens": reserve_tokens, "reserve_cost_usd": reserve_cost_usd,
+                                                       "hold_back_cost_usd": hold_back_cost_usd},
         )
