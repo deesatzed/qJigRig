@@ -1,16 +1,12 @@
 # qJig task queue
 
-This queue implements GOAL.md. T001-T047 (P1-P3 plus P4 through the first live smoke) are complete with receipts in plan/tasks.json and PROGRESS.md; T048-T074 are pending. Source-project tests do not close these tasks.
+This queue implements GOAL.md. T001–T048 are complete; T049–T074 remain pending. The machine-readable queue includes nine inserted repair tasks R01–R09 for findings F01–F09. Historical task identities and evidence remain intact.
 
-Authoritative machine-readable dependencies: [plan/tasks.json](plan/tasks.json). Exact per-task red/green/commit steps: [detailed build plan](docs/plans/2026-11-06-qjig-build.md).
+Authoritative dependencies: [plan/tasks.json](plan/tasks.json). The [detailed build plan](docs/plans/2026-11-06-qjig-build.md) is historical for completed work; GOAL.md and the repair queue govern the amended sequence.
 
 ## Next tasks
 
-1. T046 done (live smoke, see PROGRESS.md). Hy4 needs a larger token allowance than the planner/judge defaults (it spends the cap on hidden reasoning); decide before T048.
-2. T048-T052 are now unblocked (T046 done) in plan/tasks.json (fresh pipeline, Hy4 escalation, assurance cases, replay, cost aggregation).
-3. Independent of T046 in substance but ordered after it in the plan: P5 (T053-T062) and P6 (T063-T074). Starting them early would need a recorded plan change.
-
-P4 onward touches providers: it needs a labeled stand-in transport (approval) for offline tests and a configured budget before any live call.
+R01 → R02 → R06 → R08 → R07 → R03 → R04 → R05 precede T049–T051; R09 may proceed independently after T048. T057 must integrate the exact review binding from R01. This ordering repairs decision and transport boundaries, accounting and persistence before retrieval experiments or paid runs. The stand-in transport remains labeled and live calls remain opt-in and budgeted.
 
 ## Phase gates
 

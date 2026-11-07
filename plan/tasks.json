@@ -1,6 +1,6 @@
 {
   "schema": "qjig-build-queue-v1",
-  "status": "proposed implementation queue; none of these runtime tasks is complete",
+  "status": "active implementation queue; historical task identities retained",
   "tasks": [
     {
       "id": "T001",
@@ -841,7 +841,8 @@
       "phase": "P4",
       "depends_on": [
         "T048",
-        "T041"
+        "T041",
+        "R05"
       ],
       "status": "pending",
       "files": [
@@ -857,7 +858,8 @@
       "id": "T050",
       "phase": "P4",
       "depends_on": [
-        "T048"
+        "T048",
+        "R05"
       ],
       "status": "pending",
       "files": [
@@ -874,7 +876,8 @@
       "phase": "P4",
       "depends_on": [
         "T039",
-        "T048"
+        "T048",
+        "R05"
       ],
       "status": "pending",
       "files": [
@@ -974,7 +977,8 @@
       "phase": "P5",
       "depends_on": [
         "T051",
-        "T056"
+        "T056",
+        "R01"
       ],
       "status": "pending",
       "files": [
@@ -1257,7 +1261,9 @@
       "id": "T074",
       "phase": "P6",
       "depends_on": [
-        "T073"
+        "T073",
+        "R09",
+        "R01B"
       ],
       "status": "pending",
       "files": [
@@ -1268,6 +1274,170 @@
       "action": "Reconcile goal queue implementation docs and receipts",
       "acceptance": "Every completion claim links actual evidence and every open gate remains visible",
       "command": "python -m pytest tests/test_documentation.py::test_evidence_audit -q"
+    },
+    {
+      "id": "R01",
+      "phase": "repair",
+      "finding": "F01",
+      "depends_on": [
+        "T048"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/finalize.py",
+        "tests/test_finalize.py",
+        "tests/test_cli.py"
+      ],
+      "test_file": "tests/test_finalize.py",
+      "test_name": "test_unreviewed_origins_defer",
+      "action": "Enforce conservative coverage guard at shared finalization",
+      "acceptance": "Fresh and unbound reused plans cannot decide; authored control can.",
+      "command": "python -m pytest tests/test_finalize.py::test_unreviewed_origins_defer -q",
+      "evidence": "Red: test_unreviewed_origins_defer failed twice, returning decided for fresh and reused. Green: finalization/CLI/fresh regressions 11 passed; full suite 239 passed. Exact review/reuse binding remains R01B and T057; fresh coverage remains unestablished."
+    },
+    {
+      "id": "R02",
+      "phase": "repair",
+      "finding": "F02",
+      "depends_on": [
+        "R01"
+      ],
+      "status": "pending",
+      "files": [],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_redirect_never_forwards_authorization",
+      "action": "Refuse authenticated redirects and unsafe endpoints",
+      "acceptance": "All redirect statuses refuse forwarding and receipts remain sanitized.",
+      "command": "python -m pytest tests/test_providers.py::test_redirect_never_forwards_authorization -q",
+      "evidence": ""
+    },
+    {
+      "id": "R06",
+      "phase": "repair",
+      "finding": "F06",
+      "depends_on": [
+        "R02"
+      ],
+      "status": "pending",
+      "files": [],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_operational_failures_return_partial_deferral",
+      "action": "Return inspectable partial operational deferrals",
+      "acceptance": "Budget, unavailable and uncertain calls preserve outcomes and reconciliation.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_operational_failures_return_partial_deferral -q",
+      "evidence": ""
+    },
+    {
+      "id": "R08",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R06"
+      ],
+      "status": "pending",
+      "files": [],
+      "test_file": "tests/test_budgets.py",
+      "test_name": "test_full_input_output_reservation",
+      "action": "Reserve complete input and output and preserve unknown costs",
+      "acceptance": "Preflight bounds all usage and unknown spend cannot authorize calls.",
+      "command": "python -m pytest tests/test_budgets.py::test_full_input_output_reservation -q",
+      "evidence": ""
+    },
+    {
+      "id": "R07",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R08"
+      ],
+      "status": "pending",
+      "files": [],
+      "test_file": "tests/test_smoke_receipts.py",
+      "test_name": "test_interrupted_run_retains_receipts",
+      "action": "Persist reconstructable incremental run receipts",
+      "acceptance": "Interrupted runs retain sources, requests, outputs and journal.",
+      "command": "python -m pytest tests/test_smoke_receipts.py::test_interrupted_run_retains_receipts -q",
+      "evidence": ""
+    },
+    {
+      "id": "R03",
+      "phase": "repair",
+      "finding": "F03",
+      "depends_on": [
+        "R07"
+      ],
+      "status": "pending",
+      "files": [],
+      "test_file": "tests/test_retrieval.py",
+      "test_name": "test_recorded_live_query_variants",
+      "action": "Repair recorded lexical retrieval counterexamples",
+      "acceptance": "Three saved zero-hit queries recover relevant candidates with distracting controls.",
+      "command": "python -m pytest tests/test_retrieval.py::test_recorded_live_query_variants -q",
+      "evidence": ""
+    },
+    {
+      "id": "R04",
+      "phase": "repair",
+      "finding": "F04",
+      "depends_on": [
+        "R03"
+      ],
+      "status": "pending",
+      "files": [],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_exception_channel_reaches_relevant_judge",
+      "action": "Integrate mandatory acquisition channels",
+      "acceptance": "Applicable mandatory evidence reaches judging with omissions recorded.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_exception_channel_reaches_relevant_judge -q",
+      "evidence": ""
+    },
+    {
+      "id": "R05",
+      "phase": "repair",
+      "finding": "F05",
+      "depends_on": [
+        "R04"
+      ],
+      "status": "pending",
+      "files": [],
+      "test_file": "tests/test_assurance.py",
+      "test_name": "test_exception_can_enable_answer",
+      "action": "Exercise and repair source-grounded planning counterexamples",
+      "acceptance": "Enabling, restricting and contradictory conditions and contamination are exercised.",
+      "command": "python -m pytest tests/test_assurance.py::test_exception_can_enable_answer -q",
+      "evidence": ""
+    },
+    {
+      "id": "R09",
+      "phase": "repair",
+      "finding": "F09",
+      "depends_on": [
+        "T048"
+      ],
+      "status": "pending",
+      "files": [],
+      "test_file": "tests/test_repo_audit.py",
+      "test_name": "test_completed_and_pending_tasks_are_valid",
+      "action": "Reconcile active documentation and verify queue",
+      "acceptance": "Verifier detects broken dependencies and evidence without resetting historical tasks.",
+      "command": "python -m pytest tests/test_repo_audit.py::test_completed_and_pending_tasks_are_valid -q",
+      "evidence": ""
+    },
+    {
+      "id": "R01B",
+      "phase": "repair",
+      "finding": "F01",
+      "depends_on": [
+        "T057"
+      ],
+      "status": "pending",
+      "files": [],
+      "test_file": "tests/test_program_review.py",
+      "test_name": "test_review_binding_invalidated_by_change",
+      "action": "Enforce exact review and reuse bindings at every decision boundary",
+      "acceptance": "Changed request, graph, corpus, role, date or reviewer provenance invalidates reuse; AI review cannot close fresh coverage.",
+      "command": "python -m pytest tests/test_program_review.py::test_review_binding_invalidated_by_change -q",
+      "evidence": ""
     }
   ]
 }

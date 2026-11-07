@@ -46,6 +46,8 @@ def detect_updates(ctx: Context, state: RunState, lookup: Callable[[str], str | 
 
 
 def _result(state, summary, updates, restarts, superseded, extra=()) -> FinalResult:
+    if state.plan.origin in ("fresh", "reused"):
+        extra = tuple(extra) + ("plan_coverage_unestablished",)
     if summary.stop.stop and not extra:
         return FinalResult("decided", summary.stop.outcome, state, summary, updates, restarts, superseded, ())
     reasons = tuple(extra) + tuple(summary.stop.reasons if not summary.stop.stop else ())

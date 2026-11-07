@@ -134,3 +134,21 @@ def test_bad_inputs_fail_with_exit_2_and_a_message(tmp_path):
     r = ask(tmp_path, db)
     assert r.returncode == 2 and "max_calls" in r.stderr
     assert cli(cwd=tmp_path).returncode == 2  # no command
+
+
+def test_unreviewed_origin_cannot_decide(tmp_path):
+    db = setup(tmp_path)
+    assert do_import(tmp_path, db, "refund.md", "policy/refund.md").returncode == 0
+    assert do_import(tmp_path, db, "waiver.md", "policy/waiver.md").returncode == 0
+    for origin in ("authored", "fresh", "reused"):
+        policy = json.loads((tmp_path / "policy.json").read_text())
+        policy["plan"]["origin"] = origin
+        (tmp_path / "origin.json").write_text(json.dumps(policy))
+        result = ask(tmp_path, db, "origin.json")
+        output = json.loads(result.stdout)
+        if origin == "authored":
+            assert result.returncode == 0 and output["status"] == "decided"
+        else:
+            assert result.returncode == 3 and output["status"] == "deferred"
+            assert output["outcome"] is None
+            assert "plan_coverage_unestablished" in output["reasons"]

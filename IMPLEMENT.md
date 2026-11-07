@@ -1,6 +1,6 @@
 # Execution contract
 
-The current deliverable is a checkpointed review and build packet. Core implementation begins only after review of the design. Start at T001; the source workbenches remain available for reference and audit.
+The current deliverable is the operational workbench and evaluation defined in GOAL.md. T001–T048 are complete; follow the amended dependencies in plan/tasks.json. Source workbenches remain read-only review inputs.
 
 For each task in `plan/tasks.json`:
 

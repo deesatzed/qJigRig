@@ -118,3 +118,16 @@ def test_undecided_runs_stay_deferred_regardless_of_mode(tmp_path):
         summary = RunSummary(check_stop(state.plan.expression, state.observations, state.ledger), (), ())
         r = finalize(state, ctx, summary, mode="snapshot", lookup=lambda sid: v1.revision_id)
         assert r.status == "deferred" and r.outcome is None
+
+@pytest.mark.parametrize("origin", ["fresh", "reused"])
+def test_unreviewed_origins_defer(tmp_path, origin):
+    from dataclasses import replace
+
+    v1 = rev(21)
+    with Catalog.open(tmp_path / "c.sqlite") as cat:
+        state, ctx, summary = make_run(cat, v1)
+        state.plan = replace(state.plan, origin=origin)
+        result = finalize(state, ctx, summary, mode="snapshot", lookup=lambda sid: v1.revision_id)
+        assert result.status == "deferred"
+        assert result.outcome is None
+        assert "plan_coverage_unestablished" in result.reasons
