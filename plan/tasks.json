@@ -109,7 +109,7 @@
       "depends_on": [
         "T006"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/legacy_quix.py"
       ],
@@ -117,7 +117,8 @@
       "test_name": "test_translate_normalized_lines",
       "action": "Translate one CRLF QUIXER line span into canonical offsets",
       "acceptance": "Legacy normalized hash and canonical raw/text identities stay distinct",
-      "command": "python -m pytest tests/test_legacy_quix.py::test_translate_normalized_lines -q"
+      "command": "python -m pytest tests/test_legacy_quix.py::test_translate_normalized_lines -q",
+      "evidence": "Red: ModuleNotFoundError qjig.legacy_quix (initial contract). Green: focused 1 passed in 0.04s; tests/test_legacy_quix.py 3 passed in 0.05s; full suite 34 passed in 0.11s. 2026-11-06."
     },
     {
       "id": "T008",

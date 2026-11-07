@@ -71,3 +71,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `Span`, `make_span`, `verify_span` in `src/qjig/spans.py`: offsets are code-point, end-exclusive; an astral emoji counts as one position; altered quote, shifted offsets, other revision, wrong text hash and bad offsets (bool, negative, empty, out of range) all raise `ContractError`. Limit: line/page anchors and extraction assurance fields from CONTRACTS.md are not modeled yet.
 - Red: ModuleNotFoundError qjig.spans (initial contract). Green: focused 1 passed in 0.08s; tests/test_spans.py 7 passed in 0.04s; full suite 31 passed in 0.10s. 2026-11-06.
+
+## 2026-11-06: T007 complete
+
+- `translate_quix_lines` in `src/qjig/legacy_quix.py` maps legacy 1-based inclusive line spans over universal-newline text to a canonical raw-text `Span`. Test pins the real QUIXER hash (2fcfb783...) and JIG raw hash (6a3b3844...) recorded in reports/compatibility-probes.json for b'One\\r\\nTwo\\r\\n' — they stay distinct. Handles CRLF, lone CR and LF; wrong legacy hash, bad line numbers raise. Limits: blank-line-only spans are rejected as empty; no QUIXER import (legacy code not run in this test); PDF page anchors not translated.
+- Red: ModuleNotFoundError qjig.legacy_quix (initial contract). Green: focused 1 passed in 0.04s; tests/test_legacy_quix.py 3 passed in 0.05s; full suite 34 passed in 0.11s. 2026-11-06.
