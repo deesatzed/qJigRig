@@ -1585,11 +1585,16 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
         journal=stack.enter_context(Journal.open(tmp_path/'journal.sqlite'))
         reserve_evaluation_plan(goal,'factorial',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'factorial',expected_plan_sha256=plan['sha256'])
-        config_digest = campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000) if driver=='runner' else None
+        from qjig.evaluation_campaign import applicability_digest
+        metadata_hashes={case['id']:applicability_digest(inputs) for case in design['cases']}
+        config_digest = campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,case_applicability=metadata_hashes) if driver=='runner' else None
         if driver=='runner':
-            assert campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000)==config_digest
+            assert campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,case_applicability=metadata_hashes)==config_digest
             with pytest.raises(ContractError):
-                campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=2,max_bytes=5000)
+                campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,
+                                       case_applicability={'holdout':metadata_hashes['holdout']})
+            with pytest.raises(ContractError):
+                campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=2,max_bytes=5000,case_applicability=metadata_hashes)
         for arm in design['arms']:
             assignment=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==arm and a['repeat']==1)
             rid=assignment['request_id'];ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout')
@@ -1602,6 +1607,13 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                 else:
                     responses=[raw({'action':'answer','query':None,'answer':'unknown','citations':[]})]
                 transport=StandInTransport(responses)
+                changed_inputs=ApplicabilityInputs(Collection((MemberMetadata(ref['source_revisions'][0],'other',Interval('2020-01-01',OPEN)),)),frozenset(),'2026-11-07',False)
+                with pytest.raises(ContractError):
+                    run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
+                        applicability_inputs=changed_inputs,transport=transport,archive=archive,journal=journal,
+                        config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,
+                        expected_config_sha256=config_digest)
+                assert campaign.status()['in_progress']==[] and transport.calls_made==0
                 bad_config={k:dict(spec) for k in ('direct','planner','judge','reviewer')}
                 changed='planner' if arm in ('combined','decomposition_only') else 'direct'
                 bad_config[changed]['input_tokens']=99

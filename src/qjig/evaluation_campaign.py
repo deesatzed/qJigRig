@@ -15,6 +15,16 @@ from .evaluation_scoring import score_reserved_assignment
 from .goal_budget import GoalBudget
 
 
+def applicability_digest(inputs) -> str:
+    """Hash canonical recorded applicability inputs, not their authority or truth."""
+    from .applicability import ApplicabilityInputs
+    if not isinstance(inputs,ApplicabilityInputs):
+        raise ContractError('recorded applicability inputs required')
+    checked=ApplicabilityInputs.from_dict(inputs.to_dict())
+    encoded=json.dumps(checked.to_dict(),sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
+    return hashlib.sha256(encoded).hexdigest()
+
+
 class EvaluationCampaign:
     def __init__(self, goal: GoalBudget, plan_id: str, *, expected_plan_sha256: str):
         if not isinstance(goal, GoalBudget):
@@ -88,7 +98,7 @@ class EvaluationCampaign:
                 raise ContractError('invalid campaign event kind')
         return manifest,assignments,started,scored
 
-    def freeze_config(self, config: dict, *, want: int, max_bytes: int) -> str:
+    def freeze_config(self, config: dict, *, want: int, max_bytes: int, case_applicability: dict) -> str:
         """Persist declared stage settings and shared packet limits before claims."""
         from .direct_preflight import direct_run_allocations
         from .fresh_preflight import fresh_run_allocations
@@ -100,7 +110,8 @@ class EvaluationCampaign:
         direct,planner,judge,reviewer=(config[k] for k in ('direct','planner','judge','reviewer'))
         if planner['provider'] != judge['provider']:
             raise ContractError('fresh planner and judge providers must match')
-        payload={'schema':'qjig.campaign-config.v1','plan_sha256':self._digest,'want':want,'max_bytes':max_bytes,'stages':config}
+        payload={'schema':'qjig.campaign-config.v2','plan_sha256':self._digest,'want':want,'max_bytes':max_bytes,
+                 'stages':config,'case_applicability':case_applicability}
         try:
             encoded=json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
             digest=hashlib.sha256(encoded.encode('utf-8')).hexdigest()
@@ -109,7 +120,12 @@ class EvaluationCampaign:
         con=self._goal._con
         con.execute('BEGIN IMMEDIATE')
         try:
-            _,assignments,started,_=self._snapshot()
+            manifest,assignments,started,_=self._snapshot()
+            case_ids={c['id'] for c in manifest['design']['cases']}
+            if (not isinstance(case_applicability,dict) or set(case_applicability)!=case_ids
+                    or any(not isinstance(v,str) or len(v)!=64 or any(c not in '0123456789abcdef' for c in v)
+                           for v in case_applicability.values())):
+                raise ContractError('complete case applicability bindings required')
             row=con.execute('SELECT value,sha256 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
             if row is not None:
                 if row != (encoded,digest):
@@ -152,13 +168,15 @@ class EvaluationCampaign:
         if (hashlib.sha256(encoded.encode('utf-8')).hexdigest()!=digest or not hmac.compare_digest(digest,expected_config_sha256)):
             raise ContractError('campaign configuration anchor differs')
         try:
-            expected=json.dumps({'schema':'qjig.campaign-config.v1','plan_sha256':self._digest,'want':want,
-                                 'max_bytes':max_bytes,'stages':config},sort_keys=True,separators=(',',':'),
-                                ensure_ascii=False,allow_nan=False)
-        except (TypeError,ValueError,UnicodeError) as exc:
+            frozen=json.loads(encoded)
+            expected=json.dumps({'schema':'qjig.campaign-config.v2','plan_sha256':self._digest,'want':want,
+                                 'max_bytes':max_bytes,'stages':config,'case_applicability':frozen['case_applicability']},
+                                sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
+        except (KeyError,TypeError,ValueError,UnicodeError) as exc:
             raise ContractError('campaign configuration is not finite JSON') from exc
         if encoded != expected:
             raise ContractError('campaign configuration differs')
+        return frozen
 
     def status(self) -> dict:
         manifest,assignments,started,scored = self._snapshot()
@@ -204,6 +222,13 @@ class EvaluationCampaign:
             frozen=json.loads(config_row[0]);context=archive.context();stages=frozen['stages'];arm=assignment['arm']
             if context.get('want') != frozen['want'] or context.get('max_bytes') != frozen['max_bytes']:
                 raise ContractError('archive packet configuration differs')
+            metadata = context.get('applicability_inputs') if arm in ('combined','decomposition_only') else context.get('catalog_applicability') if arm=='retrieval_only' else None
+            if arm in ('combined','decomposition_only','retrieval_only') and metadata is None:
+                raise ContractError('archive applicability binding missing')
+            if metadata is not None:
+                from .applicability import ApplicabilityInputs
+                if applicability_digest(ApplicabilityInputs.from_dict(metadata)) != frozen['case_applicability'][assignment['case_id']]:
+                    raise ContractError('archive applicability binding differs')
             if arm in ('combined','decomposition_only'):
                 for name in ('planner','judge','reviewer'):
                     actual=context.get(name);spec=stages[name]
@@ -270,11 +295,13 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             or not isinstance(journal,Journal) or not isinstance(applicability_inputs,ApplicabilityInputs)
             or type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024):
         raise ContractError('invalid campaign run inputs')
-    campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
+    frozen_config=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
     manifest,assignments,started,_ = campaign._snapshot()
     if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
         raise ContractError('campaign assignment unavailable')
     assignment=assignments[request_id];arm=assignment['arm'];case_id=assignment['case_id']
+    if frozen_config['case_applicability'].get(case_id) != applicability_digest(applicability_inputs):
+        raise ContractError('campaign case applicability binding differs')
     if design != manifest['design'] or not isinstance(lock,dict) or lock.get('case_id') != case_id:
         raise ContractError('campaign case or design differs')
     prepared=prepare_evaluation_case(root,design,lock,reference,protected,

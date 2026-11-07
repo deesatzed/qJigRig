@@ -1280,7 +1280,8 @@
         "T070",
         "T071A",
         "T071B",
-        "T071C"
+        "T071C",
+        "T071D"
       ],
       "status": "pending",
       "files": [
@@ -3289,6 +3290,23 @@
       "acceptance": "Persist immutable stage configuration and packet limits tied to the reserved plan; reject altered configuration before claims or calls.",
       "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
       "evidence": "Red: guarded campaign execution accepted unpinned packet limits and no immutable campaign configuration existed. The goal ledger now persists stage settings and shared want/max_bytes before claims, checks all assignment work against the reserved slots, records the configuration digest in claims and verifies archive configuration at completion. Synthetic five-arm runs reject changed stage inputs, limits and anchors; reopen and immutability checks pass. Focused evaluation/goal/replay/fresh-preflight 115 passed; full offline suite 550 passed. Caller-supplied anchors, source metadata, transport timeouts, pricing and token bounds remain unverified; lower-level APIs bypass the runner and no complete experiment or hosted call occurred."
+    },
+    {
+      "id": "T071D",
+      "phase": "evaluation",
+      "depends_on": [
+        "T071C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_campaign.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_factorial_allocation_executes_all_arms_with_reserved_review",
+      "action": "Bind case applicability metadata across campaign arms",
+      "acceptance": "Every case has a frozen applicability-input digest and guarded execution rejects differing metadata before claims and calls.",
+      "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
+      "evidence": "Red: frozen campaign settings did not bind per-case applicability and the guarded runner accepted changed scope metadata. Version 2 configuration now requires an applicability digest for every case, checks the actual inputs before claim, and checks recorded metadata at completion for catalog and fresh arms. Synthetic five-arm execution rejects missing case bindings and changed scope without calls; focused evaluation/goal/replay/fresh-preflight 115 passed; full offline suite 550 passed. Digests are caller-supplied assertions, direct baselines do not use metadata as a source filter, old v1 configs cannot satisfy the stronger runner gate, and source authority, timeouts, live price/token bounds and hosted work remain open."
     }
   ]
 }
