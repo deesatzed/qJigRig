@@ -307,3 +307,8 @@ Full qJig suite after T024: see the T024 receipt above. All P2 behavior is offli
 - Order requested: deepseek/deepseek-v4.1-flash-1017, then meta/muse-spark-open, then openai/gpt-6.1-terra (all three listed on the public OpenRouter model list today). Hy4 stays judge/escalation.
 - LIVE, same synthetic refund question, deepseek flash as planner at 6000 tokens: 3 of 3 more runs returned a valid plan (3-4 yes/no questions joined by AND), 6 of 6 across all smoke runs today; known cost 0.0012 USD for the 3. So the next models were not called: the stated condition (deepseek not sufficient) was not met on validity.
 - Limit that no model swap fixes: the planner prompt carries only the question and a corpus hash, not the documents, so every plan joins its questions with AND and none asks about exceptions (the sample corpus has a 30-day defective-item exception). Plan completeness stays unestablished; the obligation ledger and mandatory exception channels must supply what the plan omits.
+
+## 2026-11-06: T048 complete
+
+- run_fresh in src/qjig/acquisition.py: fresh planner -> canonical BM25/recovery -> paired judge, quote offsets kept per predicate (re-slice to the quote), unresolved predicates stay open, planner failure makes no judge call, status always deferred with plan_coverage_unestablished and exception passages listed for review. STAND-IN transport only: no real model in this test; live paths are in reports/t046-smoke-receipts*.json. Not yet run live through run_fresh. Limits: one retrieval attempt per predicate, no reviewer path to close coverage.
+- Red: ImportError: run_fresh did not exist. Green: focused 1 passed in 0.07s; tests/test_fresh_pipeline.py 3 passed in 0.07s; full suite 235 passed in 1.75s. 2026-11-06.

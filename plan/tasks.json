@@ -825,15 +825,16 @@
         "T046",
         "T033"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/acquisition.py"
       ],
-      "test_file": "tests/test_acquisition.py",
+      "test_file": "tests/test_fresh_pipeline.py",
       "test_name": "test_fresh_pipeline",
       "action": "Connect fresh decomposition to canonical retrieval and observation",
       "acceptance": "Fresh run preserves each decisive evidence binding and unresolved gap",
-      "command": "python -m pytest tests/test_acquisition.py::test_fresh_pipeline -q"
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_pipeline -q",
+      "evidence": "Red: ImportError: run_fresh did not exist. Green: focused 1 passed in 0.07s; tests/test_fresh_pipeline.py 3 passed in 0.07s; full suite 235 passed in 1.75s. 2026-11-06."
     },
     {
       "id": "T049",

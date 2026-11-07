@@ -16,6 +16,12 @@ from .recovery import Exclusion, RecoveryResult, recover_packet
 from .retrieval import Candidate, bm25_candidates
 from .scheduler import next_need
 from .stopping import StopDecision, check_stop
+from .budgets import BudgetLedger
+from .judge import JudgeResult, QuoteRef, judge_predicate
+from .obligations import Obligation
+from .planner import PlanBinding, request_fresh_plan
+from .providers import Transport
+from .plans import Plan as _Plan  # noqa: F401
 from .store import Catalog
 
 
@@ -203,3 +209,88 @@ def run_until_done(state: RunState, ctx: Context) -> RunSummary:
         and is_material(p.id, state.plan.expression, state.observations)
     )
     return RunSummary(stop, tuple(skips), conflicts)
+
+
+COVERAGE_ID = "ob-plan-coverage"
+EXCEPTION_QUERY = "exception exceptions waiver unless except special case"
+
+
+@dataclass(frozen=True)
+class FreshRun:
+    """Result of the model-planned path. It is never `decided`: a generated plan is not known complete."""
+
+    status: str  # always "deferred" until a reviewer closes the plan-coverage gap
+    reasons: tuple[str, ...]
+    plan_failure: str | None
+    binding: PlanBinding | None
+    state: RunState | None
+    summary: RunSummary | None
+    judgments: dict[str, JudgeResult]
+    quote_refs: dict[str, tuple[QuoteRef, ...]]  # predicate id -> verified quote bindings that carried a decision
+    coverage_candidates: tuple[str, ...]  # entry ids of exception-channel passages found, offered for review
+
+
+def run_fresh(
+    *,
+    request: Request,
+    catalog: Catalog,
+    entries: list[IndexEntry],
+    ledger: BudgetLedger,
+    transport: Transport,
+    planner: tuple[str, str],
+    judge: tuple[str, str],
+    revision_applicability: Callable[[str], Applicability],
+    planner_max_tokens: int | None = None,
+    judge_max_tokens: int | None = None,
+    want: int = 3,
+    max_bytes: int = 3000,
+) -> FreshRun:
+    """Plan with a model, then answer each predicate through the canonical retrieval, recovery and judge path.
+
+    Every decisive quote keeps its binding. An unresolved predicate stays unresolved. Because the plan is
+    model-written, a material plan-coverage obligation is always opened; retrieval can offer exception
+    passages for review but can never close it, so the result is a deferral that names the gap.
+    """
+    kw = {} if planner_max_tokens is None else {"max_tokens": planner_max_tokens}
+    outcome = request_fresh_plan(
+        ledger, transport, request, corpus_revision_ids=sorted({e.span.revision_id for e in entries}),
+        provider=planner[0], model=planner[1], **kw,
+    )
+    if not outcome.ok:
+        return FreshRun("deferred", (f"plan_unavailable:{outcome.failure}",), outcome.failure, None, None, None, {}, {}, ())
+
+    plan = outcome.plan
+    judgments: dict[str, JudgeResult] = {}
+    refs: dict[str, tuple[QuoteRef, ...]] = {}
+    jkw = {} if judge_max_tokens is None else {"max_tokens": judge_max_tokens}
+
+    def make_evaluator(question: str, pid: str):
+        def evaluate(packet: EvidencePacket, recovery: RecoveryResult) -> EvalResult:
+            result = judge_predicate(
+                ledger, transport, question, packet, provider=judge[0], model=judge[1],
+                applicability=revision_applicability, **jkw,
+            )
+            judgments[pid] = result
+            used = tuple(r for r in (result.positive.quote_ref, result.negative.quote_ref) if r is not None)
+            refs[pid] = used
+            return EvalResult(result.outcome, result.observation.reason, tuple(dict.fromkeys(r.entry_id for r in used)))
+
+        return evaluate
+
+    check = lambda c: revision_applicability(c.revision_id)  # noqa: E731
+    specs = {p.id: NeedSpec(p.question, want, max_bytes, make_evaluator(p.question, p.id)) for p in plan.predicates}
+    obligations = ObligationLedger()
+    for p in plan.predicates:
+        obligations.open(Obligation(f"ob-{p.id}", "predicate_evidence", p.id, p.question, material=True))
+    obligations.open(Obligation(COVERAGE_ID, "exception", "__plan__", "model-written plan completeness is not established", material=True))
+    exc = recover_packet(catalog, bm25_candidates(entries, EXCEPTION_QUERY), want=want, max_bytes=max_bytes, applicability=check)
+    obligations.record_retrieval(COVERAGE_ID, hit_count=len(bm25_candidates(entries, EXCEPTION_QUERY)), result=exc)
+
+    state = RunState(request, plan, obligations)
+    ctx = Context(catalog, entries, check, specs)
+    summary = run_until_done(state, ctx)
+    reasons = ("plan_coverage_unestablished",) + tuple(r for r in summary.stop.reasons if r != "plan_coverage_unestablished")
+    return FreshRun(
+        "deferred", reasons, None, outcome.binding, state, summary, judgments, refs,
+        tuple(i.entry_id for i in exc.packet.items),
+    )
