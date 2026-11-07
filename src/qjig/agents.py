@@ -93,6 +93,17 @@ class RoleClient:
             raise ClientError('local service returned invalid intervention list')
         return result['interventions']
 
+    def get_run(self, run_id: str) -> dict:
+        if not isinstance(run_id, str) or not re.fullmatch(r'[0-9a-f]{64}', run_id):
+            raise ContractError('invalid run identity')
+        return self._request('GET', '/api/runs/' + run_id)
+
+    def list_runs(self) -> list[dict]:
+        result = self._request('GET', '/api/runs')
+        if not isinstance(result.get('runs'), list):
+            raise ClientError('local service returned invalid run list')
+        return result['runs']
+
     def ask(self, request_id: str, question: str, scope: str, policy: dict) -> dict:
         if any(not isinstance(value, str) or not value.strip() for value in (request_id, question, scope)) or not isinstance(policy, dict):
             raise ContractError('request identity, question, scope and policy are required')

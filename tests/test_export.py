@@ -75,3 +75,106 @@ def test_authored_export_preserves_deferred_result_and_missing_evidence(tmp_path
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_service_reopens_original_authored_run_after_source_change(tmp_path):
+    path = tmp_path / 'catalog.sqlite'
+    server = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '2', 'Review'))
+        source = {'source_id': 'policy.md', 'text': '# Rule\nRefunds are accepted within 14 days.\n', 'scope': 'project',
+                  'entities': [], 'effective_from': '2026-01-01', 'effective_to': 'open', 'observed_at': None, 'authority': None}
+        rev = client.import_source(source)['revision_id']
+        policy = {'label': 'AUTHORED CONTROL', 'entities': [], 'as_of': '2026-11-15', 'mode': 'snapshot', 'facts': {'days': 20},
+                  'plan': {'origin': 'authored', 'predicates': [{'id': 'p', 'question': 'Within limit?'}], 'expression': {'ref': 'p'}},
+                  'needs': {'p': {'query': 'refunds days', 'want': 1, 'max_bytes': 4000,
+                                  'evaluator': {'kind': 'numeric_threshold', 'field': 'days', 'pattern': r'within (\d+) days', 'operator': 'lte'}}}}
+        response = client.ask('original', 'Refund?', 'project', policy)
+        assert response['result']['outcome'] is False and response['run_id']
+        run_id = response['run_id']
+        original = client.get_run(run_id)
+        assert original['verification']['status'] == 'unanchored'
+        assert original['bundle']['payload']['result'] == response['result']
+        detail = client.get_source(rev)
+        offset = detail['text'].index('14')
+        client.intervene(rev, detail['text_sha256'], offset, offset + 2, '30')
+        assert client.ask('changed', 'Refund?', 'project', policy)['result']['outcome'] is True
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+    restarted = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=restarted.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = RoleClient(restarted.server_address[1], RoleDefinition('builder', '1', 'Build'))
+        reopened = client.get_run(run_id)
+        assert reopened == original
+        assert any(x['run_id'] == run_id for x in client.list_runs())
+        assert reopened['bundle']['payload']['result']['request']['role_version'] == '2'
+        assert reopened['bundle']['payload']['result']['outcome'] is False
+    finally:
+        restarted.shutdown()
+        restarted.server_close()
+        thread.join(timeout=5)
+
+
+def test_catalog_change_between_export_and_storage_defers_without_record(tmp_path, monkeypatch):
+    import qjig.service as service
+    path = tmp_path / 'catalog.sqlite'
+    servers = [create_server(path, host='127.0.0.1', port=0) for _ in range(2)]
+    threads = [threading.Thread(target=s.serve_forever, daemon=True) for s in servers]
+    for thread in threads:
+        thread.start()
+    try:
+        a, b = [RoleClient(s.server_address[1], RoleDefinition('reviewer', '1', 'Review')) for s in servers]
+        source = {'source_id': 'policy.md', 'text': '# Rule\nRefunds apply.\n', 'scope': 'project',
+                  'entities': [], 'effective_from': '2026-01-01', 'effective_to': 'open', 'observed_at': None, 'authority': None}
+        a.import_source(source)
+        policy = {'label': 'AUTHORED CONTROL', 'entities': [], 'as_of': '2026-11-15', 'mode': 'snapshot',
+                  'plan': {'origin': 'authored', 'predicates': [{'id': 'p', 'question': 'Refunds?'}], 'expression': {'ref': 'p'}},
+                  'needs': {'p': {'query': 'refunds', 'want': 1, 'max_bytes': 4000,
+                                  'evaluator': {'kind': 'phrase_present', 'pattern': 'Refunds apply'}}}}
+        original = service.export_authored
+        def change_after_export(*args, **kwargs):
+            bundle = original(*args, **kwargs)
+            b.import_source({**source, 'source_id': 'other.md', 'text': '# Other\nOther text.\n'})
+            return bundle
+        monkeypatch.setattr(service, 'export_authored', change_after_export)
+        response = a.ask('r', 'Refunds?', 'project', policy)
+        assert response['result']['status'] == 'deferred' and response['result']['outcome'] is None
+        assert 'catalog_changed_during_run' in response['result']['reasons'] and response['run_id'] is None
+        assert a.list_runs() == []
+    finally:
+        for server in servers:
+            server.shutdown()
+            server.server_close()
+        for thread in threads:
+            thread.join(timeout=5)
+
+
+def test_stored_run_with_changed_payload_is_refused(tmp_path):
+    import sqlite3
+    from qjig.agents import ClientError
+    path = tmp_path / 'catalog.sqlite'
+    server = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '1', 'Review'))
+        policy = {'label': 'AUTHORED CONTROL', 'entities': [], 'as_of': '2026-11-15', 'mode': 'snapshot',
+                  'plan': {'origin': 'authored', 'predicates': [{'id': 'p', 'question': 'Anything?'}], 'expression': {'ref': 'p'}},
+                  'needs': {'p': {'query': 'nothing', 'want': 1, 'max_bytes': 4000,
+                                  'evaluator': {'kind': 'phrase_present', 'pattern': 'anything'}}}}
+        run_id = client.ask('r', 'Anything?', 'project', policy)['run_id']
+        with sqlite3.connect(path) as con:
+            con.execute('DROP TRIGGER authored_runs_no_update')
+            con.execute('UPDATE authored_runs SET bundle=? WHERE run_id=?', ('{}', run_id))
+        with pytest.raises(ClientError):
+            client.get_run(run_id)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

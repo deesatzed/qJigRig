@@ -239,9 +239,10 @@ def test_catalog_change_during_authored_run_defers(tmp_path, monkeypatch):
             b.import_source({**source, 'source_id': 'another.md', 'text': '# Rule\nNew source.\n'})
             return result
         monkeypatch.setattr(service, 'run_authored', change_between_reads)
-        result = a.ask('r', 'Refund?', 'project', policy)['result']
-        assert result['status'] == 'deferred' and result['outcome'] is None
-        assert 'catalog_changed_during_run' in result['reasons']
+        response = a.ask('r', 'Refund?', 'project', policy)
+        result = response['result']
+        assert result['status'] == 'deferred' and result['outcome'] is None and response['run_id'] is None
+        assert 'catalog_changed_during_run' in result['reasons'] and a.list_runs() == []
     finally:
         for server in servers:
             server.shutdown()

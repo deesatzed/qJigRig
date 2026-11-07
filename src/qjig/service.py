@@ -13,9 +13,10 @@ from .cli import _dec, _member_from_row, _member_row, run_authored
 from .contracts import ContractError, Request
 from .claims import add_interpretation, list_interpretations
 from .interventions import apply_intervention, list_interventions
+from .export import export_authored, verify_authored_export
 from .indexing import index_entries
 from .sources import SourceRevision, decode_source
-from .store import Catalog
+from .store import Catalog, CatalogStateChanged
 
 MAX_BODY = 1_000_000
 _FIELDS = {"source_id", "text", "scope", "entities", "effective_from", "effective_to", "observed_at", "authority"}
@@ -78,6 +79,38 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(200, {"source_state": state})
             except sqlite3.Error:
                 self._reply(500, {"error": "local storage failure"})
+        elif self.path == "/api/runs":
+            try:
+                with Catalog.open(self.server.catalog) as catalog:
+                    runs = []
+                    for ident, text in catalog.authored_run_rows():
+                        bundle = json.loads(text)
+                        if bundle.get('sha256') != ident or verify_authored_export(bundle)['status'] != 'unanchored':
+                            raise ContractError('stored run invalid')
+                        result = bundle['payload']['result']
+                        runs.append({'run_id': ident, 'request_id': result['request']['request_id'],
+                                     'question': result['request']['question'], 'status': result['status']})
+                self._reply(200, {'runs': runs})
+            except (ContractError, ValueError, KeyError, TypeError, AttributeError, sqlite3.Error):
+                self._reply(500, {'error': 'stored run invalid'})
+        elif self.path.startswith("/api/runs/"):
+            ident = self.path.removeprefix("/api/runs/")
+            if not re.fullmatch(r"[0-9a-f]{64}", ident):
+                self._reply(404, {'error': 'not found'})
+                return
+            try:
+                with Catalog.open(self.server.catalog) as catalog:
+                    text = catalog.authored_run_row(ident)
+                if text is None:
+                    self._reply(404, {'error': 'not found'})
+                    return
+                bundle = json.loads(text)
+                verification = verify_authored_export(bundle)
+                if bundle.get('sha256') != ident or verification['status'] != 'unanchored':
+                    raise ContractError('stored run invalid')
+                self._reply(200, {'bundle': bundle, 'verification': verification})
+            except (ContractError, ValueError, TypeError, AttributeError, sqlite3.Error):
+                self._reply(500, {'error': 'stored run invalid'})
         elif self.path == "/api/interpretations":
             try:
                 with Catalog.open(self.server.catalog) as catalog:
@@ -157,17 +190,24 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(body["request"], dict) or not isinstance(body["policy"], dict):
                     raise ContractError("request and policy must be objects")
                 request = Request.from_dict(body["request"])
+                run_id = None
                 with self.server.writer_lock:
                     with Catalog.open(self.server.catalog) as catalog:
                         before = catalog.source_state()
                     result, _ = run_authored(self.server.catalog, request, body["policy"])
                     with Catalog.open(self.server.catalog) as catalog:
                         after = catalog.source_state()
+                        if before == after and result['plan_origin'] == 'authored':
+                            try:
+                                bundle = export_authored(catalog, result, body['policy'], after)
+                                run_id = catalog.save_authored_run(bundle, after)
+                            except CatalogStateChanged:
+                                after = catalog.source_state()
                 if before != after:
                     result["status"], result["outcome"] = "deferred", None
                     result["reasons"] = list(result["reasons"]) + ["catalog_changed_during_run"]
                 self._reply(200, {"kind": "deterministic", "result": result,
-                                  "source_state_before": before, "source_state_after": after})
+                                  "source_state_before": before, "source_state_after": after, "run_id": run_id})
         except (ValueError, TypeError, KeyError, UnicodeError, ContractError, ArithmeticError, re.error):
             self._reply(400, {"error": "invalid request"})
             return

@@ -1063,7 +1063,8 @@
       "depends_on": [
         "T055",
         "T052",
-        "T061A"
+        "T061A",
+        "T061B"
       ],
       "status": "pending",
       "files": [
@@ -2088,6 +2089,27 @@
       "acceptance": "A synthetic local authored result exports role, policy, unknowns and cited source bytes; verification detects altered evidence and preserves an externally anchored record after catalog changes.",
       "command": "python -m pytest tests/test_export.py::test_authored_export_verifies_bound_source_spans_after_change -q",
       "evidence": "Initial red: authored export module absent. Synthetic local results export policy, request/role, unknown costs and cited raw source bytes; offline structural checks validate digest, source identities, entry/span bindings and trace sequence. Tests preserve a deferred result and verify an externally anchored record after an intervention, reject altered evidence even after rehash, and refuse export from a changed catalog. Focused 30 passed; full suite 414 passed. No semantic correctness, authentication, complete corpus capture, service persistence, browser export or hosted accounting is established; T061 remains pending."
+    },
+    {
+      "id": "T061B",
+      "phase": "P5",
+      "depends_on": [
+        "T061A",
+        "T056C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/store.py",
+        "src/qjig/export.py",
+        "src/qjig/service.py",
+        "src/qjig/agents.py"
+      ],
+      "test_file": "tests/test_export.py",
+      "test_name": "test_service_reopens_original_authored_run_after_source_change",
+      "action": "Persist authored evidence exports with service runs",
+      "acceptance": "An actual local client can reopen a saved authored run after intervention and service restart; source-state race prevents saving a misleading record.",
+      "command": "python -m pytest tests/test_export.py::test_service_reopens_original_authored_run_after_source_change -q",
+      "evidence": "Red: service returned no durable run identity. Green: catalog v6 atomically stores structurally checked authored exports only while their source-state binding holds. Actual client reopens original evidence after intervention and service restart; changes during run or between export and storage defer without a run record; altered stored bundle refuses; v5 migration preserves sources. Focused 30 passed; full offline suite 418 passed. Retrieved bundle is unanchored; hosted/fresh runs, browser download, semantic replay and full T061 remain open."
     }
   ]
 }

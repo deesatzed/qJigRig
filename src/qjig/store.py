@@ -9,7 +9,11 @@ from pathlib import Path
 from .contracts import ContractError
 from .sources import SourceRevision, decode_source
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
+
+
+class CatalogStateChanged(ContractError):
+    """The catalog changed before a bound record could be committed."""
 
 _SCHEMA = """
 CREATE TABLE revisions(
@@ -70,6 +74,14 @@ CREATE TRIGGER interventions_no_delete BEFORE DELETE ON interventions
   BEGIN SELECT RAISE(ABORT, 'interventions are immutable'); END;
 """
 
+_RUN_SCHEMA = """
+CREATE TABLE authored_runs(run_id TEXT PRIMARY KEY, bundle TEXT NOT NULL);
+CREATE TRIGGER authored_runs_no_update BEFORE UPDATE ON authored_runs
+  BEGIN SELECT RAISE(ABORT, 'authored runs are immutable'); END;
+CREATE TRIGGER authored_runs_no_delete BEFORE DELETE ON authored_runs
+  BEGIN SELECT RAISE(ABORT, 'authored runs are immutable'); END;
+"""
+
 
 def _execute_schema(con: sqlite3.Connection, script: str) -> None:
     """Execute schema statements inside the caller's transaction, including triggers."""
@@ -95,10 +107,11 @@ class Catalog:
             if version != SCHEMA_VERSION:
                 con.execute("BEGIN IMMEDIATE")
                 version = con.execute("PRAGMA user_version").fetchone()[0]
-                scripts = {0: _SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA,
-                           1: _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA,
-                           2: _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA,
-                           3: _CLAIM_SCHEMA + _INTERVENTION_SCHEMA, 4: _INTERVENTION_SCHEMA}
+                scripts = {0: _SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA,
+                           1: _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA,
+                           2: _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA,
+                           3: _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA, 4: _INTERVENTION_SCHEMA + _RUN_SCHEMA,
+                           5: _RUN_SCHEMA}
                 if version == SCHEMA_VERSION:
                     pass  # another opener completed the migration while we waited
                 elif version in scripts:
@@ -273,16 +286,47 @@ class Catalog:
         """Hash a consistent catalog snapshot of source, index and metadata rows."""
         self._con.execute("BEGIN")
         try:
-            revisions = self._con.execute("SELECT revision_id,source_id FROM revisions ORDER BY revision_id").fetchall()
-            entries = self._con.execute(f"SELECT {self._ENTRY_COLS} FROM index_entries ORDER BY entry_id").fetchall()
-            metadata = self._con.execute("SELECT * FROM member_metadata ORDER BY revision_id").fetchall()
-            data = json.dumps({"revisions": revisions, "entries": entries, "metadata": metadata},
-                              sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            state = self._source_state_in_transaction()
             self._con.commit()
         except BaseException:
             self._con.rollback()
             raise
+        return state
+
+    def _source_state_in_transaction(self) -> str:
+        revisions = self._con.execute("SELECT revision_id,source_id FROM revisions ORDER BY revision_id").fetchall()
+        entries = self._con.execute(f"SELECT {self._ENTRY_COLS} FROM index_entries ORDER BY entry_id").fetchall()
+        metadata = self._con.execute("SELECT * FROM member_metadata ORDER BY revision_id").fetchall()
+        data = json.dumps({"revisions": revisions, "entries": entries, "metadata": metadata},
+                          sort_keys=True, ensure_ascii=False, separators=(",", ":"))
         return hashlib.sha256(data.encode('utf-8')).hexdigest()
+
+    def save_authored_run(self, bundle: dict, expected_source_state: str) -> str:
+        """Commit a validated bundle only while its source-catalog binding holds."""
+        from .export import verify_authored_export
+        if verify_authored_export(bundle)['status'] != 'unanchored' or bundle['payload']['source_state'] != expected_source_state:
+            raise ContractError('invalid authored run bundle')
+        run_id = bundle['sha256']
+        data = json.dumps(bundle, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+        self._con.execute('BEGIN IMMEDIATE')
+        try:
+            if self._source_state_in_transaction() != expected_source_state:
+                raise CatalogStateChanged('catalog changed before run storage')
+            self._con.execute('INSERT OR IGNORE INTO authored_runs VALUES (?,?)', (run_id, data))
+            if self._con.execute('SELECT bundle FROM authored_runs WHERE run_id=?', (run_id,)).fetchone()[0] != data:
+                raise ContractError('run identity collision')
+            self._con.commit()
+            return run_id
+        except BaseException:
+            self._con.rollback()
+            raise
+
+    def authored_run_rows(self) -> list[tuple[str, str]]:
+        return self._con.execute('SELECT run_id,bundle FROM authored_runs ORDER BY run_id').fetchall()
+
+    def authored_run_row(self, run_id: str) -> str | None:
+        row = self._con.execute('SELECT bundle FROM authored_runs WHERE run_id=?', (run_id,)).fetchone()
+        return None if row is None else row[0]
 
     def put_interpretation(self, claim_id: str, payload: str) -> bool:
         with self._con:

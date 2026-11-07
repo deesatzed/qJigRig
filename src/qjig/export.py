@@ -11,7 +11,7 @@ from .indexing import index_entries
 from .plans import parse_plan
 from .sources import SourceRevision, decode_source
 from .spans import Span, verify_span
-from .store import Catalog
+from .store import Catalog, CatalogStateChanged
 
 
 def _canonical(value: object) -> bytes:
@@ -23,7 +23,7 @@ def export_authored(catalog: Catalog, result: dict, policy: dict, source_state: 
     if not isinstance(result, dict) or not isinstance(policy, dict) or not isinstance(source_state, str):
         raise ContractError('authored result, policy and source state are required')
     if catalog.source_state() != source_state:
-        raise ContractError('catalog changed before export')
+        raise CatalogStateChanged('catalog changed before export')
     try:
         revision_ids = {e['revision_id'] for record in result['records'] for e in record['evidence']}
         sources = {}
@@ -39,7 +39,7 @@ def export_authored(catalog: Catalog, result: dict, policy: dict, source_state: 
     except (KeyError, TypeError, ValueError) as exc:
         raise ContractError('invalid authored result') from exc
     if catalog.source_state() != source_state:
-        raise ContractError('catalog changed during export')
+        raise CatalogStateChanged('catalog changed during export')
     bundle = {'payload': payload, 'sha256': digest}
     if verify_authored_export(bundle)['status'] != 'unanchored':
         raise ContractError('authored result failed structural verification')
