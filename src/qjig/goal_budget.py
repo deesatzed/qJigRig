@@ -5,6 +5,7 @@ ledger for the whole goal; moving or replacing the file is not an accounting res
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from decimal import Decimal
@@ -49,6 +50,7 @@ class GoalBudget:
             con.execute("CREATE TABLE IF NOT EXISTS reservations (attempt_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, partition TEXT NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS usage (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), input_tokens INTEGER, output_tokens INTEGER, cost TEXT)")
             con.execute("CREATE TABLE IF NOT EXISTS holds (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), calls INTEGER NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL)")
+            con.execute("CREATE TABLE IF NOT EXISTS recoveries (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), call_id TEXT NOT NULL, receipt_sha256 TEXT NOT NULL)")
             row = con.execute("SELECT value FROM policy WHERE id=1").fetchone()
             if row is None:
                 con.execute("INSERT INTO policy VALUES(1, ?)", (policy,))
@@ -96,6 +98,47 @@ class GoalBudget:
         except BaseException:
             self._con.execute("ROLLBACK")
             raise
+
+    def recover_receipt(self, attempt_id: str, journal) -> str:
+        """Recover from a matching journal receipt, without making or retrying a call.
+
+        The caller must supply the original trusted journal. A hash binds the recorded
+        recovery to the receipt but does not authenticate the journal or its contents.
+        """
+        row = self._con.execute("SELECT request_id FROM reservations WHERE attempt_id=?", (attempt_id,)).fetchone()
+        if row is None:
+            raise ContractError("unknown reservation")
+        events = journal.events(row[0])
+        intents = [e for e in events if e.kind == "intent" and e.payload.get("goal_attempt_id") == attempt_id]
+        if len(intents) != 1:
+            raise ContractError("no unique matching journal intent")
+        intent = intents[0]
+        terminal = [e for e in events if e.call_id == intent.call_id and e.kind in ("receipt", "failure", "uncertain", "reconciled")]
+        if len(terminal) != 1 or terminal[0].kind != "receipt":
+            raise ContractError("no unique completed journal receipt")
+        receipt = terminal[0]
+        usage = receipt.payload.get("usage")
+        if not isinstance(usage, dict):
+            raise ContractError("receipt usage is not an object")
+        inp, out, cost = usage.get("prompt_tokens"), usage.get("completion_tokens"), usage.get("cost_usd")
+        inp = inp if _valid_tokens(inp) else None
+        out = out if _valid_tokens(out) else None
+        cost = cost if _valid_cost(cost) else None
+        receipt_data = json.dumps({"call_id": receipt.call_id, "input_sha256": receipt.input_sha256,
+                                   "payload": receipt.payload, "recorded_at": receipt.recorded_at},
+                                  sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        digest = hashlib.sha256(receipt_data.encode("utf-8")).hexdigest()
+        self._con.execute("BEGIN IMMEDIATE")
+        try:
+            if self._con.execute("SELECT 1 FROM usage WHERE attempt_id=?", (attempt_id,)).fetchone():
+                raise ContractError("usage already recorded")
+            self._con.execute("INSERT INTO usage VALUES(?,?,?,?)", (attempt_id, inp, out, str(_cost(cost)) if cost is not None else None))
+            self._con.execute("INSERT INTO recoveries VALUES(?,?,?)", (attempt_id, receipt.call_id, digest))
+            self._con.execute("COMMIT")
+        except BaseException:
+            self._con.execute("ROLLBACK")
+            raise
+        return receipt.call_id
 
     def actual_usage(self) -> dict:
         rows = self._con.execute("SELECT u.input_tokens, u.output_tokens, u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()

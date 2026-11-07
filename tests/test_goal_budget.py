@@ -156,3 +156,56 @@ def test_request_goal_accounting_requires_both_bounds_before_reserving(tmp_path)
                 ledger.run("planner", lambda: ("ok", {}), provider="stand-in", model="m", input_sha256="a" * 64,
                            reserve_tokens=50, **kwargs)
         assert goal.totals().max_calls == 0 and journal.events("r") == []
+
+
+def test_recover_goal_usage_from_matching_durable_receipt(tmp_path):
+    from qjig.journal import Journal, run_journaled
+
+    limit = Budget(3, 1000, 1)
+    with GoalBudget.open(tmp_path / "g.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal, Journal.open(tmp_path / "j.sqlite") as journal:
+        goal.reserve("attempt", "r", "smoke", tokens=100, cost_usd=0.2)
+        run_journaled(journal, call=lambda: ("ok", {"prompt_tokens": 20, "completion_tokens": 10, "cost_usd": 0.1}),
+                      request_id="r", stage="planner", provider="stand-in", model="m", input_sha256="a" * 64,
+                      intent_payload={"goal_attempt_id": "attempt"})
+        assert goal.actual_usage()["unknown_calls"] == 1
+        assert goal.recover_receipt("attempt", journal) == "r#1"
+        assert goal.actual_usage() == {"calls": 1, "input_tokens": 20, "output_tokens": 10, "cost_usd": 0.1, "unknown_calls": 0}
+        goal.reserve("next", "r2", "smoke", tokens=100, cost_usd=0.2)
+        with pytest.raises(ContractError):
+            goal.recover_receipt("attempt", journal)
+
+
+def test_recover_refuses_missing_or_uncertain_receipt(tmp_path):
+    from qjig.journal import Journal
+
+    limit = Budget(2, 500, 0.5)
+    with GoalBudget.open(tmp_path / "g.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal, Journal.open(tmp_path / "j.sqlite") as journal:
+        goal.reserve("attempt", "r", "smoke", tokens=100, cost_usd=0.2)
+        with pytest.raises(ContractError):
+            goal.recover_receipt("attempt", journal)
+        intent = journal.record_intent(request_id="r", stage="planner", provider="stand-in", model="m", input_sha256="a" * 64,
+                                       payload={"goal_attempt_id": "attempt"})
+        journal.record_terminal(intent, "uncertain", {"detail": "timeout"})
+        with pytest.raises(ContractError):
+            goal.recover_receipt("attempt", journal)
+        assert goal.actual_usage()["unknown_calls"] == 1
+
+
+def test_recover_after_interruption_between_journal_receipt_and_goal_update(tmp_path, monkeypatch):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+
+    limit = Budget(3, 1000, 1)
+    with GoalBudget.open(tmp_path / "g.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal, Journal.open(tmp_path / "j.sqlite") as journal:
+        ledger = BudgetLedger(limit, journal, "r", goal_budget=goal, partition="smoke")
+        with monkeypatch.context() as patch:
+            patch.setattr(goal, "record_usage", lambda *args, **kwargs: (_ for _ in ()).throw(KeyboardInterrupt()))
+            with pytest.raises(KeyboardInterrupt):
+                ledger.run("planner", lambda: ("ok", {"prompt_tokens": 40, "completion_tokens": 20, "cost_usd": 0.1}),
+                           provider="stand-in", model="m", input_sha256="a" * 64,
+                           reserve_tokens=50, reserve_input_tokens=100, reserve_cost_usd=0.2)
+        events = journal.events("r")
+        assert [e.kind for e in events] == ["intent", "receipt"]
+        assert goal.actual_usage()["unknown_calls"] == 1
+        assert goal.recover_receipt(events[0].payload["goal_attempt_id"], journal) == events[0].call_id
+        assert goal.actual_usage()["cost_usd"] == 0.1
