@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from typing import Callable
 
 from .applicability import Applicability
 from .budgets import BudgetExceeded, BudgetLedger
 from .contracts import ContractError
 from .logic import Observation, Outcome, Support, combine_support
-from .packets import EvidencePacket
+from .packets import EvidencePacket, serialize_packet
 from .providers import FieldSpec, ProviderRequest, ProviderUnavailable, ReservationFactory, Transport, call_typed
 from .journal import ReconciliationRequired, UncertainOutcome
 
@@ -87,11 +88,12 @@ def _check_quote(side: SideResult, packet: EvidencePacket, applicability: Callab
     return SideResult(Support.SUPPORTED, side.reason, side.quote, None, side.call_id, assurance, ref)
 
 
-def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str, max_tokens: int = JUDGE_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge") -> SideResult:
+def _side(ledger: BudgetLedger, transport: Transport, claim: str, evidence: str, side: str, provider: str, model: str, max_tokens: int = JUDGE_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None, stage_prefix: str = "judge", packet_sha256: str | None = None) -> SideResult:
     req = ProviderRequest(f"{stage_prefix}_{side}", provider, model, _PROMPT.format(claim=claim, evidence=evidence), max_tokens)
     try:
         reservation = reservation_factory(req) if reservation_factory else None
-        call = call_typed(ledger, transport, req, SIDE_SCHEMA, reservation=reservation, archive=archive)
+        call = call_typed(ledger, transport, req, SIDE_SCHEMA, reservation=reservation, archive=archive,
+                          context_binding={"packet_sha256": packet_sha256})
     except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
         failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
                    UncertainOutcome: "uncertain_outcome", ReconciliationRequired: "reconciliation_required"}[type(exc)]
@@ -127,11 +129,12 @@ def judge_predicate(
     if stage_prefix not in ("judge", "escalation"):
         raise ContractError("invalid judge stage prefix")
     evidence = render_packet(packet)
-    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens, reservation_factory, archive, stage_prefix)
+    packet_sha256 = hashlib.sha256(serialize_packet(packet)).hexdigest()
+    pos = _side(ledger, transport, f"The answer to '{question}' is YES.", evidence, "positive", provider, model, max_tokens, reservation_factory, archive, stage_prefix, packet_sha256)
     if pos.failure in ("uncertain_outcome", "reconciliation_required"):
         neg = SideResult(Support.UNKNOWN, "reconciliation_required", "", "reconciliation_required", None)
     else:
-        neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens, reservation_factory, archive, stage_prefix)
+        neg = _side(ledger, transport, f"The answer to '{question}' is NO.", evidence, "negative", provider, model, max_tokens, reservation_factory, archive, stage_prefix, packet_sha256)
     return _combine_sides(pos, neg, packet, applicability)
 
 

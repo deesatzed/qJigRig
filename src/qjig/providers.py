@@ -282,7 +282,7 @@ def _validate(text: str, schema: dict[str, FieldSpec]) -> tuple[dict | None, str
 Validator = Callable[[str], tuple[dict | None, str | None]]
 
 
-def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequest, schema: "dict[str, FieldSpec] | Validator", *, reservation: CallReservation | None = None, archive=None) -> TypedCall:
+def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequest, schema: "dict[str, FieldSpec] | Validator", *, reservation: CallReservation | None = None, archive=None, context_binding: dict | None = None) -> TypedCall:
     """One budgeted, journaled provider attempt returning a validated value or an explicit failure."""
     if reservation is not None and (not isinstance(reservation, CallReservation) or reservation.request_sha256 != request.input_sha256()):
         raise ContractError("reservation does not match provider request")
@@ -344,7 +344,7 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
     }
     value, failure, digest, usage = ledger.run(
         request.stage, attempt, provider=request.provider, model=request.model,
-        input_sha256=request.input_sha256(), reserve_tokens=request.max_tokens, **kwargs,
+        input_sha256=request.input_sha256(), reserve_tokens=request.max_tokens, context_binding=context_binding, **kwargs,
     )
     call_id = ledger.last_call_id()
     return TypedCall(failure is None, value, failure, call_id, digest, usage)

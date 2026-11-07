@@ -91,19 +91,30 @@ class BudgetLedger:
         """Call id of the most recent journaled event for this request (single writer)."""
         return self._journal.events(self._request_id)[-1].call_id
 
-    def has_judge_calls(self, call_ids: tuple[str, ...]) -> bool:
-        """Check recorded standalone call IDs against this request's journal."""
+    def has_judge_calls(self, calls: tuple[tuple[str, str, str], ...], packet_sha256: str) -> bool:
+        """Match standalone sides to this request's recorded prompts and packet."""
+        from .providers import ProviderRequest
+        call_ids = [call[0] for call in calls]
         if not call_ids or len(set(call_ids)) != len(call_ids):
             return False
-        intents = {e.call_id for e in self._journal.events(self._request_id)
-                   if e.kind == "intent" and e.stage in ("judge_positive", "judge_negative")}
-        return all(call_id in intents for call_id in call_ids)
+        intents = {e.call_id: e for e in self._journal.events(self._request_id) if e.kind == "intent"}
+        for call_id, stage, prompt in calls:
+            event = intents.get(call_id)
+            if event is None or event.stage != stage or not isinstance(event.payload, dict):
+                return False
+            tokens = event.payload.get("reserve_output_tokens")
+            if not _valid_tokens(tokens) or tokens == 0 or event.payload.get("context_binding") != {"packet_sha256": packet_sha256}:
+                return False
+            request = ProviderRequest(stage, event.provider, event.model, prompt, tokens)
+            if request.input_sha256() != event.input_sha256:
+                return False
+        return True
 
     def run(
         self, stage: str, call: Callable[[], Any], *, provider: str, model: str, input_sha256: str,
         reserve_tokens: int, reserve_input_tokens: int | None = None, hold_back_calls: int = 0, hold_back_tokens: int = 0,
         reserve_cost_usd: float | None = None, hold_back_cost_usd: float = 0, reservation_binding: dict | None = None,
-        required_id: str | None = None,
+        required_id: str | None = None, context_binding: dict | None = None,
     ) -> Any:
         """Check every cap, then journal the intent and make the call. Refusals happen before any intent."""
         if self._goal_budget is not None and (reserve_input_tokens is None or reserve_cost_usd is None):
@@ -153,7 +164,8 @@ class BudgetLedger:
                                                        "reserve_input_tokens": reserve_input_tokens, "reserve_output_tokens": reserve_tokens,
                                                        "reserve_cost_usd": reserve_cost_usd,
                                                        "hold_back_cost_usd": hold_back_cost_usd, "goal_attempt_id": goal_attempt_id,
-                                                       "reservation_binding": reservation_binding, "required_id": required_id},
+                                                       "reservation_binding": reservation_binding, "required_id": required_id,
+                                                       "context_binding": context_binding},
         )
         if goal_attempt_id is not None:
             receipt = self._journal.events(self._request_id)[-1]

@@ -74,3 +74,27 @@ def test_escalation_rejects_a_different_request_ledger_before_call(tmp_path):
         with pytest.raises(ContractError, match='ledger'):
             escalate_predicate(standalone, other, transport, 'Question?', packet, reason='unknown', provider='stand-in')
         assert transport.calls_made == 0 and journal.events('different') == []
+
+
+def test_escalation_rejects_changed_question_or_packet_provenance(tmp_path):
+    from dataclasses import replace
+    import pytest
+    from qjig.contracts import ContractError
+    rev = SourceRevision.create('p/a.md', '/x', decode_source(b'# Refunds\nRefunds apply.', encoding='utf-8'))
+    packet = build_packet(bm25_candidates(index_entries(rev), 'refunds'), max_bytes=3000)
+    changed_item = replace(packet.items[0], span=replace(packet.items[0].span, revision_id='different-revision'))
+    changed_packet = replace(packet, items=(changed_item,))
+    response = RawResponse(200, json.dumps({'supported': False, 'quote': '', 'reason': 'none'}),
+                           {'prompt_tokens': 2, 'completion_tokens': 1, 'cost_usd': 0.01})
+    with Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(Budget(4, 5000, 1), journal, 'r')
+        standalone = judge_predicate(ledger, StandInTransport([response, response]), 'Question?', packet,
+                                     provider='stand-in', model='m')
+        transport = StandInTransport([response, response])
+        for question, evidence in [('Different question?', packet), ('Question?', changed_packet)]:
+            with pytest.raises(ContractError, match='binding'):
+                escalate_predicate(standalone, ledger, transport, question, evidence, reason='unknown', provider='stand-in')
+        swapped = replace(standalone, positive=standalone.negative, negative=standalone.positive)
+        with pytest.raises(ContractError, match='binding'):
+            escalate_predicate(swapped, ledger, transport, 'Question?', packet, reason='unknown', provider='stand-in')
+        assert transport.calls_made == 0 and ledger.used_calls() == 2

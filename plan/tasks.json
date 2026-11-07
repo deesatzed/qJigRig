@@ -853,7 +853,8 @@
       "test_name": "test_hy4_separate_outcome",
       "action": "Add the selected Hy4 escalation path with explicit reason",
       "acceptance": "Standalone failure/deferral remains saved and escalation is separately costed",
-      "command": "python -m pytest tests/test_escalation.py::test_hy4_separate_outcome -q"
+      "command": "python -m pytest tests/test_escalation.py::test_hy4_separate_outcome -q",
+      "evidence": "Partial: synthetic paired escalation preserves standalone result, uses same request ledger, and now binds each prior side to its recorded prompt hash and serialized evidence-packet provenance. Changed question, revision metadata and swapped sides refuse before call. Focused 79 passed before additional swapped-side assertion; full suite 388 passed. Applicability decision, full corpus, original response authenticity, archive replay and real-provider integration remain unverified; T049 pending."
     },
     {
       "id": "T050",
