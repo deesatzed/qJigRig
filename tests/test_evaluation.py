@@ -449,3 +449,36 @@ def test_direct_score_reports_reference_mismatch_and_incomplete_evidence(tmp_pat
                                      expected_reference_sha256=reference_digest(ref))
         assert score['classification'] == classification
         assert score['reference_provenance'] == 'ai_reviewed_unvalidated'
+
+
+def test_private_reference_binds_allowlisted_source_snapshots(tmp_path):
+    from qjig.contracts import Request
+    from qjig.evaluation import load_isolated_sources
+    from qjig.evaluation_scoring import make_reference, reference_digest
+    from qjig.sources import SourceRevision, decode_source
+    code, gold = b'Tests must pass.', b'private label'
+    (tmp_path / 'code').write_bytes(code); (tmp_path / 'label').write_bytes(gold)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    sources = load_isolated_sources(tmp_path, [item('code', code)], [item('label', gold)])
+    request = Request('assignment-1', 'Do tests pass?', 'reviewer', '1', 'project')
+    ref = make_reference(case_id='c', request=request, sources=sources, as_of='2026-11-07', entities=[],
+                         historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
+                         evidence=[{'path': 'code', 'quote': 'must pass'}])
+    revision = SourceRevision.create('code', 'evaluation_allowlist', decode_source(code, encoding='utf-8'))
+    assert ref['source_revisions'] == [revision.revision_id]
+    assert ref['evidence'] == [{'revision_id': revision.revision_id, 'quote': 'must pass'}]
+    assert len(reference_digest(ref)) == 64 and 'assignment-1' not in repr(ref)
+    with pytest.raises(ContractError):
+        make_reference(case_id='c', request=request, sources=sources, as_of='2026-11-07', entities=[],
+                       historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
+                       evidence=[{'path': 'code', 'quote': 'not in source'}])
+    with pytest.raises(ContractError):
+        make_reference(case_id='c', request=request, sources=sources, as_of='2026-11-07', entities=[],
+                       historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
+                       evidence=[{'path': 'label', 'quote': 'private label'}])
+    from qjig.evaluation import EvaluationSource
+    forged = (EvaluationSource('code', b'other', sources[0].sha256),)
+    with pytest.raises(ContractError):
+        make_reference(case_id='c', request=request, sources=forged, as_of='2026-11-07', entities=[],
+                       historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
+                       evidence=[{'path': 'code', 'quote': 'other'}])

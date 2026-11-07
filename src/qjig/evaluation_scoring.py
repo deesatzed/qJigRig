@@ -89,3 +89,42 @@ def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha2
             'reference_provenance': reference['provenance'], 'classification': classification,
             'answer_matches_reference': actual == expected, 'required_evidence_covered': covered,
             'semantic_assurance': 'not_assessed'}
+
+
+def make_reference(*, case_id: str, request, sources, as_of: str, entities: list[str], historical_as_known: bool,
+                   expected_answer: str, provenance: str, evidence: list[dict]) -> dict:
+    """Bind private reference assertions to source revisions and exact quotations.
+
+    Sources should come from the isolated loader. This function checks bytes and
+    quoted text, not the completeness of the protected manifest or correctness
+    of the reference judgment.
+    """
+    from .contracts import Request
+    from .evaluation import EvaluationSource
+    from .sources import SourceRevision, decode_source
+    if (not isinstance(request, Request) or not isinstance(sources, tuple) or not sources or
+            not all(isinstance(source, EvaluationSource) for source in sources)):
+        raise ContractError('request and isolated sources required')
+    revisions = {}
+    for source in sources:
+        if (source.path in revisions or not isinstance(source.raw, bytes) or not isinstance(source.sha256, str)
+                or not _SHA.fullmatch(source.sha256) or not hmac.compare_digest(hashlib.sha256(source.raw).hexdigest(), source.sha256)):
+            raise ContractError('invalid isolated source')
+        revisions[source.path] = SourceRevision.create(source.path, 'evaluation_allowlist', decode_source(source.raw, encoding='utf-8'))
+    if not isinstance(evidence, list) or not evidence:
+        raise ContractError('reference evidence required')
+    bound = []
+    for item in evidence:
+        if (not isinstance(item, dict) or set(item) != {'path', 'quote'} or not isinstance(item['path'], str)
+                or item['path'] not in revisions or not isinstance(item['quote'], str) or not item['quote'].strip()
+                or item['quote'] not in revisions[item['path']].decoded.text):
+            raise ContractError('reference evidence is not in source')
+        bound.append({'revision_id': revisions[item['path']].revision_id, 'quote': item['quote']})
+    if not isinstance(entities, list) or any(not isinstance(x, str) or not x.strip() for x in entities) or len(set(entities)) != len(entities):
+        raise ContractError('invalid reference entities')
+    ref = {'case_id': case_id, 'question': request.question, 'role': request.role, 'role_version': request.role_version,
+           'scope': request.scope, 'as_of': as_of, 'entities': sorted(entities), 'historical_as_known': historical_as_known,
+           'source_revisions': sorted(r.revision_id for r in revisions.values()), 'expected_answer': expected_answer,
+           'provenance': provenance, 'evidence': bound}
+    reference_digest(ref)
+    return ref

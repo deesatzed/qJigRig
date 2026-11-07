@@ -1221,7 +1221,8 @@
       "id": "T069",
       "phase": "P6",
       "depends_on": [
-        "T068"
+        "T068",
+        "T069A"
       ],
       "status": "pending",
       "files": [
@@ -2615,6 +2616,24 @@
       "acceptance": "An externally pinned reference must match the run context and sources; score records evidence coverage and keeps unvalidated reference provenance explicit.",
       "command": "python -m pytest tests/test_evaluation.py::test_direct_score_binds_private_reference_and_required_source_quotes -q",
       "evidence": "Red: no attributed reference comparison for direct archives existed. Green: a pinned private reference must match a structurally replayed run context and source set; exact required source quotes are compared to returned citations, and authored/AI-review provenance remains unvalidated. Synthetic tests cover matches, mismatches, deferrals, missing evidence, mismatched context and invalid hashes. Focused 17 passed; full offline 504 passed. Failed assignments, reference correctness, semantic relevance, full corpus isolation and aggregate comparison remain open."
+    },
+    {
+      "id": "T069A",
+      "phase": "P6",
+      "depends_on": [
+        "T063A",
+        "T068B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_private_reference_binds_allowlisted_source_snapshots",
+      "action": "Construct source-bound private evaluation references",
+      "acceptance": "A reference records explicit provenance and binds the exact decoded source revisions and quoted evidence from allowlisted bytes, without putting reference data in provider input.",
+      "command": "python -m pytest tests/test_evaluation.py::test_private_reference_binds_allowlisted_source_snapshots -q",
+      "evidence": "Red: private reference records could not be constructed from isolated source snapshots. Green: builder binds attributed references to verified bytes, exact revisions, request context and source quotations; rejects protected paths, changed bytes and absent quotations. Created 16 local authored-unvalidated references with 17 indexable quotes. Two stand-in end-to-end checks produced one matching reference and one unknown review. Focused 18 passed; full offline 505 passed. Protected-manifest completeness, semantic labels, full failure scoring and actual comparison remain open."
     }
   ]
 }
