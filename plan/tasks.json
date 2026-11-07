@@ -896,7 +896,8 @@
       "phase": "P4",
       "depends_on": [
         "T041",
-        "T049"
+        "T049",
+        "T052A"
       ],
       "status": "pending",
       "files": [
@@ -1843,6 +1844,24 @@
       "acceptance": "A real loopback browser can import a source, run a scoped authored control, and inspect evidence and deferral.",
       "command": "python -m pytest tests/test_web.py::test_browser_workspace_served_from_loopback -q",
       "evidence": "Red: browser workspace returned 404. Green: local HTML/CSS/JS connects to actual catalog and deterministic authored-question APIs. Headless Chromium imported and inspected a synthetic source, produced a supported no and deferred an inapplicable entity; 390px viewport had no horizontal overflow. Focused tests 6 passed; full offline suite 362 passed. See docs/verification/2026-11-07-browser-foundation.md. Full T054, accessibility review, hosted path and independent outcome evidence remain pending."
+    },
+    {
+      "id": "T052A",
+      "phase": "P4",
+      "depends_on": [
+        "T039",
+        "T041"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/costs.py"
+      ],
+      "test_file": "tests/test_costs.py",
+      "test_name": "test_resource_report_preserves_failed_and_unknown_usage",
+      "action": "Aggregate journaled work and unknown usage offline",
+      "acceptance": "Every journaled attempt, including failure and escalation, contributes to per-stage and total reporting; missing usage is not zero.",
+      "command": "python -m pytest tests/test_costs.py::test_resource_report_preserves_failed_and_unknown_usage -q",
+      "evidence": "Initial red: resource-report module absent. Green: synthetic completed, failed, uncertain, unfinished and escalation attempts are counted by stage and in totals; token/cost unknowns stay separate from known subtotals and elapsed time comes from recorded events. Duplicate/invalid terminal sequences refuse. Focused resource/budget/journal tests 70 passed; full offline suite 384 passed. One quiescent journal only; no cost provenance, cross-store validation, actual escalation or live model proof. T052 remains pending."
     }
   ]
 }
