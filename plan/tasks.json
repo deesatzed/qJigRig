@@ -3857,6 +3857,25 @@
       "acceptance": "Reopen a retained run without provider calls, report replay assurance and refuse structurally invalid archives.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: fresh archive route returned 404 after restart. Synthetic fresh run reopens from SQLite read-only with unanchored structural replay and preserved source evidence; corrupted result is rejected. Focused replay/service checks passed. This is not authenticated provenance, semantic correctness or hosted evaluation."
+    },
+    {
+      "id": "T056E",
+      "phase": "P5",
+      "depends_on": [
+        "T056D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/service.py",
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Discover and inspect saved fresh archives in the browser",
+      "acceptance": "List retained archives after restart, visibly preserve invalid entries, and open a structurally replayed run with evidence and clear assurance limits.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: fresh run listing returned 404. Synthetic browser and service tests exercise retained run discovery, restart, unanchored replay and source evidence; corrupted archive remains listed unavailable. Replay is not authenticated or semantic correctness evidence; source freshness remains unassessed."
     }
   ]
 }

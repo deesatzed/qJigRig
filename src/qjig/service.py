@@ -82,6 +82,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(200, {"source_state": state})
             except sqlite3.Error:
                 self._reply(500, {"error": "local storage failure"})
+        elif self.path == "/api/fresh-runs":
+            if self.server.fresh_backend is None:
+                self._reply(503, {'error': 'fresh planning is not configured'})
+                return
+            try:
+                with self.server.writer_lock:
+                    runs = self.server.fresh_backend.list_runs()
+                self._reply(200, {'runs': runs})
+            except (ContractError, OSError, sqlite3.Error):
+                self._reply(409, {'error': 'fresh archives unavailable'})
         elif self.path.startswith("/api/fresh-runs/"):
             ident = self.path.removeprefix("/api/fresh-runs/")
             if not re.fullmatch(r"[0-9a-f]{64}", ident) or self.server.fresh_backend is None:

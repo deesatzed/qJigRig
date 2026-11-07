@@ -77,6 +77,24 @@ class FreshWorkbench:
                     'traces': traces, 'verification': asdict(report),
                     'source_freshness': 'not_assessed'}
 
+    def list_runs(self) -> list[dict]:
+        runs = self.state_dir / 'runs'
+        if runs.is_symlink():
+            raise ContractError('unsafe fresh runs directory')
+        if not runs.exists():
+            return []
+        results = []
+        for directory in sorted(runs.iterdir()):
+            if not re.fullmatch(r'[0-9a-f]{64}', directory.name):
+                continue
+            try:
+                run = self.replay(directory.name)
+                results.append({'run_id': directory.name, 'question': run['request']['question'],
+                                'replay_status': run['verification']['status']})
+            except (ContractError, ValueError, KeyError, TypeError, AttributeError, sqlite3.Error, OSError):
+                results.append({'run_id': directory.name, 'question': None, 'replay_status': 'unavailable_or_invalid'})
+        return results
+
     def run(self, catalog_path: Path, body: object) -> dict:
         if not isinstance(body, dict) or set(body) != {'request', 'as_of', 'entities'} or not isinstance(body['request'], dict):
             raise ContractError('fresh request, date and entities required')

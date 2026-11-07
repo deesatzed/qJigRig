@@ -89,6 +89,8 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         server = create_server(tmp_path / 'catalog.sqlite', host='127.0.0.1', port=0, fresh_backend=backend)
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
         client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '1', 'Review'))
+        saved = client._request('GET', '/api/fresh-runs')
+        assert any(item['run_id'] == result['run_id'] and item['question'] == 'Refund limit?' for item in saved['runs'])
         replay = client._request('GET', '/api/fresh-runs/' + result['run_id'])
         assert replay['verification']['status'] == 'unanchored'
         assert replay['verification']['semantic_assurance'] == 'not_assessed'
@@ -96,11 +98,26 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert replay['result']['status'] == 'deferred'
         assert any(quote in item['text'] for trace in replay['traces'] for item in trace['evidence'])
         assert transport.calls_made == 4
+        if os.environ.get('QJIG_CHROMIUM_PATH'):
+            with playwright.sync_playwright() as p:
+                browser = p.chromium.launch(headless=True, executable_path=os.environ['QJIG_CHROMIUM_PATH'])
+                try:
+                    page = browser.new_page()
+                    page.goto(f'http://127.0.0.1:{server.server_address[1]}/')
+                    page.locator('#fresh-runs').get_by_role('button', name='Refund limit?', exact=False).first.click()
+                    page.get_by_text('Saved fresh run · unanchored structural replay').wait_for()
+                    assert quote in page.locator('#fresh-replay').inner_text()
+                    assert 'Decision correctness not assessed' in page.locator('#fresh-replay').inner_text()
+                finally:
+                    browser.close()
         with sqlite3.connect(tmp_path / 'fresh' / 'runs' / result['run_id'] / 'run.sqlite') as con:
             con.execute('DROP TRIGGER event_no_update')
             con.execute("UPDATE events SET data='{}' WHERE kind='run_result'")
         with pytest.raises(ClientError, match='409'):
             client._request('GET', '/api/fresh-runs/' + result['run_id'])
+        saved = client._request('GET', '/api/fresh-runs')
+        assert any(item['run_id'] == result['run_id'] and item['replay_status'] == 'unavailable_or_invalid'
+                   for item in saved['runs'])
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)
 
