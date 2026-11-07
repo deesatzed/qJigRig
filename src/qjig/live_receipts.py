@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .contracts import ContractError
 from .costs import summarize_resources
-from .evaluation_campaign import EvaluationCampaign, check_archive_config
+from .evaluation_campaign import EvaluationCampaign, applicability_digest, check_archive_config
 from .evaluation_scoring import reference_digest, score_reserved_assignment
 from .journal import Journal
 from .run_archive import RunArchive
@@ -20,7 +20,8 @@ from .run_archive import RunArchive
 
 def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, archive_root: Path, *, references: dict,
                               expected_config_sha256: str | None = None, expected_run_sha256: dict | None = None,
-                              expected_reference_sha256: dict | None = None, expected_journal_sha256: dict | None = None) -> dict:
+                              expected_reference_sha256: dict | None = None, expected_journal_sha256: dict | None = None,
+                              case_root: Path | None = None, case_inputs: dict | None = None) -> dict:
     """Inspect assigned work and retained scores without creating archives or calling providers.
 
     Callers must quiesce the separate stores and supply trusted external plan and
@@ -65,6 +66,44 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
     if (not isinstance(expected_journal_sha256, dict) or any(key not in assignments for key in expected_journal_sha256)
             or any(not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value) for value in expected_journal_sha256.values())):
         raise ContractError('invalid external journal anchors')
+    checked_cases = 0
+    if case_root is None or case_inputs is None:
+        issues.append('case_inputs_unavailable')
+    elif not isinstance(case_inputs, dict) or set(case_inputs) != case_ids:
+        invalid.append('case_set_invalid')
+    else:
+        from .applicability import ApplicabilityInputs
+        from .evaluation_cases import prepare_evaluation_case
+        from .sources import SourceRevision, decode_source
+        for case_id in sorted(case_ids):
+            try:
+                data = case_inputs[case_id]
+                if not isinstance(data, dict) or set(data) != {'lock', 'reference', 'protected', 'applicability_inputs'}:
+                    raise ContractError('invalid case inputs')
+                if case_id not in references or case_id not in expected_reference_sha256:
+                    issues.append('case_reference_anchor_unavailable')
+                    continue
+                if (data['reference'] != references[case_id]
+                        or reference_digest(data['reference']) != expected_reference_sha256[case_id]):
+                    raise ContractError('external case reference differs')
+                prepared = prepare_evaluation_case(case_root, manifest['design'], data['lock'], data['reference'], data['protected'],
+                    expected_design_sha256=manifest['design_sha256'], expected_case_sha256=manifest['case_hashes'][case_id])
+                inputs = data['applicability_inputs']
+                if not isinstance(inputs, ApplicabilityInputs):
+                    raise ContractError('case applicability unavailable')
+                if frozen is None:
+                    issues.append('case_configuration_unavailable')
+                    continue
+                revisions = {SourceRevision.create(source.path, 'evaluation_allowlist', decode_source(source.raw, encoding='utf-8')).revision_id
+                             for source in prepared.sources}
+                if (applicability_digest(inputs) != frozen['case_applicability'][case_id]
+                        or inputs.as_of != prepared.as_of or inputs.request_entities != frozenset(prepared.entities)
+                        or inputs.historical_as_known != prepared.historical_as_known
+                        or revisions != {member.revision_id for member in inputs.collection.members}):
+                    raise ContractError('case applicability differs')
+                checked_cases += 1
+            except (OSError, ContractError, ValueError, TypeError, KeyError, IndexError):
+                invalid.append('case_inputs_invalid')
     audit = campaign._goal.audit_journal(journal)
     if audit['status'] == 'invalid':
         invalid.append('goal_journal_invalid')
@@ -126,6 +165,7 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
         except (OSError, sqlite3.Error, ContractError, ValueError, TypeError, KeyError, IndexError):
             invalid.append('scored_receipt_invalid')
     return {'status': 'invalid' if invalid else 'incomplete' if issues else 'structurally_complete',
-            'assigned': len(assignments), 'scored': len(scored), 'checked': checked,
+            'assigned': len(assignments), 'scored': len(scored), 'checked': checked, 'checked_cases': checked_cases,
             'issues': sorted(set(invalid + issues)), 'resources': resources,
-            'provider_authenticity': 'not_established', 'semantic_assurance': 'not_assessed'}
+            'provider_authenticity': 'not_established', 'semantic_assurance': 'not_assessed',
+            'label_isolation': 'declared_exact_artifacts_only'}

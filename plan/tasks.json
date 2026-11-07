@@ -1347,7 +1347,8 @@
         "G02",
         "G03",
         "G04",
-        "G05"
+        "G05",
+        "G06"
       ],
       "status": "pending",
       "files": [
@@ -3765,6 +3766,23 @@
       "acceptance": "For scored assignments, missing external reference and fresh-journal anchors remain incomplete and mismatched anchors invalidate inspection.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "Independent verification repair while R08 remains open. Red: locally stored reference hashes were silently treated as anchors. Synthetic retained campaigns now exercise missing, matching and wrong external reference and fresh-journal hashes, in addition to run/config anchors and tampering. Anchors remain caller assertions and do not authenticate sources or provider execution. No model call occurred."
+    },
+    {
+      "id": "G06",
+      "phase": "verification",
+      "depends_on": [
+        "G05"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/live_receipts.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Inspect locked inputs for the entire assigned campaign",
+      "acceptance": "Recheck every declared case against its pinned design, source hashes, protected artifacts, external reference anchor and frozen applicability; missing case inputs remain incomplete.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Independent verification work while R08 remains open. Red: campaign inspector did not check the assigned case set or isolation. Synthetic tests exercise all case locks including unstarted cases, missing case inputs, changed references and protected/source overlap, alongside scored receipts. Isolation is limited to declared exact artifacts; transformed or undeclared labels, provider authenticity and final live verification remain unproved. No model call occurred."
     }
   ]
 }
