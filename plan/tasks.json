@@ -348,7 +348,7 @@
         "T017",
         "T006"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/packets.py"
       ],
@@ -356,7 +356,8 @@
       "test_name": "test_serialized_budget",
       "action": "Budget the complete evidence packet and mark truncation",
       "acceptance": "Included packet is within named limit and every omission has a reason",
-      "command": "python -m pytest tests/test_packets.py::test_serialized_budget -q"
+      "command": "python -m pytest tests/test_packets.py::test_serialized_budget -q",
+      "evidence": "Red: ModuleNotFoundError qjig.packets (initial contract). Green: focused 1 passed in 0.03s; tests/test_packets.py 3 passed in 0.04s; full suite 87 passed in 0.15s. 2026-11-06."
     },
     {
       "id": "T022",
