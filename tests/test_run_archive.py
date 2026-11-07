@@ -162,3 +162,15 @@ def test_archive_preserves_multiple_source_revisions(tmp_path):
             archive.add_revision(replace(first, revision_id=second.revision_id))
     with RunArchive.open(tmp_path / "run") as reopened:
         assert reopened.revision(first.revision_id).decoded.raw == b"line\r\n"
+
+
+def test_archive_context_is_immutable_and_hash_checked(tmp_path):
+    from qjig.contracts import ContractError
+
+    with RunArchive.open(tmp_path / "run") as archive:
+        first = {"request": {"id": "r"}, "corpus": {"rev": "unknown"}}
+        digest = archive.record_context(first)
+        assert archive.record_context(first) == digest
+        with pytest.raises(ContractError):
+            archive.record_context({"request": {"id": "changed"}, "corpus": {"rev": "unknown"}})
+        assert archive.context() == first

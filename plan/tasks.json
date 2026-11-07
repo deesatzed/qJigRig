@@ -1358,7 +1358,8 @@
         "R08",
         "R07A",
         "R07B",
-        "R07C"
+        "R07C",
+        "R07D"
       ],
       "status": "pending",
       "files": [],
@@ -1512,6 +1513,27 @@
       "acceptance": "Multiple revisions retain portable ids, exact bytes and decoding with verified identities before provider dispatch.",
       "command": "python -m pytest tests/test_run_archive.py::test_archive_preserves_multiple_source_revisions -q",
       "evidence": "Red: archive had no revision API and fresh run did not snapshot revisions. Green: distinct revisions of one source retain bytes and encoding across reopen, forged identity is rejected, and stand-in transport confirms source is archived before dispatch. Full offline suite 313 passed. R07 still requires configuration, applicability, sanitization, metadata, replay and live-harness integration."
+    },
+    {
+      "id": "R07D",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R07C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/run_archive.py",
+        "src/qjig/acquisition.py",
+        "tests/test_run_archive.py",
+        "tests/test_fresh_pipeline.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_fresh_archive_binds_request_configuration_and_applicability",
+      "action": "Persist fresh-run request and execution context",
+      "acceptance": "Run request, model settings, corpus revision IDs and applicability outcomes are immutable and available before dispatch.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_archive_binds_request_configuration_and_applicability -q",
+      "evidence": "Red: fresh run did not retain request/configuration/applicability context. Green: context is immutable, retained across reopen and available before synthetic provider dispatch; per-revision applicability is bound once and used throughout the run. Full offline suite 316 passed. Applicability records verdicts only, not underlying date/entity provenance; R07 remains open."
     }
   ]
 }

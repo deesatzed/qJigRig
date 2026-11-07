@@ -35,6 +35,9 @@ class RunArchive:
             os.chmod(db, 0o600)
             con.executescript('''
                 PRAGMA synchronous=FULL;
+                CREATE TABLE IF NOT EXISTS run_context(id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL, sha256 TEXT NOT NULL);
+                CREATE TRIGGER IF NOT EXISTS context_no_update BEFORE UPDATE ON run_context BEGIN SELECT RAISE(ABORT, 'immutable context'); END;
+                CREATE TRIGGER IF NOT EXISTS context_no_delete BEFORE DELETE ON run_context BEGIN SELECT RAISE(ABORT, 'immutable context'); END;
                 CREATE TABLE IF NOT EXISTS sources(source_id TEXT PRIMARY KEY, sha256 TEXT NOT NULL, raw BLOB NOT NULL);
                 CREATE TABLE IF NOT EXISTS revisions(revision_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, origin TEXT NOT NULL, encoding TEXT NOT NULL, raw BLOB NOT NULL);
                 CREATE TRIGGER IF NOT EXISTS revision_no_update BEFORE UPDATE ON revisions BEGIN SELECT RAISE(ABORT, 'immutable revision'); END;
@@ -59,6 +62,28 @@ class RunArchive:
 
     def __exit__(self, *args: object) -> None:
         self.close()
+
+    def record_context(self, context: dict) -> str:
+        """Bind one already-sanitized context to this archive; changed context is refused."""
+        if not isinstance(context, dict):
+            raise ContractError("run context must be an object")
+        encoded = json.dumps(context, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+        digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+        row = self._con.execute("SELECT data,sha256 FROM run_context WHERE id=1").fetchone()
+        if row is not None:
+            if row != (encoded, digest):
+                raise ContractError("archive is already bound to a different context")
+            return digest
+        self._con.execute("INSERT INTO run_context VALUES(1,?,?)", (encoded, digest))
+        return digest
+
+    def context(self) -> dict:
+        row = self._con.execute("SELECT data,sha256 FROM run_context WHERE id=1").fetchone()
+        if row is None:
+            raise ContractError("run context is missing")
+        if hashlib.sha256(row[0].encode("utf-8")).hexdigest() != row[1]:
+            raise ContractError("run context hash mismatch")
+        return json.loads(row[0])
 
     def add_source(self, source_id: str, raw: bytes) -> str:
         _check_source_id(source_id)

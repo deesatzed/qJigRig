@@ -17,9 +17,9 @@ from .retrieval import Candidate, bm25_candidates
 from .scheduler import next_need
 from .stopping import StopDecision, check_stop
 from .budgets import BudgetExceeded, BudgetLedger
-from .judge import JudgeResult, QuoteRef, judge_predicate
+from .judge import JUDGE_MAX_TOKENS, JudgeResult, QuoteRef, judge_predicate
 from .obligations import Obligation
-from .planner import PlanBinding, request_fresh_plan
+from .planner import PLANNER_MAX_TOKENS, PlanBinding, request_fresh_plan
 from .providers import ProviderUnavailable, ReservationFactory, Transport
 from .journal import ReconciliationRequired, UncertainOutcome
 from .plans import Plan as _Plan  # noqa: F401
@@ -253,9 +253,25 @@ def run_fresh(
     model-written, a material plan-coverage obligation is always opened; retrieval can offer exception
     passages for review but can never close it, so the result is a deferral that names the gap.
     """
+    revision_ids = sorted({entry.span.revision_id for entry in entries})
+    applicability = {revision_id: revision_applicability(revision_id) for revision_id in revision_ids}
+    if any(not isinstance(value, Applicability) for value in applicability.values()):
+        raise ContractError("revision applicability must be an Applicability verdict")
+    def bound_applicability(revision_id: str) -> Applicability:
+        return applicability.get(revision_id, Applicability.UNKNOWN)
     if archive is not None:
-        # Bind the entire supplied corpus before any external planner call.
-        for revision_id in sorted({entry.span.revision_id for entry in entries}):
+        # Bind the exact verdicts, effective settings and corpus before any planner call.
+        archive.record_context({
+            "schema": "qjig.fresh-context.v1", "request": request.to_dict(),
+            "budget": ledger.budget.to_dict() if ledger.budget else None,
+            "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS},
+            "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS},
+            "transport": transport.label, "want": want, "max_bytes": max_bytes,
+            "reservation_factory_configured": reservation_factory is not None,
+            "corpus": {key: value.value for key, value in applicability.items()},
+            "applicability_provenance": "verdict_only",
+        })
+        for revision_id in revision_ids:
             archive.add_revision(catalog.get_revision(revision_id))
     kw = {} if planner_max_tokens is None else {"max_tokens": planner_max_tokens}
     try:
@@ -284,7 +300,7 @@ def run_fresh(
                 return EvalResult(Outcome.UNKNOWN, "reconciliation_required")
             result = judge_predicate(
                 ledger, transport, question, packet, provider=judge[0], model=judge[1],
-                applicability=revision_applicability, reservation_factory=reservation_factory, archive=archive, **jkw,
+                applicability=bound_applicability, reservation_factory=reservation_factory, archive=archive, **jkw,
             )
             halted = any(side.failure in ("uncertain_outcome", "reconciliation_required")
                          for side in (result.positive, result.negative))
@@ -295,7 +311,7 @@ def run_fresh(
 
         return evaluate
 
-    check = lambda c: revision_applicability(c.revision_id)  # noqa: E731
+    check = lambda c: bound_applicability(c.revision_id)  # noqa: E731
     specs = {p.id: NeedSpec(p.question, want, max_bytes, make_evaluator(p.question, p.id)) for p in plan.predicates}
     obligations = ObligationLedger()
     for p in plan.predicates:

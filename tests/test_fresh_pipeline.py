@@ -195,3 +195,43 @@ def test_fresh_pipeline_archives_each_model_attempt(tmp_path):
         assert [event["kind"] for event in archive.events()] == ["request", "response", "validation"] * 3
         assert archive.source(REV.source_id) == TEXT.encode()
         assert archive.revision(REV.revision_id) == REV
+
+
+def test_fresh_archive_binds_request_configuration_and_applicability(tmp_path):
+    from qjig.run_archive import RunArchive
+
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE)])
+    with cat, journal, RunArchive.open(tmp_path / "archive") as archive:
+        send = transport.send
+        def check_context_before_send(request):
+            context = archive.context()
+            assert context["request"] == REQUEST.to_dict()
+            assert context["corpus"][REV.revision_id] == "match"
+            assert context["planner"] == {"provider": "stand-in", "model": "planner", "max_tokens": 1500}
+            assert context["judge"] == {"provider": "stand-in", "model": "judge", "max_tokens": 800}
+            return send(request)
+        transport.send = check_context_before_send
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                           revision_applicability=lambda rid: Applicability.MATCH, archive=archive)
+        assert result.status == "deferred"
+    with RunArchive.open(tmp_path / "archive") as archive:
+        assert archive.context()["request"]["request_id"] == REQUEST.request_id
+        assert archive.context()["applicability_provenance"] == "verdict_only"
+
+
+def test_fresh_run_uses_one_bound_applicability_snapshot(tmp_path):
+    from qjig.run_archive import RunArchive
+
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE)])
+    calls = []
+    def changing_applicability(revision_id):
+        calls.append(revision_id)
+        return Applicability.MATCH if len(calls) == 1 else Applicability.NO_MATCH
+    with cat, journal, RunArchive.open(tmp_path / "archive") as archive:
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                           revision_applicability=changing_applicability, archive=archive)
+        assert result.state.observations["p1"].outcome is Outcome.FALSE
+        assert calls == [REV.revision_id]
+        assert archive.context()["corpus"][REV.revision_id] == "match"
