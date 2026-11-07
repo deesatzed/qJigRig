@@ -193,7 +193,7 @@ class OpenRouterTransport:
             parsed_body = None
         metadata = self._response_metadata(parsed_body)
         if not 200 <= status < 300:
-            return RawResponse(status, body, None, metadata=metadata)
+            return RawResponse(status, body, self._usage(body), metadata=metadata)
         try:
             data = json.loads(body)
             content = data["choices"][0]["message"]["content"]

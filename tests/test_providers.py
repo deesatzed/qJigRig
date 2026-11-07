@@ -340,3 +340,26 @@ def test_typed_stand_in_consumes_named_required_budget(tmp_path):
         ledger = BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='smoke')
         result = call_typed(ledger, StandInTransport([RawResponse(200, GOOD, USAGE)]), REQ, SCHEMA, reservation=bound)
         assert result.ok and journal.events('r')[0].payload['required_id'] == 'judge'
+
+
+def test_http_error_preserves_reported_usage_for_budget_and_journal(tmp_path):
+    from qjig.goal_budget import GoalBudget
+    from qjig.providers import make_call_reservation
+
+    envelope = json.dumps({'error': {'message': 'upstream failed'}, 'usage': {
+        'prompt_tokens': 11, 'completion_tokens': 7, 'cost': 0.02}})
+    adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (502, envelope))
+    raw = adapter.send(REQ)
+    assert raw.http_status == 502
+    assert raw.usage == {'prompt_tokens': 11, 'completion_tokens': 7, 'cost_usd': 0.02}
+    limit = Budget(2, 500, 1)
+    model = {'id': REQ.model, 'context_length': 1000, 'top_provider': {'max_completion_tokens': 100},
+             'pricing': {'prompt': '0.001', 'completion': '0.001'}}
+    bound = make_call_reservation(REQ, model, input_tokens=100, input_bound_provenance='synthetic fixture')
+    with GoalBudget.open(tmp_path / 'goal.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal, Journal.open(tmp_path / 'j.sqlite') as journal:
+        result = call_typed(BudgetLedger(limit, journal, 'r', goal_budget=goal, partition='smoke'),
+                            StandInTransport([raw]), REQ, SCHEMA, reservation=bound)
+        assert result.failure == 'http_error'
+        assert journal.events('r')[-1].payload['usage'] == raw.usage
+        assert goal.actual_usage()['cost_usd'] == 0.02
+        assert goal.actual_usage()['unknown_calls'] == 0
