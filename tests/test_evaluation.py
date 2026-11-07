@@ -565,3 +565,43 @@ def test_paired_interventions_keep_missing_and_evidence_gaps_visible():
     changed = [records[0], {**records[1], 'score': {**records[1]['score'], 'required_evidence_covered': False}}]
     altered = summarize_intervention_pairs(design, changed, expected_design_sha256=digest)
     assert next(p for p in altered['pairs'] if p['parent_case']=='pilot' and p['arm']=='combined')['comparison'] == 'unknown_review'
+
+
+def test_case_lock_binds_question_sources_and_private_reference(tmp_path):
+    import copy
+    from qjig.contracts import Request
+    from qjig.evaluation import load_isolated_sources, validate_evaluation_design
+    from qjig.evaluation_cases import case_lock_digest, prepare_evaluation_case
+    from qjig.evaluation_scoring import make_reference, reference_digest
+    code, gold = b'Tests must pass.', b'private gold label'
+    (tmp_path/'code').write_bytes(code); (tmp_path/'label').write_bytes(gold)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    sources, protected = [item('code', code)], [item('label', gold)]
+    design = _sample_design(); design['families'][0]['source_hashes'] = [sources[0]['sha256']]
+    d = validate_evaluation_design(design)
+    ref = make_reference(case_id='dev', request=Request('hidden-arm', 'Do tests pass?', 'reviewer', '1', 'project'),
+                         sources=load_isolated_sources(tmp_path,sources,protected), as_of='2026-11-07', entities=[],
+                         historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
+                         evidence=[{'path':'code','quote':'must pass'}])
+    lock = {'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':d,
+            'question':'Do tests pass?','role':'reviewer','role_version':'1','scope':'project',
+            'as_of':'2026-11-07','entities':[],'historical_as_known':False,'sources':sources,
+            'reference_sha256':reference_digest(ref)}
+    digest = case_lock_digest(lock)
+    prepared = prepare_evaluation_case(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=digest)
+    assert prepared.question == 'Do tests pass?' and [x.raw for x in prepared.sources] == [code]
+    assert 'private gold label' not in repr(prepared) and 'expected_answer' not in repr(prepared)
+    changed = copy.deepcopy(lock); changed['question'] = 'Different question?'
+    with pytest.raises(ContractError):
+        prepare_evaluation_case(tmp_path,design,changed,ref,protected,expected_design_sha256=d,expected_case_sha256=digest)
+    other = b'A different family source.'
+    (tmp_path/'other').write_bytes(other)
+    foreign = copy.deepcopy(lock); foreign['sources'] = [item('other', other)]
+    with pytest.raises(ContractError, match='family'):
+        prepare_evaluation_case(tmp_path,design,foreign,ref,protected,expected_design_sha256=d,expected_case_sha256=case_lock_digest(foreign))
+    bad_ref = dict(ref, expected_answer='no')
+    with pytest.raises(ContractError):
+        prepare_evaluation_case(tmp_path,design,lock,bad_ref,protected,expected_design_sha256=d,expected_case_sha256=digest)
+    (tmp_path/'code').write_bytes(b'changed')
+    with pytest.raises(ContractError):
+        prepare_evaluation_case(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=digest)

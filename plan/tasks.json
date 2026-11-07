@@ -1133,7 +1133,8 @@
       "phase": "P6",
       "depends_on": [
         "T063",
-        "T064A"
+        "T064A",
+        "T064B"
       ],
       "status": "pending",
       "files": [
@@ -2695,6 +2696,24 @@
       "acceptance": "The initial and possible followup calls have matching bound reservations in one frozen set before any direct provider attempt.",
       "command": "python -m pytest tests/test_fresh_preflight.py::test_direct_preflight_requires_all_possible_slots_before_dispatch -q",
       "evidence": "Red: goal-budgeted direct runs had no complete initial/followup allocation. Green: declared bounds build configuration-bound slots; direct preflight requires both in one frozen set before dispatch. Synthetic missing/split set tests make zero calls; complete two-call case consumes slots and passes journal audit; changed routing ceiling rejects. Focused 66 passed before final ceiling case, final focused passed; full offline 509 passed. Caller bounds, provider price enforcement, retries, complete experiment and hosted authorization remain unverified."
+    },
+    {
+      "id": "T064B",
+      "phase": "P6",
+      "depends_on": [
+        "T064A",
+        "T069A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_cases.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_case_lock_binds_question_sources_and_private_reference",
+      "action": "Bind evaluation case inputs to a pinned design and private reference",
+      "acceptance": "Prepared case exposes only question context and pinned source bytes after checking design, per-case digest, source family and matching private reference.",
+      "command": "python -m pytest tests/test_evaluation.py::test_case_lock_binds_question_sources_and_private_reference -q",
+      "evidence": "Red: design, question, source hashes and reference could not be checked as one case binding. Green: prepared case checks external digests, declared family source hashes, protected-file loader and exact reference context, revisions and quotations, returning question context and source bytes only. Synthetic evaluation suite 22 passed; full offline 510 passed. Created and checked 16 private local draft bindings. Protected-manifest completeness, transformed labels, authorship, exact criteria and full experiment freeze remain unverified."
     }
   ]
 }

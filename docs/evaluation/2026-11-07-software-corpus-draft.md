@@ -8,6 +8,8 @@ Six source families are assigned to development (release, cache), pilot (deploy,
 
 The labels are `authored_unvalidated`. The checked-in design digest identifies a local draft, not independent labels or a completed evaluation. Current retain/revise/remove thresholds are placeholders, overlap, and must be replaced with exact, non-overlapping, predeclared criteria before any freeze. Complete price/token preflight, matching of arm access and work, review provenance, leakage checks and the full-run allocation remain open.
 
+Sixteen private case bindings now pin the case question, source paths and hashes, and reference identity to the draft design. All 16 were checked against their declared family and source-bound reference. These digests do not establish that the protected manifest is complete or that the design is frozen.
+
 Sixteen private source-bound reference records contain 17 exact evidence quotations, all present in locally indexed passages. A synthetic-only check produced `matches_reference` for one cited case and `unknown_review` for one missing-source case without a citation; these are mechanics, not model results.
 
 Sixteen local assertions over these authored sources checked the intended outcomes, including explicit missing-source cases. An initial BM25 search returned no hits for the two missing-source cases; a miss is not evidence of absence. No model call was made.
@@ -41,3 +43,4 @@ These hashes identify local private artifacts without publishing their contents.
 | `private/inputs.json` | `e5abaa4c09ac1b9b2358e87d5d94e5959e797df1bdc8de9e10b45493a31d5f0f` |
 | `private/labels.json` | `171e6f2ddebe4a0041be08a65314438da81a0483fbaf3b7ecee93b7542a2205b` |
 | `private/references.json` | `12b1b2fa97c879261abec0ca4bffd75ea6c055b77b6559d6d9bd904d99e7864d` |
+| `private/case_locks.json` | `6b62a2784e54926bc50174a243922e2ee89cf21d696f64cfc031cacea8ef8d09` |
