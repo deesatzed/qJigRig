@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -11,7 +12,7 @@ from .applicability import MemberMetadata, Interval
 from .cli import _dec, _member_from_row, _member_row, run_authored
 from .contracts import ContractError, Request
 from .claims import add_interpretation, list_interpretations
-from .indexing import index_entries, invalidate_superseded, save_entries
+from .indexing import index_entries
 from .sources import SourceRevision, decode_source
 from .store import Catalog
 
@@ -143,6 +144,9 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, KeyError, UnicodeError, ContractError, ArithmeticError, re.error):
             self._reply(400, {"error": "invalid request"})
             return
+        except sqlite3.Error:
+            self._reply(500, {"error": "local storage failure"})
+            return
 
     def _import_source(self, body: object) -> tuple[dict, bool]:
         if not isinstance(body, dict) or set(body) != _FIELDS:
@@ -157,17 +161,10 @@ class Handler(BaseHTTPRequestHandler):
         member = MemberMetadata(revision.revision_id, body["scope"], Interval(_dec(body["effective_from"]), _dec(body["effective_to"])),
                                 body["authority"], frozenset(body["entities"]), body["observed_at"])
         row = _member_row(revision.revision_id, member)
+        entries = index_entries(revision)
         with self.server.writer_lock, Catalog.open(self.server.catalog) as catalog:
-            existing = {item[0]: item for item in catalog.metadata_rows()}.get(revision.revision_id)
-            if existing is not None and existing != row:
-                raise ContractError("revision metadata conflict")
-            entries = index_entries(revision)
-            if existing is None:
-                catalog.add_revision(revision)
-                save_entries(catalog, entries)
-                invalidate_superseded(catalog, revision.source_id, current_revision_id=revision.revision_id)
-                catalog.put_metadata_row(row)
-        return {"source_id": revision.source_id, "revision_id": revision.revision_id, "entries": len(entries)}, existing is None
+            created = catalog.import_snapshot(revision, entries, row)
+        return {"source_id": revision.source_id, "revision_id": revision.revision_id, "entries": len(entries)}, created
 
 
 def create_server(catalog: str | Path, *, host: str = "127.0.0.1", port: int = 8766) -> LocalServer:

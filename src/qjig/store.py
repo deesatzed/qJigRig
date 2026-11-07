@@ -106,6 +106,43 @@ class Catalog:
                 ),
             )
 
+    def import_snapshot(self, revision: SourceRevision, entries: list, metadata: tuple) -> bool:
+        """Atomically add one service snapshot, including indexes and supersession."""
+        from .spans import verify_span
+        if not isinstance(revision, SourceRevision) or len(metadata) != 7 or metadata[0] != revision.revision_id:
+            raise ContractError("invalid snapshot metadata")
+        rows = []
+        for e in entries:
+            if e.revision_id != revision.revision_id:
+                raise ContractError("index belongs to another revision")
+            verify_span(revision, e.span)
+            rows.append((e.entry_id, e.revision_id, e.kind, e.title, e.method, e.state,
+                         e.span.start, e.span.end, e.span.text_sha256, e.parent_entry_id))
+        self._con.execute("BEGIN IMMEDIATE")
+        try:
+            existing = self._con.execute("SELECT * FROM member_metadata WHERE revision_id=?", (revision.revision_id,)).fetchone()
+            if existing is not None:
+                if existing != metadata:
+                    raise ContractError("revision metadata conflict")
+                self.get_revision(revision.revision_id)
+                self._con.commit()
+                return False
+            self._con.execute("INSERT OR IGNORE INTO revisions(revision_id,source_id,origin,encoding,raw) VALUES(?,?,?,?,?)",
+                              (revision.revision_id, revision.source_id, revision.origin, revision.decoded.encoding, revision.decoded.raw))
+            self.get_revision(revision.revision_id)
+            for row in rows:
+                present = self.index_row(row[0])
+                if present is not None and present != row:
+                    raise ContractError("existing snapshot index differs")
+                self._con.execute(f"INSERT OR IGNORE INTO index_entries({self._ENTRY_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?)", row)
+            self._con.execute("UPDATE index_entries SET state='stale' WHERE state IN ('proposed','accepted') AND revision_id != ? AND revision_id IN (SELECT revision_id FROM revisions WHERE source_id=?)", (revision.revision_id, revision.source_id))
+            self._con.execute("INSERT INTO member_metadata VALUES (?,?,?,?,?,?,?)", metadata)
+            self._con.commit()
+            return True
+        except BaseException:
+            self._con.rollback()
+            raise
+
     def _load(self, row: tuple) -> SourceRevision:
         revision_id, source_id, origin, encoding, raw = row
         rebuilt = SourceRevision.create(source_id, origin, decode_source(bytes(raw), encoding=encoding))
