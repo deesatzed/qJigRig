@@ -954,7 +954,8 @@
       "phase": "P5",
       "depends_on": [
         "T054",
-        "T055A"
+        "T055A",
+        "T055B"
       ],
       "status": "pending",
       "files": [
@@ -3607,6 +3608,21 @@
       "acceptance": "In two independent browser contexts against one local service, a source change in one makes the other client label its prior result stale and a rerun shows the changed evidence and outcome.",
       "command": "python -m pytest tests/test_source_browser.py::test_two_browser_clients_show_cross_client_source_change -q",
       "evidence": "Independent local verification while the R08 provider gate remains open, per GOAL.md. Two isolated Chrome contexts exercised synthetic authored evidence: the reader observed a 14-day no, the editor changed the source to 30 days, the reader marked its earlier result stale and reran to yes with the new evidence. Desktop and 390px contexts were used. This is one deterministic two-client path, not full browser acceptance, hosted behavior, authenticated roles or outcome validity."
+    },
+    {
+      "id": "T055B",
+      "phase": "verification",
+      "depends_on": [
+        "T054A"
+      ],
+      "status": "complete",
+      "files": [],
+      "test_file": "tests/test_source_browser.py",
+      "test_name": "test_browser_distinguishes_unknown_from_source_conflict",
+      "action": "Exercise unknown and conflicting evidence in the local browser",
+      "acceptance": "An authored no-hit case remains visibly unknown and overlapping applicable sources produce a deferred conflict showing both passages.",
+      "command": "python -m pytest tests/test_source_browser.py::test_browser_distinguishes_unknown_from_source_conflict -q",
+      "evidence": "Independent local verification while R08 remains open, as GOAL.md requires. Chromium showed a no-hit synthetic authored question as deferred with unknown, then two overlapping synthetic policies as deferred conflict with multiple_applicable_policies and both source passages. The conflict remained within a 390px viewport. This is one deterministic path and not full accessibility, semantic correctness or hosted behavior; no provider calls occurred."
     }
   ]
 }

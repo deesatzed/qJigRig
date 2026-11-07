@@ -98,3 +98,49 @@ def test_two_browser_clients_show_cross_client_source_change(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_browser_distinguishes_unknown_from_source_conflict(tmp_path):
+    playwright = pytest.importorskip('playwright.sync_api')
+    executable = os.environ.get('QJIG_CHROMIUM_PATH')
+    if not executable:
+        pytest.skip('QJIG_CHROMIUM_PATH is required for browser verification')
+    path = tmp_path / 'catalog.sqlite'
+    with Catalog.open(path) as catalog:
+        for name, days in (('first.md', 14), ('second.md', 30)):
+            revision = SourceRevision.create(name, 'synthetic', decode_source(
+                f'# Refund policy\nRefunds are accepted within {days} days.\n'.encode(), encoding='utf-8'))
+            catalog.import_snapshot(revision, index_entries(revision),
+                                    (revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+    server = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with playwright.sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, executable_path=executable)
+            try:
+                page = browser.new_page(viewport={'width': 1280, 'height': 900})
+                page.goto(f'http://127.0.0.1:{server.server_address[1]}/', wait_until='networkidle')
+                fields = {'question': 'Refund after 20 days?', 'scope': 'project', 'as_of': '2026-11-15',
+                          'value': '20', 'query': 'zephyrunfindable', 'pattern': r'within (\d+) days'}
+                for field, value in fields.items():
+                    page.locator(f'#question-form [name="{field}"]').fill(value)
+                page.locator('#question-form button[type="submit"]').click()
+                page.get_by_text('Deferred', exact=True).wait_for()
+                result = page.locator('#result')
+                assert 'unknown' in result.inner_text().lower()
+                page.locator('#question-form [name="query"]').fill('refund days policy')
+                page.locator('#question-form button[type="submit"]').click()
+                page.wait_for_function("() => document.querySelector('#result').textContent.includes('conflict')")
+                assert page.locator('#result-status').inner_text() == 'Deferred'
+                text = result.inner_text()
+                assert 'multiple_applicable_policies' in text
+                assert '14 days' in text and '30 days' in text
+                page.set_viewport_size({'width': 390, 'height': 844})
+                assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+            finally:
+                browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
