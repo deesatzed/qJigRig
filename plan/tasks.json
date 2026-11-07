@@ -771,7 +771,7 @@
         "T044",
         "T006"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/judge.py"
       ],
@@ -779,7 +779,8 @@
       "test_name": "test_quote_not_semantic_proof",
       "action": "Retain separate span-integrity and semantic-support assurance",
       "acceptance": "An exact wrong-entity quote cannot be marked independently supported",
-      "command": "python -m pytest tests/test_judge.py::test_quote_not_semantic_proof -q"
+      "command": "python -m pytest tests/test_judge.py::test_quote_not_semantic_proof -q",
+      "evidence": "Red: TypeError judge_predicate() got an unexpected keyword argument 'applicability' (behavior absent). Green: focused 1 passed in 0.06s; tests/test_judge.py 7 passed in 0.08s; full suite 226 passed in 1.30s. 2026-11-06."
     },
     {
       "id": "T046",
