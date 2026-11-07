@@ -1218,7 +1218,8 @@
         "T068F",
         "T068G",
         "T068H",
-        "T068I"
+        "T068I",
+        "T068J"
       ],
       "status": "pending",
       "files": [
@@ -3037,6 +3038,25 @@
       "acceptance": "Record a pinned journal reconciliation without inventing a response or usage; altered journal anchors and invalid event binding reject.",
       "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
       "evidence": "Red: reconciled planner, judge and reviewer timeout records could not be scored. A caller-pinned journal digest now permits validated matching reconciliation events to be retained as operator assertions while the outcome stays uncertain, without inventing provider response or usage. Missing/wrong anchors and changed reconciliation records refuse. Focused evaluation/journal/replay/goal 105 passed before final tamper checks; final failure cases 14 passed and full offline suite 540 passed. The digest is not authentication; reconciliation truth and executed-call usage remain unverified, and further retries or unrelated calls are refused rather than merged."
+    },
+    {
+      "id": "T068J",
+      "phase": "evaluation",
+      "depends_on": [
+        "T068F",
+        "T068I"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py",
+        "src/qjig/costs.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping",
+      "action": "Attach journal-derived resources to reserved assignment scores",
+      "acceptance": "Per-assignment physical calls, usage, unknown values and observed latency come from the pinned request journal and exclude unrelated requests.",
+      "command": "python -m pytest tests/test_evaluation.py::test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping -q",
+      "evidence": "Red: assignment-linked scores omitted physical resources, and journal aggregation could not select one request. Direct and combined scores now include request-scoped journal totals and stage breakdowns; fresh scoring requires an independently supplied matching journal digest. Synthetic tests cover direct and combined usage, missing/wrong anchors and exclusion of a separate uncertain request. Focused costs/evaluation/goal/replay 101 passed; full offline 540 passed. Values are reported usage, latency is observed call time, and anchor and quiescence are caller assumptions; missing assignments and actual hosted outcomes remain open."
     }
   ]
 }

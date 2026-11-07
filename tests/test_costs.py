@@ -53,3 +53,6 @@ def test_resource_report_includes_separate_requests_and_uncertain_calls(tmp_path
         report = summarize_resources(journal)
         assert report['total']['calls'] == 2 and report['total']['unknown_usage_calls'] == 2
         assert report['total']['cost_usd'] is None and report['stages']['judge']['calls'] == 2
+        only_one = summarize_resources(journal,request_id='one')
+        assert only_one['total']['calls'] == 1 and only_one['total']['unknown_usage_calls'] == 1
+        assert only_one['total']['cost_usd'] is None

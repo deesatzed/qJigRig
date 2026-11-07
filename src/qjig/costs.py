@@ -8,15 +8,18 @@ from .budgets import _valid_cost, _valid_tokens
 from .contracts import ContractError
 
 
-def summarize_resources(journal) -> dict:
+def summarize_resources(journal, *, request_id: str | None = None) -> dict:
     """Aggregate one complete, quiescent journal, retaining unknown fields.
 
     Latency is observed intent-to-terminal elapsed time, not provider inference
     time. An unfinished call makes the aggregate latency unknown. No inference,
     validation of provider-reported amounts, or cross-store reconciliation occurs.
     """
+    if request_id is not None and (not isinstance(request_id, str) or not request_id.strip()):
+        raise ContractError('invalid request identity')
     attempts = {}
-    for event in journal.all_events():
+    events = journal.all_events() if request_id is None else journal.events(request_id)
+    for event in events:
         key = (event.request_id, event.call_id)
         if event.kind == 'intent':
             if key in attempts:

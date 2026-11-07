@@ -239,6 +239,8 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
         raise ContractError('fresh run is not structurally verified')
     context, events = archive.context(), archive.events()
     request, inputs = context['request'], context['applicability_inputs']
+    if expected_journal_sha256 is not None:
+        _fresh_journal_for_scoring(journal, request['request_id'], expected_journal_sha256)
     binding = context.get('evaluation_case_binding')
     if (not isinstance(binding, dict) or binding.get('case_id') != reference['case_id']
             or binding.get('reference_sha256') != ref_hash
@@ -570,7 +572,11 @@ def score_reserved_assignment(goal, archive, journal, reference: dict, *, partit
         raise ContractError('goal and journal accounting differ')
     if expected_journal_sha256 is not None and scorer is score_direct_archive:
         raise ContractError('direct scoring binds the journal in its run digest')
+    if scorer is score_fresh_archive and expected_journal_sha256 is None:
+        raise ContractError('fresh assignment resources require a journal anchor')
     options = {'expected_journal_sha256':expected_journal_sha256} if scorer is score_fresh_archive else {}
     score = scorer(archive, journal, reference, expected_run_sha256=expected_run_sha256,
                    expected_reference_sha256=expected_reference_sha256, **options)
+    from .costs import summarize_resources
+    score['resources'] = summarize_resources(journal, request_id=request['request_id'])
     return {'arm':assignment['arm'], 'repeat':assignment['repeat'], 'score':score}

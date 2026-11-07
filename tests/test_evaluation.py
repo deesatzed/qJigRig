@@ -1082,6 +1082,8 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
         scored = score_reserved_assignment(goal,archive,journal,ref,partition='development',
             expected_plan_sha256=plan['sha256'],expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
         assert scored['arm']=='direct_full_evidence' and scored['repeat']==1 and scored['score']['case_id']=='dev'
+        assert scored['score']['resources']['total']['calls']==1
+        assert scored['score']['resources']['total']['input_tokens']==10
         with pytest.raises(ContractError):
             score_reserved_assignment(goal,archive,journal,ref,partition='development',expected_plan_sha256='0'*64,
                 expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
@@ -1178,9 +1180,21 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
                                     expected_reference_sha256=reference_digest(ref))
         assert score['request_status'] == 'deferred' and score['request_answer'] is None
         from qjig.evaluation_scoring import score_reserved_assignment
+        from qjig.evaluation_scoring import fresh_journal_digest
+        journal_anchor = fresh_journal_digest(journal,rid)
+        for invalid_anchor in (None,'0'*64):
+            with pytest.raises(ContractError):
+                score_reserved_assignment(goal,archive,journal,ref,partition='development',
+                    expected_plan_sha256=plan['sha256'],expected_run_sha256=replay.digest,
+                    expected_reference_sha256=reference_digest(ref),expected_journal_sha256=invalid_anchor)
         record = score_reserved_assignment(goal,archive,journal,ref,partition='development',
-            expected_plan_sha256=plan['sha256'],expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
-        assert record['arm']=='combined' and record['repeat']==1 and record['score']==score
+            expected_plan_sha256=plan['sha256'],expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref),
+            expected_journal_sha256=journal_anchor)
+        assert record['arm']=='combined' and record['repeat']==1
+        assert {k:v for k,v in record['score'].items() if k != 'resources'} == score
+        resource = record['score']['resources']['total']
+        assert resource['calls']==3 and resource['input_tokens']==30 and resource['output_tokens']==15
+        assert resource['cost_usd']==pytest.approx(0.0003) and resource['latency_seconds'] is not None
         with pytest.raises(ContractError):
             score_reserved_assignment(goal,archive,journal,ref,partition='pilot',expected_plan_sha256=plan['sha256'],
                 expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
