@@ -192,3 +192,73 @@ def test_direct_retrieval_uses_isolated_sources_and_bounded_followup(tmp_path):
     with pytest.raises(ContractError):
         DirectRetrieval(tmp_path, [item(path, raw) for path, raw in sources.items()],
                         [item('private/labels', secret)], want=1, max_bytes=3000, followups=0)
+
+
+def test_direct_agent_searches_and_answers_with_auditable_synthetic_calls(tmp_path):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_direct import run_direct
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    code = b'# Base\nChecks pass.\n\n# Exception\nAn admin can bypass checks.\n'
+    secret = b'PRIVATE_REFERENCE_ANSWER'
+    (tmp_path / 'rule.md').write_bytes(code); (tmp_path / 'label').write_bytes(secret)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    search = DirectRetrieval(tmp_path, [item('rule.md', code)], [item('label', secret)],
+                             want=2, max_bytes=3000, followups=1)
+    request = Request('r', 'Can admin bypass checks?', 'reviewer', '1', 'project')
+    probe = search.search('checks')
+    ident = probe['packet'].items[0].entry_id
+    # A new session ensures the tested pipeline performs both searches itself.
+    search = DirectRetrieval(tmp_path, [item('rule.md', code)], [item('label', secret)],
+                             want=2, max_bytes=3000, followups=1)
+    usage = {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01}
+    responses = [RawResponse(200, json.dumps({'action': 'search', 'query': 'admin', 'answer': None, 'citations': []}), usage),
+                 RawResponse(200, json.dumps({'action': 'answer', 'query': None, 'answer': 'yes',
+                                              'citations': [{'entry_id': ident, 'quote': 'Checks pass.'}]}), usage)]
+    with Journal.open(tmp_path / 'journal.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
+        ledger = BudgetLedger(Budget(2, 10000, 1), journal, 'r')
+        result = run_direct(search, request, ledger, StandInTransport(responses), archive=archive,
+                            provider='stand-in', model='test', max_tokens=100, as_of='2026-11-07', entities=['admin'])
+        assert result['status'] == 'recorded_unvalidated' and result['answer'] == 'yes'
+        assert len(result['searches']) == 2 and result['searches'][1]['query'] == 'admin'
+        assert len(result['call_ids']) == 2 and [e.kind for e in journal.events('r')] == ['intent', 'receipt'] * 2
+        requests = [e['data'] for e in archive.events() if e['kind'] == 'request']
+        assert len([e for e in archive.events() if e['kind'] == 'trace']) == 2
+        assert archive.events()[-1]['data'] == result and len(archive.revision_ids()) == 1
+        assert len(requests) == 2 and all(secret.decode() not in e['prompt'] for e in requests)
+        assert all('untrusted' in e['prompt'].lower() for e in requests)
+        assert all('2026-11-07' in e['prompt'] and 'admin' in e['prompt'] for e in requests)
+
+
+@pytest.mark.parametrize('mode', ['malformed', 'unsupported', 'timeout', 'budget'])
+def test_direct_agent_preserves_failures_without_inventing_an_answer(tmp_path, mode):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_direct import run_direct
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    code, secret = b'Checks must pass.', b'PRIVATE_REFERENCE_ANSWER'
+    (tmp_path / 'code').write_bytes(code); (tmp_path / 'label').write_bytes(secret)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    search = DirectRetrieval(tmp_path, [item('code', code)], [item('label', secret)], want=1, max_bytes=3000, followups=1)
+    body = 'not json' if mode == 'malformed' else json.dumps({'action': 'answer', 'query': None, 'answer': 'yes',
+                                                               'citations': [{'entry_id': 'made-up', 'quote': 'Checks'}]})
+    response = TimeoutError('synthetic timeout') if mode == 'timeout' else RawResponse(200, body, {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01})
+    with Journal.open(tmp_path / 'j.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
+        ledger = BudgetLedger(Budget(0 if mode == 'budget' else 2, 10000, 1), journal, 'r')
+        transport = StandInTransport([response])
+        result = run_direct(search, Request('r', 'Checks?', 'reviewer', '1', 'project'), ledger, transport,
+                            archive=archive, provider='stand-in', model='test', max_tokens=100, as_of='2026-11-07', entities=['admin'])
+        assert result['status'] == 'unavailable' and result['answer'] is None
+        assert result['failure'] == {'malformed': 'malformed_output', 'unsupported': 'unsupported_citation',
+                                     'timeout': 'UncertainOutcome', 'budget': 'BudgetExceeded'}[mode]
+        assert len(result['call_ids']) == (0 if mode == 'budget' else 1)
+        assert archive.events()[-1]['data'] == result
+        assert bool(journal.pending('r')) == (mode == 'timeout')

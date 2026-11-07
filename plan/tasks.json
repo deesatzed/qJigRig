@@ -1150,7 +1150,8 @@
       "depends_on": [
         "T064",
         "T048",
-        "T065A"
+        "T065A",
+        "T065B"
       ],
       "status": "pending",
       "files": [
@@ -2539,6 +2540,24 @@
       "acceptance": "A direct baseline can search allowlisted pinned sources with one bounded followup, explicit no-hit and truncation records, without loading protected artifacts.",
       "command": "python -m pytest tests/test_evaluation.py::test_direct_retrieval_uses_isolated_sources_and_bounded_followup -q",
       "evidence": "Red: no direct baseline search over isolated evaluation snapshots existed. Green: real lexical retrieval indexes hash-pinned allowlisted files, bounds hits, packet bytes and one followup, records no-hit and top-k omission counts, and refuses changed source hashes. Synthetic source/label tests and retrieval regressions 28 passed; full offline 491 passed. Protected-manifest completeness, transformed label leakage, provider integration, matched context/work and real comparisons remain unverified."
+    },
+    {
+      "id": "T065B",
+      "phase": "P6",
+      "depends_on": [
+        "T065A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation.py",
+        "src/qjig/evaluation_direct.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_direct_agent_searches_and_answers_with_auditable_synthetic_calls",
+      "action": "Connect isolated direct retrieval to budgeted synthetic provider decisions",
+      "acceptance": "A direct agent can use one search followup and return source-bound unvalidated responses with journaled attempts and archived sources; provider failures remain explicit.",
+      "command": "python -m pytest tests/test_evaluation.py::test_direct_agent_searches_and_answers_with_auditable_synthetic_calls -q",
+      "evidence": "Red: no budgeted direct retrieval agent existed. Green: synthetic two-call direct run searches pinned sources, accepts one model-directed followup, verifies quoted text is present in returned spans, and archives context, source snapshots, search traces, calls and result. Malformed, unsupported, timeout and budget failure tests retain explicit unavailable status and attempted call IDs. Focused 50 passed before final trace assertions; full offline 496 passed. Citation presence is not relevance or semantic validity; full experiment matching, preflight, replay verification and hosted execution remain open."
     }
   ]
 }

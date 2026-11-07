@@ -309,9 +309,12 @@ class DirectRetrieval:
             raise ContractError('invalid direct retrieval bounds')
         loaded = load_isolated_sources(root, sources, protected)
         entries = []
+        revisions = []
         for source in loaded:
             revision = SourceRevision.create(source.path, 'evaluation_allowlist', decode_source(source.raw, encoding='utf-8'))
             entries.extend(index_entries(revision))
+            revisions.append(revision)
+        self._revisions = tuple(revisions)
         self._entries = entries
         self._want = want
         self._max_bytes = max_bytes
