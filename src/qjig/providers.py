@@ -9,6 +9,7 @@ import json
 import socket
 import urllib.error
 import urllib.request
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol
@@ -85,12 +86,19 @@ def load_env_value(path: Path, name: str) -> str | None:
     return None
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def _urllib_post(url: str, headers: dict, payload: str, timeout: float) -> tuple[int, str]:
     req = urllib.request.Request(url, data=payload.encode("utf-8"), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.build_opener(_NoRedirect).open(req, timeout=timeout) as resp:
             return resp.status, resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            return exc.code, "redirect refused"
         return exc.code, exc.read().decode("utf-8", "replace")
     except urllib.error.URLError as exc:
         if isinstance(exc.reason, (socket.gaierror, ConnectionRefusedError)):
@@ -116,6 +124,10 @@ class OpenRouterTransport:
         if not key:
             raise ProviderUnavailable("OPENROUTER_API_KEY not available; nothing was sent")
         base = (load_env_value(self._env_path, "BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/")
+        parsed = urllib.parse.urlsplit(base)
+        if (parsed.scheme != "https" or parsed.netloc != "openrouter.ai"
+                or parsed.path != "/api/v1" or parsed.query or parsed.fragment):
+            raise ProviderUnavailable("untrusted provider endpoint; nothing was sent")
         payload = json.dumps({
             "model": request.model, "max_tokens": request.max_tokens,
             "messages": [{"role": "user", "content": request.prompt}],
@@ -123,8 +135,13 @@ class OpenRouterTransport:
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         try:
             status, body = self._post(f"{base}/chat/completions", headers, payload, self._timeout)
-        except (ConnectionRefusedError, socket.gaierror) as exc:
-            raise ProviderUnavailable(f"connection failed before send: {exc}") from exc
+        except (ConnectionRefusedError, socket.gaierror):
+            raise ProviderUnavailable("connection failed before send") from None
+        except Exception:
+            # A transport error after dispatch may have executed; do not expose its text
+            # or classify it as a definite failure. Reconciliation remains mandatory.
+            raise TimeoutError("provider outcome unknown") from None
+        body = body.replace(key, "[REDACTED]")
         if not 200 <= status < 300:
             return RawResponse(status, body, None)
         try:

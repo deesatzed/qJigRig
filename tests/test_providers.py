@@ -99,7 +99,7 @@ LIVE_BODY = json.dumps({
 })
 
 
-def _env(tmp_path, text="OPENROUTER_API_KEY=sk-test-SECRET\nBASE_URL=https://example.invalid/api/v1\n"):
+def _env(tmp_path, text="OPENROUTER_API_KEY=sk-test-SECRET\nBASE_URL=https://openrouter.ai/api/v1\n"):
     p = tmp_path / ".env"
     p.write_text(text)
     return p
@@ -118,7 +118,7 @@ def test_real_adapter_smoke_contract(tmp_path):
     raw = t.send(ProviderRequest("judge", "openrouter", "vendor/model-x", "Is it?", 50))
     assert raw.http_status == 200 and raw.body == GOOD
     assert raw.usage == {"prompt_tokens": 11, "completion_tokens": 7, "cost_usd": 0.0002}
-    assert seen["url"] == "https://example.invalid/api/v1/chat/completions"
+    assert seen["url"] == "https://openrouter.ai/api/v1/chat/completions"
     assert seen["payload"]["model"] == "vendor/model-x" and seen["payload"]["max_tokens"] == 50
     assert seen["payload"]["messages"] == [{"role": "user", "content": "Is it?"}]
     assert seen["headers"]["Authorization"] == "Bearer sk-test-SECRET"
@@ -156,5 +156,83 @@ def test_real_adapter_smoke_contract(tmp_path):
         raise TimeoutError("read timed out")
     with pytest.raises(TimeoutError):
         OpenRouterTransport(_env(tmp_path), post=slow).send(REQ)
-    assert load_env_value(_env(tmp_path), "BASE_URL") == "https://example.invalid/api/v1"
+    assert load_env_value(_env(tmp_path), "BASE_URL") == "https://openrouter.ai/api/v1"
     assert load_env_value(_env(tmp_path), "NOPE") is None
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_redirect_never_forwards_authorization(status):
+    """Real local HTTP servers, dummy credential only; no hosted call."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+    from qjig.providers import _urllib_post
+
+    received = []
+    class Destination(BaseHTTPRequestHandler):
+        def do_POST(self):
+            received.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.end_headers()
+        def do_GET(self):
+            received.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.end_headers()
+        def log_message(self, *args):
+            pass
+    destination = ThreadingHTTPServer(("127.0.0.1", 0), Destination)
+    class Redirect(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.send_response(status)
+            self.send_header("Location", f"http://127.0.0.1:{destination.server_port}/")
+            self.end_headers()
+        def log_message(self, *args):
+            pass
+    redirect = ThreadingHTTPServer(("127.0.0.1", 0), Redirect)
+    threads = [Thread(target=s.serve_forever, daemon=True) for s in (destination, redirect)]
+    for thread in threads:
+        thread.start()
+    try:
+        result, _ = _urllib_post(f"http://127.0.0.1:{redirect.server_port}/", {"Authorization": "Bearer DUMMY"}, "{}", 2)
+        assert result == status
+        assert received == []
+    finally:
+        for server in (redirect, destination):
+            server.shutdown()
+            server.server_close()
+        for thread in threads:
+            thread.join()
+
+
+@pytest.mark.parametrize("base", ["http://openrouter.ai/api/v1", "https://evil.example/api/v1", "https://openrouter.ai.evil.example/api/v1", "https://user@openrouter.ai/api/v1", "https://openrouter.ai/api/v1?key=bad"])
+def test_reject_untrusted_provider_endpoint(tmp_path, base):
+    sent = []
+    transport = OpenRouterTransport(_env(tmp_path, f"OPENROUTER_API_KEY=dummy\nBASE_URL={base}\n"), post=lambda *args: sent.append(args))
+    with pytest.raises(ProviderUnavailable):
+        transport.send(REQ)
+    assert not sent
+
+
+@pytest.mark.parametrize("kind", ["http_error", "timeout", "connection", "unexpected"])
+def test_provider_secrets_do_not_reach_journal_or_errors(tmp_path, kind):
+    """Fake HTTP responses and exceptions intentionally echo a dummy credential."""
+    secret = "sk-dummy-secret-value"
+    env = _env(tmp_path, f"OPENROUTER_API_KEY={secret}\nBASE_URL=https://openrouter.ai/api/v1\n")
+    def post(*args):
+        if kind == "http_error":
+            return 500, f"upstream echoed {secret}"
+        if kind == "timeout":
+            raise TimeoutError(f"request echoed {secret}")
+        if kind == "connection":
+            raise ConnectionRefusedError(f"request echoed {secret}")
+        raise RuntimeError(f"request echoed {secret}")
+    transport = OpenRouterTransport(env, post=post)
+    with Journal.open(tmp_path / "receipt.sqlite") as journal:
+        ledger = BudgetLedger(Budget(2, 1000, 1), journal, "safety")
+        try:
+            call_typed(ledger, transport, REQ, SCHEMA)
+        except Exception as exc:
+            assert secret not in str(exc)
+        events = journal.events("safety")
+        assert secret not in repr(events)
+        assert events[-1].kind == {"http_error": "receipt", "timeout": "uncertain", "connection": "failure", "unexpected": "uncertain"}[kind]
+        assert bool(journal.pending("safety")) == (kind in ("timeout", "unexpected"))

@@ -1302,14 +1302,17 @@
       "depends_on": [
         "R01"
       ],
-      "status": "pending",
-      "files": [],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py",
+        "tests/test_providers.py"
+      ],
       "test_file": "tests/test_providers.py",
       "test_name": "test_redirect_never_forwards_authorization",
       "action": "Refuse authenticated redirects and unsafe endpoints",
       "acceptance": "All redirect statuses refuse forwarding and receipts remain sanitized.",
       "command": "python -m pytest tests/test_providers.py::test_redirect_never_forwards_authorization -q",
-      "evidence": ""
+      "evidence": "Redirect red: 301/302/303 followed to second localhost server; 307/308 did not. Endpoint red: 5 unsafe URLs reached injected HTTP. Secret-path red: timeout and unexpected exceptions exposed dummy secret. Green: provider and journal regressions 26 passed; full offline suite 253 passed. Dummy credentials and local/fake HTTP only. Unexpected post-dispatch errors remain uncertain and require reconciliation."
     },
     {
       "id": "R06",
