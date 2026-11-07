@@ -185,3 +185,8 @@ Full qJig suite after T024: see the T024 receipt above. All P2 behavior is offli
 
 - `reachable_outcomes` enumerates every assignment of unresolved ids (unknown, conflict, missing) with known ids fixed and one shared value per id. A OR NOT A with A unknown gives {True} over 2 completions while plain `evaluate` stays unknown; A AND NOT A gives {False}; two free facts give {True,False} over 4; 6 unresolved ids = 64 completions allowed, 7 refused. Limit: it treats unresolved facts as independent free variables (no known logical relationships between distinct predicates).
 - Red: ImportError reachable_outcomes (initial contract). Green: focused 1 passed in 0.03s; tests/test_logic.py 33 passed in 0.04s; full suite 150 passed in 0.18s. 2026-11-06.
+
+## 2026-11-06: T029 complete
+
+- `is_material(predicate_id, expression, observations)`: true iff flipping that unresolved predicate changes the result under some completion of the other unresolved ones. Ordinary=false with exception unknown under OR is material; ordinary=true under OR, a known-false AND blocker, a tautology and an already-resolved predicate are not; conflict and missing observations count as unresolved. Limit: shares the independence assumption and 6-unresolved cap of T028.
+- Red: ImportError is_material (initial contract). Green: focused 1 passed in 0.03s; tests/test_logic.py 35 passed in 0.04s; full suite 152 passed in 0.19s. 2026-11-06.

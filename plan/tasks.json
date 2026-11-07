@@ -486,7 +486,7 @@
       "depends_on": [
         "T028"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/logic.py"
       ],
@@ -494,7 +494,8 @@
       "test_name": "test_material_predicate",
       "action": "Determine whether one unresolved fact can change the result",
       "acceptance": "Unknown exception stays material after ordinary=false under OR",
-      "command": "python -m pytest tests/test_logic.py::test_material_predicate -q"
+      "command": "python -m pytest tests/test_logic.py::test_material_predicate -q",
+      "evidence": "Red: ImportError is_material (initial contract). Green: focused 1 passed in 0.03s; tests/test_logic.py 35 passed in 0.04s; full suite 152 passed in 0.19s. 2026-11-06."
     },
     {
       "id": "T030",

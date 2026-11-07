@@ -130,3 +130,25 @@ def reachable_outcomes(expression: Mapping[str, Any], observations: Mapping[str,
         count += 1
         results.add(_bool_eval(expression, {**fixed, **dict(zip(free, combo))}))
     return Reachable(frozenset(results), count, tuple(free))
+
+
+def is_material(predicate_id: str, expression: Mapping[str, Any], observations: Mapping[str, Observation]) -> bool:
+    """Can this unresolved predicate change the result under some completion of the others?
+
+    False for a predicate that is already TRUE/FALSE, or that does not occur in the expression.
+    """
+    ids = _refs(expression)
+    if predicate_id not in ids:
+        return False
+    o = observations.get(predicate_id)
+    if o is not None and o.outcome in (Outcome.TRUE, Outcome.FALSE):
+        return False
+    fixed = {i: observations[i].outcome is Outcome.TRUE for i in ids if i in observations and observations[i].outcome in (Outcome.TRUE, Outcome.FALSE)}
+    others = sorted(i for i in ids if i not in fixed and i != predicate_id)
+    if len(others) + 1 > MAX_UNRESOLVED:
+        raise ContractError(f"more than {MAX_UNRESOLVED} unresolved predicates")
+    for combo in itertools.product((False, True), repeat=len(others)):
+        base = {**fixed, **dict(zip(others, combo))}
+        if _bool_eval(expression, {**base, predicate_id: False}) != _bool_eval(expression, {**base, predicate_id: True}):
+            return True
+    return False

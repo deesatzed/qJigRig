@@ -123,3 +123,32 @@ def test_more_than_six_unresolved_ids_refused():
         reachable_outcomes(expr, {})
     six = {"op": "or", "args": [ref(n) for n in names[:6]]}
     assert reachable_outcomes(six, {}).completions == 64
+
+
+from qjig.logic import is_material
+
+
+def test_material_predicate():
+    either = {"op": "or", "args": [ref("ordinary"), ref("exception")]}
+    both = {"op": "and", "args": [ref("ordinary"), ref("exception")]}
+    # ordinary=false with the exception unknown under OR: the exception still decides the answer
+    assert is_material("exception", either, obs(ordinary=F, exception=U)) is True
+    # ordinary=true under OR already settles it; the exception no longer matters
+    assert is_material("exception", either, obs(ordinary=T, exception=U)) is False
+    # under AND a known false blocks everything, so the unrelated unknown is immaterial
+    assert is_material("exception", both, obs(ordinary=F, exception=U)) is False
+    assert is_material("exception", both, obs(ordinary=T, exception=C)) is True  # conflict is unresolved too
+    # a missing observation counts as unresolved
+    assert is_material("exception", either, obs(ordinary=F)) is True
+
+
+def test_materiality_with_several_unresolved_and_shared_refs():
+    expr = {"op": "or", "args": [{"op": "and", "args": [ref("a"), ref("b")]}, ref("c")]}
+    assert is_material("a", expr, obs(a=U, b=U, c=U)) is True  # b true, c false: a decides
+    assert is_material("a", expr, obs(a=U, b=U, c=T)) is False  # c settles it
+    assert is_material("a", expr, obs(a=U, b=F, c=U)) is False  # b false kills the AND branch
+    taut = {"op": "or", "args": [ref("a"), {"op": "not", "args": [ref("a")]}]}
+    assert is_material("a", taut, obs(a=U)) is False  # same value in both branches: no effect
+    # a resolved or absent predicate is not an unresolved fact that could change the result
+    assert is_material("ordinary", expr, obs(a=U, b=U, c=U)) is False
+    assert is_material("a", expr, obs(a=T, b=U, c=U)) is False
