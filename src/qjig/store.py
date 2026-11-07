@@ -9,7 +9,7 @@ from pathlib import Path
 from .contracts import ContractError
 from .sources import SourceRevision, decode_source
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 class CatalogStateChanged(ContractError):
@@ -90,6 +90,19 @@ CREATE TRIGGER program_reviews_no_delete BEFORE DELETE ON program_reviews
   BEGIN SELECT RAISE(ABORT, 'program reviews are immutable'); END;
 """
 
+_PROGRAM_SCHEMA = """
+CREATE TABLE program_drafts(draft_id TEXT PRIMARY KEY, record TEXT NOT NULL);
+CREATE TRIGGER program_drafts_no_update BEFORE UPDATE ON program_drafts
+  BEGIN SELECT RAISE(ABORT, 'program drafts are immutable'); END;
+CREATE TRIGGER program_drafts_no_delete BEFORE DELETE ON program_drafts
+  BEGIN SELECT RAISE(ABORT, 'program drafts are immutable'); END;
+CREATE TABLE program_review_links(draft_id TEXT NOT NULL REFERENCES program_drafts(draft_id), review_id TEXT NOT NULL REFERENCES program_reviews(review_id), PRIMARY KEY(draft_id, review_id));
+CREATE TRIGGER program_review_links_no_update BEFORE UPDATE ON program_review_links
+  BEGIN SELECT RAISE(ABORT, 'program review links are immutable'); END;
+CREATE TRIGGER program_review_links_no_delete BEFORE DELETE ON program_review_links
+  BEGIN SELECT RAISE(ABORT, 'program review links are immutable'); END;
+"""
+
 
 def _execute_schema(con: sqlite3.Connection, script: str) -> None:
     """Execute schema statements inside the caller's transaction, including triggers."""
@@ -115,11 +128,11 @@ class Catalog:
             if version != SCHEMA_VERSION:
                 con.execute("BEGIN IMMEDIATE")
                 version = con.execute("PRAGMA user_version").fetchone()[0]
-                scripts = {0: _SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA,
-                           1: _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA,
-                           2: _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA,
-                           3: _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA, 4: _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA,
-                           5: _RUN_SCHEMA + _REVIEW_SCHEMA, 6: _REVIEW_SCHEMA}
+                scripts = {0: _SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA + _PROGRAM_SCHEMA,
+                           1: _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA + _PROGRAM_SCHEMA,
+                           2: _METADATA_SCHEMA + _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA + _PROGRAM_SCHEMA,
+                           3: _CLAIM_SCHEMA + _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA + _PROGRAM_SCHEMA, 4: _INTERVENTION_SCHEMA + _RUN_SCHEMA + _REVIEW_SCHEMA + _PROGRAM_SCHEMA,
+                           5: _RUN_SCHEMA + _REVIEW_SCHEMA + _PROGRAM_SCHEMA, 6: _REVIEW_SCHEMA + _PROGRAM_SCHEMA, 7: _PROGRAM_SCHEMA}
                 if version == SCHEMA_VERSION:
                     pass  # another opener completed the migration while we waited
                 elif version in scripts:
@@ -336,6 +349,19 @@ class Catalog:
         row = self._con.execute('SELECT bundle FROM authored_runs WHERE run_id=?', (run_id,)).fetchone()
         return None if row is None else row[0]
 
+    def _check_program_sources(self, binding: dict) -> None:
+        rows = {row[0]: row for row in self.metadata_rows()}
+        for revision in binding['corpus_revision_ids']:
+            try:
+                self.get_revision(revision)
+                row = rows[revision]
+                metadata = {'scope': row[1], 'authority_id': row[2], 'entity_keys': sorted(json.loads(row[3])),
+                            'effective_start': row[4], 'effective_end': row[5], 'observed_at': row[6]}
+            except (KeyError, ValueError, TypeError) as exc:
+                raise ContractError('program source or metadata unavailable') from exc
+            if metadata != binding['source_metadata'][revision]:
+                raise ContractError('program source metadata differs')
+
     def save_program_review(self, record: dict, expected_source_state: str) -> str:
         """Persist an unvalidated review bound to intact local revisions and metadata."""
         from .programs import verify_review
@@ -351,17 +377,7 @@ class Catalog:
         try:
             if self._source_state_in_transaction() != expected_source_state:
                 raise CatalogStateChanged('catalog changed before review storage')
-            rows = {row[0]: row for row in self.metadata_rows()}
-            for revision in payload['binding']['corpus_revision_ids']:
-                try:
-                    self.get_revision(revision)  # reconstitutes and checks the pinned identity
-                    row = rows[revision]
-                    metadata = {'scope': row[1], 'authority_id': row[2], 'entity_keys': sorted(json.loads(row[3])),
-                                'effective_start': row[4], 'effective_end': row[5], 'observed_at': row[6]}
-                except (KeyError, ValueError, TypeError) as exc:
-                    raise ContractError('review source or metadata unavailable') from exc
-                if metadata != payload['binding']['source_metadata'][revision]:
-                    raise ContractError('review source metadata differs')
+            self._check_program_sources(payload['binding'])
             self._con.execute('INSERT OR IGNORE INTO program_reviews VALUES (?,?)', (ident, data))
             if self._con.execute('SELECT record FROM program_reviews WHERE review_id=?', (ident,)).fetchone()[0] != data:
                 raise ContractError('review identity collision')
@@ -388,6 +404,78 @@ class Catalog:
 
     def program_review_ids(self) -> list[str]:
         return [row[0] for row in self._con.execute('SELECT review_id FROM program_reviews ORDER BY review_id')]
+
+    def save_program_draft(self, draft: dict, expected_source_state: str) -> str:
+        from .programs import verify_draft
+        try:
+            if verify_draft(draft, draft['payload']['binding']) != 'matching':
+                raise ContractError('invalid draft')
+            data = json.dumps(draft, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+            ident = draft['sha256']
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ContractError('invalid draft') from exc
+        self._con.execute('BEGIN IMMEDIATE')
+        try:
+            if self._source_state_in_transaction() != expected_source_state:
+                raise CatalogStateChanged('catalog changed before draft storage')
+            self._check_program_sources(draft['payload']['binding'])
+            self._con.execute('INSERT OR IGNORE INTO program_drafts VALUES (?,?)', (ident, data))
+            if self._con.execute('SELECT record FROM program_drafts WHERE draft_id=?', (ident,)).fetchone()[0] != data:
+                raise ContractError('draft identity collision')
+            self._con.commit()
+            return ident
+        except BaseException:
+            self._con.rollback()
+            raise
+
+    def program_draft(self, draft_id: str) -> dict | None:
+        from .programs import verify_draft
+        row = self._con.execute('SELECT record FROM program_drafts WHERE draft_id=?', (draft_id,)).fetchone()
+        if row is None:
+            return None
+        try:
+            draft = json.loads(row[0])
+            if draft['sha256'] != draft_id or verify_draft(draft, draft['payload']['binding']) != 'matching':
+                raise ContractError('stored draft integrity failure')
+            return draft
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ContractError('stored draft integrity failure') from exc
+
+    def link_program_review(self, draft_id: str, review_id: str, expected_source_state: str) -> None:
+        from .programs import verify_review
+        self._con.execute('BEGIN IMMEDIATE')
+        try:
+            if self._source_state_in_transaction() != expected_source_state:
+                raise CatalogStateChanged('catalog changed before review linking')
+            draft, review = self.program_draft(draft_id), self.program_review(review_id)
+            if draft is None or review is None:
+                raise ContractError('draft or review unavailable')
+            binding = draft['payload']['binding']
+            self._check_program_sources(binding)
+            if verify_review(review, binding, review['payload']['reviewer'])['status'] != 'matching_unvalidated':
+                raise ContractError('review binding differs from draft')
+            self._con.execute('INSERT OR IGNORE INTO program_review_links VALUES (?,?)', (draft_id, review_id))
+            self._con.commit()
+        except BaseException:
+            self._con.rollback()
+            raise
+
+    def program_status(self, draft_id: str, candidate_binding: dict) -> dict:
+        """Compare a supplied candidate to a saved draft; does not assess current corpus completeness."""
+        from .programs import verify_draft, verify_review
+        draft = self.program_draft(draft_id)
+        if draft is None:
+            raise ContractError('draft unavailable')
+        match = verify_draft(draft, candidate_binding)
+        if match == 'invalid':
+            raise ContractError('invalid candidate binding')
+        review_ids = [row[0] for row in self._con.execute('SELECT review_id FROM program_review_links WHERE draft_id=? ORDER BY review_id', (draft_id,))]
+        for review_id in review_ids:
+            review = self.program_review(review_id)
+            if review is None or verify_review(review, draft['payload']['binding'], review['payload']['reviewer'])['status'] != 'matching_unvalidated':
+                raise ContractError('stored review link invalid')
+        return {'status': 'stale' if match == 'stale' else 'review_record_linked' if review_ids else 'draft',
+                'review_ids': review_ids, 'activation': False, 'semantic_assurance': 'not_assessed'}
 
     def put_interpretation(self, claim_id: str, payload: str) -> bool:
         with self._con:

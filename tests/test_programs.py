@@ -89,3 +89,46 @@ def test_review_record_persistence_and_source_binding(tmp_path):
     with Catalog.open(path) as catalog:
         with pytest.raises(ContractError, match='integrity'):
             catalog.program_review(ident)
+
+
+def test_draft_links_only_exact_review_without_activation(tmp_path):
+    import pytest
+    from qjig.contracts import ContractError
+    from qjig.programs import make_draft, make_review
+    from qjig.sources import SourceRevision, decode_source
+    from qjig.store import Catalog
+    revision = SourceRevision.create('source.md', 'fixture', decode_source(b'# Rule\nText\n', encoding='utf-8'))
+    metadata = {'scope': 'project', 'authority_id': None, 'entity_keys': [], 'effective_start': '2026-01-01',
+                'effective_end': 'open', 'observed_at': None}
+    binding = {'request': Request('r', 'Question?', 'reviewer', '1', 'project').to_dict(),
+               'plan': {'origin': 'fresh', 'predicates': [{'id': 'p', 'question': 'Text?'}], 'expression': {'ref': 'p'}},
+               'corpus_revision_ids': [revision.revision_id], 'source_metadata': {revision.revision_id: metadata},
+               'as_of': '2026-11-07', 'entities': [], 'historical_as_known': False,
+               'planner': {'provider': 'stand-in', 'model': 'planner', 'prompt_sha256': 'b'*64, 'config': {}}}
+    reviewer = {'kind': 'synthetic', 'provider': 'stand-in', 'model': 'reviewer', 'prompt_sha256': 'c'*64, 'config': {}}
+    draft = make_draft(binding)
+    review = make_review(binding, reviewer, {'assessment': 'no_gap_found'})
+    different = copy.deepcopy(binding)
+    different['request']['question'] = 'Different question?'
+    unrelated_review = make_review(different, reviewer, {'assessment': 'no_gap_found'})
+    path = tmp_path / 'catalog.sqlite'
+    with Catalog.open(path) as catalog:
+        catalog.add_revision(revision)
+        catalog.put_metadata_row((revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+        state = catalog.source_state()
+        draft_id = catalog.save_program_draft(draft, state)
+        assert catalog.program_status(draft_id, binding)['status'] == 'draft'
+        review_id = catalog.save_program_review(review, state)
+        other_id = catalog.save_program_review(unrelated_review, state)
+        with pytest.raises(ContractError):
+            catalog.link_program_review(draft_id, other_id, state)
+        catalog.link_program_review(draft_id, review_id, state)
+        catalog.link_program_review(draft_id, review_id, state)
+    with Catalog.open(path) as catalog:
+        status = catalog.program_status(draft_id, binding)
+        assert status['status'] == 'review_record_linked' and status['review_ids'] == [review_id]
+        assert status['activation'] is False and status['semantic_assurance'] == 'not_assessed'
+        assert catalog.program_status(draft_id, different)['status'] == 'stale'
+        catalog._con.execute('INSERT INTO program_review_links VALUES (?,?)', (draft_id, other_id))
+        with pytest.raises(ContractError, match='link invalid'):
+            catalog.program_status(draft_id, binding)

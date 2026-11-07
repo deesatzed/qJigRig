@@ -996,7 +996,8 @@
         "T057B",
         "T057C",
         "T057D",
-        "T057E"
+        "T057E",
+        "T057F"
       ],
       "status": "pending",
       "files": [
@@ -2323,6 +2324,25 @@
       "acceptance": "Saved synthetic review provenance, limits and source references are available through the local service and visible browser controls.",
       "command": "python -m pytest tests/test_web.py::test_review_records_are_visible_from_local_workbench -q",
       "evidence": "Red: no review endpoint or browser view existed. Green: local service exposes integrity-checked saved review summaries and browser shows unvalidated reviewer provenance, result, snapshot context and source inspection. Tampered storage returns an error. Optional synthetic Chromium walkthrough passed keyboard source inspection and 390px no-overflow. Full offline suite 470 passed. This is read-only inspection, not hosted review, freshness, accessibility certification, activation or full T057."
+    },
+    {
+      "id": "T057F",
+      "phase": "P5",
+      "depends_on": [
+        "T057B",
+        "R01"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/programs.py",
+        "src/qjig/store.py"
+      ],
+      "test_file": "tests/test_programs.py",
+      "test_name": "test_draft_links_only_exact_review_without_activation",
+      "action": "Persist draft and exact-bound review links without activation",
+      "acceptance": "Drafts and review links survive restart, reject changed request or source binding, and never activate a program.",
+      "command": "python -m pytest tests/test_programs.py::test_draft_links_only_exact_review_without_activation -q",
+      "evidence": "Red: no durable program draft or review-link lifecycle existed. Green: schema v8 stores immutable source-bound drafts and exact-bound review links; synthetic tests cover mismatch refusal, idempotency, restart, stale candidate, forged link and no activation. Prior migration fixtures updated and v7 migration tested. Full offline 472 passed; synthetic review Chromium walkthrough passed. This does not establish authenticated provenance, current completeness, provider quality, UI lifecycle or full T057/R01B."
     }
   ]
 }

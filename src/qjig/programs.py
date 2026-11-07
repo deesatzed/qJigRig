@@ -85,6 +85,24 @@ def _digest(payload):
     return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf-8')).hexdigest()
 
 
+def make_draft(binding: dict) -> dict:
+    """Create an immutable draft snapshot; this never activates a program."""
+    payload = {'schema': 'qjig.program-draft.v1', 'binding': _binding(binding)}
+    return {'payload': payload, 'sha256': _digest(payload)}
+
+
+def verify_draft(draft: dict, binding: dict) -> str:
+    try:
+        if not isinstance(draft, dict) or set(draft) != {'payload', 'sha256'}:
+            return 'invalid'
+        payload = draft['payload']
+        if not isinstance(payload, dict) or set(payload) != {'schema', 'binding'} or make_draft(payload['binding']) != draft:
+            return 'invalid'
+        return 'matching' if _binding(binding) == payload['binding'] else 'stale'
+    except (ContractError, TypeError, KeyError, ValueError, AttributeError):
+        return 'invalid'
+
+
 def make_review(binding: dict, reviewer: dict, result: dict) -> dict:
     if not isinstance(result, dict) or not result:
         raise ContractError('review result is required')

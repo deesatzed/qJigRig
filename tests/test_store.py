@@ -83,6 +83,8 @@ def test_version_1_catalog_migrates_to_add_index_table(tmp_path):
     con.execute("DROP TABLE agent_interpretations")
     con.execute("DROP TABLE interventions")
     con.execute("DROP TABLE authored_runs")
+    con.execute("DROP TABLE program_review_links")
+    con.execute("DROP TABLE program_drafts")
     con.execute("DROP TABLE program_reviews")
     con.execute("PRAGMA user_version = 1")
     con.commit()
@@ -90,7 +92,7 @@ def test_version_1_catalog_migrates_to_add_index_table(tmp_path):
     with Catalog.open(db) as cat:
         assert cat.get_revision(r.revision_id) == r  # old data intact
         assert cat.index_rows(r.revision_id) == []  # new table present
-    assert sqlite3.connect(db).execute("PRAGMA user_version").fetchone()[0] == 7
+    assert sqlite3.connect(db).execute("PRAGMA user_version").fetchone()[0] == 8
 
 
 def test_version_2_catalog_migrates_to_add_metadata_table(tmp_path):
@@ -103,6 +105,8 @@ def test_version_2_catalog_migrates_to_add_metadata_table(tmp_path):
     con.execute("DROP TABLE agent_interpretations")
     con.execute("DROP TABLE interventions")
     con.execute("DROP TABLE authored_runs")
+    con.execute("DROP TABLE program_review_links")
+    con.execute("DROP TABLE program_drafts")
     con.execute("DROP TABLE program_reviews")
     con.execute("PRAGMA user_version = 2")
     con.commit()
@@ -122,13 +126,15 @@ def test_version_3_catalog_migrates_interpretations_without_losing_sources(tmp_p
         con.execute('DROP TABLE agent_interpretations')
         con.execute('DROP TABLE interventions')
         con.execute('DROP TABLE authored_runs')
+        con.execute('DROP TABLE program_review_links')
+        con.execute('DROP TABLE program_drafts')
         con.execute('DROP TABLE program_reviews')
         con.execute('PRAGMA user_version = 3')
     with Catalog.open(db) as cat:
         assert cat.get_revision(original.revision_id) == original
         assert cat.interpretation_rows() == []
     with sqlite3.connect(db) as con:
-        assert con.execute('PRAGMA user_version').fetchone()[0] == 7
+        assert con.execute('PRAGMA user_version').fetchone()[0] == 8
 
 
 def test_failed_migration_rolls_back_schema_changes(tmp_path):
@@ -140,6 +146,8 @@ def test_failed_migration_rolls_back_schema_changes(tmp_path):
         con.execute('DROP TABLE agent_interpretations')
         con.execute('DROP TABLE interventions')
         con.execute('DROP TABLE authored_runs')
+        con.execute('DROP TABLE program_review_links')
+        con.execute('DROP TABLE program_drafts')
         con.execute('DROP TABLE program_reviews')
         con.execute('PRAGMA user_version = 3')
         con.execute("CREATE TRIGGER agent_interpretations_no_update AFTER INSERT ON revisions BEGIN SELECT 1; END")
@@ -167,13 +175,15 @@ def test_concurrent_openers_initialize_and_migrate_once(tmp_path):
         con.execute('DROP TABLE agent_interpretations')
         con.execute('DROP TABLE interventions')
         con.execute('DROP TABLE authored_runs')
+        con.execute('DROP TABLE program_review_links')
+        con.execute('DROP TABLE program_drafts')
         con.execute('DROP TABLE program_reviews')
         con.execute('PRAGMA user_version = 3')
     barrier = Barrier(6)
     with ThreadPoolExecutor(max_workers=6) as pool:
         assert list(pool.map(open_catalog, range(6))) == [[]] * 6
     with sqlite3.connect(db) as con:
-        assert con.execute('PRAGMA user_version').fetchone()[0] == 7
+        assert con.execute('PRAGMA user_version').fetchone()[0] == 8
         assert con.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='agent_interpretations'").fetchone()[0] == 1
 
 
@@ -191,6 +201,8 @@ def test_process_exit_during_migration_rolls_back_schema(tmp_path):
         con.execute('DROP TABLE agent_interpretations')
         con.execute('DROP TABLE interventions')
         con.execute('DROP TABLE authored_runs')
+        con.execute('DROP TABLE program_review_links')
+        con.execute('DROP TABLE program_drafts')
         con.execute('DROP TABLE program_reviews')
         con.execute('PRAGMA user_version = 3')
     code = '''
@@ -222,6 +234,8 @@ def test_version_4_catalog_migrates_interventions_preserving_records(tmp_path):
     with sqlite3.connect(db) as con:
         con.execute('DROP TABLE interventions')
         con.execute('DROP TABLE authored_runs')
+        con.execute('DROP TABLE program_review_links')
+        con.execute('DROP TABLE program_drafts')
         con.execute('DROP TABLE program_reviews')
         con.execute('PRAGMA user_version = 4')
     with Catalog.open(db) as catalog:
@@ -237,6 +251,8 @@ def test_version_5_catalog_migrates_runs_preserving_revisions(tmp_path):
         catalog.add_revision(original)
     with sqlite3.connect(db) as con:
         con.execute('DROP TABLE authored_runs')
+        con.execute('DROP TABLE program_review_links')
+        con.execute('DROP TABLE program_drafts')
         con.execute('DROP TABLE program_reviews')
         con.execute('PRAGMA user_version = 5')
     with Catalog.open(db) as catalog:
@@ -250,10 +266,28 @@ def test_version_6_catalog_migrates_reviews_preserving_revisions(tmp_path):
     with Catalog.open(db) as catalog:
         catalog.add_revision(original)
     with sqlite3.connect(db) as con:
+        con.execute('DROP TABLE program_review_links')
+        con.execute('DROP TABLE program_drafts')
         con.execute('DROP TABLE program_reviews')
         con.execute('PRAGMA user_version = 6')
     with Catalog.open(db) as catalog:
         assert catalog.get_revision(original.revision_id) == original
         assert catalog.program_review('missing') is None
     with sqlite3.connect(db) as con:
-        assert con.execute('PRAGMA user_version').fetchone()[0] == 7
+        assert con.execute('PRAGMA user_version').fetchone()[0] == 8
+
+
+def test_version_7_catalog_migrates_programs_preserving_revisions(tmp_path):
+    db = tmp_path / 'catalog.sqlite'
+    original = rev(b'original source\n')
+    with Catalog.open(db) as catalog:
+        catalog.add_revision(original)
+    with sqlite3.connect(db) as con:
+        con.execute('DROP TABLE program_review_links')
+        con.execute('DROP TABLE program_drafts')
+        con.execute('PRAGMA user_version = 7')
+    with Catalog.open(db) as catalog:
+        assert catalog.get_revision(original.revision_id) == original
+        assert catalog.program_draft('missing') is None
+    with sqlite3.connect(db) as con:
+        assert con.execute('PRAGMA user_version').fetchone()[0] == 8
