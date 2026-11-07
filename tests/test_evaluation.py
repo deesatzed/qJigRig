@@ -661,7 +661,8 @@ def test_locked_direct_run_binds_case_without_exposing_reference(tmp_path):
             score_direct_archive(archive,journal,swapped,expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(swapped))
 
 
-def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path):
+@pytest.mark.parametrize(('reference_quote', 'comparison', 'covered'), [('Tests must pass.', 'matches_reference', True), ('# Checks', 'unknown_review', False)])
+def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path, reference_quote, comparison, covered):
     import json
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
     from qjig.budgets import BudgetLedger
@@ -683,7 +684,7 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
     ref = make_reference(case_id='dev',request=Request('hidden','Do tests pass?','reviewer','1','project'),
                          sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],
                          historical_as_known=False,expected_answer='yes',provenance='authored_unvalidated',
-                         evidence=[{'path':'code','quote':'Tests must pass.'}])
+                         evidence=[{'path':'code','quote':reference_quote}])
     lock = {'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':d,'question':'Do tests pass?',
             'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
             'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
@@ -714,4 +715,16 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
         assert archive.context()['evaluation_case_binding']['case_sha256']==lock_hash
         prompts = [e['data']['prompt'] for e in archive.events() if e['kind']=='request']
         assert all('PRIVATE_ARM_MAPPING' not in p and gold.decode() not in p and reference_digest(ref) not in p for p in prompts)
-        assert verify_archive(archive).status=='unanchored'
+        replay = verify_archive(archive)
+        assert replay.status=='unanchored'
+        from qjig.evaluation_scoring import score_fresh_archive
+        score = score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
+        assert score['request_status']=='deferred' and score['request_answer'] is None
+        assert score['conditional_answer']=='yes' and score['conditional_comparison']==comparison
+        assert score['required_evidence_covered'] is covered and score['semantic_assurance']=='not_assessed'
+        recorded = journal._con.execute("SELECT payload FROM events WHERE kind='receipt' LIMIT 1").fetchone()[0]
+        corrupted = json.loads(recorded); corrupted['usage']['cost_usd'] = 0
+        journal._con.execute('DROP TRIGGER events_no_update')
+        journal._con.execute("UPDATE events SET payload=? WHERE kind='receipt' AND request_seq=2", (json.dumps(corrupted),))
+        with pytest.raises(ContractError, match='journal'):
+            score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))

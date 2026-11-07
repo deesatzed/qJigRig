@@ -213,3 +213,85 @@ def summarize_intervention_pairs(design: dict, records: list[dict], *, expected_
                               'expected_change': expected_change, 'observed_change': observed_change, 'comparison': comparison})
     return {'design_sha256': expected_design_sha256, 'pairs': pairs,
             'complete_pairs': sum(p['evidence_covered'] for p in pairs), 'semantic_assurance': 'not_assessed'}
+
+
+def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha256: str,
+                        expected_reference_sha256: str) -> dict:
+    """Score a replayed fresh graph separately from its mandatory request deferral.
+
+    Exact reference quotes seen in model support statements are mechanical
+    observations, not proof of relevance, completeness or reference correctness.
+    """
+    from .logic import Observation, Outcome, evaluate
+    from .replay import verify_archive
+    ref_hash = reference_digest(reference)
+    if (not isinstance(expected_reference_sha256, str) or not _SHA.fullmatch(expected_reference_sha256)
+            or not hmac.compare_digest(ref_hash, expected_reference_sha256)
+            or not isinstance(expected_run_sha256, str) or not _SHA.fullmatch(expected_run_sha256)):
+        raise ContractError('evaluation anchors required')
+    replay = verify_archive(archive, expected_digest=expected_run_sha256)
+    if replay.status != 'structurally_verified':
+        raise ContractError('fresh run is not structurally verified')
+    context, events = archive.context(), archive.events()
+    request, inputs = context['request'], context['applicability_inputs']
+    binding = context.get('evaluation_case_binding')
+    if (not isinstance(binding, dict) or binding.get('case_id') != reference['case_id']
+            or binding.get('reference_sha256') != ref_hash
+            or any(reference[k] != request[k] for k in ('question', 'role', 'role_version', 'scope'))
+            or not isinstance(inputs, dict) or reference['as_of'] != inputs['as_of']
+            or reference['entities'] != inputs['request_entities']
+            or reference['historical_as_known'] != inputs['historical_as_known']
+            or reference['source_revisions'] != sorted(context['corpus'])):
+        raise ContractError('reference differs from fresh run context')
+    revisions = {ident: archive.revision(ident) for ident in reference['source_revisions']}
+    if any(item['quote'] not in revisions[item['revision_id']].decoded.text for item in reference['evidence']):
+        raise ContractError('reference quote not in source')
+    requests = [e for e in events if e['kind'] == 'request']
+    recorded = journal.events(request['request_id'])
+    if len(recorded) != 2 * len(requests):
+        raise ContractError('fresh journal call count differs')
+    responses = {e['call_id']: e['data'] for e in events if e['kind'] == 'response'}
+    for index, sent in enumerate(requests):
+        intent, terminal = recorded[index * 2:index * 2 + 2]
+        data, call_id = sent['data'], sent['call_id']
+        response = responses.get(call_id)
+        if (not isinstance(response, dict) or intent.kind != 'intent' or terminal.kind != 'receipt'
+                or intent.call_id != call_id or terminal.call_id != call_id
+                or (intent.stage, intent.provider, intent.model, intent.input_sha256) != (data['stage'], data['provider'], data['model'], data['input_sha256'])
+                or (terminal.stage, terminal.provider, terminal.model, terminal.input_sha256) != (data['stage'], data['provider'], data['model'], data['input_sha256'])
+                or terminal.payload.get('raw_sha256') != response['body_sha256']
+                or terminal.payload.get('usage') != (response['usage'] or {})
+                or terminal.payload.get('http_status') != response['http_status']
+                or terminal.payload.get('metadata') != response['metadata']
+                or terminal.payload.get('note') != response['note']
+                or terminal.payload.get('validation') != 'ok'
+                or intent.payload.get('request_max_price') != data.get('max_price')):
+            raise ContractError('fresh journal binding differs')
+    stages = {e['call_id']: e['data']['stage'] for e in requests}
+    pending, quoted = [], []
+    for event in events:
+        if event['kind'] == 'validation' and stages.get(event['call_id']) in ('judge_positive', 'judge_negative'):
+            value = event['data'].get('value')
+            if isinstance(value, dict) and value.get('supported') is True and isinstance(value.get('quote'), str) and value['quote'].strip():
+                pending.append(value['quote'])
+        elif event['kind'] == 'trace':
+            for quote in pending:
+                usable = [e for e in event['data']['evidence'] if quote in e['text'] and context['corpus'].get(e['revision_id']) == 'match']
+                if usable:
+                    quoted.append((usable[0]['revision_id'], quote))
+            pending.clear()
+    covered = all(any(revision == item['revision_id'] and item['quote'] in quote for revision, quote in quoted)
+                  for item in reference['evidence'])
+    result = next(e['data'] for e in events if e['kind'] == 'run_result')
+    if result['status'] != 'deferred' or 'plan_coverage_unestablished' not in result['reasons']:
+        raise ContractError('fresh coverage deferral missing')
+    observations = {k: Observation(Outcome(v['outcome']), v['reason']) for k, v in result['observations'].items()}
+    graph = evaluate(result['expression'], observations).outcome
+    answer = {Outcome.TRUE: 'yes', Outcome.FALSE: 'no', Outcome.UNKNOWN: 'unknown', Outcome.CONFLICT: 'conflict'}[graph]
+    comparison = ('unknown_review' if not covered else
+                  'matches_reference' if answer == reference['expected_answer'] else 'differs_from_reference')
+    return {'case_id': reference['case_id'], 'run_sha256': expected_run_sha256, 'reference_sha256': ref_hash,
+            'reference_provenance': reference['provenance'], 'request_status': 'deferred', 'request_answer': None,
+            'request_deferral_reason': 'plan_coverage_unestablished', 'deferral_assurance': 'not_adjudicated',
+            'conditional_answer': answer, 'conditional_comparison': comparison, 'required_evidence_covered': covered,
+            'semantic_assurance': 'not_assessed'}

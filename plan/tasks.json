@@ -1210,7 +1210,8 @@
         "T052",
         "T068A",
         "T068B",
-        "T068C"
+        "T068C",
+        "T068D"
       ],
       "status": "pending",
       "files": [
@@ -2778,6 +2779,24 @@
       "acceptance": "Fresh execution uses only the checked case sources and explicit applicability inputs; case binding stays local and references never enter provider prompts.",
       "command": "python -m pytest tests/test_evaluation.py::test_locked_fresh_run_uses_only_checked_sources_and_hides_reference -q",
       "evidence": "Red: checked evaluation cases could not run through an isolated fresh catalog. Green: runner builds an in-memory catalog solely from pinned case sources, requires explicit applicability metadata for the exact revisions and records the private case binding outside provider prompts. Synthetic planner/judge/review run defers for plan coverage and replays. Focused 88 and full offline 514 passed. Metadata provenance, persistent evaluation catalog, full label isolation, matched arm work, hosted calls and full experiment remain open."
+    },
+    {
+      "id": "T068D",
+      "phase": "P6",
+      "depends_on": [
+        "T063E",
+        "T068C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_locked_fresh_run_uses_only_checked_sources_and_hides_reference",
+      "action": "Score replayed fresh cases without converting conditional graphs into decisions",
+      "acceptance": "Fresh scoring checks reference and journal bindings and reports the request deferral separately from conditional graph and cited-evidence comparisons.",
+      "command": "python -m pytest tests/test_evaluation.py::test_locked_fresh_run_uses_only_checked_sources_and_hides_reference -q",
+      "evidence": "Red: replayed fresh runs had no reference comparison separating deferred request from conditional graph. Green: pinned reference/context and journal are checked, and exact required quotes are matched only against supported judge quotations in applicable retrieved spans. Synthetic cases distinguish conditional match from unknown evidence and reject journal tampering. Focused 81 passed before final extra case; full offline 515 passed. Deferral justification is not adjudicated; failed/incomplete fresh runs, full assignment scoring, source authority and semantics remain open."
     }
   ]
 }
