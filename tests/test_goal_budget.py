@@ -2,6 +2,30 @@
 import pytest
 
 from qjig.contracts import Budget, ContractError
+
+
+def test_account_snapshot_binds_persistent_policy_without_authorizing_calls(tmp_path):
+    key = {'data': {'limit_remaining': 0.6, 'include_byok_in_limit': False, 'is_free_tier': False,
+                    'label': 'private-account-label'}}
+    credits = {'data': {'total_credits': 1, 'total_usage': 0.2}}
+    snapshot = (key, credits)
+    path = tmp_path / 'account.sqlite'
+    too_high = Budget(2, 500, 0.7)
+    with pytest.raises(ContractError):
+        GoalBudget.open(path, total=too_high, per_request=too_high, allocations={'smoke': too_high}, account_snapshot=snapshot)
+    assert not path.exists()
+    limit = Budget(2, 500, 0.6)
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}, account_snapshot=snapshot) as goal:
+        goal.reserve('attempt', 'request', 'smoke', tokens=10, cost_usd=0.1)
+        goal.record_usage('attempt', input_tokens=3, output_tokens=2, cost_usd=0.05)
+        assert 'private-account-label' not in goal._con.execute('SELECT value FROM policy').fetchone()[0]
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}, account_snapshot=snapshot) as goal:
+        assert goal.actual_usage()['cost_usd'] == 0.05
+    with pytest.raises(ContractError):
+        GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit})
+    changed = ({'data': {**key['data'], 'limit_remaining': 0.5}}, credits)
+    with pytest.raises(ContractError):
+        GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}, account_snapshot=changed)
 from qjig.budgets import BudgetExceeded
 from qjig.goal_budget import GoalBudget
 

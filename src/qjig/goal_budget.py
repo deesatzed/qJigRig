@@ -14,6 +14,7 @@ from pathlib import Path
 from .budgets import BudgetExceeded, _valid_cost, _valid_tokens
 from .contracts import Budget, ContractError
 from .money import sum_costs
+from .account_limits import account_spend_constraints
 
 
 def _cost(value: int | float) -> Decimal:
@@ -29,7 +30,8 @@ class GoalBudget:
         self._con, self._total, self._per_request, self._allocations = con, total, per_request, allocations
 
     @classmethod
-    def open(cls, path: str | Path, *, total: Budget, per_request: Budget, allocations: dict[str, Budget]) -> "GoalBudget":
+    def open(cls, path: str | Path, *, total: Budget, per_request: Budget, allocations: dict[str, Budget],
+             account_snapshot: tuple[dict, dict] | None = None) -> "GoalBudget":
         if not isinstance(total, Budget) or not isinstance(per_request, Budget) or not isinstance(allocations, dict) or not allocations:
             raise ContractError("goal, request and partition budgets are required")
         if not _fits((total.max_calls, total.max_tokens, _cost(total.max_cost_usd)), Budget(2000, 8000000, 25)):
@@ -42,8 +44,20 @@ class GoalBudget:
                     sum_costs(_cost(b.max_cost_usd) for b in allocations.values()))
         if not _fits(assigned, total):
             raise ContractError("partition allocations exceed total")
-        policy = json.dumps({"total": total.to_dict(), "per_request": per_request.to_dict(),
-                             "allocations": {k: v.to_dict() for k, v in allocations.items()}}, sort_keys=True, separators=(",", ":"))
+        policy_data = {"total": total.to_dict(), "per_request": per_request.to_dict(),
+                       "allocations": {k: v.to_dict() for k, v in allocations.items()}}
+        if account_snapshot is not None:
+            if not isinstance(account_snapshot, tuple) or len(account_snapshot) != 2:
+                raise ContractError("key and credit account snapshots required")
+            constraints = account_spend_constraints(*account_snapshot, goal_ceiling_usd=25)
+            if _cost(total.max_cost_usd) > constraints['openrouter_credit_ceiling_usd']:
+                raise ContractError("goal budget exceeds account snapshot ceiling")
+            # Store only sanitized derived constraints, never the source response or credential.
+            policy_data['account_snapshot'] = {
+                key: str(value) if isinstance(value, Decimal) else value
+                for key, value in constraints.items()
+            }
+        policy = json.dumps(policy_data, sort_keys=True, separators=(",", ":"))
         con = sqlite3.connect(str(path), isolation_level=None, timeout=10)
         try:
             con.execute("BEGIN IMMEDIATE")

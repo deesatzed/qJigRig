@@ -1421,7 +1421,8 @@
         "R08F",
         "R08G",
         "R08H",
-        "R08I"
+        "R08I",
+        "R08J"
       ],
       "status": "pending",
       "files": [],
@@ -3439,6 +3440,24 @@
       "acceptance": "BYOK or missing/malformed billing-route information leaves total spend unknown, preserving the reported provider fee separately and preventing further budgeted calls.",
       "command": "python -m pytest tests/test_providers.py::test_openrouter_unverified_billing_route_keeps_total_cost_unknown -q",
       "evidence": "Red: BYOK, absent and malformed flags all incorrectly turned a reported zero fee into known total cost. The usage parser now preserves the fee and explicit route while treating total cost as unknown unless is_byok is explicitly false; a synthetic journal and persistent goal-budget check confirms unknown spend stops the next call. Provider usage documentation: https://openrouter.ai/blog/announcements/gif-prompts-omni-search-tool-caching-and-byok-flags/ . No hosted model call occurred. The configured account key is not a management key, so BYOK configuration cannot be established via the management-only listing API. This post-call signal cannot establish pre-dispatch spend bounds and hosted dispatch remains gated."
+    },
+    {
+      "id": "R08J",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08I"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/goal_budget.py"
+      ],
+      "test_file": "tests/test_goal_budget.py",
+      "test_name": "test_account_snapshot_binds_persistent_policy_without_authorizing_calls",
+      "action": "Bind observed account constraints to a persistent goal policy",
+      "acceptance": "Reject initial goal policies above the observed account credit cap; persist sanitized constraints with the immutable policy and reject reopening with omitted or changed constraints.",
+      "command": "python -m pytest tests/test_goal_budget.py::test_account_snapshot_binds_persistent_policy_without_authorizing_calls -q",
+      "evidence": "Red: GoalBudget could not bind an account snapshot. The ledger now rejects a goal above the observed credit ceiling before creating its database, persists only sanitized derived constraints in the same transaction as the immutable policy, and rejects changed or omitted binding on reopen. Restart preserves actual usage. A caller-supplied snapshot can drift, excluded BYOK remains unknown, and this binding does not itself authorize hosted dispatch; refresh and complete pre-dispatch bounds remain open."
     }
   ]
 }
