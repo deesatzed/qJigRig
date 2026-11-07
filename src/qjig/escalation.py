@@ -1,6 +1,6 @@
 """Separate, explicitly requested paired-judge escalation; never replaces the original."""
 from dataclasses import dataclass
-import json
+import hashlib
 from typing import Callable
 
 from .applicability import Applicability
@@ -48,16 +48,24 @@ def escalate_predicate(standalone: JudgeResult, ledger: BudgetLedger, transport:
     recovered = []
     for call, receipt in zip(calls, ledger.judge_receipt_payloads(tuple(call[0] for call in calls))):
         status = receipt.get('validation')
+        raw, code = receipt.get('raw_response'), receipt.get('http_status')
+        if (not isinstance(raw, str) or type(code) is not int or
+                hashlib.sha256(raw.encode('utf-8')).hexdigest() != receipt.get('raw_sha256')):
+            raise ContractError('standalone raw response binding unavailable')
         if status == 'ok':
             value = receipt.get('validated_value')
-            try:
-                parsed, failure = _validate(json.dumps(value), SIDE_SCHEMA)
-            except (TypeError, ValueError):
-                parsed, failure = None, 'invalid'
-            if failure:
-                raise ContractError('standalone validated result unavailable')
+            parsed, failure = _validate(raw, SIDE_SCHEMA)
+            if not 200 <= code < 300 or failure or parsed != value:
+                raise ContractError('standalone validated result differs from raw response')
             recovered.append(_side_from_value(parsed, call[0]))
         elif isinstance(status, str) and status:
+            if status == 'http_error':
+                if 200 <= code < 300:
+                    raise ContractError('standalone HTTP failure differs from response')
+            else:
+                _, failure = _validate(raw, SIDE_SCHEMA)
+                if not 200 <= code < 300 or failure != status:
+                    raise ContractError('standalone failure differs from raw response')
             recovered.append(SideResult(Support.UNKNOWN, f'provider_{status}', '', status, call[0]))
         else:
             raise ContractError('standalone validation unavailable')

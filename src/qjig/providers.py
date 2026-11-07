@@ -334,6 +334,7 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
             extra.update(validation="ok")
             if request.stage in ("judge_positive", "judge_negative", "escalation_positive", "escalation_negative"):
                 extra["validated_value"] = value
+                extra["raw_response"] = raw.body
         return (value, failure, digest, raw.usage), raw.usage or {}, extra
 
     kwargs = {} if reservation is None else {

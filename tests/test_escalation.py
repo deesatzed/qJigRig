@@ -144,3 +144,51 @@ def test_escalation_rejects_changed_standalone_result(tmp_path):
         with pytest.raises(ContractError, match='standalone'):
             escalate_predicate(forged, ledger, transport, 'Question?', packet, reason='unknown', provider='stand-in')
         assert transport.calls_made == 0 and ledger.used_calls() == 2
+
+
+def test_escalation_rejects_validated_side_diverging_from_raw_response(tmp_path):
+    from dataclasses import replace
+    import pytest
+    from qjig.contracts import ContractError
+    rev = SourceRevision.create('p/a.md', '/x', decode_source(b'# Refunds\nRefunds apply.', encoding='utf-8'))
+    packet = build_packet(bm25_candidates(index_entries(rev), 'refunds'), max_bytes=3000)
+    response = RawResponse(200, json.dumps({'supported': False, 'quote': '', 'reason': 'none'}),
+                           {'prompt_tokens': 2, 'completion_tokens': 1, 'cost_usd': 0.01})
+    with Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(Budget(4, 5000, 1), journal, 'r')
+        standalone = judge_predicate(ledger, StandInTransport([response, response]), 'Question?', packet,
+                                     provider='stand-in', model='m')
+        receipt = next(e for e in journal.events('r') if e.call_id == standalone.positive.call_id and e.kind == 'receipt')
+        changed = dict(receipt.payload)
+        changed['validated_value'] = {**changed['validated_value'], 'reason': 'fabricated'}
+        journal._con.execute('DROP TRIGGER events_no_update')
+        journal._con.execute('UPDATE events SET payload=? WHERE call_id=? AND kind=?',
+                             (json.dumps(changed), receipt.call_id, 'receipt'))
+        altered = replace(standalone, positive=replace(standalone.positive, reason='fabricated'))
+        transport = StandInTransport([response, response])
+        with pytest.raises(ContractError, match='standalone'):
+            escalate_predicate(altered, ledger, transport, 'Question?', packet, reason='unknown', provider='stand-in')
+        assert transport.calls_made == 0
+
+
+def test_escalation_requires_raw_success_response_in_prior_receipts(tmp_path):
+    import pytest
+    from qjig.contracts import ContractError
+    rev = SourceRevision.create('p/a.md', '/x', decode_source(b'# Refunds\nRefunds apply.', encoding='utf-8'))
+    packet = build_packet(bm25_candidates(index_entries(rev), 'refunds'), max_bytes=3000)
+    response = RawResponse(200, json.dumps({'supported': False, 'quote': '', 'reason': 'none'}),
+                           {'prompt_tokens': 2, 'completion_tokens': 1, 'cost_usd': 0.01})
+    with Journal.open(tmp_path / 'j.sqlite') as journal:
+        ledger = BudgetLedger(Budget(4, 5000, 1), journal, 'r')
+        standalone = judge_predicate(ledger, StandInTransport([response, response]), 'Question?', packet,
+                                     provider='stand-in', model='m')
+        receipt = next(e for e in journal.events('r') if e.kind == 'receipt')
+        old_payload = dict(receipt.payload)
+        del old_payload['raw_response']
+        journal._con.execute('DROP TRIGGER events_no_update')
+        journal._con.execute('UPDATE events SET payload=? WHERE call_id=? AND kind=?',
+                             (json.dumps(old_payload), receipt.call_id, 'receipt'))
+        transport = StandInTransport([response, response])
+        with pytest.raises(ContractError, match='raw response'):
+            escalate_predicate(standalone, ledger, transport, 'Question?', packet, reason='unknown', provider='stand-in')
+        assert transport.calls_made == 0
