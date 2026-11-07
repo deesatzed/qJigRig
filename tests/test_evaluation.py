@@ -728,3 +728,59 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
         journal._con.execute("UPDATE events SET payload=? WHERE kind='receipt' AND request_seq=2", (json.dumps(corrupted),))
         with pytest.raises(ContractError, match='journal'):
             score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
+
+
+@pytest.mark.parametrize(('mode','expected'), [('malformed','malformed'),('http_error','provider_failure'),('unavailable','provider_failure'),
+                                              ('timeout','uncertain_outcome'),('budget','unknown_review')])
+def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expected):
+    import json
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import load_isolated_sources, validate_evaluation_design
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_fresh import run_locked_fresh
+    from qjig.evaluation_scoring import make_reference, reference_digest, score_fresh_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport, ProviderUnavailable
+    from qjig.replay import verify_archive
+    from qjig.run_archive import RunArchive
+    code, gold = b'Tests must pass.', b'PRIVATE_REFERENCE_LABEL'
+    (tmp_path/'code').write_bytes(code); (tmp_path/'label').write_bytes(gold)
+    item = lambda p, raw: {'path':p,'sha256':hashlib.sha256(raw).hexdigest()}
+    sources, protected = [item('code',code)], [item('label',gold)]
+    design = _sample_design(); design['families'][0]['source_hashes'] = [sources[0]['sha256']]
+    d = validate_evaluation_design(design)
+    ref = make_reference(case_id='dev',request=Request('hidden','Do tests pass?','reviewer','1','project'),
+                         sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],
+                         historical_as_known=False,expected_answer='yes',provenance='authored_unvalidated',
+                         evidence=[{'path':'code','quote':'Tests must pass.'}])
+    lock = {'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':d,'question':'Do tests pass?',
+            'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
+            'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
+    inputs = ApplicabilityInputs(Collection((MemberMetadata(ref['source_revisions'][0],'project',Interval('2020-01-01',OPEN)),)),
+                                 frozenset(),'2026-11-07',False)
+    response = {'malformed':RawResponse(200,'not json',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
+                'http_error':RawResponse(502,'upstream error',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
+                'unavailable':ProviderUnavailable('synthetic'), 'timeout':TimeoutError('synthetic'), 'budget':None}[mode]
+    with Journal.open(tmp_path/'j.sqlite') as journal, RunArchive.open(tmp_path/'archive') as archive:
+        result = run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=case_lock_digest(lock),
+                                  applicability_inputs=inputs,ledger=BudgetLedger(Budget(0 if mode=='budget' else 8,50000,1),journal,'r'),
+                                  transport=StandInTransport([response]),archive=archive,planner=('stand-in','planner'),judge=('stand-in','judge'))
+        replay=verify_archive(archive); assert replay.status=='incomplete'
+        score=score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
+        assert score['classification']==expected and score['request_status']=='deferred' and score['request_answer'] is None
+        assert score['conditional_answer'] is None and score['required_evidence_covered'] is None
+        assert score['reconciliation_required'] is (mode=='timeout')
+        assert score['failure_verified'] is (mode!='budget')
+        if mode=='timeout':
+            journal.reconcile(journal.pending('r')[0].call_id, resolution='not_executed', detail='synthetic verification')
+            with pytest.raises(ContractError, match='reconciliation'):
+                score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
+        if mode=='malformed':
+            saved = journal._con.execute("SELECT payload FROM events WHERE kind='receipt'").fetchone()[0]
+            tampered = json.loads(saved); tampered['usage']['cost_usd']=0
+            journal._con.execute('DROP TRIGGER events_no_update')
+            journal._con.execute("UPDATE events SET payload=? WHERE kind='receipt'",(json.dumps(tampered),))
+            with pytest.raises(ContractError):
+                score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))

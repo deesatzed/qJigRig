@@ -230,7 +230,7 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
             or not isinstance(expected_run_sha256, str) or not _SHA.fullmatch(expected_run_sha256)):
         raise ContractError('evaluation anchors required')
     replay = verify_archive(archive, expected_digest=expected_run_sha256)
-    if replay.status != 'structurally_verified':
+    if replay.status not in ('structurally_verified', 'incomplete') or replay.digest != expected_run_sha256:
         raise ContractError('fresh run is not structurally verified')
     context, events = archive.context(), archive.events()
     request, inputs = context['request'], context['applicability_inputs']
@@ -246,6 +246,8 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
     revisions = {ident: archive.revision(ident) for ident in reference['source_revisions']}
     if any(item['quote'] not in revisions[item['revision_id']].decoded.text for item in reference['evidence']):
         raise ContractError('reference quote not in source')
+    if replay.status == 'incomplete':
+        return _score_fresh_planner_failure(context, events, journal, reference, expected_run_sha256, ref_hash)
     requests = [e for e in events if e['kind'] == 'request']
     recorded = journal.events(request['request_id'])
     if len(recorded) != 2 * len(requests):
@@ -295,3 +297,61 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
             'request_deferral_reason': 'plan_coverage_unestablished', 'deferral_assurance': 'not_adjudicated',
             'conditional_answer': answer, 'conditional_comparison': comparison, 'required_evidence_covered': covered,
             'semantic_assurance': 'not_assessed'}
+
+
+def _score_fresh_planner_failure(context, events, journal, reference, run_hash, ref_hash):
+    """Check a planner-failure archive against its journal; never infer a result."""
+    results = [e for e in events if e['kind'] == 'run_result']
+    if len(results) != 1 or results[0]['data'].get('schema') != 'qjig.fresh-failure.v1':
+        raise ContractError('incomplete fresh result is not a planner failure record')
+    result = results[0]['data']
+    request_id, calls, failure = context['request']['request_id'], result['call_ids'], result['failure']
+    pending = bool(journal.pending(request_id))
+    if result['reconciliation_required'] != pending:
+        raise ContractError('fresh failure reconciliation state changed')
+    classification, verified = 'unknown_review', False
+    if calls:
+        recorded = journal.events(request_id)
+        # This bounded check refuses prior or reconciled calls rather than merging them.
+        if len(calls) != 1 or len(recorded) != 2:
+            raise ContractError('fresh failure journal has unexpected work')
+        intent, terminal = recorded
+        sent = [e for e in events if e['kind'] == 'request' and e['call_id'] == calls[0]]
+        if len(sent) != 1:
+            raise ContractError('fresh failure request missing')
+        data = sent[0]['data']; identity = (data['stage'], data['provider'], data['model'], data['input_sha256'])
+        if (intent.kind != 'intent' or intent.call_id != calls[0] or terminal.call_id != calls[0]
+                or (intent.stage, intent.provider, intent.model, intent.input_sha256) != identity
+                or (terminal.stage, terminal.provider, terminal.model, terminal.input_sha256) != identity
+                or intent.payload.get('request_max_price') != data.get('max_price')):
+            raise ContractError('fresh failure journal binding differs')
+        if failure in ('uncertain_outcome', 'provider_unavailable'):
+            if (failure == 'uncertain_outcome' and terminal.kind == 'uncertain' and pending):
+                classification, verified = 'uncertain_outcome', True
+            elif (failure == 'provider_unavailable' and terminal.kind == 'failure'
+                  and terminal.payload.get('error') == 'ProviderUnavailable' and not pending):
+                classification, verified = 'provider_failure', True
+            else:
+                raise ContractError('fresh failure terminal differs')
+        else:
+            responses = [e['data'] for e in events if e['kind'] == 'response' and e['call_id'] == calls[0]]
+            validations = [e['data'] for e in events if e['kind'] == 'validation' and e['call_id'] == calls[0]]
+            if len(responses) != 1 or len(validations) != 1:
+                raise ContractError('fresh failure response missing')
+            response, validation = responses[0], validations[0]
+            if (terminal.kind != 'receipt' or validation.get('failure') != failure
+                    or terminal.payload.get('validation') != failure or terminal.payload.get('raw_sha256') != response['body_sha256']
+                    or terminal.payload.get('usage') != (response['usage'] or {})
+                    or terminal.payload.get('http_status') != response['http_status']
+                    or terminal.payload.get('metadata') != response['metadata'] or terminal.payload.get('note') != response['note']):
+                raise ContractError('fresh failure receipt differs')
+            if failure == 'malformed_output' or failure.startswith('plan_invalid:'):
+                classification, verified = 'malformed', True
+            elif failure == 'http_error':
+                classification, verified = 'provider_failure', True
+            # Validator errors remain unverified as to their cause.
+    return {'case_id': reference['case_id'], 'run_sha256': run_hash, 'reference_sha256': ref_hash,
+            'reference_provenance': reference['provenance'], 'classification': classification,
+            'request_status': 'deferred', 'request_answer': None, 'conditional_answer': None,
+            'conditional_comparison': 'unknown_review', 'required_evidence_covered': None,
+            'failure_verified': verified, 'reconciliation_required': pending, 'semantic_assurance': 'not_assessed'}

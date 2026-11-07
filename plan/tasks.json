@@ -1211,7 +1211,8 @@
         "T068A",
         "T068B",
         "T068C",
-        "T068D"
+        "T068D",
+        "T068E"
       ],
       "status": "pending",
       "files": [
@@ -2818,6 +2819,24 @@
       "acceptance": "Planner failure records preserve attempted call identities and reconciliation status, remain replayably incomplete and do not imply a decision.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_planner_failure_is_archived_with_attempt_and_reconciliation_state -q",
       "evidence": "Red: early planner failures left no terminal run summary. Green: malformed, unavailable, timeout and budget paths archive failure type, attempted call IDs and pending-reconciliation status; replay treats them as incomplete, rejects changed classification, and restart retains the records. Focused 19 and full offline 519 passed. Replay does not authenticate the journal or verify unattempted budget policy; early preflight and other crash boundaries remain open."
+    },
+    {
+      "id": "T068E",
+      "phase": "P6",
+      "depends_on": [
+        "R07K",
+        "T068D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_fresh_planner_failure_scoring_retains_uncertainty",
+      "action": "Account for archived fresh planner failures against bound references",
+      "acceptance": "Replay and journal checks distinguish malformed, provider failure and uncertain calls; an unproved budget refusal remains unknown and no answer is fabricated.",
+      "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
+      "evidence": "Red: fresh planner failures could not be reference-accounted. Green: replay and journal checks distinguish malformed responses, HTTP/provider failure and uncertain calls; unproved budget refusal remains unknown review. Synthetic tests reject changed journal usage and post-record reconciliation changes. Focused 90 and full offline 524 passed. Reconciled-call recovery, judge/reviewer failure scoring, full assignment coverage, reference semantics and hosted runs remain open."
     }
   ]
 }
