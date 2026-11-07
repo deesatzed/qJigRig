@@ -136,3 +136,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `RoleDefinition`, `RoleEstimate` (field `estimated_usefulness`, finite [0,1], state proposed) and `RoleEstimateStore`. `current_prior` returns an estimate only for the exact role id, role version, entry and revision; a version change or source change makes it unavailable while `all_for` still lists the old estimate; overwriting an existing key is refused; bad scores (bool, NaN, out of range, string, None) rejected. Limits: in-memory only; nothing produces estimates yet; scores are uncalibrated and are not truth or authority.
 - Red: ModuleNotFoundError qjig.roles (initial contract). Green: focused 1 passed in 0.03s; tests/test_roles.py 9 passed in 0.04s; full suite 81 passed in 0.15s. 2026-11-06.
+
+## 2026-11-06: T020 complete
+
+- `select_with_mandatory(channels, required_channels, limit, role_priors)` in `src/qjig/retrieval.py`: order is lexical score, then role prior (tie-breaker only; absent prior = neutral 0.5), then entry_id; every required channel that has a candidate gets its best one reserved before general fill; required channels with no candidate are returned as `missing_required` and ones squeezed out by the limit as `omitted_required`. A zero role score on the only exception source does not drop it (checked at priors 0, 0.5, 1). Limits: channel assignment (which query/source feeds which channel) is caller-supplied; two test expectations were my own miscounts and were corrected; omitted_required would also need to become an unresolved obligation (T024).
+- Red: ImportError select_with_mandatory (initial contract). Green: focused 1 passed in 0.04s; tests/test_retrieval.py 6 passed in 0.03s; full suite 84 passed in 0.16s. 2026-11-06.

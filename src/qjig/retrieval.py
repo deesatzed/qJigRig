@@ -73,3 +73,52 @@ def bm25_candidates(entries: list[IndexEntry], query: str) -> list[Candidate]:
             out.append(Candidate(e.entry_id, e.revision_id, e.span, score, prov))
     out.sort(key=lambda c: (-c.score, c.entry_id))
     return out
+
+
+NEUTRAL_PRIOR = 0.5  # used only when no role estimate exists; never excludes anything
+
+
+@dataclass(frozen=True)
+class Selection:
+    selected: tuple[tuple[str, Candidate], ...]  # (channel, candidate)
+    missing_required: tuple[str, ...]  # required channels with no candidate at all
+    omitted_required: tuple[str, ...]  # required channels that had candidates but no room
+
+
+def select_with_mandatory(
+    channels: dict[str, list[Candidate]],
+    required_channels: set[str],
+    limit: int,
+    role_priors: dict[str, float],
+) -> Selection:
+    """Pick up to `limit` candidates; every required channel with a candidate gets its best first.
+
+    Within a channel, order is lexical score, then role prior (a tie-breaker only), then entry_id.
+    Role priors never remove a candidate or a channel.
+    """
+    ordered = {
+        ch: sorted(cs, key=lambda c: (-c.score, -role_priors.get(c.entry_id, NEUTRAL_PRIOR), c.entry_id))
+        for ch, cs in channels.items()
+    }
+    missing = tuple(sorted(ch for ch in required_channels if not ordered.get(ch)))
+    reserve = [ch for ch in sorted(required_channels) if ordered.get(ch)]
+    chosen: list[tuple[str, Candidate]] = []
+    taken: set[tuple[str, str]] = set()
+    omitted = []
+    for ch in reserve:
+        if len(chosen) < limit:
+            c = ordered[ch][0]
+            chosen.append((ch, c))
+            taken.add((ch, c.entry_id))
+        else:
+            omitted.append(ch)
+    rest = sorted(
+        ((ch, c) for ch, cs in ordered.items() for c in cs if (ch, c.entry_id) not in taken),
+        key=lambda x: (-x[1].score, -role_priors.get(x[1].entry_id, NEUTRAL_PRIOR), x[0], x[1].entry_id),
+    )
+    for item in rest:
+        if len(chosen) >= limit:
+            break
+        chosen.append(item)
+    chosen.sort(key=lambda x: (-x[1].score, -role_priors.get(x[1].entry_id, NEUTRAL_PRIOR), x[0], x[1].entry_id))
+    return Selection(tuple(chosen), missing, tuple(omitted))

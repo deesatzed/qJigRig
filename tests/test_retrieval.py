@@ -52,3 +52,61 @@ def test_tokenizer_and_empty_cases():
     assert bm25_candidates(entries, "") == []
     assert bm25_candidates(entries, "!!!") == []
     assert bm25_candidates([], "body") == []
+
+
+from qjig.retrieval import select_with_mandatory
+
+
+def build_channels():
+    entries = entries_for(
+        ("a/refund.md", "# Refund window\nRefund window is thirty days. Refund window applies to all refund orders.\n"),
+        ("b/refund2.md", "# Refund window\nThe refund window is thirty days for standard orders.\n"),
+        ("c/waiver.md", "# Waiver\nA manager may grant an exception.\n"),
+    )
+    primary = bm25_candidates(entries, "refund window thirty days")
+    exception = bm25_candidates(entries, "exception")
+    return entries, primary, exception
+
+
+def test_role_cannot_hide_exception():
+    entries, primary, exception = build_channels()
+    waiver = next(e for e in entries if e.span.text.startswith("# Waiver"))
+    # the role scores the exception source at zero and the ordinary sources highly
+    priors = {c.entry_id: 1.0 for c in primary}
+    priors[waiver.entry_id] = 0.0
+    sel = select_with_mandatory(
+        {"primary": primary, "exception": exception},
+        required_channels={"exception"}, limit=2, role_priors=priors,
+    )
+    chosen = [(ch, c.entry_id) for ch, c in sel.selected]
+    assert ("exception", waiver.entry_id) in chosen  # a low role score cannot eliminate it
+    assert len(chosen) == 2 and sel.missing_required == () and sel.omitted_required == ()
+    # the same selection happens whatever the role score says
+    for p in (0.0, 0.5, 1.0):
+        priors[waiver.entry_id] = p
+        again = select_with_mandatory({"primary": primary, "exception": exception}, {"exception"}, 2, priors)
+        assert ("exception", waiver.entry_id) in [(ch, c.entry_id) for ch, c in again.selected]
+
+
+def test_role_prior_only_breaks_lexical_ties():
+    same = "# Refunds\nRefund allowed within thirty days of purchase.\n"
+    entries = entries_for(("a/one.md", same), ("b/two.md", same))
+    cands = bm25_candidates(entries, "refund")
+    assert cands[0].score == cands[1].score
+    favored = cands[1].entry_id  # would lose the entry_id tie-break
+    sel = select_with_mandatory({"primary": cands}, set(), 2, {favored: 0.9})
+    assert [c.entry_id for _, c in sel.selected][0] == favored
+    # an unfavored but lexically better candidate is never demoted below a worse one
+    entries2 = entries_for(("a/best.md", "# R\nrefund refund refund refund\n"), ("b/weak.md", "# R\nrefund and much other text here today\n"))
+    c2 = bm25_candidates(entries2, "refund")
+    sel2 = select_with_mandatory({"primary": c2}, set(), 2, {c2[1].entry_id: 1.0, c2[0].entry_id: 0.0})
+    assert [c.entry_id for _, c in sel2.selected] == [c.entry_id for c in c2]
+
+
+def test_missing_and_omitted_required_channels_are_reported():
+    entries, primary, exception = build_channels()
+    sel = select_with_mandatory({"primary": primary, "exception": []}, {"exception"}, 3, {})
+    assert sel.missing_required == ("exception",)  # no hit is reported, not treated as "no exception exists"
+    assert len(sel.selected) == len(primary) == 2  # only what exists is returned
+    sel2 = select_with_mandatory({"a": primary, "b": exception}, {"a", "b"}, 1, {})
+    assert [ch for ch, _ in sel2.selected] == ["a"] and sel2.omitted_required == ("b",)

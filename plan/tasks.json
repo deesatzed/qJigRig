@@ -330,7 +330,7 @@
       "depends_on": [
         "T019"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/retrieval.py"
       ],
@@ -338,7 +338,8 @@
       "test_name": "test_role_cannot_hide_exception",
       "action": "Order candidates without removing a mandatory exception channel",
       "acceptance": "A low role score cannot eliminate the task's required exception source",
-      "command": "python -m pytest tests/test_retrieval.py::test_role_cannot_hide_exception -q"
+      "command": "python -m pytest tests/test_retrieval.py::test_role_cannot_hide_exception -q",
+      "evidence": "Red: ImportError select_with_mandatory (initial contract). Green: focused 1 passed in 0.04s; tests/test_retrieval.py 6 passed in 0.03s; full suite 84 passed in 0.16s. 2026-11-06."
     },
     {
       "id": "T021",
