@@ -223,3 +223,53 @@ def test_unreferenced_predicate_is_unwitnessed_not_claimed_as_skipped_by_blocker
         s = run_until_done(state, ctx)
     assert called == ["a"]
     assert {x.predicate_id: x.kind for x in s.skipped} == {"b": "unreferenced", "c": "unreferenced"}
+
+
+def conflict_run(tmp_path, tag, boosted):
+    """Two policy sources that are both applicable on AS_OF but disagree (30 vs 14 days)."""
+    a = rev("# Refund limit\nRefunds are accepted within 30 days of purchase.\n" + ("refund days limit " if boosted == "a" else ""), f"policy/{tag}-a.md")
+    b = rev("# Refund limit\nRefunds are accepted within 14 days of purchase.\n" + ("refund days limit " if boosted == "b" else ""), f"policy/{tag}-b.md")
+    meta = {
+        a.revision_id: MemberMetadata(a.revision_id, "project", Interval("2026-01-01", OPEN), entity_keys=ENTITIES, observed_at="2026-01-01" if boosted == "b" else "2026-10-30"),
+        b.revision_id: MemberMetadata(b.revision_id, "project", Interval("2026-01-01", OPEN), entity_keys=ENTITIES, observed_at="2026-10-30" if boosted == "b" else "2026-01-01"),
+    }
+    cat = Catalog.open(tmp_path / f"{tag}.sqlite")
+    for r in (a, b):
+        cat.add_revision(r)
+        save_entries(cat, index_entries(r))
+    entries = [e for r in (a, b) for e in current_entries(cat, r.source_id, r.revision_id)]
+
+    def evaluate(packet, recovery):
+        rules, ids = [], []
+        for item in packet.items:
+            m = re.search(r"within (\d+) days", item.span.text)
+            rules.append(PolicyRule(meta[item.span.revision_id], NumericRule("refund_days", "lte", Decimal(m.group(1)))))
+            ids.append(item.entry_id)
+        r = evaluate_dated_numeric(FieldValue("refund_days", 20), rules, as_of=AS_OF, request_entities=ENTITIES, historical_as_known=False)
+        return EvalResult(r.outcome, r.reason, tuple(ids))
+
+    plan = parse_plan({"origin": "authored", "predicates": [{"id": "within_limit", "question": "inside the limit?"}], "expression": {"ref": "within_limit"}})
+    ledger = ObligationLedger()
+    ledger.open(Obligation("ob-within_limit", "predicate_evidence", "within_limit", "limit evidence", material=True))
+    check = applicability_filter(Collection(tuple(meta.values())), ENTITIES, AS_OF, historical_as_known=False)
+    ctx = Context(cat, entries, check, {"within_limit": NeedSpec("refund days limit", 2, 4000, evaluate)})
+    return cat, RunState(Request("req-4", "q", "reviewer", "1", "project"), plan, ledger), ctx, (a, b)
+
+
+import pytest as _pytest
+
+
+@_pytest.mark.parametrize("boosted", ["a", "b"])
+def test_material_conflict_defers(tmp_path, boosted):
+    cat, state, ctx, (a, b) = conflict_run(tmp_path, f"c{boosted}", boosted)
+    with cat:
+        summary = run_until_done(state, ctx)
+    # whichever source ranks higher or was recorded later, the contradiction is kept, not resolved
+    obs = state.observations["within_limit"]
+    assert obs.outcome is Outcome.CONFLICT and obs.reason == "multiple_applicable_policies"
+    assert summary.stop.stop is False and summary.stop.outcome is None
+    assert summary.conflicts == ("within_limit",)
+    # both applicable sources are retained as evidence in the trace
+    assert {e.revision_id for e in state.trace[0].evidence} == {a.revision_id, b.revision_id}
+    assert state.ledger.get("ob-within_limit").status != "satisfied"
+    assert state.ledger.blocking() == ["ob-within_limit"]

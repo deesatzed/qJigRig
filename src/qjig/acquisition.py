@@ -72,6 +72,7 @@ class Skip:
 class RunSummary:
     stop: StopDecision
     skipped: tuple[Skip, ...]
+    conflicts: tuple[str, ...] = ()  # material predicates whose applicable evidence disagrees
 
 
 @dataclass
@@ -194,4 +195,11 @@ def run_until_done(state: RunState, ctx: Context) -> RunSummary:
                 state.ledger.skip(ob.obligation_id, reason=f"skipped: {sk.reason}")
     state.skipped = skips
     stop = check_stop(state.plan.expression, state.observations, state.ledger)
-    return RunSummary(stop, tuple(skips))
+    conflicts = tuple(
+        p.id
+        for p in state.plan.predicates
+        if p.id in state.observations
+        and state.observations[p.id].outcome is Outcome.CONFLICT
+        and is_material(p.id, state.plan.expression, state.observations)
+    )
+    return RunSummary(stop, tuple(skips), conflicts)

@@ -611,7 +611,7 @@
       "depends_on": [
         "T034"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/acquisition.py"
       ],
@@ -619,7 +619,8 @@
       "test_name": "test_material_conflict_defers",
       "action": "Retain conflicting applicable observations",
       "acceptance": "A material contradiction cannot be chosen away by score or latest file time",
-      "command": "python -m pytest tests/test_acquisition.py::test_material_conflict_defers -q"
+      "command": "python -m pytest tests/test_acquisition.py::test_material_conflict_defers -q",
+      "evidence": "Red: AttributeError RunSummary.conflicts (behavior absent; the existing code already produced CONFLICT via the exact evaluator, but nothing surfaced material conflicts). Green: focused 2 passed in 0.05s; tests/test_acquisition.py 10 passed in 0.07s; full suite 189 passed in 0.22s. 2026-11-06."
     },
     {
       "id": "T037",
