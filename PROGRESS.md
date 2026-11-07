@@ -81,3 +81,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `translate_jig_offsets` and `translate_jig_quote` in `src/qjig/legacy_jig.py`. JIG's hash must equal the revision's `text_sha256` (real JIG hash 6a3b3844... pinned in the test); a changed revision that still contains the same quote at the same offsets is rejected; mismatched, missing, ambiguous and blank quotes are rejected. Limits: JIG's collection/source-boundary check (span_ref) is not translated; JIG code is not imported.
 - Red: ModuleNotFoundError qjig.legacy_jig (initial contract). Green: focused 1 passed in 0.03s; tests/test_legacy_jig.py 3 passed in 0.03s; full suite 37 passed in 0.14s. 2026-11-06.
+
+## 2026-11-06: T009 complete
+
+- `Catalog` in `src/qjig/store.py` (SQLite, explicit open, context manager). Two revisions of one source survive close/reopen with raw bytes and encoding intact; same-id re-add is idempotent and keeps the first origin; UPDATE/DELETE blocked by triggers; reads detect tampering; unknown schema version refused. Limits: single-writer only (not tested concurrently); no entity/scope/date metadata yet (T010); no atomic multi-record writes beyond single inserts.
+- Red: ModuleNotFoundError qjig.store (initial contract). Green: focused 1 passed in 0.04s; tests/test_store.py 4 passed in 0.04s; full suite 41 passed in 0.10s. 2026-11-06.
