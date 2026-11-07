@@ -369,6 +369,8 @@ def run_fresh(
     require_complete_reservations: bool = False,
     reservation_factory: ReservationFactory | None = None, archive=None,
     evaluation_case_binding: dict | None = None,
+    evaluation_assignment: dict | None = None,
+    required_run_set: str | None = None,
     applicability_inputs: ApplicabilityInputs | None = None,
     role_priors: dict[str, float] | None = None,
     want: int = 3,
@@ -390,6 +392,13 @@ def run_fresh(
             raise ContractError('invalid evaluation case binding')
         if archive is None:
             raise ContractError('evaluation case binding requires an archive')
+    if evaluation_assignment is not None:
+        from .evaluation_budget import validate_assignment_binding
+        validate_assignment_binding(evaluation_assignment)
+        if evaluation_case_binding is None or required_run_set is None or ledger._goal_budget is None:
+            raise ContractError('assignment requires a checked case and goal run set')
+    if required_run_set is not None and not require_complete_reservations:
+        raise ContractError('assignment requires complete fresh preflight')
     _check_role_priors({} if role_priors is None else role_priors)
     if type(require_complete_reservations) is not bool or (require_complete_reservations and ledger._goal_budget is None):
         raise ContractError('complete fresh preflight requires a goal ledger')
@@ -451,6 +460,8 @@ def run_fresh(
             if len(sets) != 1:
                 raise ContractError('fresh stages span different frozen sets')
             fresh_set = sets.pop()
+            if required_run_set is not None and fresh_set != required_run_set:
+                raise ContractError('fresh reservation set differs from assignment')
         except (ContractError, BudgetExceeded, TypeError, IndexError):
             unavailable = PlanReviewOutcome('unavailable', None, None, 'fresh_preflight_unavailable') if reviewer else None
             return FreshRun('deferred', ('plan_coverage_unestablished', 'fresh_preflight_unavailable'),
@@ -480,6 +491,7 @@ def run_fresh(
         archive.record_context({
             "schema": "qjig.fresh-context.v1", "request": request.to_dict(),
             **({"evaluation_case_binding": evaluation_case_binding} if evaluation_case_binding is not None else {}),
+            **({"evaluation_assignment": evaluation_assignment} if evaluation_assignment is not None else {}),
             "budget": ledger.budget.to_dict() if ledger.budget else None,
             "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS, **({"max_price": planner_max_price} if planner_max_price is not None else {})},
             "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS, **({"max_price": judge_max_price} if judge_max_price is not None else {})},

@@ -105,3 +105,47 @@ def reserve_evaluation_plan(goal: GoalBudget, plan_id: str, plan: dict, *, expec
     work = [slot for assignment in m['assignments'] for slot in assignment['work']]
     run_sha = goal.reserve_run_set('evaluation:' + plan_id, work, _evaluation_binding=(plan_id, encoded, digest))
     return {'plan_sha256':digest, 'run_set_sha256':run_sha, 'assignments':len(m['assignments']), 'work_items':len(work)}
+
+
+def verify_evaluation_assignment(goal: GoalBudget, binding: dict, *, case_id: str, case_sha256: str,
+                                 design_sha256: str, request_id: str, partition: str) -> str:
+    """Check a private assignment against the persisted complete plan and held slots."""
+    if not isinstance(goal, GoalBudget):
+        raise ContractError('goal ledger required')
+    validate_assignment_binding(binding)
+    row = goal._con.execute('SELECT set_id,manifest,sha256 FROM evaluation_plans WHERE plan_id=?', (binding['plan_id'],)).fetchone()
+    if row is None:
+        raise ContractError('evaluation plan unavailable')
+    set_id, encoded, digest = row
+    if (set_id != 'evaluation:' + binding['plan_id'] or not hmac.compare_digest(digest, binding['plan_sha256'])
+            or hashlib.sha256(encoded.encode('utf-8')).hexdigest() != digest):
+        raise ContractError('evaluation plan binding differs')
+    try:
+        manifest = json.loads(encoded)
+        plan = make_evaluation_plan(manifest['design'], manifest['case_hashes'], manifest['stage_templates'],
+                                    manifest['assignments'], expected_design_sha256=manifest['design_sha256'])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ContractError('evaluation plan invalid') from exc
+    if plan['sha256'] != digest or plan['manifest'] != manifest or manifest['design_sha256'] != design_sha256:
+        raise ContractError('evaluation design differs')
+    if manifest['case_hashes'].get(case_id) != case_sha256:
+        raise ContractError('evaluation case differs')
+    matches = [a for a in manifest['assignments'] if (a['case_id'], a['arm'], a['repeat']) ==
+               (case_id, binding['arm'], binding['repeat'])]
+    if len(matches) != 1 or matches[0]['request_id'] != request_id or any(w['partition'] != partition for w in matches[0]['work']):
+        raise ContractError('evaluation assignment differs')
+    frozen = goal._con.execute('SELECT manifest,sha256 FROM run_sets WHERE set_id=?', (set_id,)).fetchone()
+    if frozen is None:
+        raise ContractError('evaluation run set unavailable')
+    goal._verify_run_set(set_id, *frozen)
+    return set_id
+
+
+def validate_assignment_binding(binding: dict) -> None:
+    keys = {'plan_id', 'plan_sha256', 'arm', 'repeat'}
+    if (not isinstance(binding, dict) or set(binding) != keys
+            or not isinstance(binding['plan_id'], str) or not _PLAN_ID.fullmatch(binding['plan_id'])
+            or not isinstance(binding['plan_sha256'], str) or not _SHA.fullmatch(binding['plan_sha256'])
+            or not isinstance(binding['arm'], str) or not binding['arm'].strip()
+            or type(binding['repeat']) is not int or binding['repeat'] < 1):
+        raise ContractError('evaluation assignment binding required')

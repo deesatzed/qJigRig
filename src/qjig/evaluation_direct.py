@@ -60,7 +60,7 @@ def _prompt(request, context, packets, allow_search, *, legacy_request_id=False)
 def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, transport, *,
                archive: RunArchive, provider: str, model: str, max_tokens: int,
                as_of: str, entities: list[str], historical_as_known: bool = False,
-               reservation_factory=None, max_price=None, case_binding=None) -> dict:
+               reservation_factory=None, max_price=None, case_binding=None, evaluation_assignment=None, required_run_set=None) -> dict:
     """Run a bounded initial retrieval and optional model-requested followup.
 
     Source text is untrusted, valid quotations do not prove relevance or truth,
@@ -86,11 +86,14 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
                        for k in ('design_sha256', 'case_sha256', 'reference_sha256'))):
             raise ContractError('invalid direct case binding')
     full_evidence = isinstance(search, FullEvidence)
+    if evaluation_assignment is not None and (case_binding is None or required_run_set is None or ledger._goal_budget is None):
+        raise ContractError('evaluation assignment requires goal-budgeted checked execution')
     if full_evidence and case_binding is None:
         raise ContractError('full evidence requires a checked case binding')
-    schema = 'qjig.direct-evaluation.v4' if full_evidence else 'qjig.direct-evaluation.v3' if case_binding is not None else 'qjig.direct-evaluation.v2'
+    schema = ('qjig.direct-evaluation.v6' if full_evidence else 'qjig.direct-evaluation.v5') if evaluation_assignment is not None else ('qjig.direct-evaluation.v4' if full_evidence else 'qjig.direct-evaluation.v3' if case_binding is not None else 'qjig.direct-evaluation.v2')
     archive.record_context({'schema': schema,
                             **({'case_binding': case_binding} if case_binding is not None else {}),
+                            **({'evaluation_assignment': evaluation_assignment} if evaluation_assignment is not None else {}),
                             **({'retrieval_mode': 'full_source_v1'} if full_evidence else {}), 'request': request.to_dict(),
                             'source_revisions': sorted(r.revision_id for r in search._revisions), 'applicability': context,
                             'want': search._want, 'max_bytes': search._max_bytes,
@@ -112,9 +115,11 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
     if ledger._goal_budget is not None:
         from .direct_preflight import check_direct_slots
         try:
-            check_direct_slots(ledger._goal_budget, request_id=request.request_id, partition=ledger._partition,
+            actual_set = check_direct_slots(ledger._goal_budget, request_id=request.request_id, partition=ledger._partition,
                                provider=provider, model=model, output_tokens=max_tokens, max_price=max_price,
                                followups=search._max_rounds - 1, reservation_factory=reservation_factory)
+            if required_run_set is not None and actual_set != required_run_set:
+                raise ContractError('direct slots differ from evaluation plan')
         except (BudgetExceeded, ContractError):
             return finish({'status': 'unavailable', 'failure': 'preflight_unavailable', 'answer': None,
                            'call_ids': calls, 'searches': list(search.trace)})
@@ -147,7 +152,7 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
                       expected_design_sha256: str, expected_case_sha256: str, ledger: BudgetLedger, transport,
                       archive: RunArchive, provider: str, model: str, max_tokens: int,
                       want: int, max_bytes: int, followups: int, expanded: bool = False,
-                      evidence_mode: str = 'retrieved', reservation_factory=None, max_price=None) -> dict:
+                      evidence_mode: str = 'retrieved', reservation_factory=None, max_price=None, assignment_binding=None) -> dict:
     """Run one checked private case; reference data remains outside model input.
 
     Caller-supplied anchors and protected manifest are not authenticated here.
@@ -164,6 +169,17 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
                                        expected_case_sha256=expected_case_sha256)
     if not isinstance(ledger, BudgetLedger):
         raise ContractError('budget ledger required')
+    required_set = None
+    if ledger._goal_budget is not None:
+        from .evaluation_budget import verify_evaluation_assignment
+        required_set = verify_evaluation_assignment(ledger._goal_budget, assignment_binding, case_id=lock_copy['case_id'],
+                         case_sha256=expected_case_sha256, design_sha256=expected_design_sha256,
+                         request_id=ledger._request_id, partition=ledger._partition)
+        expected_arm = 'direct_full_evidence' if evidence_mode == 'full' else 'direct_retrieval' if evidence_mode == 'retrieved' else None
+        if assignment_binding['arm'] != expected_arm:
+            raise ContractError('direct arm differs from evidence mode')
+    elif assignment_binding is not None:
+        raise ContractError('assignment binding requires goal ledger')
     manifest = [{'path': source.path, 'sha256': source.sha256} for source in prepared.sources]
     if evidence_mode == 'full':
         if followups != 0 or expanded is not False:
@@ -179,4 +195,4 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
     return run_direct(search, request, ledger, transport, archive=archive, provider=provider, model=model,
                       max_tokens=max_tokens, as_of=prepared.as_of, entities=list(prepared.entities),
                       historical_as_known=prepared.historical_as_known, reservation_factory=reservation_factory,
-                      max_price=max_price, case_binding=binding)
+                      max_price=max_price, case_binding=binding, evaluation_assignment=assignment_binding, required_run_set=required_set)

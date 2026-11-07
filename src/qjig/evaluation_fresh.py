@@ -21,7 +21,8 @@ def run_locked_fresh(root, design: dict, lock: dict, reference: dict, protected:
                      reviewer: tuple[str, str] | None = None, planner_max_tokens: int | None = None,
                      judge_max_tokens: int | None = None, reviewer_max_tokens: int = 800,
                      planner_max_price=None, judge_max_price=None, reviewer_max_price=None,
-                     reservation_factory=None, review_reservation_factory=None, want: int = 3, max_bytes: int = 3000):
+                     reservation_factory=None, review_reservation_factory=None, want: int = 3, max_bytes: int = 3000,
+                     assignment_binding=None):
     """Run one checked case in an isolated catalog with explicit source metadata.
 
     Metadata and protected-manifest completeness are caller assertions. This
@@ -37,6 +38,16 @@ def run_locked_fresh(root, design: dict, lock: dict, reference: dict, protected:
                                        expected_case_sha256=expected_case_sha256)
     if not isinstance(applicability_inputs, ApplicabilityInputs) or not isinstance(ledger, BudgetLedger) or not isinstance(archive, RunArchive):
         raise ContractError('explicit applicability, ledger and archive are required')
+    required_set = None
+    if ledger._goal_budget is not None:
+        from .evaluation_budget import verify_evaluation_assignment
+        required_set = verify_evaluation_assignment(ledger._goal_budget, assignment_binding, case_id=lock_copy['case_id'],
+            case_sha256=expected_case_sha256, design_sha256=expected_design_sha256,
+            request_id=ledger._request_id, partition=ledger._partition)
+        if assignment_binding['arm'] != 'combined':
+            raise ContractError('fresh evaluation arm differs')
+    elif assignment_binding is not None:
+        raise ContractError('evaluation assignment requires a goal ledger')
     checked = ApplicabilityInputs.from_dict(applicability_inputs.to_dict())
     if (checked.as_of != prepared.as_of or checked.request_entities != frozenset(prepared.entities)
             or checked.historical_as_known != prepared.historical_as_known):
@@ -58,7 +69,8 @@ def run_locked_fresh(root, design: dict, lock: dict, reference: dict, protected:
         return run_fresh(request=request, catalog=catalog, entries=entries, ledger=ledger, transport=transport,
                          planner=planner, judge=judge, reviewer=reviewer, archive=archive,
                          revision_applicability=checked.verdict, applicability_inputs=checked,
-                         evaluation_case_binding=binding, planner_max_tokens=planner_max_tokens,
+                         evaluation_case_binding=binding, evaluation_assignment=assignment_binding, required_run_set=required_set,
+                         planner_max_tokens=planner_max_tokens,
                          judge_max_tokens=judge_max_tokens, reviewer_max_tokens=reviewer_max_tokens,
                          planner_max_price=planner_max_price, judge_max_price=judge_max_price,
                          reviewer_max_price=reviewer_max_price, reservation_factory=reservation_factory,

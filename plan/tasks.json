@@ -1395,7 +1395,8 @@
         "R06",
         "R08A",
         "R08B",
-        "R08C"
+        "R08C",
+        "R08D"
       ],
       "status": "pending",
       "files": [],
@@ -2918,6 +2919,32 @@
       "acceptance": "Every case/arm/repeat and its declared physical stages are present in a privately persisted plan before atomic reservation; changed plans and incomplete denominators refuse.",
       "command": "python -m pytest tests/test_evaluation.py::test_complete_evaluation_reservation_is_atomic_and_restart_safe -q",
       "evidence": "Red: goal ledger could reserve an incomplete experiment without binding case/arm/repeat coverage. Green: declared plan validates full denominator and stage counts, binds case hashes and unique request/work identities, and persists plan plus physical slots atomically; changed plans, missing assignments, partial capacity and ledger corruption reject. Synthetic 105-assignment draft reservation reopened successfully. Focused 79 before final trigger check and 39 after; full offline 528 passed. Stage templates, case hashes, prices, token bounds and provider enforcement remain caller assertions; real full-run preflight and hosted authorization remain open."
+    },
+    {
+      "id": "R08D",
+      "phase": "repair",
+      "finding": "F08",
+      "depends_on": [
+        "R08C",
+        "T063C",
+        "T063E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_budget.py",
+        "src/qjig/evaluation_direct.py",
+        "src/qjig/evaluation_fresh.py",
+        "src/qjig/acquisition.py",
+        "src/qjig/evaluation_replay.py",
+        "src/qjig/replay.py",
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_goal_budgeted_case_requires_matching_reserved_assignment",
+      "action": "Require each goal-budgeted evaluation run to match the complete reserved plan",
+      "acceptance": "The checked case, private arm/repeat, opaque request identity and required call set must match the persisted complete evaluation plan before execution.",
+      "command": "python -m pytest tests/test_evaluation.py::test_goal_budgeted_case_requires_matching_reserved_assignment -q",
+      "evidence": "Red: a checked goal-budgeted direct case executed without any assignment binding. Green: direct and combined fresh wrappers check the persisted plan digest, case, arm, repeat, request and partition before execution and require their actual reserved stages to use that plan set. Synthetic direct success and missing/wrong binding refusals pass; a fresh missing-binding refusal passes. Direct replay validates the private assignment; fresh replay validates optional assignment structure. Focused evaluation/acquisition/replay 60 passed; full offline suite 529 passed. The fresh success path has not been exercised with a complete reserved plan. Stage templates, prices, input bounds and caller-supplied plan digest remain assertions, and hosted transport remains gated."
     }
   ]
 }

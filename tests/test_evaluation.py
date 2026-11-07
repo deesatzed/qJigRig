@@ -708,6 +708,16 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
                              applicability_inputs=bad_inputs,ledger=ledger,transport=StandInTransport(responses),archive=archive,
                              planner=('stand-in','planner'),judge=('stand-in','judge'),reviewer=('stand-in','reviewer'))
         assert journal.events('PRIVATE_ARM_MAPPING') == [] and archive.events() == []
+        from qjig.goal_budget import GoalBudget
+        with GoalBudget.open(tmp_path/'fresh-goal.sqlite', total=Budget(8,50000,1), per_request=Budget(8,50000,1),
+                             allocations={'development':Budget(8,50000,1)}) as goal:
+            guarded = BudgetLedger(Budget(8,50000,1),journal,'PRIVATE_ARM_MAPPING',goal_budget=goal,partition='development')
+            guarded_transport = StandInTransport(responses)
+            with pytest.raises(ContractError):
+                run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=lock_hash,
+                                 applicability_inputs=inputs,ledger=guarded,transport=guarded_transport,archive=archive,
+                                 planner=('stand-in','planner'),judge=('stand-in','judge'))
+            assert guarded_transport.calls_made == 0 and journal.events('PRIVATE_ARM_MAPPING') == [] and archive.events() == []
         transport = StandInTransport(responses)
         result = run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=lock_hash,
                                   applicability_inputs=inputs,ledger=ledger,transport=transport,archive=archive,
@@ -964,3 +974,65 @@ def test_complete_evaluation_reservation_is_atomic_and_restart_safe(tmp_path):
             goal.select_required_work('evaluation:study',request_id=first['request_id'],partition=first['partition'],
                                       stage=first['stage'],provider=first['provider'],model=first['model'],
                                       tokens=first['tokens'],cost_usd=first['cost_usd'])
+
+
+def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.direct_preflight import direct_run_allocations,direct_slot_reservation
+    from qjig.evaluation import load_isolated_sources,validate_evaluation_design
+    from qjig.evaluation_budget import make_evaluation_plan,reserve_evaluation_plan
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_direct import run_locked_direct
+    from qjig.evaluation_scoring import make_reference,reference_digest
+    from qjig.goal_budget import GoalBudget
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse,StandInTransport
+    from qjig.run_archive import RunArchive
+    code,gold=b'Tests must pass.',b'PRIVATE_REFERENCE_LABEL'
+    (tmp_path/'code').write_bytes(code);(tmp_path/'label').write_bytes(gold)
+    item=lambda p,v:{'path':p,'sha256':hashlib.sha256(v).hexdigest()}
+    sources,protected=[item('code',code)],[item('label',gold)]
+    design=_sample_design();design['families'][0]['source_hashes']=[sources[0]['sha256']];d=validate_evaluation_design(design)
+    ref=make_reference(case_id='dev',request=Request('hidden','Do tests pass?','reviewer','1','project'),
+                       sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],historical_as_known=False,
+                       expected_answer='yes',provenance='authored_unvalidated',evidence=[{'path':'code','quote':'must pass'}])
+    lock={'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':d,'question':'Do tests pass?',
+          'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
+          'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
+    case_hashes={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']};case_hashes['dev']=case_lock_digest(lock)
+    templates={arm:{'direct_initial':1} for arm in design['arms']}
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    cap={'prompt':2,'completion':3};families={f['id']:f['partition'] for f in design['families']};assignments=[]
+    for case in design['cases']:
+        partition=families[case['family']]
+        for arm in design['arms']:
+            for repeat in range(1,design['repeats'][partition]+1):
+                rid='opaque-'+str(len(assignments));work=direct_run_allocations(request_id=rid,partition=partition,provider='stand-in',model=model,
+                         input_tokens=100,output_tokens=100,max_price=cap,followups=0)
+                assignments.append({'case_id':case['id'],'arm':arm,'repeat':repeat,'request_id':rid,'work':work})
+    plan=make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=d)
+    target=next(x for x in assignments if x['case_id']=='dev' and x['arm']=='direct_full_evidence');rid=target['request_id']
+    total=Budget(60,12000,1);per=Budget(1,200,0.1);alloc={'development':Budget(15,3000,0.2),'pilot':Budget(15,3000,0.2),'holdout':Budget(30,6000,0.2)}
+    response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),{'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.001})
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=alloc) as goal,Journal.open(tmp_path/'j.sqlite') as journal,RunArchive.open(tmp_path/'archive') as archive:
+        reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])
+        ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='development');transport=StandInTransport([response])
+        def factory(req):return direct_slot_reservation(goal,'evaluation:study',request_id=rid,partition='development',request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
+        options=dict(expected_design_sha256=d,expected_case_sha256=case_lock_digest(lock),ledger=ledger,transport=transport,
+                     archive=archive,provider='stand-in',model=model['id'],max_tokens=100,want=1,max_bytes=3000,
+                     followups=0,evidence_mode='full',max_price=cap,reservation_factory=factory)
+        with pytest.raises(ContractError):run_locked_direct(tmp_path,design,lock,ref,protected,**options)
+        assert transport.calls_made==0 and journal.events(rid)==[] and archive.events()==[]
+        binding={'plan_id':'study','plan_sha256':plan['sha256'],'arm':'direct_full_evidence','repeat':1}
+        with pytest.raises(ContractError):run_locked_direct(tmp_path,design,lock,ref,protected,assignment_binding={**binding,'arm':'combined'},**options)
+        with pytest.raises(ContractError):run_locked_direct(tmp_path,design,lock,ref,protected,assignment_binding={**binding,'plan_sha256':'0'*64},**options)
+        assert transport.calls_made==0 and journal.events(rid)==[]
+        result=run_locked_direct(tmp_path,design,lock,ref,protected,assignment_binding=binding,**options)
+        assert result['status']=='recorded_unvalidated' and transport.calls_made==1
+        assert archive.context()['evaluation_assignment']==binding
+        from qjig.evaluation_replay import verify_direct_archive
+        assert verify_direct_archive(archive,journal)['status']=='unanchored'
+        prompt=next(e['data']['prompt'] for e in archive.events() if e['kind']=='request')
+        assert plan['sha256'] not in prompt and rid not in prompt and 'direct_full_evidence' not in prompt

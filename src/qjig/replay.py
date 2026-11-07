@@ -91,6 +91,11 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                     or any(not isinstance(b[k], str) or not re.fullmatch(r'[0-9a-f]{64}', b[k])
                            for k in ('design_sha256', 'case_sha256', 'reference_sha256'))):
                 raise ContractError('invalid evaluation case binding')
+        if 'evaluation_assignment' in context:
+            from .evaluation_budget import validate_assignment_binding
+            validate_assignment_binding(context['evaluation_assignment'])
+            if 'evaluation_case_binding' not in context:
+                raise ContractError('assignment requires a case binding')
         revisions = {revision_id: archive.revision(revision_id) for revision_id in archive.revision_ids()}
         if set(revisions) != set(context["corpus"]):
             raise ContractError("corpus revision set differs from context")
