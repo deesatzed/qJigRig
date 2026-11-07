@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from decimal import Decimal
+from decimal import Decimal, ROUND_CEILING, localcontext
 import socket
 import urllib.error
 import urllib.request
@@ -77,6 +77,15 @@ def make_call_reservation(request: ProviderRequest, model: dict, *, input_tokens
     if required_id is not None and (not isinstance(required_id, str) or not required_id.strip()):
         raise ContractError("invalid required work identity")
     cost = upper_cost(model, input_tokens=input_tokens, output_tokens=request.max_tokens)
+    if request.max_price is not None:
+        # Ceilings are USD per million tokens. Add the catalog calculation rather
+        # than assuming its other charge categories are covered by these limits.
+        # This arithmetic does not verify provider enforcement or completeness.
+        with localcontext() as ctx:
+            ctx.rounding = ROUND_CEILING
+            capped = (Decimal(str(request.max_price["prompt"])) * input_tokens
+                      + Decimal(str(request.max_price["completion"])) * request.max_tokens) / Decimal(1000000)
+            cost += capped
     as_float = float(cost)
     if not math.isfinite(as_float):
         raise ContractError("price bound is not representable")

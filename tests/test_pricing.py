@@ -48,3 +48,15 @@ def test_reservation_rounds_float_up_and_binds_model():
     assert Decimal(str(reservation.cost_usd)) >= exact
     with pytest.raises(ContractError):
         make_call_reservation(request, {**model, "id": "another/model"}, input_tokens=17, input_bound_provenance="fixture")
+
+
+def test_capped_routing_reservation_covers_ceiling_and_snapshot():
+    from qjig.providers import ProviderRequest, make_call_reservation
+    request = ProviderRequest('judge', 'openrouter', 'synthetic/model', 'question', 50,
+                              max_price={'prompt': 10.0, 'completion': 20.0})
+    model = {'id': request.model, 'context_length': 1000, 'top_provider': {'max_completion_tokens': 100},
+             'pricing': {'prompt': '0.0000001', 'completion': '0.0000002', 'input_cache_write': '0.0000003'}}
+    snapshot_cost = upper_cost(model, input_tokens=100, output_tokens=50)
+    ceiling_cost = Decimal('10') * 100 / 1000000 + Decimal('20') * 50 / 1000000
+    reservation = make_call_reservation(request, model, input_tokens=100, input_bound_provenance='fixture')
+    assert Decimal(str(reservation.cost_usd)) >= snapshot_cost + ceiling_cost
