@@ -125,3 +125,20 @@ def test_dates_are_applied_independently():
     assert date_applicability(both, as_of, historical_as_known=True).overall is Applicability.NO_MATCH
     with pytest.raises(ContractError):
         dated("12/01/2026")
+
+
+def test_applicability_inputs_round_trip_keeps_unknowns_and_scope_provenance():
+    from qjig.applicability import ApplicabilityInputs
+    from qjig.contracts import ContractError
+
+    member = MemberMetadata("rev-a", "project", Interval(UNKNOWN_BOUND, OPEN), authority_id="policy-team",
+                            entity_keys=frozenset({"customer:42"}), observed_at=None)
+    original = ApplicabilityInputs(Collection((member,)), frozenset({"customer:42"}), "2026-11-15", True)
+    rebuilt = ApplicabilityInputs.from_dict(original.to_dict())
+    assert rebuilt == original
+    assert rebuilt.verdict("rev-a") is Applicability.UNKNOWN
+    assert rebuilt.to_dict()["scope_authority_assurance"] == "recorded_not_assessed"
+    invalid = original.to_dict()
+    invalid["as_of"] = "not-a-date"
+    with pytest.raises(ContractError):
+        ApplicabilityInputs.from_dict(invalid)

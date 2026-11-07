@@ -158,3 +158,76 @@ def date_applicability(
     else:
         overall = Applicability.MATCH
     return DateVerdict(effective, observation, overall)
+
+
+@dataclass(frozen=True)
+class ApplicabilityInputs:
+    """Recorded inputs for the existing entity/date checks; scope and authority are provenance."""
+
+    collection: Collection
+    request_entities: frozenset[str]
+    as_of: str
+    historical_as_known: bool
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.collection, Collection):
+            raise ContractError("collection is required")
+        if not isinstance(self.request_entities, frozenset) or any(not isinstance(v, str) or not v for v in self.request_entities):
+            raise ContractError("request entities must be a frozenset of non-empty strings")
+        parse_date(self.as_of)
+        if type(self.historical_as_known) is not bool:
+            raise ContractError("historical_as_known must be boolean")
+
+    def verdict(self, revision_id: str) -> Applicability:
+        try:
+            member = self.collection.member(revision_id)
+        except KeyError:
+            return Applicability.UNKNOWN
+        values = {entity_applicability(member, self.request_entities).value,
+                  date_applicability(member, self.as_of, historical_as_known=self.historical_as_known).overall}
+        if Applicability.NO_MATCH in values:
+            return Applicability.NO_MATCH
+        return Applicability.UNKNOWN if Applicability.UNKNOWN in values else Applicability.MATCH
+
+    def to_dict(self) -> dict:
+        def bound(value):
+            return value.value if isinstance(value, _Bound) else value
+        return {"as_of": self.as_of, "historical_as_known": self.historical_as_known,
+                "request_entities": sorted(self.request_entities),
+                "scope_authority_assurance": "recorded_not_assessed",
+                "members": [{"revision_id": m.revision_id, "scope": m.scope, "authority_id": m.authority_id,
+                             "entity_keys": sorted(m.entity_keys), "effective_start": bound(m.effective.start),
+                             "effective_end": bound(m.effective.end), "observed_at": m.observed_at}
+                            for m in sorted(self.collection.members, key=lambda item: item.revision_id)]}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ApplicabilityInputs":
+        expected = {"as_of", "historical_as_known", "request_entities", "scope_authority_assurance", "members"}
+        if not isinstance(data, dict) or set(data) != expected or data["scope_authority_assurance"] != "recorded_not_assessed":
+            raise ContractError("invalid applicability input record")
+        entities, rows = data["request_entities"], data["members"]
+        if not isinstance(entities, list) or not all(isinstance(x, str) and x for x in entities) or len(set(entities)) != len(entities):
+            raise ContractError("invalid request entities")
+        if not isinstance(rows, list):
+            raise ContractError("invalid member records")
+        required = {"revision_id", "scope", "authority_id", "entity_keys", "effective_start", "effective_end", "observed_at"}
+        members = []
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != required:
+                raise ContractError("invalid member record")
+            keys = row["entity_keys"]
+            if (not isinstance(row["revision_id"], str) or not row["revision_id"] or
+                not isinstance(row["scope"], str) or not row["scope"] or
+                (row["authority_id"] is not None and not isinstance(row["authority_id"], str)) or
+                not isinstance(keys, list) or not all(isinstance(x, str) and x for x in keys) or len(set(keys)) != len(keys)):
+                raise ContractError("invalid member fields")
+            def parse_bound(value):
+                if value == "unknown":
+                    return UNKNOWN_BOUND
+                if value == "open":
+                    return OPEN
+                return value
+            members.append(MemberMetadata(row["revision_id"], row["scope"],
+                                          Interval(parse_bound(row["effective_start"]), parse_bound(row["effective_end"])),
+                                          authority_id=row["authority_id"], entity_keys=frozenset(keys), observed_at=row["observed_at"]))
+        return cls(Collection(tuple(members)), frozenset(entities), data["as_of"], data["historical_as_known"])

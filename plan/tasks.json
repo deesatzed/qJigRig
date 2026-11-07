@@ -1359,7 +1359,8 @@
         "R07A",
         "R07B",
         "R07C",
-        "R07D"
+        "R07D",
+        "R07E"
       ],
       "status": "pending",
       "files": [],
@@ -1534,6 +1535,27 @@
       "acceptance": "Run request, model settings, corpus revision IDs and applicability outcomes are immutable and available before dispatch.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_archive_binds_request_configuration_and_applicability -q",
       "evidence": "Red: fresh run did not retain request/configuration/applicability context. Green: context is immutable, retained across reopen and available before synthetic provider dispatch; per-revision applicability is bound once and used throughout the run. Full offline suite 316 passed. Applicability records verdicts only, not underlying date/entity provenance; R07 remains open."
+    },
+    {
+      "id": "R07E",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R07D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/applicability.py",
+        "src/qjig/acquisition.py",
+        "tests/test_applicability.py",
+        "tests/test_fresh_pipeline.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_fresh_archive_retains_applicability_inputs",
+      "action": "Capture reconstructable applicability inputs for fresh runs",
+      "acceptance": "Archive exact entity, effective/observation date, scope and authority inputs and refuse conflicting verdicts before dispatch.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_archive_retains_applicability_inputs -q",
+      "evidence": "Red: no reconstructable applicability input record existed. Green: synthetic fresh archive records entities, as-of date, historical mode, effective/observation dates, scope and authority; records round-trip and conflicting verdicts refuse before dispatch. Full offline suite 319 passed. Explicit inputs remain optional for compatibility; legacy verdict-only archives and scope/authority assurance stay labeled; R07 remains pending."
     }
   ]
 }

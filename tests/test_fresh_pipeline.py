@@ -235,3 +235,46 @@ def test_fresh_run_uses_one_bound_applicability_snapshot(tmp_path):
         assert result.state.observations["p1"].outcome is Outcome.FALSE
         assert calls == [REV.revision_id]
         assert archive.context()["corpus"][REV.revision_id] == "match"
+
+
+def test_fresh_archive_retains_applicability_inputs(tmp_path):
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.run_archive import RunArchive
+
+    member = MemberMetadata(REV.revision_id, "project", Interval("2026-01-01", OPEN),
+                            authority_id="team:policy", entity_keys=frozenset({"customer:42"}), observed_at="2026-02-01")
+    inputs = ApplicabilityInputs(Collection((member,)), frozenset({"customer:42"}), "2026-11-15", False)
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE)])
+    with cat, journal, RunArchive.open(tmp_path / "archive") as archive:
+        result = run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                           planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                           revision_applicability=lambda rid: Applicability.MATCH, applicability_inputs=inputs, archive=archive)
+        assert result.status == "deferred"
+        context = archive.context()
+        assert context["applicability_provenance"] == "recorded_inputs"
+        assert context["applicability_inputs"]["as_of"] == "2026-11-15"
+        assert context["applicability_inputs"]["request_entities"] == ["customer:42"]
+        recorded = context["applicability_inputs"]["members"][0]
+        assert recorded["authority_id"] == "team:policy" and recorded["effective_end"] == "open"
+        assert recorded["observed_at"] == "2026-02-01" and recorded["revision_id"] == REV.revision_id
+        assert ApplicabilityInputs.from_dict(context["applicability_inputs"]).verdict(REV.revision_id) is Applicability.MATCH
+
+
+def test_conflicting_applicability_inputs_refuse_before_dispatch(tmp_path):
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.contracts import ContractError
+    from qjig.run_archive import RunArchive
+    import pytest
+
+    member = MemberMetadata(REV.revision_id, "project", Interval("2026-01-01", OPEN),
+                            entity_keys=frozenset({"customer:another"}))
+    inputs = ApplicabilityInputs(Collection((member,)), frozenset({"customer:42"}), "2026-11-15", False)
+    assert inputs.verdict(REV.revision_id) is Applicability.NO_MATCH
+    assert inputs.verdict("missing") is Applicability.UNKNOWN
+    cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN)])
+    with cat, journal, RunArchive.open(tmp_path / "archive") as archive:
+        with pytest.raises(ContractError, match="do not match"):
+            run_fresh(request=REQUEST, catalog=cat, entries=entries, ledger=ledger, transport=transport,
+                      planner=("stand-in", "planner"), judge=("stand-in", "judge"),
+                      revision_applicability=lambda rid: Applicability.MATCH, applicability_inputs=inputs, archive=archive)
+        assert transport.calls_made == 0 and journal.events(REQUEST.request_id) == []

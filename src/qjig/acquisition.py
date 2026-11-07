@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .applicability import Applicability
+from .applicability import Applicability, ApplicabilityInputs
 from .indexing import IndexEntry
 from .contracts import ContractError
 from .logic import Observation, Outcome, evaluate, expression_ids, is_material
@@ -244,6 +244,7 @@ def run_fresh(
     planner_max_tokens: int | None = None,
     judge_max_tokens: int | None = None,
     reservation_factory: ReservationFactory | None = None, archive=None,
+    applicability_inputs: ApplicabilityInputs | None = None,
     want: int = 3,
     max_bytes: int = 3000,
 ) -> FreshRun:
@@ -257,6 +258,11 @@ def run_fresh(
     applicability = {revision_id: revision_applicability(revision_id) for revision_id in revision_ids}
     if any(not isinstance(value, Applicability) for value in applicability.values()):
         raise ContractError("revision applicability must be an Applicability verdict")
+    if applicability_inputs is not None:
+        if not isinstance(applicability_inputs, ApplicabilityInputs):
+            raise ContractError("invalid applicability inputs")
+        if any(applicability_inputs.verdict(key) is not value for key, value in applicability.items()):
+            raise ContractError("applicability inputs do not match recorded verdicts")
     def bound_applicability(revision_id: str) -> Applicability:
         return applicability.get(revision_id, Applicability.UNKNOWN)
     if archive is not None:
@@ -269,7 +275,8 @@ def run_fresh(
             "transport": transport.label, "want": want, "max_bytes": max_bytes,
             "reservation_factory_configured": reservation_factory is not None,
             "corpus": {key: value.value for key, value in applicability.items()},
-            "applicability_provenance": "verdict_only",
+            "applicability_provenance": "recorded_inputs" if applicability_inputs is not None else "verdict_only",
+            "applicability_inputs": applicability_inputs.to_dict() if applicability_inputs is not None else None,
         })
         for revision_id in revision_ids:
             archive.add_revision(catalog.get_revision(revision_id))
