@@ -953,7 +953,8 @@
       "id": "T055",
       "phase": "P5",
       "depends_on": [
-        "T054"
+        "T054",
+        "T055A"
       ],
       "status": "pending",
       "files": [
@@ -3573,6 +3574,23 @@
       "acceptance": "Reconstruct the versioned request body from archived request fields and reject mismatched response wire digests; missing or unversioned OpenRouter digests remain incomplete.",
       "command": "python -m pytest tests/test_replay.py::test_replay_rejects_response_wire_digest_that_differs_from_request -q",
       "evidence": "Red: replay accepted a changed wire payload digest. A stable v1 serializer now constructs the body sent by the adapter and replay compares its digest with the retained response metadata; unversioned or missing OpenRouter digest is incomplete. A second red exposed price-key ordering differences after archive serialization; v1 now specifies key order. Fake HTTP and tampered synthetic archive only; this does not authenticate evidence, verify pre-dispatch bounds or authorize hosted calls."
+    },
+    {
+      "id": "T055A",
+      "phase": "repair",
+      "depends_on": [
+        "T054A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_source_browser.py",
+      "test_name": "test_failed_source_selection_hides_prior_preview",
+      "action": "Clear stale source preview when a new selection begins",
+      "acceptance": "A failed source selection must not leave the previously selected source text visible; verify through a real local browser.",
+      "command": "python -m pytest tests/test_source_browser.py::test_failed_source_selection_hides_prior_preview -q",
+      "evidence": "Independent local source-inspection repair while R08 provider preflight remains open, as required by GOAL.md. Red in Chromium: after one synthetic source was selected, an injected HTTP 503 for a second selection left the first text visible. The browser now clears and hides the prior preview before requesting another source. The optional browser test uses local Playwright/Chromium, not a provider or network model call. This does not establish full accessibility, browser acceptance or source authority."
     }
   ]
 }
