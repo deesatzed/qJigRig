@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .indexing import IndexEntry
 from .spans import Span
@@ -73,6 +73,29 @@ def bm25_candidates(entries: list[IndexEntry], query: str) -> list[Candidate]:
             out.append(Candidate(e.entry_id, e.revision_id, e.span, score, prov))
     out.sort(key=lambda c: (-c.score, c.entry_id))
     return out
+
+
+# Small, explicit morphology set derived from the recorded refund counterexamples.
+# This is not a general stemmer or a claim that matching passages are relevant.
+EXPANDED_BM25_METHOD = "bm25_query_expansion_v1"
+_QUERY_EXPANSIONS = {
+    "refund": ("refunds", "refunded"),
+    "exception": ("exceptions",),
+    "waiver": ("waivers",),
+}
+
+
+def expand_query_v1(query: str) -> str:
+    """Append controlled lexical variants; original query terms remain intact."""
+    original = tokenize(query)
+    extra = sorted({variant for term in original for variant in _QUERY_EXPANSIONS.get(term, ())})
+    return " ".join(original + extra)
+
+
+def bm25_expanded_candidates(entries: list[IndexEntry], query: str) -> list[Candidate]:
+    """BM25 over the versioned expanded query, retaining original source spans."""
+    return [replace(candidate, provenance=replace(candidate.provenance, method=EXPANDED_BM25_METHOD))
+            for candidate in bm25_candidates(entries, expand_query_v1(query))]
 
 
 NEUTRAL_PRIOR = 0.5  # used only when no role estimate exists; never excludes anything

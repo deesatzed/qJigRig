@@ -110,3 +110,42 @@ def test_missing_and_omitted_required_channels_are_reported():
     assert len(sel.selected) == len(primary) == 2  # only what exists is returned
     sel2 = select_with_mandatory({"a": primary, "b": exception}, {"a", "b"}, 1, {})
     assert [ch for ch, _ in sel2.selected] == ["a"] and sel2.omitted_required == ("b",)
+
+
+def test_recorded_live_query_variants():
+    """Historical live questions over the same authored synthetic corpus; no model call."""
+    import json
+    from pathlib import Path
+    from qjig.retrieval import bm25_expanded_candidates, EXPANDED_BM25_METHOD
+
+    report = json.loads((Path(__file__).resolve().parents[1] / "reports/t048-fresh-live.json").read_text())
+    recorded = []
+    for run in report["runs"]:
+        predicates = dict(run["predicates"])
+        recorded.extend(predicates[pid] for pid, observation in run["observations"].items()
+                        if observation == ["unknown", "no_retrieval_hit"])
+    assert len(recorded) == 3
+    corpus = entries_for(("sample/refunds.md", "# Refunds\nRefunds are accepted within 14 days of purchase.\n\n# Exceptions\nDefective items may be refunded within 30 days.\n"))
+    for query in recorded:
+        assert bm25_candidates(corpus, query) == []
+        expanded = bm25_expanded_candidates(corpus, query)
+        assert expanded and all(c.provenance.method == EXPANDED_BM25_METHOD for c in expanded)
+        assert any("Refunds are accepted" in c.span.text or "Defective items may be refunded" in c.span.text for c in expanded)
+    # Expansion may retrieve a lexical distractor; its presence is not treated as support.
+    distractor = entries_for(("other.md", "# Exceptions\nExceptionless control flow.\n"))
+    assert bm25_candidates(distractor, recorded[-1]) == []
+    assert bm25_expanded_candidates(distractor, recorded[-1])
+
+
+def test_expansion_is_bounded_deterministic_and_does_not_infer_absence():
+    from qjig.retrieval import bm25_expanded_candidates, expand_query_v1
+
+    assert expand_query_v1("refund exception") == "refund exception exceptions refunded refunds"
+    assert expand_query_v1("nonrefundable exceptional") == "nonrefundable exceptional"
+    entries = entries_for(("policy.md", "# Policy\nRefunds are allowed.\n"), ("other.md", "# Other\nNo relevant text.\n"))
+    query = "refund"
+    assert bm25_candidates(entries, query) == []
+    result = bm25_expanded_candidates(entries, query)
+    assert result == bm25_expanded_candidates(list(reversed(entries)), query)
+    assert result[0].span.text.startswith("# Policy")
+    assert bm25_expanded_candidates(entries, "unmentioned") == []

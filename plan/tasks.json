@@ -1377,7 +1377,8 @@
       "phase": "repair",
       "finding": "F03",
       "depends_on": [
-        "R07"
+        "R07",
+        "R03A"
       ],
       "status": "pending",
       "files": [],
@@ -1577,6 +1578,25 @@
       "acceptance": "Fake HTTP and archive preserve available response id, returned model, provider and finish reason without credentials.",
       "command": "python -m pytest tests/test_providers.py::test_response_metadata_is_retained_without_credentials -q",
       "evidence": "Red: RawResponse had no metadata. Green: fake HTTP captures response id, model, provider, finish reason, including no-content output; escaped dummy credential is redacted from content, errors and metadata. Full offline suite 322 passed. The JSON id is labeled response_id, not asserted to be an HTTP request id; full R07 and live tests remain pending."
+    },
+    {
+      "id": "R03A",
+      "phase": "repair",
+      "finding": "F03",
+      "depends_on": [
+        "T048"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/retrieval.py",
+        "tests/test_retrieval.py"
+      ],
+      "test_file": "tests/test_retrieval.py",
+      "test_name": "test_recorded_live_query_variants",
+      "action": "Reproduce recorded zero-hit queries and develop versioned lexical expansion offline",
+      "acceptance": "All three saved zero-hit questions recover relevant candidate access while preserving lexical baseline and disclosing distractors.",
+      "command": "python -m pytest tests/test_retrieval.py::test_recorded_live_query_variants -q",
+      "evidence": "Red: versioned expanded retrieval absent. Green: all three no_retrieval_hit questions are read from the saved live receipt; unchanged BM25 returns zero, controlled expansion retrieves relevant synthetic candidates, and an irrelevant exception passage is also retrieved. Retrieval/recovery/packet tests 18 passed; full suite 324 passed. Expansion is not integrated into fresh acquisition; R03 remains pending."
     }
   ]
 }
