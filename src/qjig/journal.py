@@ -142,7 +142,8 @@ class Journal:
 
 
 def run_journaled(
-    journal: Journal, *, call: Callable[[], Any], request_id: str, stage: str, provider: str, model: str, input_sha256: str
+    journal: Journal, *, call: Callable[[], Any], request_id: str, stage: str, provider: str, model: str, input_sha256: str,
+    intent_payload: dict | None = None,
 ) -> Any:
     """Write the intent, then call. `call` returns (result, usage). A crash leaves the intent pending."""
     blocking = [e for e in journal.pending(request_id) if (e.stage, e.provider, e.model, e.input_sha256) == (stage, provider, model, input_sha256)]
@@ -151,7 +152,7 @@ def run_journaled(
             "unresolved earlier call(s) with the same input: " + ", ".join(e.call_id for e in blocking)
             + "; verify whether they executed, then reconcile before retrying"
         )
-    intent = journal.record_intent(request_id=request_id, stage=stage, provider=provider, model=model, input_sha256=input_sha256)
+    intent = journal.record_intent(request_id=request_id, stage=stage, provider=provider, model=model, input_sha256=input_sha256, payload=intent_payload)
     try:
         result, usage = call()
     except UncertainOutcome as exc:  # sent, outcome unknown: stays unresolved

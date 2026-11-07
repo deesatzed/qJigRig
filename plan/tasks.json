@@ -700,7 +700,7 @@
         "T003",
         "T039"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/budgets.py"
       ],
@@ -708,7 +708,8 @@
       "test_name": "test_physical_call_cap",
       "action": "Enforce request-wide physical call reservations",
       "acceptance": "Planner repair stability probes final checks and fallback share the cap",
-      "command": "python -m pytest tests/test_budgets.py::test_physical_call_cap -q"
+      "command": "python -m pytest tests/test_budgets.py::test_physical_call_cap -q",
+      "evidence": "Red: ModuleNotFoundError qjig.budgets (initial contract); two of my own test expectations were wrong first (token arithmetic, default call cap) and were corrected in the tests. Green: focused 1 passed in 0.04s; tests/test_budgets.py 4 passed in 0.05s; full suite 207 passed in 1.20s. 2026-11-06."
     },
     {
       "id": "T042",
