@@ -15,7 +15,7 @@ from .packets import EvidencePacket, serialize_packet
 from .plans import Plan
 from .contracts import Request
 from .recovery import Exclusion, RecoveryResult, check_candidate, recover_packet
-from .retrieval import BM25_METHOD, EXPANDED_BM25_METHOD, Candidate, bm25_candidates, bm25_expanded_candidates, select_unique_with_mandatory
+from .retrieval import BM25_METHOD, EXPANDED_BM25_METHOD, NEUTRAL_PRIOR, Candidate, bm25_candidates, bm25_expanded_candidates, select_unique_with_mandatory
 from .scheduler import next_need
 from .stopping import StopDecision, check_stop
 from .budgets import BudgetExceeded, BudgetLedger
@@ -207,6 +207,7 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
             packet_truncations=recovery.packet.truncated_entry_ids,
         )
     else:
+        candidates.sort(key=lambda c: (-c.score, -spec.role_priors.get(c.entry_id, NEUTRAL_PRIOR), c.entry_id))
         recovery = recover_packet(
             ctx.catalog, candidates, want=spec.want, max_bytes=spec.max_bytes, applicability=ctx.applicability
         )

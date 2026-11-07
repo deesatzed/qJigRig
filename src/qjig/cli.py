@@ -22,6 +22,7 @@ from .logic import Outcome
 from .obligations import Obligation, ObligationLedger
 from .plans import parse_plan
 from .recovery import applicability_filter
+from .roles import RoleEstimate, RoleEstimateStore
 from .sources import SourceRevision, decode_source
 from .store import Catalog
 
@@ -116,13 +117,43 @@ def _evaluator(spec: dict, members: dict[str, MemberMetadata], facts: dict, enti
     raise ContractError(f"unknown evaluator kind {kind!r}")
 
 
-def _need(spec: dict, inherited_evaluator: dict | None = None, **ctx: Any) -> NeedSpec:
+def _need(spec: dict, inherited_evaluator: dict | None = None, *, role_priors: dict | None = None, **ctx: Any) -> NeedSpec:
     """A followup block may omit its evaluator and then reuses its parent's."""
     evaluator = spec.get("evaluator") or inherited_evaluator
     if evaluator is None:
         raise ContractError("every need requires an evaluator")
-    follow = _need(spec["followup"], evaluator, **ctx) if "followup" in spec else None
-    return NeedSpec(spec["query"], spec["want"], spec["max_bytes"], _evaluator(evaluator, **ctx), follow)
+    follow = _need(spec["followup"], evaluator, role_priors=role_priors, **ctx) if "followup" in spec else None
+    return NeedSpec(spec["query"], spec["want"], spec["max_bytes"], _evaluator(evaluator, **ctx), follow,
+                    role_priors=role_priors or {})
+
+
+def _role_priors(request: Request, estimates: object, entries: list) -> tuple[dict, dict]:
+    """Use only explicit proposals for this role and live entry/revision identity."""
+    if not isinstance(estimates, list):
+        raise ContractError("role estimates must be a list")
+    live = {e.entry_id: e.revision_id for e in entries}
+    store = RoleEstimateStore()
+    priors, applied, ignored = {}, [], []
+    fields = {"role_id", "role_version", "entry_id", "revision_id", "estimated_usefulness", "method", "receipt"}
+    for item in estimates:
+        if not isinstance(item, dict) or set(item) != fields or any(
+            not isinstance(item[key], str) or not item[key].strip() for key in fields - {"estimated_usefulness"}
+        ):
+            raise ContractError("invalid role estimate")
+        estimate = RoleEstimate(**item)
+        store.put(estimate)
+        reason = None
+        if (estimate.role_id, estimate.role_version) != (request.role, request.role_version):
+            reason = "role_or_version_mismatch"
+        elif live.get(estimate.entry_id) != estimate.revision_id:
+            reason = "entry_or_revision_not_live"
+        if reason:
+            ignored.append({"role_id": estimate.role_id, "role_version": estimate.role_version,
+                            "entry_id": estimate.entry_id, "revision_id": estimate.revision_id, "reason": reason})
+        else:
+            priors[estimate.entry_id] = estimate.estimated_usefulness
+            applied.append({**item, "state": estimate.state})
+    return priors, {"applied": applied, "ignored": ignored, "effect": "lexical_tie_break_only"}
 
 
 def _origin_lookup(cat: Catalog):
@@ -164,11 +195,13 @@ def run_authored(catalog: str | Path, request: Request, policy: dict) -> tuple[d
     historical = bool(policy.get("historical_as_known", False))
     with Catalog.open(catalog) as cat:
         members = {r[0]: _member_from_row(r) for r in cat.metadata_rows()}
+        entries = load_live_entries(cat)
+        role_priors, role_prior_provenance = _role_priors(request, policy.get("role_estimates", []), entries)
         specs, ledger = {}, ObligationLedger()
         for p in plan.predicates:
             need = policy["needs"][p.id]
             specs[p.id] = _need(need, members=members, facts=policy.get("facts", {}), entities=entities, as_of=as_of,
-                                historical=historical)
+                                historical=historical, role_priors=role_priors)
             ledger.open(Obligation(f"ob-{p.id}", "exception" if need.get("kind") == "exception" else "predicate_evidence",
                                    p.id, p.question, material=True))
         entity_date_filter = applicability_filter(Collection(tuple(members.values())), entities, as_of, historical_as_known=historical)
@@ -176,13 +209,14 @@ def run_authored(catalog: str | Path, request: Request, policy: dict) -> tuple[d
             member = members.get(candidate.revision_id)
             scope = scope_applicability(request.scope, member.scope if member else None)
             return combine_applicability(scope, entity_date_filter(candidate))
-        ctx = Context(cat, load_live_entries(cat), scoped_filter, specs)
+        ctx = Context(cat, entries, scoped_filter, specs)
         state = RunState(request, plan, ledger)
         summary = run_until_done(state, ctx)
         final = finalize(state, ctx, summary, mode=mode, lookup=_origin_lookup(cat))
         st = final.state
         result = {
             "policy_label": policy.get("label", ""),
+            "role_prior_provenance": role_prior_provenance,
             "request": request.to_dict(),
             "mode": mode,
             "status": final.status,
