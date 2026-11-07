@@ -20,6 +20,7 @@ HTML = '''<!doctype html>
 <button type="submit">Run authored rule <span aria-hidden="true">↗</span></button><p id="question-message" role="status" aria-live="polite"></p></form>
 <section class="result" aria-labelledby="result-title"><div class="list-head"><h3 id="result-title">Result &amp; evidence</h3><span id="result-status" class="badge">Not run</span></div><p class="muted">Catalog changes are checked while this page is open; external files are not monitored.</p><div id="result" aria-live="polite"><p class="muted">Your result, evidence and open questions will appear here.</p></div></section>
 <section class="result" aria-labelledby="saved-title"><div class="list-head"><h3 id="saved-title">Saved runs</h3><button id="refresh-runs" class="quiet" type="button">Refresh</button></div><p class="note">Saved bundles retain cited source bytes. Structural checks do not authenticate the record or establish that its decision is correct.</p><ul id="saved-runs"><li class="muted">No saved runs loaded.</li></ul><p id="saved-run-message" role="status" aria-live="polite"></p><button id="download-run" type="button" disabled>Download selected bundle</button></section>
+<section class="result" aria-labelledby="programs-title"><div class="list-head"><h3 id="programs-title">Saved program drafts</h3><button id="refresh-programs" class="quiet" type="button">Refresh</button></div><p class="note">Drafts are not active. Source status checks the local index when refreshed; it does not assess external changes or completeness.</p><div id="program-list" aria-live="polite"><p class="muted">No drafts loaded.</p></div></section>
 <section class="result" aria-labelledby="reviews-title"><div class="list-head"><h3 id="reviews-title">Saved reviews</h3><button id="refresh-reviews" class="quiet" type="button">Refresh</button></div><p class="note">Reviews are unvalidated records of a specific snapshot. Local source status is checked when refreshed; external files are not monitored. Reviews do not activate a program or establish that all conditions were found.</p><div id="review-list" aria-live="polite"><p class="muted">No reviews loaded.</p></div></section></section></div>
 <footer>Sources and interpretations stay distinct. Unknown information remains unknown.</footer></main></body></html>'''
 
@@ -32,7 +33,7 @@ JS = r'''
 "use strict";
 const byId = id => document.getElementById(id);
 const splitEntities = value => value.split(",").map(x => x.trim()).filter(Boolean);
-let selectedSource = null, selectionSerial = 0, sourceEpoch = 0, resultSourceState = null, selectedRun = null, runSerial = 0, reviewSerial = 0;
+let selectedSource = null, selectionSerial = 0, sourceEpoch = 0, resultSourceState = null, selectedRun = null, runSerial = 0, reviewSerial = 0, programSerial = 0;
 function line(parent, tag, text, cls) { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; parent.append(node); return node; }
 async function api(path, options = {}) { const response = await fetch(path, options); const data = await response.json(); if (!response.ok) throw new Error(data.error || "Request failed"); return data; }
 async function openSource(revisionId) { const serial = ++selectionSerial; selectedSource = null; byId("selected-source").textContent = "Loading source…"; try { const detail = await api(`/api/sources/${encodeURIComponent(revisionId).replace("%3A", ":")}`); if (serial !== selectionSerial) return; selectedSource = detail; const preview = byId("source-preview"); preview.textContent = detail.text; preview.hidden = false; byId("selected-source").textContent = `Selected: ${detail.source_id} · ${detail.revision_id}`; } catch (error) { if (serial === selectionSerial) { byId("selected-source").textContent = "Could not load source."; byId("source-message").textContent = error.message; } } }
@@ -49,6 +50,16 @@ byId("refresh").addEventListener("click", refreshSources);
 async function refreshRuns() { const list = byId("saved-runs"); list.replaceChildren(); try { const data = await api("/api/runs"); if (!data.runs.length) { line(list, "li", "No saved runs yet.", "muted"); return; } for (const run of data.runs) { const li = document.createElement("li"), button = document.createElement("button"); button.type = "button"; button.textContent = `${run.question} · ${run.status} · ${run.run_id.slice(0, 12)}`; button.addEventListener("click", () => openSavedRun(run.run_id)); li.append(button); list.append(li); } } catch (error) { line(list, "li", `Could not load runs: ${error.message}`, "error"); } }
 async function openSavedRun(runId) { const serial = ++runSerial; selectedRun = null; byId("download-run").disabled = true; byId("saved-run-message").textContent = "Opening saved result…"; try { const data = await api(`/api/runs/${runId}`); if (serial !== runSerial) return; if (data.verification.status !== "unanchored" || data.bundle.sha256 !== runId) throw new Error("Saved bundle did not pass structural checks"); selectedRun = data.bundle; resultSourceState = data.bundle.payload.source_state; renderResult(data.bundle.payload.result); byId("download-run").disabled = false; byId("saved-run-message").textContent = "Saved snapshot opened. The bundle is unanchored; decision semantics were not assessed."; await checkSourceState(); } catch (error) { if (serial === runSerial) byId("saved-run-message").textContent = `Could not open saved result: ${error.message}`; } }
 byId("refresh-runs").addEventListener("click", refreshRuns);
+async function refreshPrograms() { const area = byId("program-list"), serial = ++programSerial; area.replaceChildren(); try {
+  const data = await api("/api/programs"); if (serial !== programSerial) return; if (!data.programs.length) { line(area, "p", "No saved drafts yet.", "muted"); return; }
+  for (const program of data.programs) { const block = line(area, "div", "", "evidence");
+    line(block, "strong", program.question); line(block, "p", `Scope: ${program.scope} · ${program.role} / ${program.role_version} · as of ${program.as_of}`);
+    const labels = {draft:"Draft · no linked review", review_record_linked:"Draft · review record linked (unvalidated)", stale:"Source snapshot changed · draft is stale", source_state_unknown:"Local source status unknown"};
+    line(block, "p", labels[program.status] || "Draft status unknown", "note"); const freshness = {matches_local_index:"Local source index matches this draft", stale:"Source snapshot changed", unknown:"Local source status unknown"}; line(block, "p", freshness[program.source_freshness] || "Local source status unknown", "note"); line(block, "p", "Not active · semantic completeness not assessed", "note");
+    for (const revision of program.source_revisions) { const button = line(block, "button", `Inspect source ${revision.slice(0, 17)}…`, "quiet"); button.type = "button"; button.addEventListener("click", async () => { await openSource(revision); byId("selected-source").scrollIntoView({behavior:"smooth", block:"center"}); }); }
+  }
+} catch (error) { if (serial === programSerial) line(area, "p", `Could not load drafts: ${error.message}`, "error"); } }
+byId("refresh-programs").addEventListener("click", refreshPrograms);
 async function refreshReviews() { const area = byId("review-list"), serial = ++reviewSerial; area.replaceChildren(); try {
   const data = await api("/api/reviews"); if (serial !== reviewSerial) return; if (!data.reviews.length) { line(area, "p", "No saved reviews yet.", "muted"); return; }
   for (const review of data.reviews) { const block = line(area, "div", "", "evidence");
@@ -78,7 +89,7 @@ byId("intervention-form").addEventListener("submit", async event => { event.prev
   const start = Array.from(source.text.slice(0, at)).length, end = start + Array.from(passage).length;
   const payload = {parent_revision_id:source.revision_id,text_sha256:source.text_sha256,start,end,replacement:form.get("replacement"),role_id:form.get("role").trim(),role_version:form.get("role_version").trim()};
   message.textContent = "Creating revision…";
-  try { const edit = await api("/api/interventions", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); sourceEpoch++; markSourceChanged(); message.textContent = "Revision created. Run the question again to compare."; await refreshSources(); await openSource(edit.child_revision_id); await refreshInterventions(); await refreshReviews(); } catch (error) { message.textContent = `Could not create revision: ${error.message}`; }
+  try { const edit = await api("/api/interventions", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); sourceEpoch++; markSourceChanged(); message.textContent = "Revision created. Run the question again to compare."; await refreshSources(); await openSource(edit.child_revision_id); await refreshInterventions(); await refreshReviews(); await refreshPrograms(); } catch (error) { message.textContent = `Could not create revision: ${error.message}`; }
 });
 byId("interpretation-form").addEventListener("submit", async event => { event.preventDefault(); const form = new FormData(event.currentTarget), message = byId("interpretation-message"), source = selectedSource;
   if (!source) { message.textContent = "Select a source first."; return; }
@@ -91,7 +102,7 @@ byId("interpretation-form").addEventListener("submit", async event => { event.pr
 });
 byId("source-form").addEventListener("submit", async event => { event.preventDefault(); const form = new FormData(event.currentTarget); const message = byId("source-message"); message.textContent = "Adding source…";
   const payload = {source_id: form.get("source_id").trim(), text: form.get("text"), scope: form.get("scope").trim(), entities: splitEntities(form.get("entities")), effective_from: form.get("effective_from"), effective_to: form.get("effective_to") || "open", observed_at: form.get("observed_at") || null, authority: form.get("authority").trim() || null};
-  try { const result = await api("/api/sources", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)}); sourceEpoch++; markSourceChanged(); message.textContent = `Source saved: ${result.source_id}`; await refreshSources(); await refreshReviews(); } catch (error) { message.textContent = `Could not add source: ${error.message}`; }
+  try { const result = await api("/api/sources", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)}); sourceEpoch++; markSourceChanged(); message.textContent = `Source saved: ${result.source_id}`; await refreshSources(); await refreshReviews(); await refreshPrograms(); } catch (error) { message.textContent = `Could not add source: ${error.message}`; }
 });
 byId("question-form").addEventListener("submit", async event => { event.preventDefault(); const serial = ++runSerial; selectedRun = null; byId("download-run").disabled = true; const form = new FormData(event.currentTarget); const message = byId("question-message"), epoch = sourceEpoch; message.textContent = "Running…";
   const question = form.get("question").trim(), entities = splitEntities(form.get("entities"));
@@ -112,6 +123,7 @@ refreshInterpretations();
 refreshInterventions();
 refreshRuns();
 refreshReviews();
+refreshPrograms();
 window.setInterval(checkSourceState, 3000);
 window.addEventListener("focus", checkSourceState);
 '''

@@ -49,6 +49,11 @@ def main():
                 try:
                     page = browser.new_page(viewport={'width': 1280, 'height': 900})
                     page.goto(f'http://127.0.0.1:{server.server_address[1]}/', wait_until='networkidle')
+                    programs = page.locator('#program-list')
+                    programs.get_by_text('Can this merge?').wait_for()
+                    assert 'review record linked (unvalidated)' in programs.inner_text()
+                    assert 'Not active' in programs.inner_text()
+                    assert 'Local source index matches this draft' in programs.inner_text()
                     area = page.locator('#review-list')
                     area.get_by_text('Can this merge?').wait_for()
                     assert 'Synthetic review · unvalidated' in area.inner_text()
@@ -62,12 +67,15 @@ def main():
                     page.locator('#intervention-form [name="replacement"]').fill('must pass and be reviewed')
                     page.locator('#intervention-form button[type="submit"]').click()
                     area.get_by_text('Source snapshot changed · review is stale').wait_for()
+                    programs.get_by_text('Source snapshot changed · draft is stale').wait_for()
+                    programs.get_by_role('button', name='Inspect source', exact=False).click()
+                    page.wait_for_function("() => document.querySelector('#source-preview').textContent.includes('Tests must pass.')")
                     area.get_by_role('button', name='Inspect source', exact=False).click()
                     page.wait_for_function("() => document.querySelector('#source-preview').textContent.includes('Tests must pass.')")
                     page.set_viewport_size({'width': 390, 'height': 844})
                     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
                     print(json.dumps({'status': 'passed', 'synthetic_review_visible': True, 'keyboard_source_inspection': True,
-                                      'source_change_shown_stale': True,
+                                      'source_change_shown_stale': True, 'draft_status_and_original_source_visible': True,
                                       'viewport_width': 390, 'hosted_calls': 0, 'semantic_assurance': 'not_assessed'}))
                 finally:
                     browser.close()

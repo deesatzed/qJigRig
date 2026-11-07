@@ -1000,7 +1000,8 @@
         "T057F",
         "T057G",
         "T057H",
-        "T057I"
+        "T057I",
+        "T057J"
       ],
       "status": "pending",
       "files": [
@@ -2461,6 +2462,25 @@
       "acceptance": "Direct public adapter sends refuse before reading credentials or touching the transport while hosted preflight is unavailable.",
       "command": "python -m pytest tests/test_providers.py::test_direct_openrouter_send_cannot_bypass_preflight -q",
       "evidence": "Red: public direct adapter send reached injected HTTP despite missing complete preflight. Green: public send refuses before credential access and injected HTTP; fake-only adapter mechanics remain separately tested. Focused provider suite 35 passed; full offline suite 487 passed. The internal unchecked helper and arbitrary Python/network access are not sandboxed. Full R08 and actual hosted preflight remain open."
+    },
+    {
+      "id": "T057J",
+      "phase": "P5",
+      "depends_on": [
+        "T057I"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/service.py",
+        "src/qjig/web.py",
+        "scripts/verify_review_browser.py"
+      ],
+      "test_file": "tests/test_web.py",
+      "test_name": "test_draft_programs_visible_with_status_and_source_links",
+      "action": "Expose saved program drafts and local freshness in the workbench",
+      "acceptance": "Unreviewed and reviewed drafts remain inspectable with separate local source freshness, linked reviews, source revisions and no activation claim.",
+      "command": "python -m pytest tests/test_web.py::test_draft_programs_visible_with_status_and_source_links -q",
+      "evidence": "Red: no saved-program API or draft view. Green: real local HTTP tests cover unreviewed and linked synthetic-review drafts, nonactivation, source links and stale source revision. Chromium synthetic walkthrough inspects linked draft, source and stale transition at desktop and 390px. Focused 27 passed before expanded assertions; full offline suite 488 passed. No program creation, hosted review, activation, semantic validation or full T057 claimed."
     }
   ]
 }

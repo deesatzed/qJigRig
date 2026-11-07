@@ -111,6 +111,25 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(200, {'bundle': bundle, 'verification': verification})
             except (ContractError, ValueError, TypeError, AttributeError, sqlite3.Error):
                 self._reply(500, {'error': 'stored run invalid'})
+        elif self.path == "/api/programs":
+            try:
+                with Catalog.open(self.server.catalog) as catalog:
+                    programs = []
+                    for ident in catalog.program_draft_ids():
+                        draft = catalog.program_draft(ident)
+                        binding = draft['payload']['binding']
+                        status = catalog.program_status(ident, binding)
+                        request = binding['request']
+                        programs.append({'draft_id': ident, 'question': request['question'],
+                                         'scope': request['scope'], 'role': request['role'],
+                                         'role_version': request['role_version'], 'as_of': binding['as_of'],
+                                         'source_revisions': binding['corpus_revision_ids'],
+                                         'status': status['status'], 'source_freshness': status['source_freshness']['status'],
+                                         'review_ids': status['review_ids'], 'activation': status['activation'],
+                                         'semantic_assurance': status['semantic_assurance']})
+                self._reply(200, {'programs': programs})
+            except (ContractError, ValueError, KeyError, TypeError, AttributeError, sqlite3.Error):
+                self._reply(500, {'error': 'stored program invalid'})
         elif self.path == "/api/reviews":
             try:
                 with Catalog.open(self.server.catalog) as catalog:

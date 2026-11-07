@@ -185,3 +185,55 @@ def test_review_view_reports_local_source_freshness(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_draft_programs_visible_with_status_and_source_links(tmp_path):
+    import json
+    from qjig.contracts import Request
+    from qjig.indexing import index_entries
+    from qjig.programs import make_draft
+    from qjig.sources import SourceRevision, decode_source
+    from qjig.store import Catalog
+    path = tmp_path / 'catalog.sqlite'
+    revision = SourceRevision.create('rule.md', 'fixture', decode_source(b'# Rule\nTests pass.\n', encoding='utf-8'))
+    metadata = {'scope': 'project', 'authority_id': None, 'entity_keys': [], 'effective_start': '2026-01-01', 'effective_end': 'open', 'observed_at': None}
+    binding = {'request': Request('r', 'Can this merge?', 'reviewer', '1', 'project').to_dict(),
+               'plan': {'origin': 'fresh', 'predicates': [{'id': 'p', 'question': 'Tests pass?'}], 'expression': {'ref': 'p'}},
+               'corpus_revision_ids': [revision.revision_id], 'source_metadata': {revision.revision_id: metadata},
+               'as_of': '2026-11-07', 'entities': [], 'historical_as_known': False,
+               'planner': {'provider': 'stand-in', 'model': 'planner', 'prompt_sha256': 'b'*64, 'config': {}}}
+    with Catalog.open(path) as catalog:
+        catalog.import_snapshot(revision, index_entries(revision), (revision.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+        draft_id = catalog.save_program_draft(make_draft(binding), catalog.source_state())
+    server = create_server(path, host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+    try:
+        def get(path):
+            conn = http.client.HTTPConnection('127.0.0.1', server.server_address[1], timeout=5)
+            conn.request('GET', path); response = conn.getresponse(); body = response.read(); conn.close()
+            return response.status, body
+        status, body = get('/api/programs')
+        assert status == 200
+        (program,) = json.loads(body)['programs']
+        assert program['draft_id'] == draft_id and program['question'] == 'Can this merge?'
+        assert program['status'] == 'draft' and program['source_freshness'] == 'matches_local_index'
+        assert program['review_ids'] == [] and program['activation'] is False
+        assert program['source_revisions'] == [revision.revision_id]
+        assert b'id="program-list"' in get('/')[1]
+        from qjig.programs import make_review
+        reviewer = {'kind': 'synthetic', 'provider': 'stand-in', 'model': 'reviewer', 'prompt_sha256': 'c'*64, 'config': {}}
+        review = make_review(binding, reviewer, {'assessment': 'uncertain'})
+        with Catalog.open(path) as catalog:
+            review_id = catalog.save_program_review(review, catalog.source_state())
+            catalog.link_program_review(draft_id, review_id, catalog.source_state())
+        linked = json.loads(get('/api/programs')[1])['programs'][0]
+        assert linked['status'] == 'review_record_linked' and linked['review_ids'] == [review_id]
+        assert linked['activation'] is False and linked['semantic_assurance'] == 'not_assessed'
+        newer = SourceRevision.create('rule.md', 'fixture', decode_source(b'# Rule\nTests fail.\n', encoding='utf-8'))
+        with Catalog.open(path) as catalog:
+            catalog.import_snapshot(newer, index_entries(newer), (newer.revision_id, 'project', None, '[]', '2026-01-01', 'open', None))
+        status, body = get('/api/programs')
+        assert json.loads(body)['programs'][0]['status'] == 'stale'
+        assert json.loads(body)['programs'][0]['source_revisions'] == [revision.revision_id]
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=5)
