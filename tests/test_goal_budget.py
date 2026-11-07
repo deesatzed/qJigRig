@@ -557,3 +557,16 @@ def test_audit_rejects_individual_token_bound_overruns(tmp_path, input_tokens, o
             second.run('judge', lambda: seen.append('called'), provider='stand-in', model='m', input_sha256='b'*64,
                        reserve_tokens=40, reserve_input_tokens=60, reserve_cost_usd=0.2)
         assert seen == [] and journal.events('r2') == [] and goal.totals().max_calls == 1
+
+
+@pytest.mark.parametrize('extra', [1e-30, 5e-324])
+def test_required_work_costs_cannot_round_below_goal_cap(tmp_path, extra):
+    limit = Budget(4, 1000, 1.0)
+    with GoalBudget.open(tmp_path / 'g.sqlite', total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
+        with pytest.raises(BudgetExceeded):
+            goal.reserve_required('r', 'smoke', [
+                ('first', 1, 0.5, 'judge', 'stand-in', 'm'),
+                ('second', 1, 0.5, 'judge', 'stand-in', 'm'),
+                ('third', 1, extra, 'judge', 'stand-in', 'm'),
+            ])
+        assert goal._con.execute('SELECT COUNT(*) FROM required_work').fetchone()[0] == 0

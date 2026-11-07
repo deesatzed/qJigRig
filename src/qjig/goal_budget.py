@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .budgets import BudgetExceeded, _valid_cost, _valid_tokens
 from .contracts import Budget, ContractError
+from .money import sum_costs
 
 
 def _cost(value: int | float) -> Decimal:
@@ -38,7 +39,7 @@ class GoalBudget:
         if any(not isinstance(k, str) or not k.strip() or not isinstance(v, Budget) for k, v in allocations.items()):
             raise ContractError("invalid allocation")
         assigned = (sum(b.max_calls for b in allocations.values()), sum(b.max_tokens for b in allocations.values()),
-                    sum((_cost(b.max_cost_usd) for b in allocations.values()), Decimal(0)))
+                    sum_costs(_cost(b.max_cost_usd) for b in allocations.values()))
         if not _fits(assigned, total):
             raise ContractError("partition allocations exceed total")
         policy = json.dumps({"total": total.to_dict(), "per_request": per_request.to_dict(),
@@ -81,7 +82,7 @@ class GoalBudget:
 
     @staticmethod
     def _sum(rows) -> tuple[int, int, Decimal]:
-        return len(rows), sum(row[0] for row in rows), sum((Decimal(row[1]) for row in rows), Decimal(0))
+        return len(rows), sum(row[0] for row in rows), sum_costs(Decimal(row[1]) for row in rows)
 
     def totals(self) -> Budget:
         count, tokens, cost = self._sum(self._con.execute("SELECT tokens, cost FROM reservations").fetchall())
@@ -90,15 +91,15 @@ class GoalBudget:
     @staticmethod
     def _committed_rows(rows) -> tuple[int, int, Decimal]:
         tokens = 0
-        cost = Decimal(0)
+        costs = []
         for bound, bound_cost, inp, out, actual_cost in rows:
             if inp is None or out is None or actual_cost is None:
                 tokens += bound
-                cost += Decimal(bound_cost)
+                costs.append(Decimal(bound_cost))
             else:
                 tokens += inp + out
-                cost += Decimal(actual_cost)
-        return len(rows), tokens, cost
+                costs.append(Decimal(actual_cost))
+        return len(rows), tokens, sum_costs(costs)
 
     def committed(self) -> Budget:
         rows = self._con.execute("SELECT r.tokens,r.cost,u.input_tokens,u.output_tokens,u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()
@@ -178,7 +179,7 @@ class GoalBudget:
         rows = self._con.execute("SELECT u.input_tokens, u.output_tokens, u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()
         known_input = sum(r[0] for r in rows if r[0] is not None)
         known_output = sum(r[1] for r in rows if r[1] is not None)
-        known_cost = float(sum((Decimal(r[2]) for r in rows if r[2] is not None), Decimal(0)))
+        known_cost = float(sum_costs(Decimal(r[2]) for r in rows if r[2] is not None))
         return {"calls": len(rows),
                 "input_tokens": known_input if all(r[0] is not None for r in rows) else None,
                 "output_tokens": known_output if all(r[1] is not None for r in rows) else None,
@@ -275,7 +276,7 @@ class GoalBudget:
             n, t, c = self._committed_rows(rows)
             pending = self._con.execute("SELECT r.tokens,r.cost FROM required_work r WHERE r.attempt_id IS NULL AND " + condition + " AND (? IS NULL OR r.work_id != ?)", (*args, exclude_required, exclude_required)).fetchall()
             pn, pt, pc = self._sum(pending)
-            if not _fits((n + pn + calls, t + pt + tokens, c + pc + cost), limit):
+            if not _fits((n + pn + calls, t + pt + tokens, sum_costs((c, pc, cost))), limit):
                 raise BudgetExceeded(label, "reservation exceeds persistent limit")
 
     def reserve_required(self, request_id: str, partition: str, work: list[tuple[str, int, float, str, str, str]]) -> None:
@@ -300,7 +301,7 @@ class GoalBudget:
             if any(self._con.execute("SELECT 1 FROM required_work WHERE work_id=?", (item[0],)).fetchone() for item in normalized):
                 raise ContractError("required work already exists")
             self._check_capacity(request_id, partition, len(normalized), sum(item[1] for item in normalized),
-                                 sum((item[2] for item in normalized), Decimal(0)))
+                                 sum_costs(item[2] for item in normalized))
             self._con.executemany("INSERT INTO required_work (work_id,request_id,partition,tokens,cost,stage,provider,model) VALUES(?,?,?,?,?,?,?,?)",
                                   [(ident, request_id, partition, tokens, str(cost), stage, provider, model)
                                    for ident, tokens, cost, stage, provider, model in normalized])
@@ -397,7 +398,7 @@ class GoalBudget:
             if any(i + o > bound or Decimal(c) > Decimal(cost) for bound, cost, i, o, c in previous):
                 raise BudgetExceeded("bound_exceeded", "observed usage exceeded its reservation")
             self._check_capacity(request_id, partition, 1 + hold_back_calls, tokens + hold_back_tokens,
-                                 _cost(cost_usd) + _cost(hold_back_cost_usd), required_id)
+                                 sum_costs((_cost(cost_usd), _cost(hold_back_cost_usd))), required_id)
             self._con.execute("INSERT INTO reservations VALUES(?,?,?,?,?)", (attempt_id, request_id, partition, tokens, str(_cost(cost_usd))))
             self._con.execute("INSERT INTO holds VALUES(?,?,?,?)", (attempt_id, hold_back_calls, hold_back_tokens, str(_cost(hold_back_cost_usd))))
             if required_id is not None:

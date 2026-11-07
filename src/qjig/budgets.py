@@ -12,6 +12,7 @@ from typing import Any, Callable
 
 from .contracts import Budget, ContractError
 from .journal import Event, Journal, run_journaled
+from .money import sum_costs
 
 
 def _valid_tokens(value: Any) -> bool:
@@ -164,9 +165,9 @@ class BudgetLedger:
         if known is not None and known >= self.budget.max_cost_usd:
             raise BudgetExceeded("cost", f"known cost {known} has reached the requested cap {self.budget.max_cost_usd}")
         if reserve_cost_usd is not None:
-            spent = sum((Decimal(str(e.payload.get("usage", {}).get("cost_usd")))
-                         for _, rest in self._calls() for e in rest if e.kind == "receipt"), Decimal(0))
-            if spent + Decimal(str(reserve_cost_usd)) + Decimal(str(hold_back_cost_usd)) > Decimal(str(self.budget.max_cost_usd)):
+            spent = sum_costs(Decimal(str(e.payload.get("usage", {}).get("cost_usd")))
+                              for _, rest in self._calls() for e in rest if e.kind == "receipt")
+            if sum_costs((spent, reserve_cost_usd, hold_back_cost_usd)) > Decimal(str(self.budget.max_cost_usd)):
                 raise BudgetExceeded("cost", "reserved work exceeds cost cap")
         goal_attempt_id = None
         if self._goal_budget is not None:
