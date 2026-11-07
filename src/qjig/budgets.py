@@ -89,11 +89,11 @@ class BudgetLedger:
 
     def run(
         self, stage: str, call: Callable[[], Any], *, provider: str, model: str, input_sha256: str,
-        reserve_tokens: int, hold_back_calls: int = 0, hold_back_tokens: int = 0,
+        reserve_tokens: int, reserve_input_tokens: int = 0, hold_back_calls: int = 0, hold_back_tokens: int = 0,
         reserve_cost_usd: float | None = None, hold_back_cost_usd: float = 0,
     ) -> Any:
         """Check every cap, then journal the intent and make the call. Refusals happen before any intent."""
-        for name, value in (("reserve_tokens", reserve_tokens), ("hold_back_calls", hold_back_calls), ("hold_back_tokens", hold_back_tokens)):
+        for name, value in (("reserve_tokens", reserve_tokens), ("reserve_input_tokens", reserve_input_tokens), ("hold_back_calls", hold_back_calls), ("hold_back_tokens", hold_back_tokens)):
             if not _valid_tokens(value):
                 raise ContractError(f"{name} must be a non-negative integer")
         if reserve_cost_usd is not None and not _valid_cost(reserve_cost_usd):
@@ -106,7 +106,7 @@ class BudgetLedger:
             raise BudgetExceeded("calls", "no budget was provided, so no external work is authorized")
         if self.used_calls() + 1 + hold_back_calls > self.budget.max_calls:
             raise BudgetExceeded("calls", f"{self.used_calls()} used of {self.budget.max_calls}; {stage} needs 1 plus {hold_back_calls} held back")
-        if self.committed_tokens() + reserve_tokens + hold_back_tokens > self.budget.max_tokens:
+        if self.committed_tokens() + reserve_input_tokens + reserve_tokens + hold_back_tokens > self.budget.max_tokens:
             raise BudgetExceeded("tokens", f"{self.committed_tokens()} committed of {self.budget.max_tokens}; {stage} reserves {reserve_tokens}")
         if self.cost_status() != "known":
             raise BudgetExceeded("cost_unknown", "previous call has unknown cost; further calls are not authorized")
@@ -120,6 +120,8 @@ class BudgetLedger:
                 raise BudgetExceeded("cost", "reserved work exceeds cost cap")
         return run_journaled(
             self._journal, call=call, request_id=self._request_id, stage=stage, provider=provider, model=model,
-            input_sha256=input_sha256, intent_payload={"reserve_tokens": reserve_tokens, "reserve_cost_usd": reserve_cost_usd,
+            input_sha256=input_sha256, intent_payload={"reserve_tokens": reserve_input_tokens + reserve_tokens,
+                                                       "reserve_input_tokens": reserve_input_tokens, "reserve_output_tokens": reserve_tokens,
+                                                       "reserve_cost_usd": reserve_cost_usd,
                                                        "hold_back_cost_usd": hold_back_cost_usd},
         )

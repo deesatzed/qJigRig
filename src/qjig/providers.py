@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
-from .budgets import BudgetLedger
+from .budgets import BudgetExceeded, BudgetLedger
 from .journal import UncertainOutcome
 from .logic import Observation, Outcome
 
@@ -212,6 +212,8 @@ Validator = Callable[[str], tuple[dict | None, str | None]]
 
 def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequest, schema: "dict[str, FieldSpec] | Validator") -> TypedCall:
     """One budgeted, journaled provider attempt returning a validated value or an explicit failure."""
+    if isinstance(transport, OpenRouterTransport):
+        raise BudgetExceeded("preflight_unavailable", "hosted calls require complete input, cost and goal-wide reservations")
 
     def attempt():
         try:

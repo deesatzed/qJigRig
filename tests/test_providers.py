@@ -229,7 +229,12 @@ def test_provider_secrets_do_not_reach_journal_or_errors(tmp_path, kind):
         if kind == "connection":
             raise ConnectionRefusedError(f"request echoed {secret}")
         raise RuntimeError(f"request echoed {secret}")
-    transport = OpenRouterTransport(env, post=post)
+    adapter = OpenRouterTransport(env, post=post)
+    class FakeHTTPAdapter:
+        label = "STAND_IN: injected fake HTTP"
+        def send(self, request):
+            return adapter.send(request)
+    transport = FakeHTTPAdapter()
     with Journal.open(tmp_path / "receipt.sqlite") as journal:
         ledger = BudgetLedger(Budget(2, 1000, 1), journal, "safety")
         try:
@@ -240,3 +245,15 @@ def test_provider_secrets_do_not_reach_journal_or_errors(tmp_path, kind):
         assert secret not in repr(events)
         assert events[-1].kind == {"http_error": "receipt", "timeout": "uncertain", "connection": "failure", "unexpected": "uncertain"}[kind]
         assert bool(journal.pending("safety")) == (kind in ("timeout", "unexpected"))
+
+
+def test_live_provider_without_complete_preflight_never_dispatches(tmp_path):
+    """Injected fake HTTP and dummy credential: incomplete budgeting must refuse before an intent."""
+    from qjig.budgets import BudgetExceeded
+    seen = []
+    transport = OpenRouterTransport(_env(tmp_path), post=lambda *args: seen.append(args))
+    with Journal.open(tmp_path / "preflight.sqlite") as journal:
+        ledger = BudgetLedger(Budget(5, 10000, 1), journal, "preflight")
+        with pytest.raises(BudgetExceeded):
+            call_typed(ledger, transport, REQ, SCHEMA)
+        assert seen == [] and journal.events("preflight") == []

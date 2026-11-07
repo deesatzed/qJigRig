@@ -134,7 +134,7 @@ def test_known_spend_at_cap_blocks_call(tmp_path):
 
 
 @pytest.mark.parametrize("kwargs", [
-    {"tokens": -1}, {"tokens": True}, {"hold_back_calls": -1}, {"hold_back_tokens": -1},
+    {"tokens": -1}, {"tokens": True}, {"reserve_input_tokens": -1}, {"reserve_input_tokens": True}, {"hold_back_calls": -1}, {"hold_back_tokens": -1},
 ])
 def test_invalid_reservations_never_dispatch(tmp_path, kwargs):
     from qjig.contracts import ContractError
@@ -179,3 +179,18 @@ def test_held_back_cost_requires_call_cost_bound(tmp_path):
         with pytest.raises(ContractError):
             run(ledger, "planner", hold_back_cost_usd=0.1)
         assert j.events("req-1") == []
+
+
+def test_input_output_and_held_back_tokens_are_reserved_together(tmp_path):
+    j, ledger = make(tmp_path, tokens=100)
+    with j:
+        invoked = []
+        with pytest.raises(BudgetExceeded) as error:
+            run(ledger, "planner", tokens=50, reserve_input_tokens=40, hold_back_tokens=11,
+                call=lambda: invoked.append(True))
+        assert error.value.limit == "tokens" and not invoked and j.events("req-1") == []
+        run(ledger, "planner", tokens=50, reserve_input_tokens=40, hold_back_tokens=10)
+        intent = next(e for e in j.events("req-1") if e.kind == "intent")
+        assert intent.payload["reserve_tokens"] == 90
+        assert intent.payload["reserve_input_tokens"] == 40
+        assert intent.payload["reserve_output_tokens"] == 50
