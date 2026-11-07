@@ -1282,7 +1282,8 @@
         "T071B",
         "T071C",
         "T071D",
-        "T071E"
+        "T071E",
+        "T071F"
       ],
       "status": "pending",
       "files": [
@@ -3325,6 +3326,26 @@
       "acceptance": "All case inputs are checked before dispatch, scored receipts are revalidated on restart, and missing assignments remain visible without blind retry.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "Red: no multi-assignment driver existed. The bounded sequential batch validates all declared case locks, references, source snapshots and frozen applicability before dispatch, orders development/pilot/holdout work, preserves the full remaining count, and reconstructs previously scored archive/journal receipts before resuming. Synthetic tests cover a broken holdout reference blocking all calls, two successive batches, development-first ordering and changed receipt refusal. Focused evaluation/goal/replay/fresh-preflight 116 passed; full offline suite 551 passed. Nonmatching applicability currently blocks the entire batch, so required wrong-entity/date scenarios still need an explicit recorded deferral path; token/cost/provider enforcement, authenticated anchors and complete hosted evaluation remain open."
+    },
+    {
+      "id": "T071F",
+      "phase": "evaluation",
+      "depends_on": [
+        "T071E",
+        "T066D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_deferral.py",
+        "src/qjig/evaluation_campaign.py",
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Record inapplicable full-source assignments as replayable no-call deferrals",
+      "acceptance": "A nonmatching source does not block unrelated assignments or reach a judge; its own assignment is archived, scored unknown and retained in the denominator.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Red: batch preflight rejected the entire experiment when one full-source case had nonmatching applicability. The batch now preserves such cases; a decomposition-only assignment with a nonmatching or unknown source is durably archived as a no-call deferral, with per-source scope/entity-date verdicts reconstructed on replay and scored as unknown review. Synthetic wrong-scope, wrong-date, wrong-entity and unknown-input cases passed; zero calls, resumed receipt verification, changed verdict rejection and full denominator preservation were checked. Focused evaluation/goal/replay/fresh-preflight 119 passed before final score assertions; final four cases passed; full offline suite 554 passed. Metadata and anchors remain caller assertions; this does not adjudicate whether the deferral is justified or establish provider outcomes."
     }
   ]
 }

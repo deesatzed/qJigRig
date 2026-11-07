@@ -1723,9 +1723,10 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             reopened._con.execute("UPDATE evaluation_campaign_events SET payload='{}' WHERE kind='started'")
 
 
-def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path):
+@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown'])
+def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path,mismatch):
     import copy,json
-    from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
+    from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN,UNKNOWN_BOUND
     from qjig.contracts import Budget,Request
     from qjig.evaluation import load_isolated_sources,validate_evaluation_design
     from qjig.evaluation_budget import build_factorial_allocation,reserve_evaluation_plan
@@ -1755,6 +1756,17 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                                    frozenset(),'2026-11-07',False)
         cases[ident]={'lock':lock,'reference':ref,'protected':protected,'applicability_inputs':inputs}
         hashes[ident]=case_lock_digest(lock);metadata[ident]=applicability_digest(inputs)
+    wrong=cases['holdout']['applicability_inputs'];rev=wrong.collection.members[0].revision_id
+    if mismatch=='entity':
+        cases['holdout']['reference']['entities']=['target']
+        cases['holdout']['lock']['entities']=['target']
+        cases['holdout']['lock']['reference_sha256']=reference_digest(cases['holdout']['reference'])
+        hashes['holdout']=case_lock_digest(cases['holdout']['lock'])
+    scope='other' if mismatch=='scope' else 'project'
+    interval=Interval('2027-01-01',OPEN) if mismatch=='date' else Interval(UNKNOWN_BOUND,OPEN) if mismatch=='unknown' else Interval('2020-01-01',OPEN)
+    member=MemberMetadata(rev,scope,interval,entity_keys=frozenset({'other'}) if mismatch=='entity' else frozenset())
+    wrong=ApplicabilityInputs(Collection((member,)),frozenset({'target'}) if mismatch=='entity' else frozenset(),'2026-11-07',False)
+    cases['holdout']['applicability_inputs']=wrong;metadata['holdout']=applicability_digest(wrong)
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
            'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
@@ -1790,9 +1802,39 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                                   expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
         assert second['executed']==2 and second['scored']==4 and second['remaining']==56 and len(set(calls))==4
         assert all(next(a for a in plan['manifest']['assignments'] if a['request_id']==rid)['case_id'].startswith('dev') for rid in calls)
+        from qjig.evaluation_campaign import run_campaign_assignment
+        from qjig.run_archive import RunArchive
+        target=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']=='decomposition_only' and a['repeat']==1)
+        with RunArchive.open(tmp_path/'runs'/target['request_id']) as archive:
+            transport=StandInTransport([]);data=cases['holdout']
+            receipt=run_campaign_assignment(campaign,target['request_id'],tmp_path,design,data['lock'],data['reference'],data['protected'],
+                applicability_inputs=data['applicability_inputs'],transport=transport,archive=archive,journal=journal,config=config,
+                want=1,max_bytes=5000,expected_config_sha256=config_hash)
+            assert receipt['status']=='scored' and transport.calls_made==0 and journal.events(target['request_id'])==[]
+            assert archive.context()['schema']=='qjig.applicability-deferral.v1'
+            assert campaign.status()['scored']==5
+            from qjig.evaluation_deferral import verify_applicability_deferral
+            assert verify_applicability_deferral(archive,journal,expected_digest=receipt['run_sha256'])['status']=='structurally_verified'
+            from qjig.evaluation_scoring import score_reserved_assignment
+            scored=score_reserved_assignment(goal,archive,journal,data['reference'],partition='holdout',
+                expected_plan_sha256=plan['sha256'],expected_run_sha256=receipt['run_sha256'],
+                expected_reference_sha256=reference_digest(data['reference']))
+            assert scored['score']['classification']=='unknown_review' and scored['score']['request_answer'] is None
+            assert scored['score']['resources']['total']['calls']==0
+            original=archive.context();changed=copy.deepcopy(original)
+            changed['verdicts'][rev]['combined']='match'
+            encoded=json.dumps(changed,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+            archive._con.execute('DROP TRIGGER context_no_update')
+            archive._con.execute('UPDATE run_context SET data=?,sha256=?',(encoded,hashlib.sha256(encoded.encode()).hexdigest()))
+            assert verify_applicability_deferral(archive,journal)['status']=='invalid'
+            encoded=json.dumps(original,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+            archive._con.execute('UPDATE run_context SET data=?,sha256=?',(encoded,hashlib.sha256(encoded.encode()).hexdigest()))
+        third=run_campaign_batch(campaign,tmp_path,design,cases,journal=journal,archive_root=tmp_path/'runs',config=config,
+                                 want=1,max_bytes=5000,expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=1)
+        assert third['executed']==1 and third['scored']==6 and len(calls)==5
         journal._con.execute('DROP TRIGGER events_no_update')
         journal._con.execute("UPDATE events SET payload='{}' WHERE kind='receipt' AND request_id=?",(calls[0],))
         with pytest.raises(ContractError):
             run_campaign_batch(campaign,tmp_path,design,cases,journal=journal,archive_root=tmp_path/'runs',config=config,
                                want=1,max_bytes=5000,expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
-        assert len(calls)==4
+        assert len(calls)==5

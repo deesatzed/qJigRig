@@ -314,15 +314,15 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
                for source in prepared.sources]
     if {revision.revision_id for revision in revisions} != {member.revision_id for member in applicability_inputs.collection.members}:
         raise ContractError('campaign applicability source set differs')
+    applicability_deferral = False
     if arm in ('direct_full_evidence','decomposition_only'):
         from .evaluation import _full_source_entries,_full_source_packet
         _full_source_packet(_full_source_entries(revisions),max_bytes)
         if arm == 'decomposition_only':
             from .applicability import Applicability,combine_applicability,scope_applicability
-            if any(combine_applicability(applicability_inputs.verdict(revision.revision_id),
-                    scope_applicability(prepared.scope,applicability_inputs.collection.member(revision.revision_id).scope))
-                    is not Applicability.MATCH for revision in revisions):
-                raise ContractError('campaign full source applicability differs')
+            applicability_deferral = any(combine_applicability(applicability_inputs.verdict(revision.revision_id),
+                scope_applicability(prepared.scope,applicability_inputs.collection.member(revision.revision_id).scope))
+                is not Applicability.MATCH for revision in revisions)
     if (not isinstance(config,dict) or set(config) != {'direct','planner','judge','reviewer'}
             or any(not isinstance(spec,dict) or set(spec) != {'provider','model','input_tokens','output_tokens','max_price'}
                    for spec in config.values())):
@@ -353,7 +353,19 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
     ledger=BudgetLedger(campaign._goal._per_request,journal,request_id,goal_budget=campaign._goal,partition=partition)
     binding={'plan_id':campaign._plan_id,'plan_sha256':campaign._digest,'arm':arm,'repeat':claim['repeat']}
     set_id='evaluation:'+campaign._plan_id
-    if arm in ('combined','decomposition_only'):
+    if applicability_deferral:
+        from .contracts import Request
+        from .evaluation_deferral import record_applicability_deferral,verify_applicability_deferral
+        request=Request(request_id,prepared.question,prepared.role,prepared.role_version,prepared.scope)
+        case_binding={'case_id':case_id,'design_sha256':manifest['design_sha256'],
+                      'case_sha256':claim['case_sha256'],'reference_sha256':reference_digest(reference)}
+        record_applicability_deferral(archive,request,case_binding,binding,applicability_inputs,revisions,
+                                      want=want,max_bytes=max_bytes,stages=config)
+        replay=verify_applicability_deferral(archive,journal)
+        if replay['status']!='unanchored':
+            raise ContractError('campaign applicability deferral is not replayable')
+        run_hash,journal_hash=replay['sha256'],None
+    elif arm in ('combined','decomposition_only'):
         def factory(req):
             spec = planner if req.stage=='planner' else reviewer if req.stage=='plan_review' else judge
             return fresh_slot_reservation(campaign._goal,set_id,request_id=request_id,partition=partition,
@@ -400,7 +412,7 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
     """
     import re
     from pathlib import Path
-    from .applicability import Applicability,ApplicabilityInputs,combine_applicability,scope_applicability
+    from .applicability import ApplicabilityInputs
     from .evaluation import _full_source_entries,_full_source_packet
     from .evaluation_cases import prepare_evaluation_case
     from .evaluation_scoring import reference_digest
@@ -431,10 +443,6 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
                 or inputs.historical_as_known != prepared.historical_as_known
                 or {r.revision_id for r in revisions} != {m.revision_id for m in inputs.collection.members}):
             raise ContractError('campaign case applicability context differs')
-        if any(combine_applicability(inputs.verdict(r.revision_id),
-                scope_applicability(prepared.scope,inputs.collection.member(r.revision_id).scope)) is not Applicability.MATCH
-               for r in revisions):
-            raise ContractError('campaign full source applicability unavailable')
         _full_source_packet(_full_source_entries(revisions),max_bytes)
         prepared_by_case[ident]=data
     archive_base=Path(archive_root)

@@ -553,6 +553,11 @@ def score_reserved_assignment(goal, archive, journal, reference: dict, *, partit
         case = context.get('case_binding')
         expected_arm = 'direct_retrieval' if schema.endswith('.v5') else 'direct_full_evidence' if schema.endswith('.v6') else 'retrieval_only'
         scorer = score_direct_archive
+    elif schema == 'qjig.applicability-deferral.v1':
+        from .evaluation_deferral import score_applicability_deferral
+        case = context.get('case_binding')
+        expected_arm = 'decomposition_only'
+        scorer = score_applicability_deferral
     elif schema == 'qjig.fresh-context.v1':
         case = context.get('evaluation_case_binding')
         expected_arm = 'decomposition_only' if context.get('retrieval_method') == 'full_source_v1' else 'combined'
@@ -570,8 +575,8 @@ def score_reserved_assignment(goal, archive, journal, reference: dict, *, partit
         raise ContractError('incomplete reserved evaluation context') from exc
     if goal.audit_journal(journal)['status'] != 'verified':
         raise ContractError('goal and journal accounting differ')
-    if expected_journal_sha256 is not None and scorer is score_direct_archive:
-        raise ContractError('direct scoring binds the journal in its run digest')
+    if expected_journal_sha256 is not None and scorer is not score_fresh_archive:
+        raise ContractError('this scoring path binds the journal in its run digest')
     if scorer is score_fresh_archive and expected_journal_sha256 is None:
         raise ContractError('fresh assignment resources require a journal anchor')
     options = {'expected_journal_sha256':expected_journal_sha256} if scorer is score_fresh_archive else {}
