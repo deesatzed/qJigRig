@@ -171,6 +171,11 @@ class RunArchive:
             raise ContractError("invalid trace identity")
         self._event("trace", f"{request_id}#{sequence}", data)
 
+    def record_review(self, call_id: str, record: dict) -> None:
+        if not self._con.execute("SELECT 1 FROM events WHERE kind='validation' AND call_id=?", (call_id,)).fetchone():
+            raise ContractError("review has no recorded validation")
+        self._event("review_record", call_id, record)
+
     def record_run_result(self, request_id: str, data: dict) -> None:
         if not isinstance(request_id, str) or not request_id:
             raise ContractError("run result requires request id")

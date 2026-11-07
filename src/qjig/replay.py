@@ -13,6 +13,8 @@ from .packets import EvidencePacket, PacketItem
 from .planner import _plan_validator, _planner_prompt, corpus_manifest_sha256
 from .plans import parse_plan
 from .providers import ProviderRequest, _validate
+from .program_review import _REVIEW_SCHEMA, _review_prompt
+from .programs import verify_review
 from .run_archive import RunArchive
 from .spans import Span, verify_span
 
@@ -26,6 +28,42 @@ class ReplayReport:
     checked_responses: int
     checked_traces: int
     semantic_assurance: str = "not_assessed"
+
+
+def _check_review(record, call_id, request, response, validation, context, plan):
+    if plan is None or validation.get('failure') is not None or validation.get('value') is None:
+        raise ContractError('review has no validated response or plan')
+    payload = record['payload']
+    binding, actor = payload['binding'], payload['reviewer']
+    if verify_review(record, binding, actor)['status'] != 'matching_unvalidated':
+        raise ContractError('invalid review record')
+    inputs = ApplicabilityInputs.from_dict(context['applicability_inputs'])
+    members = {row['revision_id']: {k: v for k, v in row.items() if k != 'revision_id'} for row in inputs.to_dict()['members']}
+    ids = sorted(context['corpus'])
+    planner = context['planner']
+    planner_prompt = _planner_prompt(Request.from_dict(context['request']), corpus_manifest_sha256(ids), context['planning_evidence'])
+    expected = {'request': context['request'], 'plan': {'origin': plan.origin,
+                'predicates': [{'id': p.id, 'question': p.question, 'depends_on': list(p.depends_on),
+                                **({'exact_operator': p.exact_operator} if p.exact_operator is not None else {})}
+                               for p in plan.predicates], 'expression': plan.expression},
+                'corpus_revision_ids': ids, 'source_metadata': {ident: members[ident] for ident in ids},
+                'as_of': inputs.as_of, 'entities': sorted(inputs.request_entities),
+                'historical_as_known': inputs.historical_as_known,
+                'planner': {'provider': planner['provider'], 'model': planner['model'],
+                            'prompt_sha256': hashlib.sha256(planner_prompt.encode('utf-8')).hexdigest(),
+                            'config': {'max_tokens': planner['max_tokens'], 'max_price': planner.get('max_price')}}}
+    if binding != expected or request.prompt != _review_prompt(binding, context['planning_evidence']['packet']):
+        raise ContractError('review inputs differ from plan or prompt')
+    settings = context['reviewer']
+    expected_kind = {'STAND_IN: authored responses, not a model': 'synthetic',
+                     'LIVE: openrouter, real model call': 'ai'}.get(context['transport'])
+    if (expected_kind is None or actor != {'kind': expected_kind, 'provider': settings['provider'], 'model': settings['model'],
+            'prompt_sha256': hashlib.sha256(request.prompt.encode('utf-8')).hexdigest(),
+            'config': {'max_tokens': settings['max_tokens'], 'max_price': settings.get('max_price')}}):
+        raise ContractError('reviewer provenance differs')
+    expected_result = {**validation['value'], 'call_id': call_id, 'raw_sha256': response['body_sha256'], 'usage': response['usage']}
+    if payload['result'] != expected_result:
+        raise ContractError('review result differs from response')
 
 
 def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -> ReplayReport:
@@ -86,11 +124,12 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
     except (ContractError, KeyError, TypeError, ValueError):
         issues.append("invalid_planning_or_applicability")
     requests, responses, validations, failures = {}, {}, {}, {}
-    planner_calls, plan_predicates, plan_expression = set(), None, None
+    planner_calls, plan_predicates, plan_expression, plan = set(), None, None, None
     request_data, response_data, validation_data, pending_judges, plan_questions = {}, {}, {}, [], {}
     trace_observations = {}
     trace_rounds = {}
     final_result = None
+    review_record, review_call = None, None
     traces = 0
     for event in events:
         kind, call_id, data = event["kind"], event["call_id"], event["data"]
@@ -103,6 +142,13 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                 request_data[call_id] = request
                 if data["stage"] in ("judge_positive", "judge_negative"):
                     pending_judges.append((call_id, request))
+                elif data["stage"] == "plan_review":
+                    settings = context.get('reviewer')
+                    if (not isinstance(settings, dict) or review_call is not None or
+                            (request.provider, request.model, request.max_tokens, request.max_price) !=
+                            (settings['provider'], settings['model'], settings['max_tokens'], settings.get('max_price'))):
+                        raise ContractError('review request differs from context')
+                    review_call = call_id
                 elif data["stage"] != "planner":
                     incomplete.append(f"unsupported_stage:{call_id}")
                 if data["stage"] == "planner":
@@ -133,11 +179,13 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                 stage = request_data[call_id].stage
                 if data.get("failure") == "validator_error":
                     incomplete.append(f"validator_error:{call_id}")
-                elif stage == "planner" or stage in ("judge_positive", "judge_negative"):
+                elif stage == "planner" or stage in ("judge_positive", "judge_negative", "plan_review"):
                     if not 200 <= saved_response["http_status"] < 300:
                         expected_value, expected_failure = None, "http_error"
                     elif stage == "planner":
                         expected_value, expected_failure = _plan_validator(saved_response["body"])
+                    elif stage == 'plan_review':
+                        expected_value, expected_failure = _validate(saved_response['body'], _REVIEW_SCHEMA)
                     else:
                         expected_value, expected_failure = _validate(saved_response["body"], SIDE_SCHEMA)
                     if data.get("value") != expected_value or data.get("failure") != expected_failure:
@@ -155,6 +203,11 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                     raise ContractError("failure without prior request")
                 failures[call_id] = event["seq"]
                 incomplete.append(f"provider_failure:{call_id}")
+            elif kind == 'review_record':
+                if review_record is not None or call_id != review_call or call_id not in validation_data:
+                    raise ContractError('review record is not uniquely linked')
+                _check_review(data, call_id, request_data[call_id], response_data[call_id], validation_data[call_id], context, plan)
+                review_record = data
             elif kind == "trace":
                 traces += 1
                 if plan_predicates is None or data["predicate_id"] not in plan_predicates:
@@ -228,6 +281,21 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
                     "plan_coverage_unestablished" not in data.get("reasons", []) or
                     COVERAGE_ID not in data.get("blocking_obligations", [])):
                     raise ContractError("run result does not match recorded trace or plan")
+                review = data.get('review')
+                if 'reviewer' in context:
+                    if not isinstance(review, dict) or set(review) != {'status', 'failure', 'call_id', 'review_id'}:
+                        raise ContractError('configured review result missing')
+                    if review['status'] == 'recorded':
+                        if review_record is None:
+                            incomplete.append('review_record_unavailable')
+                        elif review != {'status': 'recorded', 'failure': None, 'call_id': review_call, 'review_id': review_record['sha256']}:
+                            raise ContractError('review result differs from record')
+                    elif review['status'] == 'unavailable' and review['review_id'] is None and isinstance(review['failure'], str) and review_record is None:
+                        incomplete.append('review_unavailable')
+                    else:
+                        raise ContractError('invalid review result')
+                elif review is not None or review_record is not None:
+                    raise ContractError('review has no configured context')
                 final_result = data
             else:
                 raise ContractError("unknown event kind")

@@ -677,7 +677,7 @@ def test_fresh_pipeline_consumes_preflight_slots(tmp_path):
         assert goal.audit_journal(journal)['status'] == 'verified'
 
 
-def test_configured_fresh_run_records_separate_review(tmp_path):
+def test_configured_fresh_run_records_separate_review(tmp_path, monkeypatch):
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
     from qjig.run_archive import RunArchive
     cat, entries, journal, ledger, transport = build(tmp_path, [raw(PLAN), side(False), side(True, QUOTE),
@@ -699,6 +699,29 @@ def test_configured_fresh_run_records_separate_review(tmp_path):
         result = [event['data'] for event in archive.events() if event['kind'] == 'run_result'][0]
         assert result['review']['review_id'] == run.review.record['sha256']
         assert transport.calls_made == 4
+        from qjig.replay import verify_archive
+        def forbidden(*args, **kwargs):
+            raise AssertionError('replay attempted inference')
+        monkeypatch.setattr(transport, 'send', forbidden)
+        report = verify_archive(archive)
+        assert report.status == 'unanchored' and not report.issues
+        assert verify_archive(archive, expected_digest=report.digest).status == 'structurally_verified'
+    import hashlib
+    import sqlite3
+    with sqlite3.connect(tmp_path / 'archive' / 'run.sqlite') as con:
+        con.execute('DROP TRIGGER event_no_update')
+        seq, raw_record = con.execute("SELECT seq,data FROM events WHERE kind='review_record'").fetchone()
+        forged = json.loads(raw_record)
+        forged['payload']['result']['reason'] = 'forged after review'
+        encoded = json.dumps(forged['payload'], sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+        forged['sha256'] = hashlib.sha256(encoded.encode('utf-8')).hexdigest()
+        con.execute('UPDATE events SET data=? WHERE seq=?', (json.dumps(forged), seq))
+        seq, raw_result = con.execute("SELECT seq,data FROM events WHERE kind='run_result'").fetchone()
+        altered = json.loads(raw_result)
+        altered['review']['review_id'] = forged['sha256']
+        con.execute('UPDATE events SET data=? WHERE seq=?', (json.dumps(altered), seq))
+    with RunArchive.open(tmp_path / 'archive') as archive:
+        assert verify_archive(archive).status == 'invalid'
 
 
 @pytest.mark.parametrize('mode', ['budget', 'malformed'])

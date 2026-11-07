@@ -1389,7 +1389,8 @@
         "R07E",
         "R07F",
         "R07G",
-        "R07I"
+        "R07I",
+        "R07J"
       ],
       "status": "pending",
       "files": [],
@@ -2281,6 +2282,26 @@
       "acceptance": "A synthetic fresh run records a separate review bound to its generated plan and source context while the request remains deferred.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_configured_fresh_run_records_separate_review -q",
       "evidence": "Red: fresh run could not configure a reviewer. Green: configured synthetic run performs a separate review after predicate work, persists and identifies it in the archived result while retaining coverage deferral. Budget/malformed failures remain explicit; uncertain judge outcome prevents review dispatch. Focused 56 passed before additional cases; full offline 464 passed. Review-stage archive replay, full lifecycle/UI, complete resource reservation and hosted inference remain open."
+    },
+    {
+      "id": "R07J",
+      "phase": "repair",
+      "depends_on": [
+        "R07I",
+        "T057D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/replay.py",
+        "src/qjig/program_review.py",
+        "src/qjig/run_archive.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_configured_fresh_run_records_separate_review",
+      "action": "Replay fresh review stage without inference",
+      "acceptance": "Synthetic fresh review archives bind the reviewer request, response, review record, plan, sources and final result and replay without provider calls.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_configured_fresh_run_records_separate_review -q",
+      "evidence": "Red: a synthetic reviewed fresh archive replayed as incomplete due unsupported review stage. Green: archive retains the review record; offline replay binds reviewer settings and prompt, validated response, review result, plan, source/applicability context and final review ID. Rehashed altered result is rejected against response; replay test prohibits inference. Focused 22 passed; full offline 464 passed. This is structural consistency, not authenticated provenance, source completeness or semantic quality; full R07/T051 and hosted replay remain open."
     }
   ]
 }
