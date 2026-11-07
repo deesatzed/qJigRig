@@ -160,10 +160,15 @@ class GoalBudget:
 
     def actual_usage(self) -> dict:
         rows = self._con.execute("SELECT u.input_tokens, u.output_tokens, u.cost FROM reservations r LEFT JOIN usage u ON r.attempt_id=u.attempt_id").fetchall()
-        return {"calls": len(rows), "input_tokens": sum(r[0] for r in rows if r[0] is not None),
-                "output_tokens": sum(r[1] for r in rows if r[1] is not None),
-                "cost_usd": (float(sum((Decimal(r[2]) for r in rows if r[2] is not None), Decimal(0)))
-                             if not rows or any(r[2] is not None for r in rows) else None),
+        known_input = sum(r[0] for r in rows if r[0] is not None)
+        known_output = sum(r[1] for r in rows if r[1] is not None)
+        known_cost = float(sum((Decimal(r[2]) for r in rows if r[2] is not None), Decimal(0)))
+        return {"calls": len(rows),
+                "input_tokens": known_input if all(r[0] is not None for r in rows) else None,
+                "output_tokens": known_output if all(r[1] is not None for r in rows) else None,
+                "cost_usd": known_cost if all(r[2] is not None for r in rows) else None,
+                "known_input_tokens": known_input, "known_output_tokens": known_output,
+                "known_cost_usd": known_cost,
                 "unknown_calls": sum(any(v is None for v in row) for row in rows)}
 
     def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float,

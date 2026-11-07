@@ -75,7 +75,7 @@ def test_actual_and_unknown_usage_survive_restart_and_block_dispatch(tmp_path):
         with pytest.raises(BudgetExceeded, match="unknown"):
             ledger.reserve("b", "r", "smoke", tokens=100, cost_usd=0.1)
         ledger.record_usage("a", input_tokens=100, output_tokens=40, cost_usd=0.12)
-        assert ledger.actual_usage() == {"calls": 1, "input_tokens": 100, "output_tokens": 40, "cost_usd": 0.12, "unknown_calls": 0}
+        assert ledger.actual_usage() == {"calls": 1, "input_tokens": 100, "output_tokens": 40, "cost_usd": 0.12, "known_input_tokens": 100, "known_output_tokens": 40, "known_cost_usd": 0.12, "unknown_calls": 0}
         ledger.reserve("b", "r", "smoke", tokens=100, cost_usd=0.1)
         ledger.record_usage("b", input_tokens=None, output_tokens=None, cost_usd=None)
     with GoalBudget.open(path, total=limit, per_request=limit, allocations={"smoke": limit}) as ledger:
@@ -115,7 +115,7 @@ def test_request_ledger_reserves_goal_before_call_and_records_receipt(tmp_path):
             return "ok", {"prompt_tokens": 40, "completion_tokens": 20, "cost_usd": 0.1}
         assert ledger.run("planner", call, provider="stand-in", model="m", input_sha256="a" * 64,
                           reserve_tokens=50, reserve_input_tokens=100, reserve_cost_usd=0.2) == "ok"
-        assert goal.actual_usage() == {"calls": 1, "input_tokens": 40, "output_tokens": 20, "cost_usd": 0.1, "unknown_calls": 0}
+        assert goal.actual_usage() == {"calls": 1, "input_tokens": 40, "output_tokens": 20, "cost_usd": 0.1, "known_input_tokens": 40, "known_output_tokens": 20, "known_cost_usd": 0.1, "unknown_calls": 0}
         assert journal.events("r")[0].payload["goal_attempt_id"]
 
 
@@ -171,7 +171,7 @@ def test_recover_goal_usage_from_matching_durable_receipt(tmp_path):
                       intent_payload={"goal_attempt_id": "attempt"})
         assert goal.actual_usage()["unknown_calls"] == 1
         assert goal.recover_receipt("attempt", journal) == "r#1"
-        assert goal.actual_usage() == {"calls": 1, "input_tokens": 20, "output_tokens": 10, "cost_usd": 0.1, "unknown_calls": 0}
+        assert goal.actual_usage() == {"calls": 1, "input_tokens": 20, "output_tokens": 10, "cost_usd": 0.1, "known_input_tokens": 20, "known_output_tokens": 10, "known_cost_usd": 0.1, "unknown_calls": 0}
         goal.reserve("next", "r2", "smoke", tokens=100, cost_usd=0.2)
         with pytest.raises(ContractError):
             goal.recover_receipt("attempt", journal)
@@ -225,3 +225,24 @@ def test_complete_usage_releases_only_unused_reservation_after_restart(tmp_path)
         goal.reserve("b", "r", "smoke", tokens=70, cost_usd=0.14)
         assert goal.totals() == Budget(2, 160, 0.32)  # sum of original bounds, not actual spend
         assert goal.committed() == Budget(2, 100, 0.2)
+
+
+def test_goal_actual_usage_does_not_report_partial_sums_as_totals(tmp_path):
+    limit = Budget(3, 1000, 1)
+    path = tmp_path / 'goal.sqlite'
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
+        goal.reserve('known', 'r', 'smoke', tokens=100, cost_usd=0.1)
+        goal.record_usage('known', input_tokens=30, output_tokens=10, cost_usd=0.04)
+        goal.reserve('unknown', 'r', 'smoke', tokens=100, cost_usd=0.1)
+        goal.record_usage('unknown', input_tokens=20, output_tokens=None, cost_usd=None)
+    with GoalBudget.open(path, total=limit, per_request=limit, allocations={'smoke': limit}) as goal:
+        usage = goal.actual_usage()
+        assert usage['input_tokens'] == 50
+        assert usage['output_tokens'] is None
+        assert usage['cost_usd'] is None
+        assert usage['known_input_tokens'] == 50
+        assert usage['known_output_tokens'] == 10
+        assert usage['known_cost_usd'] == 0.04
+        assert usage['unknown_calls'] == 1
+        with pytest.raises(BudgetExceeded, match='unknown'):
+            goal.reserve('later', 'r', 'smoke', tokens=1, cost_usd=0.01)
