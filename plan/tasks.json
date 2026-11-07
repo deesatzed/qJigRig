@@ -1355,7 +1355,8 @@
       "phase": "repair",
       "finding": "F07",
       "depends_on": [
-        "R08"
+        "R08",
+        "R07A"
       ],
       "status": "pending",
       "files": [],
@@ -1445,6 +1446,25 @@
       "acceptance": "Changed request, graph, corpus, role, date or reviewer provenance invalidates reuse; AI review cannot close fresh coverage.",
       "command": "python -m pytest tests/test_program_review.py::test_review_binding_invalidated_by_change -q",
       "evidence": ""
+    },
+    {
+      "id": "R07A",
+      "phase": "repair",
+      "finding": "F07",
+      "depends_on": [
+        "R06"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/run_archive.py",
+        "tests/test_run_archive.py"
+      ],
+      "test_file": "tests/test_run_archive.py",
+      "test_name": "test_interrupted_run_retains_inputs_and_responses",
+      "action": "Build durable local run archive foundation",
+      "acceptance": "Incremental source snapshots and reconstructable call records survive interruption without credentials.",
+      "command": "python -m pytest tests/test_run_archive.py::test_interrupted_run_retains_inputs_and_responses -q",
+      "evidence": "Red: run archive module absent. Green: 3 tests cover source snapshots, reconstructable synthetic requests and raw responses across simulated interruption and child os._exit, immutable source identities and orphan response refusal; full suite 307 passed. Offline only; R07 retains full provider integration, sanitization, metadata and replay work."
     }
   ]
 }
