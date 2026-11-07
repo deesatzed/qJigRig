@@ -61,6 +61,18 @@ CREATE TRIGGER agent_interpretations_no_delete BEFORE DELETE ON agent_interpreta
 """
 
 
+def _execute_schema(con: sqlite3.Connection, script: str) -> None:
+    """Execute schema statements inside the caller's transaction, including triggers."""
+    statement = ""
+    for line in script.splitlines(keepends=True):
+        statement += line
+        if sqlite3.complete_statement(statement):
+            con.execute(statement)
+            statement = ""
+    if statement.strip():
+        raise ContractError("incomplete catalog schema statement")
+
+
 class Catalog:
     def __init__(self, con: sqlite3.Connection) -> None:
         self._con = con
@@ -68,18 +80,26 @@ class Catalog:
     @classmethod
     def open(cls, path: str | Path) -> "Catalog":
         con = sqlite3.connect(str(path))
-        version = con.execute("PRAGMA user_version").fetchone()[0]
-        if version == 0:
-            con.executescript(_SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
-        elif version == 1:  # additive migrations: index entries, then member metadata
-            con.executescript(_INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
-        elif version == 2:  # additive migration: member metadata
-            con.executescript(_METADATA_SCHEMA + _CLAIM_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
-        elif version == 3:
-            con.executescript(_CLAIM_SCHEMA + f"PRAGMA user_version = {SCHEMA_VERSION};")
-        elif version != SCHEMA_VERSION:
+        try:
+            version = con.execute("PRAGMA user_version").fetchone()[0]
+            if version != SCHEMA_VERSION:
+                con.execute("BEGIN IMMEDIATE")
+                version = con.execute("PRAGMA user_version").fetchone()[0]
+                scripts = {0: _SCHEMA + _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA,
+                           1: _INDEX_SCHEMA + _METADATA_SCHEMA + _CLAIM_SCHEMA,
+                           2: _METADATA_SCHEMA + _CLAIM_SCHEMA, 3: _CLAIM_SCHEMA}
+                if version == SCHEMA_VERSION:
+                    pass  # another opener completed the migration while we waited
+                elif version in scripts:
+                    _execute_schema(con, scripts[version])
+                    con.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+                else:
+                    raise ContractError(f"unsupported catalog schema version {version}")
+                con.commit()
+        except BaseException:
+            con.rollback()
             con.close()
-            raise ContractError(f"unsupported catalog schema version {version}")
+            raise
         return cls(con)
 
     def close(self) -> None:

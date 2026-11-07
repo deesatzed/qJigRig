@@ -120,3 +120,76 @@ def test_version_3_catalog_migrates_interpretations_without_losing_sources(tmp_p
         assert cat.interpretation_rows() == []
     with sqlite3.connect(db) as con:
         assert con.execute('PRAGMA user_version').fetchone()[0] == 4
+
+
+def test_failed_migration_rolls_back_schema_changes(tmp_path):
+    db = tmp_path / 'catalog.sqlite'
+    original = rev(b'original source\n')
+    with Catalog.open(db) as cat:
+        cat.add_revision(original)
+    with sqlite3.connect(db) as con:
+        con.execute('DROP TABLE agent_interpretations')
+        con.execute('PRAGMA user_version = 3')
+        con.execute("CREATE TRIGGER agent_interpretations_no_update AFTER INSERT ON revisions BEGIN SELECT 1; END")
+    with pytest.raises(sqlite3.OperationalError):
+        Catalog.open(db)
+    with sqlite3.connect(db) as con:
+        assert con.execute('PRAGMA user_version').fetchone()[0] == 3
+        assert con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_interpretations'").fetchone() is None
+        assert con.execute('SELECT revision_id FROM revisions').fetchone()[0] == original.revision_id
+
+
+def test_concurrent_openers_initialize_and_migrate_once(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    db = tmp_path / 'catalog.sqlite'
+    barrier = Barrier(6)
+    def open_catalog(_):
+        barrier.wait(timeout=5)
+        with Catalog.open(db) as catalog:
+            return catalog.revision_ids()
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        assert list(pool.map(open_catalog, range(6))) == [[]] * 6
+    with sqlite3.connect(db) as con:
+        con.execute('DROP TABLE agent_interpretations')
+        con.execute('PRAGMA user_version = 3')
+    barrier = Barrier(6)
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        assert list(pool.map(open_catalog, range(6))) == [[]] * 6
+    with sqlite3.connect(db) as con:
+        assert con.execute('PRAGMA user_version').fetchone()[0] == 4
+        assert con.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='agent_interpretations'").fetchone()[0] == 1
+
+
+def test_process_exit_during_migration_rolls_back_schema(tmp_path):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    db = tmp_path / 'catalog.sqlite'
+    original = rev(b'preserved source\n')
+    with Catalog.open(db) as catalog:
+        catalog.add_revision(original)
+    with sqlite3.connect(db) as con:
+        con.execute('DROP TABLE agent_interpretations')
+        con.execute('PRAGMA user_version = 3')
+    code = '''
+import os, sys
+import qjig.store as store
+def die(con, script):
+    con.execute('CREATE TABLE agent_interpretations(claim_id TEXT PRIMARY KEY, payload TEXT NOT NULL)')
+    os._exit(23)
+store._execute_schema = die
+store.Catalog.open(sys.argv[1])
+'''
+    env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / 'src'))
+    child = subprocess.run([sys.executable, '-c', code, str(db)], env=env, timeout=10, capture_output=True)
+    assert child.returncode == 23, child.stderr.decode()
+    with sqlite3.connect(db) as con:
+        assert con.execute('PRAGMA user_version').fetchone()[0] == 3
+        assert con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='agent_interpretations'").fetchone() is None
+    with Catalog.open(db) as catalog:
+        assert catalog.get_revision(original.revision_id) == original
+        assert catalog.interpretation_rows() == []

@@ -1023,7 +1023,8 @@
       "depends_on": [
         "T058",
         "T009",
-        "T059A"
+        "T059A",
+        "T059B"
       ],
       "status": "pending",
       "files": [
@@ -1966,6 +1967,23 @@
       "acceptance": "A failed source import leaves no partial new revision and does not stale the prior source; concurrent service instances serialize identical writes.",
       "command": "python -m pytest tests/test_writer.py::test_source_import_rolls_back_all_changes_on_failure -q",
       "evidence": "Red: metadata insertion failure left new revision committed and old index stale. Green: BEGIN IMMEDIATE transaction covers source, index, stale-state update and metadata; service reports storage failure. Tests include injected SQLite error, actual child process exit mid-transaction, and simultaneous identical imports through two service instances. Focused 31 passed; full offline suite 401 passed. Full T059, claim lifecycle and broader power-loss/disk-failure assurance remain open."
+    },
+    {
+      "id": "T059B",
+      "phase": "P5",
+      "depends_on": [
+        "T059A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/store.py"
+      ],
+      "test_file": "tests/test_store.py",
+      "test_name": "test_failed_migration_rolls_back_schema_changes",
+      "action": "Make catalog initialization and migration atomic",
+      "acceptance": "A failed schema upgrade preserves the original schema and data; concurrent openers serialize migration.",
+      "command": "python -m pytest tests/test_store.py::test_failed_migration_rolls_back_schema_changes -q",
+      "evidence": "Red: failed v3-to-v4 migration left a new table behind with old schema version. Green: initialization and additive migrations execute under BEGIN IMMEDIATE and recheck version after acquiring the lock; failed DDL and child process exit roll back, concurrent openers initialize/migrate once and v1-v3 data survive. Focused 20 passed; full suite 404 passed. Existing partially migrated catalogs require explicit inspection; arbitrary disk/power loss and full T059 remain open."
     }
   ]
 }
