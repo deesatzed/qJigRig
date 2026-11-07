@@ -220,7 +220,14 @@ def run_round(state: RunState, ctx: Context) -> TraceRecord | None:
             ctx.catalog, candidates, want=spec.want, max_bytes=spec.max_bytes, applicability=ctx.applicability
         )
     ob_id = f"ob-{pid}"
-    state.ledger.record_retrieval(ob_id, hit_count=len(candidates), result=recovery)
+    hit_count = len(candidates)
+    has_no_hit_followup = (state.attempts.get(pid, 0) == 0 and base.followup is not None and ctx.max_rounds > 1
+                           and (base.followup_reasons is None or 'no_retrieval_hit' in base.followup_reasons))
+    if channel_report is not None and not hit_count and not has_no_hit_followup:
+        # On the final available attempt, a verified mandatory-only packet is
+        # still evidence to evaluate. Primary hit_count remains zero in the trace.
+        hit_count = sum(channel_report.hits.values())
+    state.ledger.record_retrieval(ob_id, hit_count=hit_count, result=recovery)
     ob = state.ledger.get(ob_id)
     if channel_report is not None and channel_report.omitted:
         observation = Observation(Outcome.UNKNOWN, "mandatory_channel_omitted")
@@ -514,7 +521,7 @@ def run_fresh(
             "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS, **({"max_price": planner_max_price} if planner_max_price is not None else {})},
             "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS, **({"max_price": judge_max_price} if judge_max_price is not None else {})},
             "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": "full_source_v1" if full_source_evidence else EXPANDED_BM25_METHOD,
-            "followup_policy": "none_full_source_v1" if full_source_evidence else "request_question_on_no_primary_hit_v1",
+            "followup_policy": "none_full_source_v1" if full_source_evidence else "request_question_on_no_primary_hit_v2",
             "reservation_factory_configured": reservation_factory is not None, "role_priors": role_priors or {},
             "corpus": {key: value.value for key, value in applicability.items()},
             "scope_policy": "exact_nonempty_v1", "source_scopes": scopes,

@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "06b304728a2dd9f465a4089d0e79d9f4d505a302db5d6d62f5b5cd54f491a905",
-  "queue_sha256": "dc4aa8cc7eade559f5dfe1c214278589bca9f3e79d2d748ec2084e61b00fbf21",
+  "queue_sha256": "9ac296b43f77ccfb66a3b442c8625e2f13411b2137900d525151b99a1bb2e6fc",
   "gates": [
     {
       "id": "F01",
@@ -37,7 +37,8 @@
         "R04",
         "R04A",
         "R04B",
-        "R04C"
+        "R04C",
+        "R04D"
       ],
       "evidence": []
     },
@@ -220,6 +221,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_targeted_retrieval_followup -q",
       "queue_evidence_assertion": "Red: a no-hit fresh predicate stopped without followup. Green: one versioned original-question followup is allowed only after no_retrieval_hit; earlier trace retained and unknown, conflict, provider failure do not cause a retry. Fresh focused 31 passed; full offline suite 442 passed; repository verifier 119 tasks. This lexical fallback is not semantic relevance proof, fresh coverage remains unestablished, and full R04/live comparison remain pending."
+    },
+    {
+      "id": "R04D",
+      "status": "unverified",
+      "task_ids": [
+        "R04D"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_mandatory_exception_is_judged_after_primary_and_followup_miss -q",
+      "queue_evidence_assertion": "Red: two primary misses left an applicable exception in the packet but never called either judge. Synthetic checks now cover fallback and no-fallback variants, preserve coverage deferral, and prevent judging an inapplicable exception. Versioned v2 archive replays; relabeling it v1 is invalid. Fresh/acquisition/replay/evaluation regressions: 134 passed; full offline suite before final added parameter: 592 passed, 7 skipped; final focused cases: 3 passed. Hosted and semantic outcome validation remain open."
     },
     {
       "id": "R05",

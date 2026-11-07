@@ -4190,6 +4190,24 @@
       "acceptance": "Show recorded missing, excluded, omitted and truncated acquisition information and open material obligations in immediate and saved fresh results without inferring absence from missing hits.",
       "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
       "evidence": "Red: fresh service dropped the recorded channel report and blocking obligations. Synthetic actual-pipeline and Chrome checks now show missing exception-channel hits, the explicit no-absence caveat and the coverage obligation in immediate and saved views. Focused browser/fresh/replay checks: 65 passed; final browser walkthrough: 1 passed. Channel diagnostics are recorded, not independently verified; R04/R05 remain open."
+    },
+    {
+      "id": "R04D",
+      "phase": "repair",
+      "depends_on": [
+        "R04C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/acquisition.py",
+        "src/qjig/replay.py"
+      ],
+      "test_file": "tests/test_fresh_pipeline.py",
+      "test_name": "test_mandatory_exception_is_judged_after_primary_and_followup_miss",
+      "action": "Preserve mandatory evidence after primary and bounded fallback misses",
+      "acceptance": "On the final available round, send applicable mandatory-only evidence to the paired judges while retaining primary no-hit diagnostics, the bounded fallback and plan-coverage deferral.",
+      "command": "python -m pytest tests/test_fresh_pipeline.py::test_mandatory_exception_is_judged_after_primary_and_followup_miss -q",
+      "evidence": "Red: two primary misses left an applicable exception in the packet but never called either judge. Synthetic checks now cover fallback and no-fallback variants, preserve coverage deferral, and prevent judging an inapplicable exception. Versioned v2 archive replays; relabeling it v1 is invalid. Fresh/acquisition/replay/evaluation regressions: 134 passed; full offline suite before final added parameter: 592 passed, 7 skipped; final focused cases: 3 passed. Hosted and semantic outcome validation remain open."
     }
   ]
 }

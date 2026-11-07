@@ -873,3 +873,70 @@ def test_planner_failure_is_archived_with_attempt_and_reconciliation_state(tmp_p
         with RunArchive.open(tmp_path/'archive') as reopened, Journal.open(tmp_path/'j.sqlite') as restored_journal:
             final = [e for e in reopened.events() if e['kind']=='run_result']
             assert len(final)==1 and final[0]['data']['reconciliation_required'] is bool(restored_journal.pending('req-f'))
+
+
+@pytest.mark.parametrize('same_question', [False, True])
+def test_mandatory_exception_is_judged_after_primary_and_followup_miss(tmp_path, same_question):
+    """No primary hit does not discard an applicable exception after the bounded fallback."""
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.replay import verify_archive
+    from qjig.run_archive import RunArchive
+    text = '# Exceptions\nSpecial case: veterans are eligible.\n'
+    quote = 'Special case: veterans are eligible.'
+    revision = SourceRevision.create('exception.md', 'synthetic', decode_source(text.encode(), encoding='utf-8'))
+    plan = {'predicates':[{'id':'p1','question':'Does a former soldier satisfy this condition?'}], 'expression':{'ref':'p1'}}
+    question = plan['predicates'][0]['question'] if same_question else 'Does a military member qualify?'
+    request = Request('exception-only', question, 'reviewer', '1', 'project')
+    prompts = []
+    class Spy(StandInTransport):
+        def send(self, request):
+            prompts.append(request.prompt)
+            return super().send(request)
+    with Catalog.open(tmp_path/'c.sqlite') as cat, Journal.open(tmp_path/'j.sqlite') as journal, RunArchive.open(tmp_path/'run') as archive:
+        add_fixture_revision(cat, revision)
+        save_entries(cat, index_entries(revision))
+        entries = current_entries(cat, revision.source_id, revision.revision_id)
+        transport = Spy([raw(plan), side(True,quote), side(False)])
+        ledger = BudgetLedger(Budget(6,50000,1),journal,request.request_id)
+        inputs = ApplicabilityInputs(Collection((MemberMetadata(revision.revision_id, 'project', Interval('2026-01-01',OPEN)),)),
+                                     frozenset(), '2026-11-15', False)
+        result = run_fresh(request=request,catalog=cat,entries=entries,ledger=ledger,transport=transport,
+            planner=('stand-in','planner'),judge=('stand-in','judge'),want=2,
+            revision_applicability=inputs.verdict,applicability_inputs=inputs,archive=archive)
+        assert [trace.query for trace in result.state.trace] == ([question] if same_question else [plan['predicates'][0]['question'],question])
+        if not same_question:
+            assert result.state.trace[0].observation.reason == 'no_retrieval_hit'
+        assert result.state.trace[-1].hit_count == 0
+        assert 'exception' in result.state.trace[-1].channels.delivered
+        assert all(quote in prompt for prompt in prompts[1:]) and len(prompts)==3
+        assert result.state.observations['p1'].outcome is Outcome.TRUE
+        assert result.status == 'deferred' and 'ob-plan-coverage' in result.summary.stop.blocking_obligations
+        assert archive.context()['followup_policy'] == 'request_question_on_no_primary_hit_v2'
+        assert verify_archive(archive).status == 'unanchored'
+        import hashlib
+        context = archive.context(); context['followup_policy'] = 'request_question_on_no_primary_hit_v1'
+        encoded = json.dumps(context, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
+        archive._con.execute('DROP TRIGGER context_no_update')
+        archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',
+                             (encoded,hashlib.sha256(encoded.encode()).hexdigest()))
+        assert verify_archive(archive).status == 'invalid'
+
+
+def test_mandatory_only_inapplicable_evidence_is_not_judged(tmp_path):
+    revision = SourceRevision.create('exception.md', 'synthetic', decode_source(
+        b'# Exceptions\nSpecial case: veterans are eligible.\n',encoding='utf-8'))
+    request = Request('other-entity','Does a military member qualify?','reviewer','1','project')
+    plan = {'predicates':[{'id':'p1','question':'Does a former soldier satisfy this condition?'}], 'expression':{'ref':'p1'}}
+    with Catalog.open(tmp_path/'c.sqlite') as cat, Journal.open(tmp_path/'j.sqlite') as journal:
+        add_fixture_revision(cat,revision); save_entries(cat,index_entries(revision))
+        entries=current_entries(cat,revision.source_id,revision.revision_id)
+        transport=StandInTransport([raw(plan)])
+        ledger=BudgetLedger(Budget(6,50000,1),journal,request.request_id)
+        result=run_fresh(request=request,catalog=cat,entries=entries,ledger=ledger,transport=transport,
+            planner=('stand-in','planner'),judge=('stand-in','judge'),want=2,
+            revision_applicability=lambda rid: Applicability.NO_MATCH)
+        assert transport.calls_made == 1
+        assert result.state.observations['p1'].outcome is Outcome.UNKNOWN
+        assert result.state.trace[-1].observation.reason == 'only_inapplicable_candidates'
+        assert 'exception' in result.state.trace[-1].channels.excluded
+        assert result.status == 'deferred'
