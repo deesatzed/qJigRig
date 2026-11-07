@@ -9,7 +9,9 @@ HTML = '''<!doctype html>
 <form id="source-form"><label>Source ID<input name="source_id" required placeholder="docs/policy.md"></label><label>Source text<textarea name="text" required rows="6"></textarea></label>
 <div class="grid"><label>Scope<input name="scope" required placeholder="project"></label><label>Entities <span class="muted">comma-separated</span><input name="entities"></label><label>Effective from<input name="effective_from" type="date" required></label><label>Effective to <span class="muted">leave empty if open</span><input name="effective_to" type="date"></label><label>Observed on <span class="muted">optional</span><input name="observed_at" type="date"></label><label>Authority <span class="muted">optional</span><input name="authority"></label></div>
 <button type="submit">Add source <span aria-hidden="true">↗</span></button><p id="source-message" role="status" aria-live="polite"></p></form>
-<div class="source-list"><div class="list-head"><h3>Sources</h3><button id="refresh" class="quiet" type="button">Refresh</button></div><ul id="sources"><li class="muted">No sources loaded.</li></ul><pre id="source-preview" hidden></pre></div></section>
+<div class="source-list"><div class="list-head"><h3>Sources</h3><button id="refresh" class="quiet" type="button">Refresh</button></div><ul id="sources"><li class="muted">No sources loaded.</li></ul><p id="selected-source" class="muted">Select a source to inspect it.</p><pre id="source-preview" hidden></pre></div>
+<section class="result" aria-labelledby="interpretation-title"><div class="list-head"><h3 id="interpretation-title">Share an interpretation</h3><button id="refresh-interpretations" class="quiet" type="button">Refresh</button></div><p class="note">An interpretation is an attributed finding, not original source text or an independent review. Select a source above and copy one unique passage.</p>
+<form id="interpretation-form"><label>Source passage<textarea name="passage" rows="3" required></textarea></label><label>Interpretation<textarea name="text" rows="3" required></textarea></label><div class="grid"><label>Role<input name="role" value="reviewer" required></label><label>Role version<input name="role_version" value="1" required></label></div><button type="submit">Share interpretation <span aria-hidden="true">↗</span></button><p id="interpretation-message" role="status" aria-live="polite"></p></form><div id="interpretation-list" aria-live="polite"><p class="muted">No interpretations loaded.</p></div></section></section>
 <section class="panel" aria-labelledby="question-title"><div class="section-head"><span class="step">02</span><div><p class="eyebrow">AUTHORED CONTROL</p><h2 id="question-title">Ask a question</h2></div></div>
 <p class="note">This first workflow evaluates an authored numeric rule. A valid rule does not establish that all conditions or exceptions have been found.</p>
 <form id="question-form"><label>Question<input name="question" required></label><div class="grid"><label>Scope<input name="scope" required placeholder="project"></label><label>Entities <span class="muted">comma-separated</span><input name="entities"></label><label>As of<input name="as_of" type="date" required></label><label>Measured value<input name="value" type="number" step="any" required></label><label>Role<input name="role" value="reviewer" required></label><label>Role version<input name="role_version" value="1" required></label></div>
@@ -26,16 +28,33 @@ JS = r'''
 "use strict";
 const byId = id => document.getElementById(id);
 const splitEntities = value => value.split(",").map(x => x.trim()).filter(Boolean);
+let selectedSource = null, selectionSerial = 0;
 function line(parent, tag, text, cls) { const node = document.createElement(tag); node.textContent = text; if (cls) node.className = cls; parent.append(node); return node; }
 async function api(path, options = {}) { const response = await fetch(path, options); const data = await response.json(); if (!response.ok) throw new Error(data.error || "Request failed"); return data; }
 async function refreshSources() {
   const list = byId("sources"); list.replaceChildren();
   try { const data = await api("/api/sources"); if (!data.sources.length) { line(list, "li", "No sources yet.", "muted"); return; }
     for (const source of data.sources) { const li = document.createElement("li"); const button = document.createElement("button"); button.type = "button"; button.textContent = `${source.source_id} · ${source.revision_id.slice(0, 13)}`;
-      button.addEventListener("click", async () => { try { const detail = await api(`/api/sources/${encodeURIComponent(source.revision_id).replace("%3A", ":")}`); const preview = byId("source-preview"); preview.textContent = detail.text; preview.hidden = false; } catch (error) { byId("source-message").textContent = error.message; } }); li.append(button); list.append(li); }
+      button.addEventListener("click", async () => { const serial = ++selectionSerial; selectedSource = null; byId("selected-source").textContent = "Loading source…"; try { const detail = await api(`/api/sources/${encodeURIComponent(source.revision_id).replace("%3A", ":")}`); if (serial !== selectionSerial) return; selectedSource = detail; const preview = byId("source-preview"); preview.textContent = detail.text; preview.hidden = false; byId("selected-source").textContent = `Selected: ${detail.source_id} · ${detail.revision_id}`; } catch (error) { if (serial === selectionSerial) { byId("selected-source").textContent = "Could not load source."; byId("source-message").textContent = error.message; } } }); li.append(button); list.append(li); }
   } catch (error) { line(list, "li", `Could not load sources: ${error.message}`, "error"); }
 }
 byId("refresh").addEventListener("click", refreshSources);
+async function refreshInterpretations() {
+  const area = byId("interpretation-list"); area.replaceChildren();
+  try { const data = await api("/api/interpretations"); if (!data.interpretations.length) { line(area, "p", "No interpretations yet.", "muted"); return; }
+    for (const claim of data.interpretations) { const block = line(area, "div", "", "evidence"); line(block, "strong", `Interpretation · ${claim.role_id} / ${claim.role_version}`); line(block, "p", claim.text); line(block, "p", `Source revision: ${claim.evidence.revision_id}`); line(block, "blockquote", claim.evidence.text); }
+  } catch (error) { line(area, "p", `Could not load interpretations: ${error.message}`, "error"); }
+}
+byId("refresh-interpretations").addEventListener("click", refreshInterpretations);
+byId("interpretation-form").addEventListener("submit", async event => { event.preventDefault(); const form = new FormData(event.currentTarget), message = byId("interpretation-message"), source = selectedSource;
+  if (!source) { message.textContent = "Select a source first."; return; }
+  const passage = form.get("passage"), at = source.text.indexOf(passage);
+  if (!passage.trim() || at < 0 || at !== source.text.lastIndexOf(passage)) { message.textContent = "Copy a unique, exact passage from the selected source."; return; }
+  const start = Array.from(source.text.slice(0, at)).length, end = start + Array.from(passage).length;
+  const payload = {role_id:form.get("role").trim(), role_version:form.get("role_version").trim(), text:form.get("text").trim(), evidence:{revision_id:source.revision_id,text_sha256:source.text_sha256,start,end}};
+  message.textContent = "Sharing…";
+  try { await api("/api/interpretations", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); message.textContent = "Interpretation shared."; await refreshInterpretations(); } catch (error) { message.textContent = `Could not share interpretation: ${error.message}`; }
+});
 byId("source-form").addEventListener("submit", async event => { event.preventDefault(); const form = new FormData(event.currentTarget); const message = byId("source-message"); message.textContent = "Adding source…";
   const payload = {source_id: form.get("source_id").trim(), text: form.get("text"), scope: form.get("scope").trim(), entities: splitEntities(form.get("entities")), effective_from: form.get("effective_from"), effective_to: form.get("effective_to") || "open", observed_at: form.get("observed_at") || null, authority: form.get("authority").trim() || null};
   try { const result = await api("/api/sources", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)}); message.textContent = `Source saved: ${result.source_id}`; await refreshSources(); } catch (error) { message.textContent = `Could not add source: ${error.message}`; }
@@ -55,4 +74,5 @@ function renderResult(result) { const area = byId("result"); area.replaceChildre
   const open = result.obligations.filter(item => !["satisfied","skipped"].includes(item.status)); if (open.length) { line(area,"h4","Still open"); for (const item of open) line(area,"p",`${item.predicate_id}: ${item.reason || item.status}`); }
 }
 refreshSources();
+refreshInterpretations();
 '''

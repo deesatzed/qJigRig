@@ -1041,7 +1041,8 @@
       "phase": "P5",
       "depends_on": [
         "T058",
-        "T060A"
+        "T060A",
+        "T060B"
       ],
       "status": "pending",
       "files": [
@@ -1984,6 +1985,25 @@
       "acceptance": "A failed schema upgrade preserves the original schema and data; concurrent openers serialize migration.",
       "command": "python -m pytest tests/test_store.py::test_failed_migration_rolls_back_schema_changes -q",
       "evidence": "Red: failed v3-to-v4 migration left a new table behind with old schema version. Green: initialization and additive migrations execute under BEGIN IMMEDIATE and recheck version after acquiring the lock; failed DDL and child process exit roll back, concurrent openers initialize/migrate once and v1-v3 data survive. Focused 20 passed; full suite 404 passed. Existing partially migrated catalogs require explicit inspection; arbitrary disk/power loss and full T059 remain open."
+    },
+    {
+      "id": "T060B",
+      "phase": "P5",
+      "depends_on": [
+        "T060A",
+        "T054A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/web.py",
+        "docs/verification/2026-11-07-browser-interpretation.md"
+      ],
+      "test_file": "tests/test_web.py",
+      "test_name": "test_browser_serves_source_linked_interpretation_controls",
+      "action": "Expose source-linked interpretations in browser workspace",
+      "acceptance": "A real browser can add and inspect an attributed interpretation linked to an exact source passage without treating it as source text.",
+      "command": "python -m pytest tests/test_web.py::test_browser_serves_source_linked_interpretation_controls -q",
+      "evidence": "Red: browser had no interpretation controls. Green: source selection, unique exact-passage input and attributed interpretation use actual local API; headless Chromium rejected duplicate passage, saved and displayed Unicode-offset evidence, and reloaded at 390px without horizontal overflow. Focused web/service/claim suite 9 passed; full suite 405 passed. Evidence: docs/verification/2026-11-07-browser-interpretation.md. Not full accessibility, two-browser, hosted or workflow acceptance; full T060 remains pending."
     }
   ]
 }

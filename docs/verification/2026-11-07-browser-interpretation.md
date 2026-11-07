@@ -1,0 +1,5 @@
+# Browser interpretation foundation, 2026-11-07
+
+A local service was started with `PYTHONPATH=src python -m qjig serve --catalog .local/verification/interpretations-browser.sqlite --port 0`. In headless Chromium at 1280 × 900, a synthetic source containing an emoji and a repeated passage was imported and selected. Submitting the repeated passage was refused as ambiguous. Submitting the unique sentence after the emoji saved an attributed interpretation; the displayed source quote matched, and the API returned code-point offsets 10–46. The interpretation appeared after reloading at 390 × 844, where document width matched the viewport.
+
+This is evidence for the exercised deterministic local browser path only. It is not a complete accessibility review, a two-browser or hosted-model walkthrough, independent review, source-authority verification, or full workflow acceptance. The source and interpretation were synthetic; no hosted call was made. The SQLite data remain local and are not included in the commit.

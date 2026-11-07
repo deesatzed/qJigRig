@@ -21,3 +21,22 @@ def test_browser_workspace_served_from_loopback(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_browser_serves_source_linked_interpretation_controls(tmp_path):
+    server = create_server(tmp_path / 'catalog.sqlite', host='127.0.0.1', port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        connection = http.client.HTTPConnection('127.0.0.1', server.server_address[1], timeout=3)
+        connection.request('GET', '/')
+        response = connection.getresponse()
+        html = response.read().decode()
+        assert response.status == 200
+        assert 'Share an interpretation' in html and 'id="interpretation-form"' in html
+        assert 'id="interpretation-list"' in html and 'id="selected-source"' in html
+        connection.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
