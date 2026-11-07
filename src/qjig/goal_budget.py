@@ -48,6 +48,7 @@ class GoalBudget:
             con.execute("CREATE TABLE IF NOT EXISTS policy (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS reservations (attempt_id TEXT PRIMARY KEY, request_id TEXT NOT NULL, partition TEXT NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL)")
             con.execute("CREATE TABLE IF NOT EXISTS usage (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), input_tokens INTEGER, output_tokens INTEGER, cost TEXT)")
+            con.execute("CREATE TABLE IF NOT EXISTS holds (attempt_id TEXT PRIMARY KEY REFERENCES reservations(attempt_id), calls INTEGER NOT NULL, tokens INTEGER NOT NULL, cost TEXT NOT NULL)")
             row = con.execute("SELECT value FROM policy WHERE id=1").fetchone()
             if row is None:
                 con.execute("INSERT INTO policy VALUES(1, ?)", (policy,))
@@ -104,10 +105,12 @@ class GoalBudget:
                              if not rows or any(r[2] is not None for r in rows) else None),
                 "unknown_calls": sum(any(v is None for v in row) for row in rows)}
 
-    def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float) -> None:
+    def reserve(self, attempt_id: str, request_id: str, partition: str, *, tokens: int, cost_usd: float,
+                hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0) -> None:
         if any(not isinstance(v, str) or not v.strip() for v in (attempt_id, request_id, partition)):
             raise ContractError("reservation identities must be non-empty")
-        if partition not in self._allocations or not _valid_tokens(tokens) or not _valid_cost(cost_usd):
+        if (partition not in self._allocations or not _valid_tokens(tokens) or not _valid_cost(cost_usd)
+                or not _valid_tokens(hold_back_calls) or not _valid_tokens(hold_back_tokens) or not _valid_cost(hold_back_cost_usd)):
             raise ContractError("invalid reservation")
         self._con.execute("BEGIN IMMEDIATE")
         try:
@@ -124,9 +127,11 @@ class GoalBudget:
                 ("request", "SELECT tokens,cost FROM reservations WHERE request_id=?", (request_id,), self._per_request),
             ):
                 n, t, c = self._sum(self._con.execute(query, args).fetchall())
-                if not _fits((n + 1, t + tokens, c + _cost(cost_usd)), limit):
+                if not _fits((n + 1 + hold_back_calls, t + tokens + hold_back_tokens,
+                              c + _cost(cost_usd) + _cost(hold_back_cost_usd)), limit):
                     raise BudgetExceeded(label, "reservation exceeds persistent limit")
             self._con.execute("INSERT INTO reservations VALUES(?,?,?,?,?)", (attempt_id, request_id, partition, tokens, str(_cost(cost_usd))))
+            self._con.execute("INSERT INTO holds VALUES(?,?,?,?)", (attempt_id, hold_back_calls, hold_back_tokens, str(_cost(hold_back_cost_usd))))
             self._con.execute("COMMIT")
         except BaseException:
             self._con.execute("ROLLBACK")

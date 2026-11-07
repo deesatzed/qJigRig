@@ -98,3 +98,61 @@ def test_actual_usage_unknown_and_exceeded_bounds_are_not_hidden(tmp_path):
         assert ledger.actual_usage()["cost_usd"] == 0.11
         with pytest.raises(BudgetExceeded, match="bound_exceeded"):
             ledger.reserve("b", "r", "smoke", tokens=50, cost_usd=0.05)
+
+
+def test_request_ledger_reserves_goal_before_call_and_records_receipt(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+
+    limit = Budget(3, 1000, 1)
+    with GoalBudget.open(tmp_path / "goal.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal, Journal.open(tmp_path / "journal.sqlite") as journal:
+        ledger = BudgetLedger(limit, journal, "r", goal_budget=goal, partition="smoke")
+        def call():
+            assert goal.totals() == Budget(1, 150, 0.2)
+            assert [e.kind for e in journal.events("r")] == ["intent"]
+            return "ok", {"prompt_tokens": 40, "completion_tokens": 20, "cost_usd": 0.1}
+        assert ledger.run("planner", call, provider="stand-in", model="m", input_sha256="a" * 64,
+                          reserve_tokens=50, reserve_input_tokens=100, reserve_cost_usd=0.2) == "ok"
+        assert goal.actual_usage() == {"calls": 1, "input_tokens": 40, "output_tokens": 20, "cost_usd": 0.1, "unknown_calls": 0}
+        assert journal.events("r")[0].payload["goal_attempt_id"]
+
+
+def test_request_ledger_crash_retains_goal_reservation(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+
+    limit = Budget(3, 1000, 1)
+    with GoalBudget.open(tmp_path / "goal.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal, Journal.open(tmp_path / "journal.sqlite") as journal:
+        ledger = BudgetLedger(limit, journal, "r", goal_budget=goal, partition="smoke")
+        with pytest.raises(KeyboardInterrupt):
+            ledger.run("planner", lambda: (_ for _ in ()).throw(KeyboardInterrupt()), provider="stand-in", model="m",
+                       input_sha256="b" * 64, reserve_tokens=50, reserve_input_tokens=100, reserve_cost_usd=0.2)
+        assert goal.actual_usage()["unknown_calls"] == 1 and len(journal.pending("r")) == 1
+        with pytest.raises(BudgetExceeded):
+            goal.reserve("another", "other", "smoke", tokens=1, cost_usd=0.01)
+
+
+def test_goal_reservation_holds_back_mandatory_work(tmp_path):
+    limit = Budget(3, 500, 0.5)
+    with GoalBudget.open(tmp_path / "g.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal:
+        with pytest.raises(BudgetExceeded):
+            goal.reserve("a", "r", "smoke", tokens=100, cost_usd=0.1, hold_back_calls=2,
+                         hold_back_tokens=401, hold_back_cost_usd=0.4)
+        assert goal.totals().max_calls == 0
+        goal.reserve("a", "r", "smoke", tokens=100, cost_usd=0.1, hold_back_calls=2,
+                     hold_back_tokens=400, hold_back_cost_usd=0.4)
+        assert goal.totals() == Budget(1, 100, 0.1)
+
+
+def test_request_goal_accounting_requires_both_bounds_before_reserving(tmp_path):
+    from qjig.budgets import BudgetLedger
+    from qjig.journal import Journal
+
+    limit = Budget(3, 1000, 1)
+    with GoalBudget.open(tmp_path / "g.sqlite", total=limit, per_request=limit, allocations={"smoke": limit}) as goal, Journal.open(tmp_path / "j.sqlite") as journal:
+        ledger = BudgetLedger(limit, journal, "r", goal_budget=goal, partition="smoke")
+        for kwargs in ({"reserve_input_tokens": 100}, {"reserve_cost_usd": 0.2}):
+            with pytest.raises(BudgetExceeded, match="preflight_unavailable"):
+                ledger.run("planner", lambda: ("ok", {}), provider="stand-in", model="m", input_sha256="a" * 64,
+                           reserve_tokens=50, **kwargs)
+        assert goal.totals().max_calls == 0 and journal.events("r") == []
