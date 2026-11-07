@@ -55,3 +55,59 @@ def test_allowlisted_evaluation_sources_exclude_reference_artifacts(tmp_path):
     (tmp_path / 'private' / 'labels.json').write_bytes(b'modified')
     with pytest.raises(ContractError):
         load_isolated_sources(tmp_path, sources, protected)
+
+
+def test_evaluation_design_checks_splits_and_requirements():
+    import copy
+    from qjig.evaluation import validate_evaluation_design
+
+    categories = ['supported_yes', 'supported_no', 'genuine_unknown', 'wrong_entity',
+                  'wrong_date', 'conflicting_versions', 'enabling_exception',
+                  'restricting_exception', 'missing_decisive', 'changed_decisive',
+                  'irrelevant_change']
+    families = [{'id': f'{partition}{i}', 'partition': partition,
+                 'source_hashes': [hashlib.sha256(f'{partition}{i}'.encode()).hexdigest()]}
+                for partition in ('development', 'pilot', 'holdout') for i in range(2)]
+    cases = [dict(id='dev', family='development0', categories=categories[:-3],
+                  evidence_requirements=['identify decisive source'], parent=None),
+             dict(id='dev-change', family='development0', categories=categories[-3:],
+                  evidence_requirements=['inspect intervention'], parent='dev')]
+    for partition in ('pilot', 'holdout'):
+        cases.extend([dict(id=partition, family=partition+'0', categories=['supported_yes'],
+                           evidence_requirements=['identify decisive source'], parent=None),
+                      dict(id=partition+'-changed', family=partition+'0', categories=['changed_decisive'],
+                           evidence_requirements=['inspect changed source'], parent=partition)])
+    design = {'families': families, 'related_families': [['development0', 'development1']],
+              'cases': cases,
+              'arms': ['direct_full_evidence', 'direct_retrieval', 'retrieval_only',
+                       'decomposition_only', 'combined'],
+              'separate_results': ['authored_reuse', 'escalation'],
+              'repeats': {'development': 1, 'pilot': 1, 'holdout': 2},
+              'metrics': ['outcome_support', 'decisive_evidence_validity', 'source_coverage',
+                          'resource_completeness', 'latency', 'calls', 'input_tokens',
+                          'output_tokens', 'cost', 'variation'],
+              'outcomes': ['timeout', 'malformed', 'unsupported', 'justified_deferral',
+                           'unjustified_deferral', 'unknown_review'],
+              'criteria': {key: {'metric': 'outcome_support', 'operator': op, 'threshold': value}
+                           for key, op, value in [('retain', '>=', 0.8), ('revise', '>=', 0.5),
+                                                  ('remove', '<', 0.5)]},
+              'evaluation_provenance': 'synthetic fixture only'}
+    digest = validate_evaluation_design(design)
+    assert len(digest) == 64
+    assert validate_evaluation_design(design, expected_digest=digest) == digest
+    invalid = []
+    d = copy.deepcopy(design); d['families'][1]['partition'] = 'holdout'; invalid.append(d)
+    d = copy.deepcopy(design); d['families'][2]['source_hashes'] = d['families'][0]['source_hashes']; invalid.append(d)
+    d = copy.deepcopy(design); d['cases'][-1]['parent'] = 'pilot'; invalid.append(d)
+    d = copy.deepcopy(design); d['cases'][0]['categories'].remove('wrong_date'); invalid.append(d)
+    d = copy.deepcopy(design); d['repeats']['holdout'] = 1; invalid.append(d)
+    d = copy.deepcopy(design); d['cases'][-1]['parent'] = 'missing'; invalid.append(d)
+    d = copy.deepcopy(design); d['cases'][-2]['parent'] = d['cases'][-1]['id']; invalid.append(d)
+    d = copy.deepcopy(design); d['arms'].remove('combined'); invalid.append(d)
+    d = copy.deepcopy(design); d['criteria']['retain']['threshold'] = float('nan'); invalid.append(d)
+    for item in invalid:
+        with pytest.raises(ContractError):
+            validate_evaluation_design(item)
+    changed = copy.deepcopy(design); changed['evaluation_provenance'] = 'changed'
+    with pytest.raises(ContractError):
+        validate_evaluation_design(changed, expected_digest=digest)

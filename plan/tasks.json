@@ -1129,7 +1129,8 @@
       "id": "T064",
       "phase": "P6",
       "depends_on": [
-        "T063"
+        "T063",
+        "T064A"
       ],
       "status": "pending",
       "files": [
@@ -2424,6 +2425,23 @@
       "acceptance": "A guarded source loader rejects path aliasing, changed source bytes and verbatim protected artifact content before returning any retrievable input.",
       "command": "python -m pytest tests/test_evaluation.py::test_allowlisted_evaluation_sources_exclude_reference_artifacts -q",
       "evidence": "Red: no isolated allowlisted evaluation source loader existed. Green: synthetic loader validates all declared hashes and bounded regular files, rejects overlapping paths, hard links, symlinks, traversal and exact protected-artifact bytes, and returns no partial bundle. Synthetic retrieval over accepted files found no protected markers. Focused 33 passed; full offline 485 passed. Caller completeness, transformed or paraphrased labels, other ingestion entrypoints, full T063 and real evaluation remain unverified."
+    },
+    {
+      "id": "T064A",
+      "phase": "P6",
+      "depends_on": [
+        "T063A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_evaluation_design_checks_splits_and_requirements",
+      "action": "Check declared offline evaluation design before a corpus freeze",
+      "acceptance": "Declared family splits, interventions, categories, arms, repeats, metrics and decision criteria are internally consistent.",
+      "command": "python -m pytest tests/test_evaluation.py::test_evaluation_design_checks_splits_and_requirements -q",
+      "evidence": "Red: no design checker existed. Green: synthetic design checks declared partitions, exact cross-split source hashes, related-family declarations, parent chains, coverage categories, arm and outcome names, repeat minima, metric names, numeric criteria and canonical digest. Focused 2 passed; full offline suite 486 passed. Declarations do not prove relatedness completeness, semantic evidence quality, metric definitions, unambiguous decision criteria, provider isolation or an actual frozen corpus."
     }
   ]
 }
