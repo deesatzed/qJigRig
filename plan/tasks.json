@@ -1099,7 +1099,8 @@
         "T057",
         "T059",
         "T060",
-        "T061"
+        "T061",
+        "T062A"
       ],
       "status": "pending",
       "files": [
@@ -3591,6 +3592,21 @@
       "acceptance": "A failed source selection must not leave the previously selected source text visible; verify through a real local browser.",
       "command": "python -m pytest tests/test_source_browser.py::test_failed_source_selection_hides_prior_preview -q",
       "evidence": "Independent local source-inspection repair while R08 provider preflight remains open, as required by GOAL.md. Red in Chromium: after one synthetic source was selected, an injected HTTP 503 for a second selection left the first text visible. The browser now clears and hides the prior preview before requesting another source. The optional browser test uses local Playwright/Chromium, not a provider or network model call. This does not establish full accessibility, browser acceptance or source authority."
+    },
+    {
+      "id": "T062A",
+      "phase": "verification",
+      "depends_on": [
+        "T056C"
+      ],
+      "status": "complete",
+      "files": [],
+      "test_file": "tests/test_source_browser.py",
+      "test_name": "test_two_browser_clients_show_cross_client_source_change",
+      "action": "Exercise a source intervention across two isolated browser clients",
+      "acceptance": "In two independent browser contexts against one local service, a source change in one makes the other client label its prior result stale and a rerun shows the changed evidence and outcome.",
+      "command": "python -m pytest tests/test_source_browser.py::test_two_browser_clients_show_cross_client_source_change -q",
+      "evidence": "Independent local verification while the R08 provider gate remains open, per GOAL.md. Two isolated Chrome contexts exercised synthetic authored evidence: the reader observed a 14-day no, the editor changed the source to 30 days, the reader marked its earlier result stale and reran to yes with the new evidence. Desktop and 390px contexts were used. This is one deterministic two-client path, not full browser acceptance, hosted behavior, authenticated roles or outcome validity."
     }
   ]
 }
