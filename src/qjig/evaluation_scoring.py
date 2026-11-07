@@ -295,7 +295,8 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
     return {'case_id': reference['case_id'], 'run_sha256': expected_run_sha256, 'reference_sha256': ref_hash,
             'reference_provenance': reference['provenance'], 'request_status': 'deferred', 'request_answer': None,
             'request_deferral_reason': 'plan_coverage_unestablished', 'deferral_assurance': 'not_adjudicated',
-            'conditional_answer': answer, 'conditional_comparison': comparison, 'required_evidence_covered': covered,
+            'conditional_answer': answer, 'conditional_comparison': comparison, 'reference_expected_answer': reference['expected_answer'],
+            'required_evidence_covered': covered,
             'semantic_assurance': 'not_assessed'}
 
 
@@ -353,5 +354,55 @@ def _score_fresh_planner_failure(context, events, journal, reference, run_hash, 
     return {'case_id': reference['case_id'], 'run_sha256': run_hash, 'reference_sha256': ref_hash,
             'reference_provenance': reference['provenance'], 'classification': classification,
             'request_status': 'deferred', 'request_answer': None, 'conditional_answer': None,
-            'conditional_comparison': 'unknown_review', 'required_evidence_covered': None,
+            'conditional_comparison': 'unknown_review', 'reference_expected_answer': reference['expected_answer'],
+            'required_evidence_covered': None,
             'failure_verified': verified, 'reconciliation_required': pending, 'semantic_assurance': 'not_assessed'}
+
+
+def summarize_fresh_intervention_pairs(design: dict, records: list[dict], *, expected_design_sha256: str) -> dict:
+    """Compare fresh conditional graphs while explicitly retaining request deferrals.
+
+    Scored records and arm mappings are caller assertions; conditional graph
+    outcomes do not establish request-level answers or semantic correctness.
+    """
+    if not isinstance(records, list):
+        raise ContractError('scored assignments must be a list')
+    converted, original = [], {}
+    answers = ('yes', 'no', 'unknown', 'conflict')
+    for record in records:
+        if not isinstance(record, dict) or set(record) != {'arm', 'repeat', 'score'} or not isinstance(record['score'], dict):
+            raise ContractError('invalid fresh assignment')
+        score = record['score']
+        required = {'case_id', 'run_sha256', 'reference_sha256', 'reference_provenance', 'request_status',
+                    'request_answer', 'conditional_answer', 'reference_expected_answer',
+                    'required_evidence_covered', 'semantic_assurance'}
+        if not required <= set(score):
+            raise ContractError('fresh score is incomplete')
+        conditional, expected, covered = (score.get('conditional_answer'), score.get('reference_expected_answer'),
+                                           score.get('required_evidence_covered'))
+        if (score.get('request_status') != 'deferred' or score.get('request_answer') is not None
+                or score.get('semantic_assurance') != 'not_assessed' or expected not in answers
+                or (conditional is not None and conditional not in answers)
+                or (conditional is None and covered is not None)
+                or (conditional is not None and type(covered) is not bool)):
+            raise ContractError('fresh request and conditional graph differ')
+        mapped = {'case_id':score.get('case_id'), 'run_sha256':score.get('run_sha256'),
+                  'reference_sha256':score.get('reference_sha256'), 'reference_provenance':score.get('reference_provenance'),
+                  'recorded_answer':conditional, 'reference_expected_answer':expected,
+                  'required_evidence_covered':covered, 'answer_matches_reference':None if conditional is None else conditional == expected}
+        converted.append({'arm':record['arm'], 'repeat':record['repeat'], 'score':mapped})
+        key = (score.get('case_id'), record['arm'], record['repeat'])
+        try:
+            original[key] = score
+        except TypeError as exc:
+            raise ContractError('invalid fresh assignment identity') from exc
+    report = summarize_intervention_pairs(design, converted, expected_design_sha256=expected_design_sha256)
+    for pair in report['pairs']:
+        parent = original.get((pair['parent_case'], pair['arm'], pair['repeat']))
+        intervention = original.get((pair['intervention_case'], pair['arm'], pair['repeat']))
+        pair['parent_request_status'] = parent['request_status'] if parent else None
+        pair['intervention_request_status'] = intervention['request_status'] if intervention else None
+        pair['parent_request_answer'] = None
+        pair['intervention_request_answer'] = None
+    report['comparison_scope'] = 'conditional_graph_only'
+    return report

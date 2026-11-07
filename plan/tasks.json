@@ -1246,7 +1246,8 @@
       "phase": "P6",
       "depends_on": [
         "T069",
-        "T070A"
+        "T070A",
+        "T070B"
       ],
       "status": "pending",
       "files": [
@@ -2837,6 +2838,25 @@
       "acceptance": "Replay and journal checks distinguish malformed, provider failure and uncertain calls; an unproved budget refusal remains unknown and no answer is fabricated.",
       "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
       "evidence": "Red: fresh planner failures could not be reference-accounted. Green: replay and journal checks distinguish malformed responses, HTTP/provider failure and uncertain calls; unproved budget refusal remains unknown review. Synthetic tests reject changed journal usage and post-record reconciliation changes. Focused 90 and full offline 524 passed. Reconciled-call recovery, judge/reviewer failure scoring, full assignment coverage, reference semantics and hosted runs remain open."
+    },
+    {
+      "id": "T070B",
+      "phase": "P6",
+      "depends_on": [
+        "T070A",
+        "T068D",
+        "T068E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_fresh_paired_report_keeps_request_deferrals_separate_from_conditional_graphs",
+      "action": "Report paired fresh conditional graphs without treating them as request decisions",
+      "acceptance": "The paired conditional view retains request deferrals and never presents a conditional graph outcome as a completed request answer.",
+      "command": "python -m pytest tests/test_evaluation.py::test_fresh_paired_report_keeps_request_deferrals_separate_from_conditional_graphs -q",
+      "evidence": "Red: paired reporting could not consume fresh scores without turning graph outcomes into request decisions. Green: conditional-only pair view preserves both deferred request statuses, rejects fabricated or missing request answers, and keeps absent evidence unknown. Synthetic draft parent/intervention run produced one conditional match while both requests stayed deferred. Full offline 525 passed before final missing-field guard; focused guard passed. Assignment mappings, references, semantics and actual comparison remain unverified."
     }
   ]
 }

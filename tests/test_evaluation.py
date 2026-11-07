@@ -721,6 +721,7 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
         score = score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
         assert score['request_status']=='deferred' and score['request_answer'] is None
         assert score['conditional_answer']=='yes' and score['conditional_comparison']==comparison
+        assert score['reference_expected_answer']=='yes' and score['request_answer'] is None
         assert score['required_evidence_covered'] is covered and score['semantic_assurance']=='not_assessed'
         recorded = journal._con.execute("SELECT payload FROM events WHERE kind='receipt' LIMIT 1").fetchone()[0]
         corrupted = json.loads(recorded); corrupted['usage']['cost_usd'] = 0
@@ -784,3 +785,36 @@ def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expec
             journal._con.execute("UPDATE events SET payload=? WHERE kind='receipt'",(json.dumps(tampered),))
             with pytest.raises(ContractError):
                 score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
+
+
+def test_fresh_paired_report_keeps_request_deferrals_separate_from_conditional_graphs():
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_scoring import summarize_fresh_intervention_pairs
+    design = _sample_design(); digest = validate_evaluation_design(design)
+    def score(case, run, ref, answer, expected):
+        return {'case_id':case,'run_sha256':run*64,'reference_sha256':ref*64,
+                'reference_provenance':'authored_unvalidated','request_status':'deferred','request_answer':None,
+                'conditional_answer':answer,'reference_expected_answer':expected,
+                'required_evidence_covered':True,'semantic_assurance':'not_assessed'}
+    records = [{'arm':'combined','repeat':1,'score':score('pilot','a','c','no','no')},
+               {'arm':'combined','repeat':1,'score':score('pilot-changed','b','d','yes','yes')}]
+    report = summarize_fresh_intervention_pairs(design,records,expected_design_sha256=digest)
+    pair = next(p for p in report['pairs'] if p['parent_case']=='pilot' and p['arm']=='combined')
+    assert report['comparison_scope']=='conditional_graph_only' and report['complete_pairs']==1
+    assert pair['comparison']=='matches_reference' and pair['observed_change'] is True
+    assert pair['parent_request_status']=='deferred' and pair['intervention_request_status']=='deferred'
+    assert pair['parent_request_answer'] is None and pair['intervention_request_answer'] is None
+    wrong = [records[0], {**records[1], 'score':{**records[1]['score'],'conditional_answer':'no'}}]
+    wrong_pair = next(p for p in summarize_fresh_intervention_pairs(design,wrong,expected_design_sha256=digest)['pairs']
+                      if p['parent_case']=='pilot' and p['arm']=='combined')
+    assert wrong_pair['comparison']=='differs_from_reference' and wrong_pair['intervention_request_answer'] is None
+    incomplete = [records[0], {**records[1], 'score':{**records[1]['score'],'conditional_answer':None,'required_evidence_covered':None}}]
+    incomplete_pair = next(p for p in summarize_fresh_intervention_pairs(design,incomplete,expected_design_sha256=digest)['pairs']
+                           if p['parent_case']=='pilot' and p['arm']=='combined')
+    assert incomplete_pair['comparison']=='unknown_review' and incomplete_pair['intervention_request_status']=='deferred'
+    missing_status = dict(records[1]['score']); del missing_status['request_answer']
+    with pytest.raises(ContractError):
+        summarize_fresh_intervention_pairs(design,[records[0], {**records[1], 'score':missing_status}],expected_design_sha256=digest)
+    fabricated = [records[0], {**records[1], 'score':{**records[1]['score'],'request_answer':'yes'}}]
+    with pytest.raises(ContractError):
+        summarize_fresh_intervention_pairs(design,fabricated,expected_design_sha256=digest)
