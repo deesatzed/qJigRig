@@ -969,7 +969,8 @@
       "depends_on": [
         "T055",
         "T037",
-        "T056A"
+        "T056A",
+        "T056B"
       ],
       "status": "pending",
       "files": [
@@ -2027,6 +2028,25 @@
       "acceptance": "A local client makes irrelevant and decisive changes with exact parent links; original revisions remain available and the authored decision changes only for the decisive edit.",
       "command": "python -m pytest tests/test_interventions.py::test_controlled_changes_preserve_parent_and_affect_authored_decision -q",
       "evidence": "Red: local clients could not create linked interventions. Green: schema v5 stores immutable intervention records with exact parent/child revisions; same-source derived child becomes current atomically with link and inherited metadata. Synthetic authored decision remains false after irrelevant edit and changes true after threshold edit; old revision retained, stale-parent conflicts refuse, exact retries do not reactivate older children, concurrent edits serialize, injected link failure rolls back. Focused 26 passed before added v4 migration test; full suite 409 passed. Full browser intervention, replay and independent evaluation remain open."
+    },
+    {
+      "id": "T056B",
+      "phase": "P5",
+      "depends_on": [
+        "T056A",
+        "T054A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/web.py",
+        "docs/verification/2026-11-07-browser-intervention.md"
+      ],
+      "test_file": "tests/test_web.py",
+      "test_name": "test_browser_serves_controlled_intervention_controls",
+      "action": "Expose exact-parent source intervention in browser",
+      "acceptance": "A real browser edits a uniquely selected passage, retains parent provenance, marks the previous result as needing rerun, and displays the changed authored outcome.",
+      "command": "python -m pytest tests/test_web.py::test_browser_serves_controlled_intervention_controls -q",
+      "evidence": "Red: browser lacked intervention controls. Green: headless Chromium selected synthetic source, changed 14 to 30, displayed parent and child and marked earlier no result for rerun, then showed yes against new passage. Narrow viewport overflow found and fixed, with persisted edit visible after server restart. Focused 11 passed; full suite 410 passed. See docs/verification/2026-11-07-browser-intervention.md. External changes, accessibility, replay, hosted and full T056 remain open."
     }
   ]
 }
