@@ -1241,3 +1241,51 @@ def test_decision_criteria_partition_and_incomplete_evidence():
         changed = copy.deepcopy(design); changed['criteria']['revise'] = rule
         with pytest.raises(ContractError):
             validate_decision_criteria(changed,expected_design_sha256=validate_evaluation_design(changed))
+
+
+def test_holdout_comparison_keeps_deferrals_and_missing_pairs_unknown():
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_scoring import summarize_holdout_comparison
+    design = _sample_design(); digest = validate_evaluation_design(design)
+    cases = [c['id'] for c in design['cases'] if c['family'].startswith('holdout')]
+    records = []
+    for case in cases:
+        for repeat in (1,2):
+            for arm in ('direct_retrieval','combined'):
+                score = {'case_id':case,'run_sha256':hashlib.sha256(f'{case}-{repeat}-{arm}'.encode()).hexdigest(),
+                         'reference_sha256':hashlib.sha256(case.encode()).hexdigest(),
+                         'reference_provenance':'authored_unvalidated','reference_expected_answer':'yes',
+                         'semantic_assurance':'not_assessed'}
+                if arm == 'combined':
+                    score.update(request_status='deferred',request_answer=None,conditional_answer='yes',
+                                 required_evidence_covered=True)
+                else:
+                    score.update(recorded_answer='yes',answer_matches_reference=True,required_evidence_covered=True)
+                records.append({'arm':arm,'repeat':repeat,'score':score})
+    report = summarize_holdout_comparison(design,records,expected_design_sha256=digest,
+                                          baseline_arm='direct_retrieval',candidate_arm='combined')
+    assert report['assigned_pairs']==6 and report['recorded_pairs']==6
+    assert report['baseline_supported']==6 and report['candidate_unknown']==6
+    assert report['candidate_support_rate'] is None and report['paired_difference'] is None
+    assert all(p['candidate_status']=='unknown' for p in report['pairs'])
+    direct_records = []
+    for record in records:
+        copy = dict(record,score=dict(record['score']))
+        if copy['arm']=='combined':
+            copy['arm']='direct_full_evidence'
+            copy['score'].update(recorded_answer='no',answer_matches_reference=False)
+        direct_records.append(copy)
+    complete = summarize_holdout_comparison(design,direct_records,expected_design_sha256=digest,
+                                            baseline_arm='direct_retrieval',candidate_arm='direct_full_evidence')
+    assert complete['baseline_support_rate']==1 and complete['candidate_support_rate']==0
+    assert complete['paired_difference']==-1
+    partial = summarize_holdout_comparison(design,records[:-1],expected_design_sha256=digest,
+                                           baseline_arm='direct_retrieval',candidate_arm='combined')
+    assert partial['recorded_pairs']==5 and partial['missing_pairs']==1 and partial['candidate_support_rate'] is None
+    bad = [*records, records[0]]
+    with pytest.raises(ContractError):
+        summarize_holdout_comparison(design,bad,expected_design_sha256=digest,baseline_arm='direct_retrieval',candidate_arm='combined')
+    changed = [dict(r,score=dict(r['score'])) for r in records]
+    changed[1]['score']['reference_sha256']='0'*64
+    with pytest.raises(ContractError):
+        summarize_holdout_comparison(design,changed,expected_design_sha256=digest,baseline_arm='direct_retrieval',candidate_arm='combined')

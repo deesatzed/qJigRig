@@ -580,3 +580,78 @@ def score_reserved_assignment(goal, archive, journal, reference: dict, *, partit
     from .costs import summarize_resources
     score['resources'] = summarize_resources(journal, request_id=request['request_id'])
     return {'arm':assignment['arm'], 'repeat':assignment['repeat'], 'score':score}
+
+
+def summarize_holdout_comparison(design: dict, records: list[dict], *, expected_design_sha256: str,
+                                 baseline_arm: str, candidate_arm: str) -> dict:
+    """Pair request-level mechanical scores; records and arm mappings are caller assertions.
+
+    Conditional fresh graph answers do not count as request answers. This does
+    not authenticate source authority, semantic relevance, or reference labels.
+    """
+    from .evaluation import validate_evaluation_design
+    if not isinstance(expected_design_sha256, str) or not _SHA.fullmatch(expected_design_sha256):
+        raise ContractError('design anchor required')
+    validate_evaluation_design(design, expected_digest=expected_design_sha256)
+    arms = {'direct_full_evidence', 'direct_retrieval', 'combined'}
+    if (baseline_arm not in arms or candidate_arm not in arms or baseline_arm == candidate_arm
+            or not isinstance(records, list)):
+        raise ContractError('unsupported holdout comparison')
+    families = {f['id']:f['partition'] for f in design['families']}
+    cases = {c['id'] for c in design['cases'] if families[c['family']] == 'holdout'}
+    repeats = design['repeats']['holdout']
+    if len(cases) * repeats > 100_000:
+        raise ContractError('holdout comparison exceeds limit')
+    indexed, references, run_ids = {}, {}, set()
+    for record in records:
+        if not isinstance(record, dict) or set(record) != {'arm','repeat','score'} or not isinstance(record['score'], dict):
+            raise ContractError('invalid holdout score')
+        arm, repeat, score = record['arm'], record['repeat'], record['score']
+        case = score.get('case_id'); run_id = score.get('run_sha256'); ref = score.get('reference_sha256')
+        expected, provenance = score.get('reference_expected_answer'), score.get('reference_provenance')
+        if (arm not in (baseline_arm,candidate_arm) or not isinstance(case,str) or case not in cases
+                or type(repeat) is not int or not 1 <= repeat <= repeats
+                or not isinstance(run_id,str) or not _SHA.fullmatch(run_id) or run_id in run_ids
+                or not isinstance(ref,str) or not _SHA.fullmatch(ref)
+                or expected not in ('yes','no','unknown','conflict')
+                or provenance not in ('authored_unvalidated','ai_reviewed_unvalidated')
+                or score.get('semantic_assurance') != 'not_assessed'):
+            raise ContractError('invalid holdout score identity')
+        key = (case,repeat,arm)
+        if key in indexed or (case in references and references[case] != (ref,expected,provenance)):
+            raise ContractError('duplicate assignment or changed reference')
+        references[case] = (ref,expected,provenance); run_ids.add(run_id)
+        if arm == 'combined':
+            if score.get('request_status') != 'deferred' or 'request_answer' not in score or score['request_answer'] is not None:
+                raise ContractError('invalid fresh request result')
+            status = 'unknown'
+        else:
+            if 'recorded_answer' not in score or 'required_evidence_covered' not in score or 'answer_matches_reference' not in score:
+                raise ContractError('incomplete direct score')
+            answer, covered, matched = score['recorded_answer'], score['required_evidence_covered'], score['answer_matches_reference']
+            if (answer not in ('yes','no','unknown','conflict',None) or type(covered) not in (bool,type(None))
+                    or type(matched) not in (bool,type(None))
+                    or (answer is None and (covered is not None or matched is not None))
+                    or (answer is not None and (type(covered) is not bool or matched is not (answer == expected)))):
+                raise ContractError('invalid direct outcome')
+            status = 'unknown' if answer is None or not covered else 'supported' if matched else 'unsupported'
+        indexed[key] = status
+    pairs = []
+    for case in sorted(cases):
+        for repeat in range(1,repeats+1):
+            before = indexed.get((case,repeat,baseline_arm)); after = indexed.get((case,repeat,candidate_arm))
+            pairs.append({'case_id':case,'repeat':repeat,'baseline_status':before or 'missing',
+                          'candidate_status':after or 'missing'})
+    total = len(pairs)
+    recorded = sum(p['baseline_status'] != 'missing' and p['candidate_status'] != 'missing' for p in pairs)
+    def count(side,status): return sum(p[side+'_status'] == status for p in pairs)
+    def rate(side):
+        return count(side,'supported') / total if total and count(side,'unknown') == 0 and count(side,'missing') == 0 else None
+    base_rate, candidate_rate = rate('baseline'), rate('candidate')
+    return {'design_sha256':expected_design_sha256,'baseline_arm':baseline_arm,'candidate_arm':candidate_arm,
+            'assigned_pairs':total,'recorded_pairs':recorded,'missing_pairs':total-recorded,
+            'baseline_supported':count('baseline','supported'),'candidate_supported':count('candidate','supported'),
+            'baseline_unknown':count('baseline','unknown'),'candidate_unknown':count('candidate','unknown'),
+            'baseline_support_rate':base_rate,'candidate_support_rate':candidate_rate,
+            'paired_difference':None if base_rate is None or candidate_rate is None else candidate_rate-base_rate,
+            'pairs':pairs,'semantic_assurance':'not_assessed'}
