@@ -1,7 +1,7 @@
 import pytest
 
 from qjig.contracts import ContractError
-from qjig.indexing import index_entries, split_broad_section, index_markdown_headings, load_entries, resolve_entry, save_entries
+from qjig.indexing import current_entries, invalidate_superseded, index_entries, split_broad_section, index_markdown_headings, load_entries, resolve_entry, save_entries
 from qjig.sources import SourceRevision, decode_source
 from qjig.spans import verify_span
 from qjig.store import Catalog
@@ -115,3 +115,46 @@ def test_narrow_or_single_paragraph_sections_are_not_split():
         split_broad_section(revision, section, max_chars=0)
     with pytest.raises(ContractError):
         split_broad_section(revision, section, max_chars=True)
+
+
+def test_revision_stales_indexes(tmp_path):
+    v1 = rev("# Limit\nten items\n")
+    v2 = rev("# Limit\ntwenty items\n")
+    other = rev("# Other\nunrelated\n", source_id="p/other.md")
+    with Catalog.open(tmp_path / "c.sqlite") as cat:
+        for r in (v1, v2, other):
+            cat.add_revision(r)
+        save_entries(cat, index_entries(v1))
+        save_entries(cat, index_entries(other))
+        old = load_entries(cat, v1.revision_id)
+        assert [e.state for e in old] == ["accepted"]
+        # origin gets a new revision: v1 entries go stale, v2 has none until it is indexed
+        changed = invalidate_superseded(cat, "p/policy.md", current_revision_id=v2.revision_id)
+        assert changed == 1
+        assert current_entries(cat, "p/policy.md", v2.revision_id) == []
+        # old entries remain inspectable, marked stale, and still resolve to the old pinned text
+        stale = load_entries(cat, v1.revision_id)
+        assert [e.state for e in stale] == ["stale"]
+        entry, span, _ = resolve_entry(cat, stale[0].entry_id)
+        assert span.text == "# Limit\nten items"
+        # asking for current entries under the OLD revision as if current finds none
+        assert current_entries(cat, "p/policy.md", v1.revision_id) == []
+        # indexing the new revision makes only its entries current
+        save_entries(cat, index_entries(v2))
+        cur = current_entries(cat, "p/policy.md", v2.revision_id)
+        assert [e.span.text for e in cur] == ["# Limit\ntwenty items"]
+        # unrelated sources untouched; repeating is a no-op
+        assert [e.state for e in load_entries(cat, other.revision_id)] == ["accepted"]
+        assert invalidate_superseded(cat, "p/policy.md", current_revision_id=v2.revision_id) == 0
+
+
+def test_invalidate_requires_stored_current_revision(tmp_path):
+    v1 = rev("# A\nx\n")
+    with Catalog.open(tmp_path / "c.sqlite") as cat:
+        cat.add_revision(v1)
+        with pytest.raises(ContractError):
+            invalidate_superseded(cat, "p/policy.md", current_revision_id="rev1:" + "0" * 64)
+        other = rev("# A\nx\n", source_id="p/other.md")
+        cat.add_revision(other)
+        with pytest.raises(ContractError):  # revision belongs to a different source
+            invalidate_superseded(cat, "p/policy.md", current_revision_id=other.revision_id)

@@ -116,3 +116,8 @@ Full qJig suite after T005: 24 passed (`python -m pytest -q`, Python 3.13.9). T0
 
 - `split_broad_section(revision, section, max_chars=...)` proposes paragraph children (blank-line separated) as exact, non-overlapping slices inside the parent span with `parent_entry_id` and state `proposed`; sections within the limit or with one paragraph return nothing; invalid max_chars rejected. Limit: the heading line stays attached to the first paragraph; what counts as 'broad' is a caller-supplied character limit, not a tuned value.
 - Red: ImportError split_broad_section (initial contract). Green: focused 1 passed in 0.04s; tests/test_indexing.py 9 passed in 0.06s; full suite 65 passed in 0.15s. 2026-11-06.
+
+## 2026-11-06: T016 complete
+
+- `invalidate_superseded` marks live entries of a source's other revisions `stale` (rejected stay rejected); `current_entries` returns only proposed/accepted entries of the revision the caller names as current. Old entries stay loadable and resolve to the old pinned text; the new revision has none until indexed; unrelated sources untouched; repeat is a no-op. Limit: the catalog does not itself decide which revision is current — the caller passes it (a current-revision policy arrives with T037).
+- Red: ImportError current_entries/invalidate_superseded (initial contract). Green: focused 1 passed in 0.04s; tests/test_indexing.py 11 passed in 0.05s; full suite 67 passed in 0.13s. 2026-11-06.

@@ -262,7 +262,7 @@
       "depends_on": [
         "T015"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/indexing.py"
       ],
@@ -270,7 +270,8 @@
       "test_name": "test_revision_stales_indexes",
       "action": "Invalidate derived indexes after an origin revision",
       "acceptance": "Old entries are inspectable but cannot appear current for the new source",
-      "command": "python -m pytest tests/test_indexing.py::test_revision_stales_indexes -q"
+      "command": "python -m pytest tests/test_indexing.py::test_revision_stales_indexes -q",
+      "evidence": "Red: ImportError current_entries/invalidate_superseded (initial contract). Green: focused 1 passed in 0.04s; tests/test_indexing.py 11 passed in 0.05s; full suite 67 passed in 0.13s. 2026-11-06."
     },
     {
       "id": "T017",

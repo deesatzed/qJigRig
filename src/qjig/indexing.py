@@ -173,3 +173,17 @@ def split_broad_section(
             )
         )
     return out
+
+
+def invalidate_superseded(catalog: Catalog, source_id: str, *, current_revision_id: str) -> int:
+    """Mark live entries of every other revision of this source stale. Returns the number changed."""
+    if catalog.revision_source_id(current_revision_id) != source_id:
+        raise ContractError("current revision is not a stored revision of this source")
+    return catalog.stale_other_revisions(source_id, current_revision_id)
+
+
+def current_entries(catalog: Catalog, source_id: str, current_revision_id: str) -> list[IndexEntry]:
+    """Live (non-stale, non-rejected) entries of the revision the caller treats as current."""
+    if catalog.revision_source_id(current_revision_id) != source_id:
+        raise ContractError("revision is not a stored revision of this source")
+    return [e for e in load_entries(catalog, current_revision_id) if e.state in ("proposed", "accepted")]

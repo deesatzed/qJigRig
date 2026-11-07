@@ -128,3 +128,17 @@ class Catalog:
         return self._con.execute(
             f"SELECT {self._ENTRY_COLS} FROM index_entries WHERE entry_id=?", (entry_id,)
         ).fetchone()
+
+    def stale_other_revisions(self, source_id: str, keep_revision_id: str) -> int:
+        """Mark live (proposed/accepted) entries of this source's other revisions as stale."""
+        with self._con:
+            cur = self._con.execute(
+                "UPDATE index_entries SET state='stale' WHERE state IN ('proposed','accepted') "
+                "AND revision_id != ? AND revision_id IN (SELECT revision_id FROM revisions WHERE source_id=?)",
+                (keep_revision_id, source_id),
+            )
+        return cur.rowcount
+
+    def revision_source_id(self, revision_id: str) -> str | None:
+        row = self._con.execute("SELECT source_id FROM revisions WHERE revision_id=?", (revision_id,)).fetchone()
+        return row[0] if row else None
