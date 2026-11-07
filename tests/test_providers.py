@@ -393,3 +393,17 @@ def test_invalid_routing_price_ceiling_is_refused(ceiling):
         return
     with pytest.raises(ContractError):
         ProviderRequest('judge', 'openrouter', 'model', 'Question?', 50, max_price=ceiling)
+
+
+def test_capped_request_refuses_fabricated_underreservation_before_call(tmp_path):
+    from qjig.contracts import ContractError
+    from qjig.providers import CallReservation
+    req = ProviderRequest('judge', 'stand-in', 'm', 'question', 50,
+                          max_price={'prompt': 10.0, 'completion': 20.0})
+    forged = CallReservation(req.input_sha256(), 100, 0.00001, '0' * 64, 'unverified assertion')
+    transport = StandInTransport([RawResponse(200, GOOD, USAGE)])
+    with Journal.open(tmp_path / 'journal.sqlite') as journal:
+        ledger = BudgetLedger(Budget(2, 1000, 1), journal, 'r')
+        with pytest.raises(ContractError, match='ceiling'):
+            call_typed(ledger, transport, req, SCHEMA, reservation=forged)
+        assert journal.events('r') == [] and transport.calls_made == 0

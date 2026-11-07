@@ -17,7 +17,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Protocol
 
-from .budgets import BudgetExceeded, BudgetLedger
+from .budgets import BudgetExceeded, BudgetLedger, _valid_cost, _valid_tokens
 from .contracts import ContractError
 from .pricing import upper_cost
 from .journal import UncertainOutcome
@@ -67,6 +67,15 @@ class CallReservation:
     required_id: str | None = None
 
 
+def _ceiling_token_cost(request: ProviderRequest, input_tokens: int) -> Decimal:
+    if not _valid_tokens(input_tokens) or input_tokens == 0 or not _valid_tokens(request.max_tokens) or request.max_tokens == 0:
+        raise ContractError("ceiling requires positive input and output bounds")
+    with localcontext() as ctx:
+        ctx.rounding = ROUND_CEILING
+        return (Decimal(str(request.max_price["prompt"])) * input_tokens
+                + Decimal(str(request.max_price["completion"])) * request.max_tokens) / Decimal(1000000)
+
+
 def make_call_reservation(request: ProviderRequest, model: dict, *, input_tokens: int, input_bound_provenance: str,
                           hold_back_calls: int = 0, hold_back_tokens: int = 0, hold_back_cost_usd: float = 0,
                           required_id: str | None = None) -> CallReservation:
@@ -83,9 +92,7 @@ def make_call_reservation(request: ProviderRequest, model: dict, *, input_tokens
         # This arithmetic does not verify provider enforcement or completeness.
         with localcontext() as ctx:
             ctx.rounding = ROUND_CEILING
-            capped = (Decimal(str(request.max_price["prompt"])) * input_tokens
-                      + Decimal(str(request.max_price["completion"])) * request.max_tokens) / Decimal(1000000)
-            cost += capped
+            cost += _ceiling_token_cost(request, input_tokens)
     as_float = float(cost)
     if not math.isfinite(as_float):
         raise ContractError("price bound is not representable")
@@ -308,6 +315,10 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
     """One budgeted, journaled provider attempt returning a validated value or an explicit failure."""
     if reservation is not None and (not isinstance(reservation, CallReservation) or reservation.request_sha256 != request.input_sha256()):
         raise ContractError("reservation does not match provider request")
+    if reservation is not None and request.max_price is not None:
+        if (not _valid_cost(reservation.cost_usd) or
+                Decimal(str(reservation.cost_usd)) < _ceiling_token_cost(request, reservation.input_tokens)):
+            raise ContractError("reservation does not cover routing ceiling")
     if isinstance(transport, OpenRouterTransport):
         raise BudgetExceeded("preflight_unavailable", "hosted calls require complete input, cost and goal-wide reservations")
 
