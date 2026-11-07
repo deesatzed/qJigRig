@@ -187,3 +187,72 @@ def test_failed_question_does_not_present_previous_result(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_browser_and_two_role_clients_keep_interpretation_separate_after_restart(tmp_path):
+    from qjig.agents import RoleClient
+    from qjig.roles import RoleDefinition
+
+    playwright = pytest.importorskip('playwright.sync_api')
+    executable = os.environ.get('QJIG_CHROMIUM_PATH')
+    if not executable:
+        pytest.skip('QJIG_CHROMIUM_PATH is required for browser verification')
+    path = tmp_path / 'catalog.sqlite'
+
+    def start():
+        server = create_server(path, host='127.0.0.1', port=0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return server, thread
+
+    def stop(server, thread):
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    server, thread = start()
+    try:
+        builder = RoleClient(server.server_address[1], RoleDefinition('builder', '1', 'Build'))
+        reviewer = RoleClient(server.server_address[1], RoleDefinition('reviewer', '2', 'Review'))
+        text = '# Refund policy\nRefunds are accepted within 14 days.\n'
+        source = {'source_id': 'policy.md', 'text': text, 'scope': 'project', 'entities': [],
+                  'effective_from': '2026-01-01', 'effective_to': 'open', 'observed_at': None, 'authority': None}
+        revision = builder.import_source(source)['revision_id']
+        detail = builder.get_source(revision)
+        start_offset = text.index('Refunds')
+        end = start_offset + len('Refunds are accepted within 14 days.')
+        claim = builder.add_interpretation('Late requests might need a waiver.',
+                                           {'revision_id': revision, 'text_sha256': detail['text_sha256'],
+                                            'start': start_offset, 'end': end})
+        assert reviewer.list_interpretations() == [claim]
+        with playwright.sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, executable_path=executable)
+            try:
+                page = browser.new_page(viewport={'width': 1280, 'height': 900})
+                page.goto(f'http://127.0.0.1:{server.server_address[1]}/', wait_until='networkidle')
+                interpretation = page.locator('#interpretation-list')
+                interpretation.get_by_text('Late requests might need a waiver.').wait_for()
+                assert 'Interpretation · builder / 1' in interpretation.inner_text()
+                assert 'Refunds are accepted within 14 days.' in interpretation.inner_text()
+                assert len(reviewer.list_sources()) == 1
+                policy = {'label': 'AUTHORED CONTROL', 'entities': [], 'as_of': '2026-11-15', 'mode': 'snapshot',
+                          'plan': {'origin': 'authored', 'predicates': [{'id': 'p', 'question': 'A waiver?'}], 'expression': {'ref': 'p'}},
+                          'needs': {'p': {'query': 'waiver', 'want': 1, 'max_bytes': 4000,
+                                          'evaluator': {'kind': 'phrase_present', 'pattern': 'waiver'}}}}
+                result = reviewer.ask('r', 'A waiver?', 'project', policy)['result']
+                assert result['status'] == 'deferred' and result['records'][0]['evidence'] == []
+                stop(server, thread)
+                server, thread = start()
+                page.goto(f'http://127.0.0.1:{server.server_address[1]}/', wait_until='networkidle')
+                page.locator('#interpretation-list').get_by_text('Late requests might need a waiver.').wait_for()
+                button = page.get_by_role('button', name='policy.md', exact=False)
+                button.focus()
+                page.keyboard.press('Enter')
+                page.locator('#source-preview').get_by_text('14 days', exact=False).wait_for()
+                assert 'waiver' not in page.locator('#source-preview').inner_text()
+                page.set_viewport_size({'width': 390, 'height': 844})
+                assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+            finally:
+                browser.close()
+    finally:
+        stop(server, thread)

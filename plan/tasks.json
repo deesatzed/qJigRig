@@ -1102,7 +1102,8 @@
         "T059",
         "T060",
         "T061",
-        "T062A"
+        "T062A",
+        "T062B"
       ],
       "status": "pending",
       "files": [
@@ -3657,6 +3658,22 @@
       "acceptance": "Install qJig into a fresh virtual environment and run synthetic import, authored ask, trace and loopback service from outside the checkout without PYTHONPATH.",
       "command": "python -m pytest tests/test_clean_install.py::test_clean_install_cli_and_loopback_service -q",
       "evidence": "Independent local verification while R08 and full T073 prerequisites remain open, as directed by GOAL.md. The opt-in test builds and installs a wheel into a fresh venv, invokes isolated Python outside the checkout with PYTHONPATH and API-key environment variables removed, imports a synthetic source, produces an authored decision and trace, and starts the actual loopback service. A separate manual venv install and CLI help check also passed. This is a point-in-time smoke; full suite in the installed environment, documented commands, browser/two-client and hosted gates remain open. No model call occurred. A separate staged offline suite using installed qjig from site-packages and no staged src directory passed 575 tests with 5 optional tests skipped; build/browser/live acceptance remains open. Installed-package Chrome checks subsequently passed all four source-browser tests plus saved-run and synthetic-review walkthroughs; this is still partial browser acceptance."
+    },
+    {
+      "id": "T062B",
+      "phase": "verification",
+      "depends_on": [
+        "T062A",
+        "T060A"
+      ],
+      "status": "complete",
+      "files": [],
+      "test_file": "tests/test_source_browser.py",
+      "test_name": "test_browser_and_two_role_clients_keep_interpretation_separate_after_restart",
+      "action": "Exercise shared role interpretation and source separation through browser restart",
+      "acceptance": "Two role clients and the browser share a source-linked interpretation, a claim-only query does not become source evidence, and the records remain distinct after service restart.",
+      "command": "python -m pytest tests/test_source_browser.py::test_browser_and_two_role_clients_keep_interpretation_separate_after_restart -q",
+      "evidence": "Independent synthetic local verification while R08 remains open. A builder client imported a source and shared a span-linked interpretation, a reviewer client observed it and a claim-only query deferred without source evidence, and Chrome displayed the interpretation separately before and after service restart; keyboard inspection retained only original source text. The first test attempt failed from a local variable shadowing its startup helper; corrected. Role identities are caller assertions, no provider call occurred, and full workflow/semantic acceptance remains open."
     }
   ]
 }
