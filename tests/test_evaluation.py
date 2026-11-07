@@ -308,3 +308,59 @@ def test_direct_replay_checks_search_and_source_tampering(tmp_path):
         archive._con.execute('DROP TRIGGER revision_no_update')
         archive._con.execute("UPDATE revisions SET raw=?", (b'Checks can fail.',))
         assert verify_direct_archive(archive, journal, expected_digest=report['sha256'])['status'] == 'invalid'
+
+
+def test_direct_provider_prompt_excludes_internal_assignment_identity(tmp_path):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_direct import run_direct
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    code, secret = b'Tests pass.', b'private labels'
+    (tmp_path / 'code').write_bytes(code); (tmp_path / 'label').write_bytes(secret)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    search = DirectRetrieval(tmp_path, [item('code', code)], [item('label', secret)], want=1, max_bytes=3000, followups=0)
+    response = RawResponse(200, json.dumps({'action': 'answer', 'query': None, 'answer': 'unknown', 'citations': []}),
+                           {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01})
+    with Journal.open(tmp_path / 'j.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
+        request = Request('PRIVATE_ARM_MAPPING_COMBINED', 'Do tests pass?', 'reviewer', '1', 'project')
+        run_direct(search, request, BudgetLedger(Budget(2, 10000, 1), journal, request.request_id),
+                   StandInTransport([response]), archive=archive, provider='stand-in', model='test', max_tokens=100,
+                   as_of='2026-11-07', entities=[])
+        prompt = next(e['data']['prompt'] for e in archive.events() if e['kind'] == 'request')
+        assert request.request_id not in prompt and 'request_id' not in prompt
+        assert 'Do tests pass?' in prompt
+        assert archive.context()['request']['request_id'] == request.request_id
+
+
+def test_legacy_direct_prompt_archive_remains_replayable(tmp_path, monkeypatch):
+    import json
+    import qjig.evaluation_direct as direct
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    code, secret = b'Tests pass.', b'private labels'
+    (tmp_path / 'code').write_bytes(code); (tmp_path / 'label').write_bytes(secret)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    search = DirectRetrieval(tmp_path, [item('code', code)], [item('label', secret)], want=1, max_bytes=3000, followups=0)
+    response = RawResponse(200, json.dumps({'action': 'answer', 'query': None, 'answer': 'unknown', 'citations': []}),
+                           {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01})
+    original = direct._prompt
+    monkeypatch.setattr(direct, '_prompt', lambda *args: original(*args, legacy_request_id=True))
+    with Journal.open(tmp_path / 'j.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
+        request = Request('legacy-id', 'Do tests pass?', 'reviewer', '1', 'project')
+        direct.run_direct(search, request, BudgetLedger(Budget(2, 10000, 1), journal, request.request_id),
+                          StandInTransport([response]), archive=archive, provider='stand-in', model='test', max_tokens=100,
+                          as_of='2026-11-07', entities=[])
+        context = archive.context(); context['schema'] = 'qjig.direct-evaluation.v1'
+        encoded = json.dumps(context, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False)
+        archive._con.execute('DROP TRIGGER context_no_update')
+        archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1', (encoded, hashlib.sha256(encoded.encode()).hexdigest()))
+        assert verify_direct_archive(archive, journal)['status'] == 'unanchored'

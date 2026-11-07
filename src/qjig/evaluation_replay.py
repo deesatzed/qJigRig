@@ -30,7 +30,7 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
         context, events = archive.context(), archive.events()
         keys = {'schema', 'request', 'source_revisions', 'applicability', 'want', 'max_bytes', 'followups',
                 'expanded', 'provider', 'model', 'max_tokens', 'max_price'}
-        if not isinstance(context, dict) or set(context) != keys or context['schema'] != 'qjig.direct-evaluation.v1':
+        if not isinstance(context, dict) or set(context) != keys or context['schema'] not in ('qjig.direct-evaluation.v1', 'qjig.direct-evaluation.v2'):
             raise ContractError('invalid direct context')
         request = Request.from_dict(context['request'])
         revisions = [archive.revision(i) for i in archive.revision_ids()]
@@ -75,7 +75,7 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
                 raise ContractError('direct search trace differs')
             allow = step + 1 < search._max_rounds
             pr = ProviderRequest('direct_initial' if step == 0 else 'direct_final', context['provider'], context['model'],
-                                 _prompt(request, context['applicability'], packets, allow), context['max_tokens'],
+                                 _prompt(request, context['applicability'], packets, allow, legacy_request_id=context['schema'].endswith('.v1')), context['max_tokens'],
                                  max_price=context['max_price'])
             data = sent['data']
             expected_request = {'stage': pr.stage, 'provider': pr.provider, 'model': pr.model, 'prompt': pr.prompt,

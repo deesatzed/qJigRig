@@ -1115,7 +1115,8 @@
       "phase": "P6",
       "depends_on": [
         "T061",
-        "T063A"
+        "T063A",
+        "T063B"
       ],
       "status": "pending",
       "files": [
@@ -2577,6 +2578,24 @@
       "acceptance": "Rebuild source identities, search packets and prompts, validate quotations and journal receipt bindings without inference; changed data is invalid and incomplete work stays incomplete.",
       "command": "python -m pytest tests/test_evaluation.py::test_direct_replay_checks_search_and_source_tampering -q",
       "evidence": "Red: direct run had no structural replay. Green: rebuilds source revisions, searches, packets, prompts and validated quotations, compares journal intents/receipts and records optional external digest. Synthetic one- and two-call tests pass; tampered source, trace and journal usage reject; failed and uncertain runs remain incomplete. Focused replay/provider suite 60 passed before added tamper case; full offline 497 passed. Replay shares retrieval/prompt code, does not authenticate source or receipt, prove label isolation, validate semantics or account for unrecorded external calls."
+    },
+    {
+      "id": "T063B",
+      "phase": "P6",
+      "depends_on": [
+        "T065B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_direct.py",
+        "src/qjig/evaluation_replay.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_direct_provider_prompt_excludes_internal_assignment_identity",
+      "action": "Keep internal request and assignment identifiers out of direct provider input",
+      "acceptance": "New direct prompts omit internal request IDs while archives retain them, and replay remains versioned for prior records.",
+      "command": "python -m pytest tests/test_evaluation.py::test_direct_provider_prompt_excludes_internal_assignment_identity -q",
+      "evidence": "Red: direct provider prompt contained a canary request ID that could encode arm mapping. Green: version 2 prompt omits request_id while local archive preserves it; version 1 legacy replay is tested with an emulated recording. Focused 27 passed; full offline 499 passed. This does not prove other fields, source content or other provider entrypoints are free of labels."
     }
   ]
 }
