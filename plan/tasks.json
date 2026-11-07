@@ -24,7 +24,7 @@
       "depends_on": [
         "T001"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/contracts.py"
       ],
@@ -32,7 +32,8 @@
       "test_name": "test_roundtrip_request",
       "action": "Round-trip a minimal versioned Request with exact role and scope",
       "acceptance": "The parsed request equals the serialized request and rejects unknown schema version",
-      "command": "python -m pytest tests/test_contracts.py::test_roundtrip_request -q"
+      "command": "python -m pytest tests/test_contracts.py::test_roundtrip_request -q",
+      "evidence": "Red: ModuleNotFoundError qjig.contracts (initial contract). Green: test_roundtrip_request 1 passed; tests/test_contracts.py 1 passed; full suite 2 passed. 2026-11-06."
     },
     {
       "id": "T003",
