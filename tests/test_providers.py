@@ -363,3 +363,33 @@ def test_http_error_preserves_reported_usage_for_budget_and_journal(tmp_path):
         assert journal.events('r')[-1].payload['usage'] == raw.usage
         assert goal.actual_usage()['cost_usd'] == 0.02
         assert goal.actual_usage()['unknown_calls'] == 0
+
+
+def test_routing_price_ceiling_is_bound_sent_and_archived(tmp_path):
+    from qjig.run_archive import RunArchive
+    seen = {}
+    def fake_post(url, headers, payload, timeout):
+        seen.update(json.loads(payload))
+        return 200, LIVE_BODY
+    ceiling = {'prompt': 0.5, 'completion': 2.0}
+    request = ProviderRequest('judge', 'openrouter', 'vendor/model-x', 'Question?', 50, max_price=ceiling)
+    plain = ProviderRequest('judge', 'openrouter', 'vendor/model-x', 'Question?', 50)
+    assert request.input_sha256() != plain.input_sha256()
+    with RunArchive.open(tmp_path / 'run') as archive:
+        archive.record_request('call', request)
+        stored = archive.events()[0]['data']
+        assert stored['max_price'] == ceiling and stored['input_sha256'] == request.input_sha256()
+    OpenRouterTransport(_env(tmp_path), post=fake_post).send(request)
+    assert seen['provider']['max_price'] == ceiling
+    ceiling['prompt'] = 999
+    assert request.input_sha256() == stored['input_sha256']
+
+
+@pytest.mark.parametrize('ceiling', [None, {}, {'prompt': -1, 'completion': 2}, {'prompt': True, 'completion': 2},
+                                      {'prompt': float('inf'), 'completion': 2}, {'prompt': 1, 'completion': 2, 'extra': 1}])
+def test_invalid_routing_price_ceiling_is_refused(ceiling):
+    from qjig.contracts import ContractError
+    if ceiling is None:
+        return
+    with pytest.raises(ContractError):
+        ProviderRequest('judge', 'openrouter', 'model', 'Question?', 50, max_price=ceiling)

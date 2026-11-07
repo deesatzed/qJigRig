@@ -14,6 +14,7 @@ import urllib.request
 import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Callable, Protocol
 
 from .budgets import BudgetExceeded, BudgetLedger
@@ -34,12 +35,21 @@ class ProviderRequest:
     model: str
     prompt: str
     max_tokens: int
+    max_price: dict[str, float] | None = None
+
+    def __post_init__(self) -> None:
+        if self.max_price is not None:
+            value = self.max_price
+            if (not isinstance(value, dict) or set(value) != {"prompt", "completion"}
+                    or any(type(v) not in (int, float) or not math.isfinite(v) or v < 0 for v in value.values())):
+                raise ContractError("invalid routing price ceiling")
+            object.__setattr__(self, "max_price", MappingProxyType(dict(value)))
 
     def input_sha256(self) -> str:
-        blob = json.dumps(
-            {"stage": self.stage, "provider": self.provider, "model": self.model, "prompt": self.prompt, "max_tokens": self.max_tokens},
-            sort_keys=True, ensure_ascii=False,
-        )
+        data = {"stage": self.stage, "provider": self.provider, "model": self.model, "prompt": self.prompt, "max_tokens": self.max_tokens}
+        if self.max_price is not None:
+            data["max_price"] = dict(self.max_price)
+        blob = json.dumps(data, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
@@ -172,10 +182,13 @@ class OpenRouterTransport:
         if (parsed.scheme != "https" or parsed.netloc != "openrouter.ai"
                 or parsed.path != "/api/v1" or parsed.query or parsed.fragment):
             raise ProviderUnavailable("untrusted provider endpoint; nothing was sent")
-        payload = json.dumps({
+        body = {
             "model": request.model, "max_tokens": request.max_tokens,
             "messages": [{"role": "user", "content": request.prompt}],
-        }, ensure_ascii=False)
+        }
+        if request.max_price is not None:
+            body["provider"] = {"max_price": dict(request.max_price)}
+        payload = json.dumps(body, ensure_ascii=False)
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         try:
             status, body = self._post(f"{base}/chat/completions", headers, payload, self._timeout)

@@ -143,9 +143,11 @@ class RunArchive:
         self._con.execute("INSERT INTO events(kind,call_id,data,recorded_at) VALUES(?,?,?,?)", (kind, call_id, encoded, time.time()))
 
     def record_request(self, call_id: str, request: ProviderRequest) -> None:
-        self._event("request", call_id, {"stage": request.stage, "provider": request.provider, "model": request.model,
-                                          "prompt": request.prompt, "max_tokens": request.max_tokens,
-                                          "input_sha256": request.input_sha256()})
+        data = {"stage": request.stage, "provider": request.provider, "model": request.model,
+                "prompt": request.prompt, "max_tokens": request.max_tokens, "input_sha256": request.input_sha256()}
+        if request.max_price is not None:
+            data["max_price"] = dict(request.max_price)
+        self._event("request", call_id, data)
 
     def record_response(self, call_id: str, response: RawResponse) -> None:
         if not self._con.execute("SELECT 1 FROM events WHERE kind='request' AND call_id=?", (call_id,)).fetchone():

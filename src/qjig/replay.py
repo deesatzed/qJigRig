@@ -95,7 +95,7 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None) -
         kind, call_id, data = event["kind"], event["call_id"], event["data"]
         try:
             if kind == "request":
-                request = ProviderRequest(data["stage"], data["provider"], data["model"], data["prompt"], data["max_tokens"])
+                request = ProviderRequest(data["stage"], data["provider"], data["model"], data["prompt"], data["max_tokens"], max_price=data.get("max_price"))
                 if request.input_sha256() != data["input_sha256"]:
                     raise ContractError("request hash mismatch")
                 requests[call_id] = event["seq"]

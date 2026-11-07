@@ -211,3 +211,26 @@ def test_replay_rejects_tampered_source_scope_even_if_context_hash_rewritten(tmp
     with RunArchive.open(directory) as archive:
         report = verify_archive(archive)
         assert report.status == "invalid" and "invalid_planning_or_applicability" in report.issues
+
+
+def test_replay_rejects_changed_routing_ceiling(tmp_path):
+    import json
+    from qjig.providers import ProviderRequest
+
+    directory = tmp_path / 'partial'
+    with RunArchive.open(directory) as archive:
+        archive.record_context({'schema': 'qjig.fresh-context.v1', 'corpus': {}})
+        request = ProviderRequest('planner', 'stand-in', 'm', 'question', 20,
+                                  max_price={'prompt': 0.5, 'completion': 2.0})
+        archive.record_request('r#1', request)
+        assert verify_archive(archive).status == 'incomplete'
+    with sqlite3.connect(directory / 'run.sqlite') as con:
+        con.execute('DROP TRIGGER event_no_update')
+        seq, raw = con.execute("SELECT seq,data FROM events WHERE kind='request'").fetchone()
+        changed = json.loads(raw)
+        changed['max_price']['completion'] = 20
+        con.execute('UPDATE events SET data=? WHERE seq=?', (json.dumps(changed), seq))
+    with RunArchive.open(directory) as archive:
+        report = verify_archive(archive)
+        assert report.status == 'invalid'
+        assert any(item.startswith('invalid_request:') for item in report.issues)
