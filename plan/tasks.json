@@ -1344,7 +1344,8 @@
         "R09",
         "R01B",
         "G01",
-        "G02"
+        "G02",
+        "G03"
       ],
       "status": "pending",
       "files": [
@@ -3710,6 +3711,23 @@
       "acceptance": "Verify local command-record schema, gate references, input/output hashes, path containment, counts and exit status without treating caller-reported execution as gate completion.",
       "command": "python -m pytest tests/test_gates.py::test_check_receipt_verifies_artifacts_without_claiming_gate_completion -q",
       "evidence": "Independent verification foundation while R08 remains open. Red: no linked check-receipt inspector existed. Synthetic tests cover success, failure, changed inputs, path escape, malformed counts and unknown gates. A real local queue-audit pytest receipt is recorded separately with command, exit code, counts and hashes. These are caller-reported and hash checks do not authenticate execution or prove F09 completion."
+    },
+    {
+      "id": "G03",
+      "phase": "verification",
+      "depends_on": [
+        "G02"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/live_receipts.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_retained_campaign_inspection_refuses_unstarted_work_without_creating_archives",
+      "action": "Inspect retained campaign receipts without provider calls",
+      "acceptance": "Inspect the assigned denominator, journal accounting, recorded usage, provider labels and scored archives with anchored references; report missing work or attribution as incomplete and changed evidence as invalid without creating archives.",
+      "command": "python -m pytest tests/test_evaluation.py::test_retained_campaign_inspection_refuses_unstarted_work_without_creating_archives -q",
+      "evidence": "Independent structural verification foundation while R08 remains open. Red: no no-call campaign receipt inspection existed. Synthetic tests cover 60 unstarted assignments, four reconstructed scored archives, stand-in attribution, missing references, altered archive and altered journal. Archive connections use SQLite read-only mode. This does not authenticate provider labels or references, prove full campaign semantic validity, or provide the required final live-receipt CLI. No provider call occurred."
     }
   ]
 }

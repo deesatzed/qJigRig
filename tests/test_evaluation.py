@@ -1807,6 +1807,23 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                                   expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
         assert second['executed']==2 and second['scored']==4 and second['remaining']==56 and len(set(calls))==4
         assert all(next(a for a in plan['manifest']['assignments'] if a['request_id']==rid)['case_id'].startswith('dev') for rid in calls)
+        from qjig.live_receipts import inspect_campaign_receipts
+        report=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()})
+        assert report['status']=='incomplete' and report['checked']==4 and report['scored']==4
+        assert 'unstarted_assignments' in report['issues'] and 'provider_attribution_not_live' in report['issues']
+        assert report['provider_authenticity']=='not_established'
+        absent=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={})
+        assert absent['status']=='incomplete' and 'reference_unavailable' in absent['issues'] and absent['checked']==0
+        import sqlite3
+        with sqlite3.connect(tmp_path/'runs'/calls[0]/'run.sqlite') as con:
+            con.execute('DROP TRIGGER event_no_update')
+            seq, original = con.execute("SELECT seq,data FROM events WHERE kind='response' LIMIT 1").fetchone()
+            altered=json.loads(original);altered['body']='tampered'
+            con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(altered),seq))
+        altered_report=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()})
+        assert altered_report['status']=='invalid' and 'scored_receipt_invalid' in altered_report['issues']
+        with sqlite3.connect(tmp_path/'runs'/calls[0]/'run.sqlite') as con:
+            con.execute('UPDATE events SET data=? WHERE seq=?',(original,seq))
         from qjig.evaluation_campaign import run_campaign_assignment
         from qjig.run_archive import RunArchive
         target=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']=='decomposition_only' and a['repeat']==1)
@@ -1839,7 +1856,40 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
         assert third['executed']==1 and third['scored']==6 and len(calls)==5
         journal._con.execute('DROP TRIGGER events_no_update')
         journal._con.execute("UPDATE events SET payload='{}' WHERE kind='receipt' AND request_id=?",(calls[0],))
+        assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()})['status']=='invalid'
         with pytest.raises(ContractError):
             run_campaign_batch(campaign,tmp_path,design,cases,journal=journal,archive_root=tmp_path/'runs',config=config,
                                want=1,max_bytes=5000,expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
         assert len(calls)==5
+def test_retained_campaign_inspection_refuses_unstarted_work_without_creating_archives(tmp_path):
+    from qjig.contracts import Budget
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_budget import build_factorial_allocation, reserve_evaluation_plan
+    from qjig.evaluation_campaign import EvaluationCampaign
+    from qjig.goal_budget import GoalBudget
+    from qjig.journal import Journal
+    from qjig.live_receipts import inspect_campaign_receipts
+
+    design = _sample_design()
+    digest = validate_evaluation_design(design)
+    hashes = {case['id']: hashlib.sha256(case['id'].encode()).hexdigest() for case in design['cases']}
+    model = {'id': 'synthetic/model', 'context_length': 10000,
+             'top_provider': {'max_completion_tokens': 1000},
+             'pricing': {'prompt': '0.000001', 'completion': '0.000002'}}
+    spec = {'provider': 'stand-in', 'model': model, 'input_tokens': 100, 'output_tokens': 100,
+            'max_price': {'prompt': 2, 'completion': 3}}
+    plan = build_factorial_allocation(design, hashes, {k: dict(spec) for k in ('direct', 'planner', 'judge', 'reviewer')},
+                                      expected_design_sha256=digest, assignment_secret=b'synthetic-private-test-secret-32-bytes')
+    total, per = Budget(800, 200000, 10), Budget(30, 6000, 1)
+    allocations = {'development': Budget(200, 50000, 2), 'pilot': Budget(200, 50000, 2),
+                   'holdout': Budget(400, 100000, 6)}
+    archive_root = tmp_path / 'not-created'
+    with GoalBudget.open(tmp_path / 'goal.sqlite', total=total, per_request=per, allocations=allocations) as goal, Journal.open(tmp_path / 'journal.sqlite') as journal:
+        reserve_evaluation_plan(goal, 'test', plan, expected_plan_sha256=plan['sha256'])
+        campaign = EvaluationCampaign(goal, 'test', expected_plan_sha256=plan['sha256'])
+        report = inspect_campaign_receipts(campaign, journal, archive_root, references={})
+        assert report['status'] == 'incomplete'
+        assert report['assigned'] == 60 and report['scored'] == 0
+        assert 'unstarted_assignments' in report['issues']
+        assert report['provider_authenticity'] == 'not_established'
+        assert not archive_root.exists()
