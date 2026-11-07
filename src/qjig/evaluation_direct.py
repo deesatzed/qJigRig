@@ -6,7 +6,7 @@ import re
 from datetime import date
 from .budgets import BudgetExceeded, BudgetLedger
 from .contracts import ContractError, Request
-from .evaluation import DirectRetrieval
+from .evaluation import DirectRetrieval, FullEvidence
 from .journal import ReconciliationRequired, UncertainOutcome
 from .packets import serialize_packet
 from .providers import ProviderRequest, ProviderUnavailable, call_typed
@@ -85,8 +85,13 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
                 or any(not isinstance(case_binding[k], str) or not re.fullmatch(r'[0-9a-f]{64}', case_binding[k])
                        for k in ('design_sha256', 'case_sha256', 'reference_sha256'))):
             raise ContractError('invalid direct case binding')
-    archive.record_context({'schema': 'qjig.direct-evaluation.v3' if case_binding is not None else 'qjig.direct-evaluation.v2',
-                            **({'case_binding': case_binding} if case_binding is not None else {}), 'request': request.to_dict(),
+    full_evidence = isinstance(search, FullEvidence)
+    if full_evidence and case_binding is None:
+        raise ContractError('full evidence requires a checked case binding')
+    schema = 'qjig.direct-evaluation.v4' if full_evidence else 'qjig.direct-evaluation.v3' if case_binding is not None else 'qjig.direct-evaluation.v2'
+    archive.record_context({'schema': schema,
+                            **({'case_binding': case_binding} if case_binding is not None else {}),
+                            **({'retrieval_mode': 'full_source_v1'} if full_evidence else {}), 'request': request.to_dict(),
                             'source_revisions': sorted(r.revision_id for r in search._revisions), 'applicability': context,
                             'want': search._want, 'max_bytes': search._max_bytes,
                             'followups': search._max_rounds - 1, 'expanded': search._expanded,
@@ -142,7 +147,7 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
                       expected_design_sha256: str, expected_case_sha256: str, ledger: BudgetLedger, transport,
                       archive: RunArchive, provider: str, model: str, max_tokens: int,
                       want: int, max_bytes: int, followups: int, expanded: bool = False,
-                      reservation_factory=None, max_price=None) -> dict:
+                      evidence_mode: str = 'retrieved', reservation_factory=None, max_price=None) -> dict:
     """Run one checked private case; reference data remains outside model input.
 
     Caller-supplied anchors and protected manifest are not authenticated here.
@@ -160,7 +165,14 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
     if not isinstance(ledger, BudgetLedger):
         raise ContractError('budget ledger required')
     manifest = [{'path': source.path, 'sha256': source.sha256} for source in prepared.sources]
-    search = DirectRetrieval(root, manifest, protected, want=want, max_bytes=max_bytes, followups=followups, expanded=expanded)
+    if evidence_mode == 'full':
+        if followups != 0 or expanded is not False:
+            raise ContractError('full evidence does not use retrieval followups or expansion')
+        search = FullEvidence(root, manifest, protected, want=want, max_bytes=max_bytes)
+    elif evidence_mode == 'retrieved':
+        search = DirectRetrieval(root, manifest, protected, want=want, max_bytes=max_bytes, followups=followups, expanded=expanded)
+    else:
+        raise ContractError('invalid direct evidence mode')
     request = Request(ledger._request_id, prepared.question, prepared.role, prepared.role_version, prepared.scope)
     binding = {'case_id': lock_copy['case_id'], 'design_sha256': expected_design_sha256,
                'case_sha256': expected_case_sha256, 'reference_sha256': lock_copy['reference_sha256']}

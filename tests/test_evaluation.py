@@ -818,3 +818,61 @@ def test_fresh_paired_report_keeps_request_deferrals_separate_from_conditional_g
     fabricated = [records[0], {**records[1], 'score':{**records[1]['score'],'request_answer':'yes'}}]
     with pytest.raises(ContractError):
         summarize_fresh_intervention_pairs(design,fabricated,expected_design_sha256=digest)
+
+
+def test_full_evidence_baseline_sends_every_source_or_refuses(tmp_path):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import load_isolated_sources, validate_evaluation_design
+    from qjig.evaluation_cases import case_lock_digest
+    from qjig.evaluation_direct import run_locked_direct
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.evaluation_scoring import make_reference, reference_digest, score_direct_archive
+    from qjig.indexing import make_entry_id
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    a,b,gold=b'Tests must pass.\n',b'An unrelated second file.\n',b'PRIVATE_REFERENCE_LABEL'
+    for p,v in [('a',a),('b',b),('label',gold)]: (tmp_path/p).write_bytes(v)
+    item=lambda p,v:{'path':p,'sha256':hashlib.sha256(v).hexdigest()}
+    sources,protected=[item('a',a),item('b',b)],[item('label',gold)]
+    design=_sample_design();design['families'][0]['source_hashes']=[x['sha256'] for x in sources];d=validate_evaluation_design(design)
+    ref=make_reference(case_id='dev',request=Request('hidden','Are tests required?','reviewer','1','project'),
+                       sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],historical_as_known=False,
+                       expected_answer='yes',provenance='authored_unvalidated',evidence=[{'path':'a','quote':'Tests must pass.'}])
+    lock={'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':d,'question':'Are tests required?',
+          'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
+          'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
+    from qjig.sources import SourceRevision,decode_source
+    rev=SourceRevision.create('a','evaluation_allowlist',decode_source(a,encoding='utf-8'))
+    eid=make_entry_id(rev.revision_id,'full_source','full_source_v1',0,len(rev.decoded.text))
+    response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'yes',
+                                         'citations':[{'entry_id':eid,'quote':'Tests must pass.'}]}),
+                         {'prompt_tokens':8,'completion_tokens':3,'cost_usd':0.01})
+    with Journal.open(tmp_path/'j.sqlite') as journal,RunArchive.open(tmp_path/'archive') as archive:
+        ledger=BudgetLedger(Budget(2,10000,1),journal,'opaque')
+        options=dict(expected_design_sha256=d,expected_case_sha256=case_lock_digest(lock),ledger=ledger,
+                     archive=archive,provider='stand-in',model='test',max_tokens=100,want=1,followups=0,evidence_mode='full')
+        transport=StandInTransport([response])
+        with pytest.raises(ContractError):
+            run_locked_direct(tmp_path,design,lock,ref,protected,transport=transport,max_bytes=100,**options)
+        assert transport.calls_made==0 and journal.events('opaque')==[] and archive.events()==[]
+        with pytest.raises(ContractError):
+            run_locked_direct(tmp_path,design,lock,ref,protected,transport=transport,max_bytes=3000,
+                              **{**options,'followups':1})
+        assert transport.calls_made==0 and journal.events('opaque')==[]
+        result=run_locked_direct(tmp_path,design,lock,ref,protected,transport=transport,max_bytes=3000,**options)
+        assert result['status']=='recorded_unvalidated' and result['searches'][0]['method']=='full_source_v1'
+        prompt=next(e['data']['prompt'] for e in archive.events() if e['kind']=='request')
+        payload=json.loads(prompt[prompt.index('{\"applicability\"'):])
+        texts=[item['text'] for packet in payload['packets'] for item in packet['items']]
+        assert a.decode() in texts and b.decode() in texts and gold.decode() not in prompt
+        report=verify_direct_archive(archive,journal);assert report['status']=='unanchored'
+        score=score_direct_archive(archive,journal,ref,expected_run_sha256=report['sha256'],expected_reference_sha256=reference_digest(ref))
+        assert score['classification']=='matches_reference'
+        event=next(e for e in archive.events() if e['kind']=='trace')
+        altered=event['data']; altered['packet']['items'][0]['text']='tampered'
+        archive._con.execute('DROP TRIGGER event_no_update')
+        archive._con.execute("UPDATE events SET data=? WHERE seq=?",(json.dumps(altered),event['seq']))
+        assert verify_direct_archive(archive,journal)['status']=='invalid'

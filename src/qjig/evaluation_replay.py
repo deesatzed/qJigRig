@@ -8,13 +8,25 @@ import re
 from dataclasses import asdict
 
 from .contracts import ContractError, Request
-from .evaluation import DirectRetrieval
+from .evaluation import DirectRetrieval, FullEvidence, _full_source_entries, _full_source_packet
 from .evaluation_direct import _prompt, _validator
 from .indexing import index_entries
 from .journal import Journal
 from .packets import serialize_packet
 from .providers import ProviderRequest
 from .run_archive import RunArchive
+
+
+def _rebuild_search(context, revisions):
+    full = context['schema'] == 'qjig.direct-evaluation.v4'
+    search = object.__new__(FullEvidence if full else DirectRetrieval)
+    search._revisions = tuple(revisions)
+    search._entries = _full_source_entries(revisions) if full else [entry for revision in revisions for entry in index_entries(revision)]
+    search._want, search._max_bytes = context['want'], context['max_bytes']
+    search._max_rounds, search._expanded, search._trace = 1 + context['followups'], context['expanded'], []
+    if full:
+        search._packet = _full_source_packet(search._entries, context['max_bytes'])
+    return search
 
 
 def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_digest: str | None = None) -> dict:
@@ -30,9 +42,9 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
         context, events = archive.context(), archive.events()
         keys = {'schema', 'request', 'source_revisions', 'applicability', 'want', 'max_bytes', 'followups',
                 'expanded', 'provider', 'model', 'max_tokens', 'max_price'}
-        if not isinstance(context, dict) or context.get('schema') not in ('qjig.direct-evaluation.v1', 'qjig.direct-evaluation.v2', 'qjig.direct-evaluation.v3'):
+        if not isinstance(context, dict) or context.get('schema') not in ('qjig.direct-evaluation.v1', 'qjig.direct-evaluation.v2', 'qjig.direct-evaluation.v3', 'qjig.direct-evaluation.v4'):
             raise ContractError('invalid direct context')
-        if context['schema'] == 'qjig.direct-evaluation.v3':
+        if context['schema'] in ('qjig.direct-evaluation.v3', 'qjig.direct-evaluation.v4'):
             keys.add('case_binding')
             binding = context.get('case_binding')
             if (not isinstance(binding, dict) or set(binding) != {'case_id', 'design_sha256', 'case_sha256', 'reference_sha256'}
@@ -40,6 +52,10 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
                     or any(not isinstance(binding[k], str) or not re.fullmatch(r'[0-9a-f]{64}', binding[k])
                            for k in ('design_sha256', 'case_sha256', 'reference_sha256'))):
                 raise ContractError('invalid case binding')
+        if context['schema'] == 'qjig.direct-evaluation.v4':
+            keys.add('retrieval_mode')
+            if context.get('retrieval_mode') != 'full_source_v1' or context.get('followups') != 0 or context.get('expanded') is not False:
+                raise ContractError('invalid full evidence mode')
         if set(context) != keys:
             raise ContractError('invalid direct context')
         request = Request.from_dict(context['request'])
@@ -73,11 +89,7 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
         expected_kinds = [kind for _ in call_ids for kind in ('trace', 'request', 'response', 'validation')] + ['run_result']
         if [e['kind'] for e in events] != expected_kinds or len(journal_events) != len(call_ids) * 2:
             raise ContractError('direct events missing or unexpected')
-        search = object.__new__(DirectRetrieval)
-        search._revisions = tuple(revisions)
-        search._entries = [entry for revision in revisions for entry in index_entries(revision)]
-        search._want, search._max_bytes = context['want'], context['max_bytes']
-        search._max_rounds, search._expanded, search._trace = 1 + context['followups'], context['expanded'], []
+        search = _rebuild_search(context, revisions)
         packets, query, value = [], request.question, None
         for step, call_id in enumerate(call_ids):
             trace, sent, response, validated = events[step * 4: step * 4 + 4]
@@ -143,11 +155,7 @@ def _verify_failure(context, events, journal_events, revisions, request, digest)
     if (not isinstance(calls, list) or len(calls) > 1 + context['followups'] or len(set(calls)) != len(calls)
             or len(journal_events) != len(calls) * 2):
         raise ContractError('invalid failed call set')
-    search = object.__new__(DirectRetrieval)
-    search._revisions = tuple(revisions)
-    search._entries = [entry for revision in revisions for entry in index_entries(revision)]
-    search._want, search._max_bytes = context['want'], context['max_bytes']
-    search._max_rounds, search._expanded, search._trace = 1 + context['followups'], context['expanded'], []
+    search = _rebuild_search(context, revisions)
     packets, query, cursor, terminal_failure = [], request.question, 0, None
     for step in range(1 + context['followups']):
         found = search.search(query)

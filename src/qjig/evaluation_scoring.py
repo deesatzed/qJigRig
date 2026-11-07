@@ -63,7 +63,7 @@ def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha2
         raise ContractError('direct run is not structurally verified')
     context = archive.context()
     request, applicability = context['request'], context['applicability']
-    if context.get('schema') == 'qjig.direct-evaluation.v3':
+    if context.get('schema') in ('qjig.direct-evaluation.v3', 'qjig.direct-evaluation.v4'):
         binding = context['case_binding']
         if binding['case_id'] != reference['case_id'] or binding['reference_sha256'] != ref_hash:
             raise ContractError('reference differs from recorded case binding')
@@ -72,7 +72,11 @@ def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha2
             or reference['source_revisions'] != context['source_revisions']):
         raise ContractError('reference differs from direct run context')
     revisions = {ident: archive.revision(ident) for ident in context['source_revisions']}
-    entries = {entry.entry_id: entry for revision in revisions.values() for entry in index_entries(revision)}
+    if context.get('schema') == 'qjig.direct-evaluation.v4':
+        from .evaluation import _full_source_entries
+        entries = {entry.entry_id: entry for entry in _full_source_entries(revisions.values())}
+    else:
+        entries = {entry.entry_id: entry for revision in revisions.values() for entry in index_entries(revision)}
     for requirement in reference['evidence']:
         if requirement['quote'] not in revisions[requirement['revision_id']].decoded.text:
             raise ContractError('reference quote not in source')

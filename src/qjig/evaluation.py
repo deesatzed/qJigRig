@@ -341,3 +341,44 @@ class DirectRetrieval:
                   'interpretation': 'candidates_not_validated' if candidates else 'no_hits_not_evidence_of_absence'}
         self._trace.append(record)
         return {**record, 'packet': packet}
+
+
+def _full_source_entries(revisions):
+    """Create deterministic, whole-text evidence entries for pinned revisions."""
+    from .indexing import IndexEntry, make_entry_id
+    from .spans import make_span
+    entries = []
+    for revision in sorted(revisions, key=lambda r: r.revision_id):
+        text = revision.decoded.text
+        if not text:
+            raise ContractError('empty source cannot be represented as a full-text span')
+        span = make_span(revision, 0, len(text))
+        ident = make_entry_id(revision.revision_id, 'full_source', 'full_source_v1', 0, len(text))
+        entries.append(IndexEntry(ident, revision.revision_id, span, 'full_source', None, 'full_source_v1', 'accepted'))
+    return entries
+
+
+def _full_source_packet(entries, max_bytes):
+    from .packets import build_packet
+    packet = build_packet(entries, max_bytes=max_bytes)
+    if packet.omitted or packet.truncated_entry_ids or len(packet.items) != len(entries):
+        raise ContractError('full source evidence exceeds packet budget')
+    return packet
+
+
+class FullEvidence(DirectRetrieval):
+    """Provide all declared source text in one packet or refuse before dispatch."""
+    def __init__(self, root, sources: list[dict], protected: list[dict], *, want: int, max_bytes: int):
+        super().__init__(root, sources, protected, want=want, max_bytes=max_bytes, followups=0, expanded=False)
+        self._entries = _full_source_entries(self._revisions)
+        self._packet = _full_source_packet(self._entries, max_bytes)
+
+    def search(self, query: str) -> dict:
+        if self._trace:
+            raise ContractError('full evidence has no search followup')
+        if not isinstance(query, str) or not query.strip() or len(query.encode('utf-8')) > 4096:
+            raise ContractError('invalid full evidence question')
+        record = {'round': 1, 'query': query, 'matches': len(self._entries), 'top_k_omitted': 0,
+                  'method': 'full_source_v1', 'interpretation': 'complete_source_text_supplied'}
+        self._trace.append(record)
+        return {**record, 'packet': self._packet}

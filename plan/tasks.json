@@ -1173,7 +1173,8 @@
       "id": "T066",
       "phase": "P6",
       "depends_on": [
-        "T065"
+        "T065",
+        "T066A"
       ],
       "status": "pending",
       "files": [
@@ -2857,6 +2858,27 @@
       "acceptance": "The paired conditional view retains request deferrals and never presents a conditional graph outcome as a completed request answer.",
       "command": "python -m pytest tests/test_evaluation.py::test_fresh_paired_report_keeps_request_deferrals_separate_from_conditional_graphs -q",
       "evidence": "Red: paired reporting could not consume fresh scores without turning graph outcomes into request decisions. Green: conditional-only pair view preserves both deferred request statuses, rejects fabricated or missing request answers, and keeps absent evidence unknown. Synthetic draft parent/intervention run produced one conditional match while both requests stayed deferred. Full offline 525 passed before final missing-field guard; focused guard passed. Assignment mappings, references, semantics and actual comparison remain unverified."
+    },
+    {
+      "id": "T066A",
+      "phase": "P6",
+      "depends_on": [
+        "T063C",
+        "T065C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation.py",
+        "src/qjig/evaluation_direct.py",
+        "src/qjig/evaluation_replay.py",
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_full_evidence_baseline_sends_every_source_or_refuses",
+      "action": "Provide a replayable direct full-source evidence baseline",
+      "acceptance": "The direct full-evidence arm supplies every pinned source text or refuses before provider dispatch when the bounded packet cannot fit.",
+      "command": "python -m pytest tests/test_evaluation.py::test_full_evidence_baseline_sends_every_source_or_refuses -q",
+      "evidence": "Red: no full-source direct baseline existed. Green: checked case sends every complete pinned source text in one bounded packet or refuses before dispatch if omitted/truncated; empty sources and retrieval followup are refused. V4 archives replay whole-source packets and source-bound quotations. Synthetic tests cover full text, protected markers, small budgets, replay and tampering; focused 39 and full offline 526 passed. No token bound, matched work, provider guarantee, hosted inference or actual comparison is established."
     }
   ]
 }
