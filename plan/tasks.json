@@ -1175,7 +1175,8 @@
       "phase": "P6",
       "depends_on": [
         "T065",
-        "T066A"
+        "T066A",
+        "T066B"
       ],
       "status": "pending",
       "files": [
@@ -3132,6 +3133,23 @@
       "acceptance": "The paired summary labels exact quote and answer agreement as mechanical reference matches and leaves semantic outcome support unknown.",
       "command": "python -m pytest tests/test_evaluation.py::test_holdout_comparison_keeps_deferrals_and_missing_pairs_unknown -q",
       "evidence": "Red: a paired holdout report called exact-quote coverage and reference-answer agreement supported outcomes, despite not assessing semantic support. Version 2 now labels them reference matches and mechanical match rates and leaves outcome_support unknown. Synthetic full, missing and deferred paired cases pass; focused evaluation/costs/replay 65 passed; full offline suite 542 passed. This repairs report semantics only: reference truth, independent accuracy and semantic support are not established, and no hosted comparison occurred."
+    },
+    {
+      "id": "T066B",
+      "phase": "evaluation",
+      "depends_on": [
+        "T063E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_catalog_retrieval_includes_mandatory_channels_and_excludes_scope",
+      "action": "Expose the qJig catalog retrieval mechanics for the retrieval-only arm",
+      "acceptance": "Use the real planning acquisition channels, verify source and applicability, retain omissions and enforce bounded followup without decomposition.",
+      "command": "python -m pytest tests/test_evaluation.py::test_catalog_retrieval_includes_mandatory_channels_and_excludes_scope -q",
+      "evidence": "Red: no non-decomposed adapter exposed qJig planning acquisition. The adapter now uses the existing primary, exception and contradiction channel selection with pinned revisions, recorded applicability/scope, role ordering, packet omissions and at most one followup. Synthetic tests cover required channels, scope exclusion, omitted channels, private-label isolation and followup limit. Focused evaluation/acquisition/retrieval/recovery 75 passed; full offline 543 passed. This is retrieval mechanics only: provider dispatch, refusing unsafe omissions, assignment binding, durable replay, scoring, matched work and hosted runs are not implemented for this arm."
     }
   ]
 }

@@ -1314,3 +1314,39 @@ def test_holdout_comparison_keeps_deferrals_and_missing_pairs_unknown():
     changed[1]['score']['reference_sha256']='0'*64
     with pytest.raises(ContractError):
         summarize_holdout_comparison(design,changed,expected_design_sha256=digest,baseline_arm='direct_retrieval',candidate_arm='combined')
+
+
+def test_catalog_retrieval_includes_mandatory_channels_and_excludes_scope(tmp_path):
+    from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
+    from qjig.evaluation import CatalogRetrieval
+    from qjig.sources import SourceRevision, decode_source
+    texts = {'primary':b'Deployment requires approval.',
+             'exception':b'Exception waiver allows deployment without approval.',
+             'conflict':b'Conflicting revision says deployment does not require approval.',
+             'other':b'Deployment approval exception is never required.'}
+    sources = []
+    revisions = {}
+    for name, raw in texts.items():
+        (tmp_path/name).write_bytes(raw)
+        sources.append({'path':name,'sha256':hashlib.sha256(raw).hexdigest()})
+        revisions[name] = SourceRevision.create(name,'evaluation_allowlist',decode_source(raw,encoding='utf-8'))
+    (tmp_path/'label').write_bytes(b'PRIVATE_REFERENCE_LABEL')
+    protected = [{'path':'label','sha256':hashlib.sha256(b'PRIVATE_REFERENCE_LABEL').hexdigest()}]
+    inputs = ApplicabilityInputs(Collection(tuple(MemberMetadata(r.revision_id,'other' if name=='other' else 'project',
+                                         Interval('2020-01-01',OPEN)) for name,r in revisions.items())),
+                                 frozenset(),'2026-11-07',False)
+    search = CatalogRetrieval(tmp_path,sources,protected,want=3,max_bytes=5000,followups=1,
+                              applicability_inputs=inputs,scope='project')
+    result = search.search('deployment approval')
+    texts_sent = [item.span.text for item in result['packet'].items]
+    assert any('Exception waiver' in text for text in texts_sent)
+    assert any('Conflicting revision' in text for text in texts_sent)
+    assert all('never required' not in text for text in texts_sent)
+    assert result['method']=='qjig_catalog_v1' and result['channels']['channel_hits']['exception'] > 0
+    assert any(item['reason']=='inapplicable' for item in result['channels']['excluded'])
+    assert all('PRIVATE_REFERENCE_LABEL' not in text for text in texts_sent)
+    restricted = CatalogRetrieval(tmp_path,sources,protected,want=1,max_bytes=5000,followups=0,
+                                  applicability_inputs=inputs,scope='project').search('deployment approval')
+    assert restricted['channels']['channel_omitted']
+    search.search('waiver')
+    with pytest.raises(ContractError): search.search('third query')

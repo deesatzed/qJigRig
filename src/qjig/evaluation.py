@@ -460,3 +460,54 @@ class FullEvidence(DirectRetrieval):
                   'method': 'full_source_v1', 'interpretation': 'complete_source_text_supplied'}
         self._trace.append(record)
         return {**record, 'packet': self._packet}
+
+
+class CatalogRetrieval(DirectRetrieval):
+    """Expose qJig's planning acquisition for a non-decomposed question.
+
+    Applicability is caller-supplied metadata, and missing channel hits never
+    establish the absence of an exception. This class does not call a model.
+    """
+    def __init__(self, root, sources: list[dict], protected: list[dict], *, want: int,
+                 max_bytes: int, followups: int, applicability_inputs, scope: str, role_priors=None):
+        from .applicability import ApplicabilityInputs
+        from .acquisition import _check_role_priors
+        if not isinstance(applicability_inputs, ApplicabilityInputs) or not isinstance(scope, str) or not scope.strip():
+            raise ContractError('recorded applicability and scope required')
+        priors = {} if role_priors is None else role_priors
+        _check_role_priors(priors)
+        super().__init__(root, sources, protected, want=want, max_bytes=max_bytes, followups=followups, expanded=True)
+        self._inputs = ApplicabilityInputs.from_dict(applicability_inputs.to_dict())
+        if {m.revision_id for m in self._inputs.collection.members} != {r.revision_id for r in self._revisions}:
+            raise ContractError('catalog applicability source set differs')
+        self._scope, self._role_priors = scope, dict(priors)
+
+    def search(self, query: str) -> dict:
+        import json
+        from .acquisition import _planning_packet
+        from .applicability import combine_applicability, scope_applicability
+        from .packets import EvidencePacket, Omission, PacketItem
+        from .spans import Span
+        from .store import Catalog
+        if len(self._trace) >= self._max_rounds:
+            raise ContractError('catalog retrieval round limit reached')
+        if not isinstance(query, str) or not query.strip() or len(query.encode('utf-8')) > 4096:
+            raise ContractError('invalid catalog retrieval query')
+        def applicability(revision_id):
+            member = self._inputs.collection.member(revision_id)
+            return combine_applicability(self._inputs.verdict(revision_id), scope_applicability(self._scope,member.scope))
+        with Catalog.open(':memory:') as catalog:
+            for revision in self._revisions:
+                catalog.add_revision(revision)
+            evidence = _planning_packet(catalog,self._entries,query,applicability,want=self._want,
+                                        max_bytes=self._max_bytes,role_priors=self._role_priors)
+        raw = evidence.pop('packet')
+        items = tuple(PacketItem(i['entry_id'],Span(i['revision_id'],i['text_sha256'],i['start'],i['end'],i['text']),
+                                 i['truncated'],i['original_end']) for i in raw['items'])
+        omitted = tuple(Omission(i['entry_id'],i['reason']) for i in raw['omitted'])
+        size = len(json.dumps(raw,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode('utf-8'))
+        packet = EvidencePacket(items,omitted,tuple(i.entry_id for i in items if i.truncated),raw['limit'],size)
+        record = {'round':len(self._trace)+1,'query':query,'matches':evidence['channel_hits']['primary'],
+                  'method':'qjig_catalog_v1','interpretation':'untrusted_incomplete','channels':evidence}
+        self._trace.append(record)
+        return {**record,'packet':packet}
