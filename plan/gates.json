@@ -1,0 +1,886 @@
+{
+  "schema": "qjig.gate-inventory.v1",
+  "goal_sha256": "06b304728a2dd9f465a4089d0e79d9f4d505a302db5d6d62f5b5cd54f491a905",
+  "queue_sha256": "c1415c7850f8b55c9615e8321d6f3470dbfdfd1b94d53e06a00e013fa953fce4",
+  "gates": [
+    {
+      "id": "F01",
+      "status": "unverified",
+      "task_ids": [
+        "R01",
+        "R01B"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F02",
+      "status": "unverified",
+      "task_ids": [
+        "R02"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F03",
+      "status": "unverified",
+      "task_ids": [
+        "R03",
+        "R03A",
+        "R03B"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F04",
+      "status": "unverified",
+      "task_ids": [
+        "R04",
+        "R04A",
+        "R04B",
+        "R04C"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F05",
+      "status": "unverified",
+      "task_ids": [
+        "R05",
+        "R05A",
+        "R05B"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F06",
+      "status": "unverified",
+      "task_ids": [
+        "R06"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F07",
+      "status": "unverified",
+      "task_ids": [
+        "R07",
+        "R07A",
+        "R07B",
+        "R07C",
+        "R07D",
+        "R07E",
+        "R07F",
+        "R07G",
+        "R07H",
+        "R07I",
+        "R07J",
+        "R07K"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F08",
+      "status": "unverified",
+      "task_ids": [
+        "R08",
+        "R08A",
+        "R08B",
+        "R08C",
+        "R08D",
+        "R08E",
+        "R08F",
+        "R08G",
+        "R08H",
+        "R08I",
+        "R08J",
+        "R08K",
+        "R08L",
+        "R08M",
+        "R08N",
+        "R08O",
+        "R08P"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F09",
+      "status": "unverified",
+      "task_ids": [
+        "R09"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "R01",
+      "status": "unverified",
+      "task_ids": [
+        "R01"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_finalize.py::test_unreviewed_origins_defer -q",
+      "queue_evidence_assertion": "Red: test_unreviewed_origins_defer failed twice, returning decided for fresh and reused. Green: finalization/CLI/fresh regressions 11 passed; full suite 239 passed. Exact review/reuse binding remains R01B and T057; fresh coverage remains unestablished."
+    },
+    {
+      "id": "R01B",
+      "status": "unverified",
+      "task_ids": [
+        "R01B"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_program_review.py::test_review_binding_invalidated_by_change -q",
+      "queue_evidence_assertion": ""
+    },
+    {
+      "id": "R02",
+      "status": "unverified",
+      "task_ids": [
+        "R02"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_providers.py::test_redirect_never_forwards_authorization -q",
+      "queue_evidence_assertion": "Redirect red: 301/302/303 followed to second localhost server; 307/308 did not. Endpoint red: 5 unsafe URLs reached injected HTTP. Secret-path red: timeout and unexpected exceptions exposed dummy secret. Green: provider and journal regressions 26 passed; full offline suite 253 passed. Dummy credentials and local/fake HTTP only. Unexpected post-dispatch errors remain uncertain and require reconciliation."
+    },
+    {
+      "id": "R03",
+      "status": "unverified",
+      "task_ids": [
+        "R03"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_retrieval.py::test_recorded_live_query_variants -q",
+      "queue_evidence_assertion": ""
+    },
+    {
+      "id": "R03A",
+      "status": "unverified",
+      "task_ids": [
+        "R03A"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_retrieval.py::test_recorded_live_query_variants -q",
+      "queue_evidence_assertion": "Red: versioned expanded retrieval absent. Green: all three no_retrieval_hit questions are read from the saved live receipt; unchanged BM25 returns zero, controlled expansion retrieves relevant synthetic candidates, and an irrelevant exception passage is also retrieved. Retrieval/recovery/packet tests 18 passed; full suite 324 passed. Expansion is not integrated into fresh acquisition; R03 remains pending."
+    },
+    {
+      "id": "R03B",
+      "status": "unverified",
+      "task_ids": [
+        "R03B"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_recorded_zero_hit_reaches_fresh_judge -q",
+      "queue_evidence_assertion": "Red: first saved zero-hit predicate made only the planner call. Green: all three saved zero-hit questions reach the stand-in judge with verified spans and expanded-method trace; authored CLI trace retains baseline method. Focused CLI/fresh/retrieval 27 passed before expanding the parametrized cases; full suite 327 passed. Full R03 and live comparison remain pending."
+    },
+    {
+      "id": "R04",
+      "status": "unverified",
+      "task_ids": [
+        "R04"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_exception_channel_reaches_relevant_judge -q",
+      "queue_evidence_assertion": ""
+    },
+    {
+      "id": "R04A",
+      "status": "unverified",
+      "task_ids": [
+        "R04A"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_exception_channel_reaches_relevant_judge -q",
+      "queue_evidence_assertion": "Red: an exception passage without primary-query overlap did not reach the stand-in judge. Green: primary/exception/contradiction channels select verified applicable spans; role-zero exception still reaches judging; shared candidate deduplicated; excluded, missing, omitted and truncated paths remain distinct and omission defers; invalid priors refuse before call. Full offline suite 335 passed. Channel searches are lexical and do not prove completeness; durable trace export and live assessment remain open under R04."
+    },
+    {
+      "id": "R04B",
+      "status": "unverified",
+      "task_ids": [
+        "R04B"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_scope_mismatch_never_reaches_planner -q",
+      "queue_evidence_assertion": "Red: wrong-scope and missing-scope synthetic passages reached fresh planner despite callback MATCH. Green: exact non-empty catalog scope is combined with entity/date applicability before planner/judge acquisition; mismatch is no_match, missing scope unknown. Archive records separate scope verdicts; replay detects altered scope even with a rewritten context hash. Focused fresh/replay/CLI/service 48 passed; full offline suite 361 passed. Scope metadata is recorded provenance, not authenticated authority; full R04 remains pending."
+    },
+    {
+      "id": "R04C",
+      "status": "unverified",
+      "task_ids": [
+        "R04C"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_targeted_retrieval_followup -q",
+      "queue_evidence_assertion": "Red: a no-hit fresh predicate stopped without followup. Green: one versioned original-question followup is allowed only after no_retrieval_hit; earlier trace retained and unknown, conflict, provider failure do not cause a retry. Fresh focused 31 passed; full offline suite 442 passed; repository verifier 119 tasks. This lexical fallback is not semantic relevance proof, fresh coverage remains unestablished, and full R04/live comparison remain pending."
+    },
+    {
+      "id": "R05",
+      "status": "unverified",
+      "task_ids": [
+        "R05"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_assurance.py::test_exception_can_enable_answer -q",
+      "queue_evidence_assertion": ""
+    },
+    {
+      "id": "R05A",
+      "status": "unverified",
+      "task_ids": [
+        "R05A"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_assurance.py::test_saved_expression_fails_enabling_exception_control -q",
+      "queue_evidence_assertion": "Red: no authored counterexample checker existed. Green: saved second-run expression evaluates FALSE under an explicitly hypothetical enabling assignment expected TRUE; separate authored enabling, restricting, missing and conflict controls distinguish matched, contradicted and inconclusive outcomes. Focused assurance/logic/plans 56 passed; full suite 339 passed. Attribution is authored and independent=false; source-grounded planning and contamination attacks remain under R05/T050."
+    },
+    {
+      "id": "R05B",
+      "status": "unverified",
+      "task_ids": [
+        "R05B"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_planner_receives_bounded_verified_applicable_sources -q",
+      "queue_evidence_assertion": "Red: planner prompt contained only question and corpus hash. Green: stand-in planning receives bounded verified applicable primary/exception/contradiction candidates, records exclusions/channel omissions/truncation, labels source text untrusted, binds packet content into prompt hash, and remains deferred. Tests include applicable instruction contamination and inapplicable exclusion; no model resistance inferred. Full offline suite 343 passed. R05 and T050 retain semantic evaluation and live comparison requirements."
+    },
+    {
+      "id": "R06",
+      "status": "unverified",
+      "task_ids": [
+        "R06"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_operational_failures_return_partial_deferral -q",
+      "queue_evidence_assertion": "Red: zero-budget planner raised BudgetExceeded rather than partial result. Green: stand-in tests cover zero budget, unavailable planner, uncertain planner, uncertain first and second judge sides, retained positive quote, no further calls and pending reconciliation. Focused fresh/judge/planner/journal 29 passed; offline suite 255 passed. Journal remains source of attempted-call records."
+    },
+    {
+      "id": "R07",
+      "status": "unverified",
+      "task_ids": [
+        "R07"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_smoke_receipts.py::test_interrupted_run_retains_receipts -q",
+      "queue_evidence_assertion": ""
+    },
+    {
+      "id": "R07A",
+      "status": "unverified",
+      "task_ids": [
+        "R07A"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_run_archive.py::test_interrupted_run_retains_inputs_and_responses -q",
+      "queue_evidence_assertion": "Red: run archive module absent. Green: 3 tests cover source snapshots, reconstructable synthetic requests and raw responses across simulated interruption and child os._exit, immutable source identities and orphan response refusal; full suite 307 passed. Offline only; R07 retains full provider integration, sanitization, metadata and replay work."
+    },
+    {
+      "id": "R07B",
+      "status": "unverified",
+      "task_ids": [
+        "R07B"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_run_archive.py::test_typed_call_archives_before_dispatch -q",
+      "queue_evidence_assertion": "Red: typed call and run_fresh lacked archive argument. Green: synthetic request recorded before dispatch, raw response and validated results recorded, malformed and timeout paths retained, post-dispatch archive failure leaves uncertain journal intent, three-call fresh pipeline archived; full offline suite 311 passed. Live harness, source/config snapshots, complete transport metadata, sanitization and replay remain R07."
+    },
+    {
+      "id": "R07C",
+      "status": "unverified",
+      "task_ids": [
+        "R07C"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_run_archive.py::test_archive_preserves_multiple_source_revisions -q",
+      "queue_evidence_assertion": "Red: archive had no revision API and fresh run did not snapshot revisions. Green: distinct revisions of one source retain bytes and encoding across reopen, forged identity is rejected, and stand-in transport confirms source is archived before dispatch. Full offline suite 313 passed. R07 still requires configuration, applicability, sanitization, metadata, replay and live-harness integration."
+    },
+    {
+      "id": "R07D",
+      "status": "unverified",
+      "task_ids": [
+        "R07D"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_archive_binds_request_configuration_and_applicability -q",
+      "queue_evidence_assertion": "Red: fresh run did not retain request/configuration/applicability context. Green: context is immutable, retained across reopen and available before synthetic provider dispatch; per-revision applicability is bound once and used throughout the run. Full offline suite 316 passed. Applicability records verdicts only, not underlying date/entity provenance; R07 remains open."
+    },
+    {
+      "id": "R07E",
+      "status": "unverified",
+      "task_ids": [
+        "R07E"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_archive_retains_applicability_inputs -q",
+      "queue_evidence_assertion": "Red: no reconstructable applicability input record existed. Green: synthetic fresh archive records entities, as-of date, historical mode, effective/observation dates, scope and authority; records round-trip and conflicting verdicts refuse before dispatch. Full offline suite 319 passed. Explicit inputs remain optional for compatibility; legacy verdict-only archives and scope/authority assurance stay labeled; R07 remains pending."
+    },
+    {
+      "id": "R07F",
+      "status": "unverified",
+      "task_ids": [
+        "R07F"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_providers.py::test_response_metadata_is_retained_without_credentials -q",
+      "queue_evidence_assertion": "Red: RawResponse had no metadata. Green: fake HTTP captures response id, model, provider, finish reason, including no-content output; escaped dummy credential is redacted from content, errors and metadata. Full offline suite 322 passed. The JSON id is labeled response_id, not asserted to be an HTTP request id; full R07 and live tests remain pending."
+    },
+    {
+      "id": "R07G",
+      "status": "unverified",
+      "task_ids": [
+        "R07G"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_trace_is_durable_before_next_predicate -q",
+      "queue_evidence_assertion": "Red: earlier predicate trace was absent when the next judge call began. Green: each synthetic acquisition trace, including source spans, channel status, exclusions and observation, is persisted before the next predicate; simulated interruption preserves the first trace and a pending later intent. Focused fresh/acquisition/archive suite 42 passed; full suite 337 passed. Integrity verification and full replay remain pending."
+    },
+    {
+      "id": "R07H",
+      "status": "unverified",
+      "task_ids": [
+        "R07H"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_replay.py::test_archive_replay_detects_changed_evidence_without_inference -q",
+      "queue_evidence_assertion": "Red: no archive replay existed and missing final result was accepted as unanchored complete. Green: synthetic replay checks bound source identities and spans, context/applicability inputs, planner request, response hashes, validated plan and final trace/result binding; missing records remain incomplete, an external digest detects changes, and monkeypatched transport confirms no inference. Full offline suite 349 passed. Judge semantics, journal reconciliation, full cross-store/resource replay and authenticity remain pending under T051/R07."
+    },
+    {
+      "id": "R07I",
+      "status": "unverified",
+      "task_ids": [
+        "R07I"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_replay.py::test_replay_validates_fresh_retrieval_followup -q",
+      "queue_evidence_assertion": "Red: replay accepted a changed followup query. Green: synthetic two-round archive reopens and verifies; replay checks policy, query, round sequence and no-hit predecessor, rejecting a changed followup or invalid predecessor. Focused 56 passed before a fixture-only extension; full offline suite 443 passed after correcting the test fixture trigger. This checks recorded trace consistency, not retrieval completeness, source authenticity or model semantics; full R07/T051 remain open."
+    },
+    {
+      "id": "R07J",
+      "status": "unverified",
+      "task_ids": [
+        "R07J"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_configured_fresh_run_records_separate_review -q",
+      "queue_evidence_assertion": "Red: a synthetic reviewed fresh archive replayed as incomplete due unsupported review stage. Green: archive retains the review record; offline replay binds reviewer settings and prompt, validated response, review result, plan, source/applicability context and final review ID. Rehashed altered result is rejected against response; replay test prohibits inference. Focused 22 passed; full offline 464 passed. This is structural consistency, not authenticated provenance, source completeness or semantic quality; full R07/T051 and hosted replay remain open."
+    },
+    {
+      "id": "R07K",
+      "status": "unverified",
+      "task_ids": [
+        "R07K"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_pipeline.py::test_planner_failure_is_archived_with_attempt_and_reconciliation_state -q",
+      "queue_evidence_assertion": "Red: early planner failures left no terminal run summary. Green: malformed, unavailable, timeout and budget paths archive failure type, attempted call IDs and pending-reconciliation status; replay treats them as incomplete, rejects changed classification, and restart retains the records. Focused 19 and full offline 519 passed. Replay does not authenticate the journal or verify unattempted budget policy; early preflight and other crash boundaries remain open."
+    },
+    {
+      "id": "R08",
+      "status": "unverified",
+      "task_ids": [
+        "R08"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_budgets.py::test_full_input_output_reservation -q",
+      "queue_evidence_assertion": "Partial: restart test exposed partial known usage reported as complete totals. Goal ledger now reports each incomplete total as unknown and separately labels known subtotals. Focused ledger/budget/fresh suite 72 passed; full offline suite 363 passed. R08 remains pending: verified complete-input bounds, durable mandatory work reservations, pricing and full hosted enforcement are not established; hosted typed calls remain refused. Further partial: atomic named required-work reservations survive restarts and block unrelated spending; named consumption reaches journaled typed stand-in calls. Concurrent plans and invalid batches are tested. Focused 100 passed; full suite 367 passed. Work IDs are caller assertions, not authenticated prompt/stage bindings; full run-set allocation and paid preflight remain pending. Required allocations now also bind stage/provider/model, rejecting mismatches before intent and preserving legacy unbound allocations without allowing consumption. Full suite 369 passed. Prompt-level binding, frozen assignment set, validated token/pricing bounds and hosted enforcement remain open. Atomic frozen run-set reservation now spans requests/partitions; restart, overbooking, failed batch rollback and allocation mismatch at consumption are tested. Focused 104 passed; full 371 passed. Declared assignments, token/cost bounds and database authenticity remain unverified; no actual complete experiment preflight or hosted enforcement. Synthetic HTTP-error usage is retained through adapter, journal and goal ledger; focused 105 passed, full suite 373 passed. R08 and live authorization remain open. Crash receipt recovery now refuses mismatched journal reservation bounds and terminal identity, keeping usage unknown. Full suite 375 passed. Cross-store authenticity and general audit remain open. Added read-only quiescent goal/journal accounting comparison; synthetic orphan, duplicate, mismatch and malformed identity cases exercised. Full suite 379 passed. This is not atomic across stores or proof of missing external calls, and live verifier and paid preflight remain open. Goal-budgeted dispatch now refuses incomplete/invalid cross-store accounting before reservation or call; synthetic mismatch and malformed intent tests plus full suite 381 passed. Audit requires quiescence and does not authenticate the stores; verified input/pricing bounds and hosted enforcement remain open. Individual input and output overrun checks now invalidate cross-store accounting even when combined tokens fit; further dispatch is refused. Synthetic focused 98 passed; full offline suite 425 passed. Complete hosted preflight remains unverified and disabled. Optional provider prompt/completion routing ceilings are now immutable request-hash inputs, sent in fake HTTP and archived for replay; altered ceilings fail replay. Full offline suite 433 passed. Fresh-run integration, verified ceiling-to-cost reservation, complete input bounds and hosted enforcement remain open. Capped reservations now add the request ceiling token charge to snapshot cost using upward-rounded decimal arithmetic; red case exposed an underestimated reservation. Focused 110 passed; full suite 434 passed. This does not verify routing enforcement, additional endpoint charges, input bounds or hosted preflight. Fresh stand-in runs now pass separate frozen planner/judge price ceilings into their requests and archive configuration; replay checks them even after rehashing a changed request. Full suite 435 passed. Capped standalone escalation, complete input and all-category price bounds and hosted enforcement remain open. Capped standalone judgments can now be verified from journaled request ceilings before a separately capped synthetic escalation; altered standalone ceiling is refused before dispatch. Full offline suite 437 passed. Live enforcement, complete input and all-category cost bounds remain open. Typed dispatch now rejects a fabricated reservation below capped input/output token charges before journaling or transport; focused 128 and full offline 438 passed. It does not prove input bounds, catalog/endpoint extra charges, provider enforcement or hosted authorization. Red: decimal rounding silently admitted reservations above the goal cost cap. Goal/partition/request sums now accumulate with high precision and upward rounding; tiny and subnormal over-cap batches are rejected atomically. Focused 102 passed before parameter extension; full offline suite 445 passed. This is arithmetic enforcement, not proof of complete price or token bounds. Conservative 25-slot fresh allocation builder now enumerates planner and each possible paired-judge round from explicit caps and asserted bounds; synthetic pipeline consumed three frozen slots, and an insufficient aggregate reservation rolled back atomically. Full offline suite 447 passed. This omits retries/review/escalation, does not bind a complete experiment or authenticate prices/input bounds, and does not authorize hosted dispatch. Added persisted fresh-slot selection against an existing verified run set; synthetic execution uses it and restart skips consumed slots, while mismatched stage/model/bounds refuse. Reservation consumption remains atomic. Focused 41 passed; full offline 448 passed. Complete experiment, trusted price/input bounds and hosted dispatch remain open. Versioned v2 fresh-slot identities bind declared input/output bounds, routing ceilings and pricing snapshot; the fresh helper rejects changed cheaper settings. Focused 76 passed and full offline 449 passed. Generic ledger reservation does not independently enforce this fresh-specific binding; live dispatch remains disabled and complete input/pricing proof remains open. Version 3 fresh slots persist a configuration digest in the frozen manifest and required-work row; ledger consumption requires it, typed dispatch recomputes it, and cross-store audit/recovery compare it. Synthetic bypass and forged-request tests pass; focused 104 and full offline 451 passed. The digest does not authenticate in-process callers or prove pricing/input bounds; hosted dispatch remains disabled. Fresh allocations can now include a separately bound review slot. For goal-budgeted configured review, the run checks an intact unconsumed bound review slot before its first call; a missing slot defers without dispatch, and a synthetic run consumes the slot and passes accounting audit. Focused 52 passed before final checks; full offline 467 passed. Complete planner/judge/experiment preflight, trusted token/price bounds and hosted enforcement remain open. Configured goal-budgeted review runs now verify the full planner and bounded paired-judge slot set plus review belong to one intact frozen set before dispatch; strict check can also be requested without review. Missing or split slots defer with zero calls. Focused 54 passed; full offline 469 passed. Bounds remain caller assertions and retries/escalation, complete experiment, pricing/token provenance and hosted enforcement remain open."
+    },
+    {
+      "id": "R08A",
+      "status": "unverified",
+      "task_ids": [
+        "R08A"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_providers.py::test_direct_openrouter_send_cannot_bypass_preflight -q",
+      "queue_evidence_assertion": "Red: public direct adapter send reached injected HTTP despite missing complete preflight. Green: public send refuses before credential access and injected HTTP; fake-only adapter mechanics remain separately tested. Focused provider suite 35 passed; full offline suite 487 passed. The internal unchecked helper and arbitrary Python/network access are not sandboxed. Full R08 and actual hosted preflight remain open."
+    },
+    {
+      "id": "R08B",
+      "status": "unverified",
+      "task_ids": [
+        "R08B"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_fresh_preflight.py::test_direct_preflight_requires_all_possible_slots_before_dispatch -q",
+      "queue_evidence_assertion": "Red: goal-budgeted direct runs had no complete initial/followup allocation. Green: declared bounds build configuration-bound slots; direct preflight requires both in one frozen set before dispatch. Synthetic missing/split set tests make zero calls; complete two-call case consumes slots and passes journal audit; changed routing ceiling rejects. Focused 66 passed before final ceiling case, final focused passed; full offline 509 passed. Caller bounds, provider price enforcement, retries, complete experiment and hosted authorization remain unverified."
+    },
+    {
+      "id": "R08C",
+      "status": "unverified",
+      "task_ids": [
+        "R08C"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_complete_evaluation_reservation_is_atomic_and_restart_safe -q",
+      "queue_evidence_assertion": "Red: goal ledger could reserve an incomplete experiment without binding case/arm/repeat coverage. Green: declared plan validates full denominator and stage counts, binds case hashes and unique request/work identities, and persists plan plus physical slots atomically; changed plans, missing assignments, partial capacity and ledger corruption reject. Synthetic 105-assignment draft reservation reopened successfully. Focused 79 before final trigger check and 39 after; full offline 528 passed. Stage templates, case hashes, prices, token bounds and provider enforcement remain caller assertions; real full-run preflight and hosted authorization remain open."
+    },
+    {
+      "id": "R08D",
+      "status": "unverified",
+      "task_ids": [
+        "R08D"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_goal_budgeted_case_requires_matching_reserved_assignment -q",
+      "queue_evidence_assertion": "Red: a checked goal-budgeted direct case executed without any assignment binding. Green: direct and combined fresh wrappers check the persisted plan digest, case, arm, repeat, request and partition before execution and require their actual reserved stages to use that plan set. Synthetic direct success and missing/wrong binding refusals pass; a fresh missing-binding refusal passes. Direct replay validates the private assignment; fresh replay validates optional assignment structure. Focused evaluation/acquisition/replay 60 passed; full offline suite 529 passed. The fresh success path has not been exercised with a complete reserved plan. Stage templates, prices, input bounds and caller-supplied plan digest remain assertions, and hosted transport remains gated. Subsequent integration test exercised a fully reserved combined assignment through synthetic planner and paired judges, replay, scoring and ledger audit: focused 84 passed, full offline 530 passed. Other arms used placeholder slots; bounds and costs were synthetic."
+    },
+    {
+      "id": "R08E",
+      "status": "unverified",
+      "task_ids": [
+        "R08E"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_pricing.py::test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse -q",
+      "queue_evidence_assertion": "Red: synthetic current-shape endpoint pricing with numeric zero discount was rejected as an unknown category. Zero is now accepted without price reduction; nonzero, malformed discounts and unrecognized charges still refuse. Focused pricing/goal/evaluation suite 89 passed; full offline suite 540 passed. Public endpoint catalog read found configured model IDs and discount metadata; availability, token bounds, provider enforcement and complete billing remain unverified and hosted dispatch stays disabled."
+    },
+    {
+      "id": "R08F",
+      "status": "unverified",
+      "task_ids": [
+        "R08F"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_enumerates_real_arm_work_before_reservation -q",
+      "queue_evidence_assertion": "Red: complete evaluation plans accepted caller-provided placeholder stages but had no builder for the five actual arm templates. The builder now generates opaque deterministic assignment IDs and physical direct, bounded-followup, planner, paired-judge and mandatory review slots for every case/arm/repeat; insufficient capacity rolls back atomically. Focused evaluation/fresh-preflight/goal suite 98 passed; full offline suite 548 passed. The local draft produced 105 assignments and 1197 synthetic slots in .local/verification/factorial-allocation-synthetic-ar472ibq. This uses synthetic prices and input bounds; decomposition reserves extra judge rounds, smoke/acceptance and escalation are separate, and actual hosted preflight remains unverified."
+    },
+    {
+      "id": "R08G",
+      "status": "unverified",
+      "task_ids": [
+        "R08G"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_providers.py::test_real_adapter_smoke_contract -q",
+      "queue_evidence_assertion": "Red: the fake-HTTP OpenRouter adapter omitted the documented usage.include request. The adapter now requests usage details; missing cost remains unknown and the public hosted gate remains closed. Focused provider/pricing/goal suite 79 passed; full offline suite 555 passed. Documentation: https://openrouter.ai/support/ . No live request occurred; response availability, complete provider input/cost bounds, and archived wire-configuration binding remain unverified."
+    },
+    {
+      "id": "R08H",
+      "status": "unverified",
+      "task_ids": [
+        "R08H"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_account_limits.py::test_account_ceiling_uses_strictest_remaining_limit_without_claiming_authorization -q",
+      "queue_evidence_assertion": "Red: no parser derived a conservative account credit ceiling from current-key and credits responses. The parser now chooses the lowest goal, finite key and remaining-credit cap, rejects missing/nonfinite/malformed values, does not treat excluded BYOK as bounded, and never authorizes hosted work. A second red test exposed upward decimal rounding near a cap; bounded high-precision floor arithmetic now preserves the lower value. Authenticated read-only no-redirect key/credits checks succeeded; the key excludes BYOK from its limit. Sanitized ignored receipt: .local/verification/account-constraints-d20599ib.json. Focused account/goal/provider 76 passed; full offline 558 passed. This snapshot can drift, is not yet wired into the persisted GoalBudget policy, does not verify account-side enforcement or complete token/billing bounds, and made no model call."
+    },
+    {
+      "id": "R08I",
+      "status": "unverified",
+      "task_ids": [
+        "R08I"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_providers.py::test_openrouter_unverified_billing_route_keeps_total_cost_unknown -q",
+      "queue_evidence_assertion": "Red: BYOK, absent and malformed flags all incorrectly turned a reported zero fee into known total cost. The usage parser now preserves the fee and explicit route while treating total cost as unknown unless is_byok is explicitly false; a synthetic journal and persistent goal-budget check confirms unknown spend stops the next call. Provider usage documentation: https://openrouter.ai/blog/announcements/gif-prompts-omni-search-tool-caching-and-byok-flags/ . No hosted model call occurred. The configured account key is not a management key, so BYOK configuration cannot be established via the management-only listing API. This post-call signal cannot establish pre-dispatch spend bounds and hosted dispatch remains gated."
+    },
+    {
+      "id": "R08J",
+      "status": "unverified",
+      "task_ids": [
+        "R08J"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_goal_budget.py::test_account_snapshot_binds_persistent_policy_without_authorizing_calls -q",
+      "queue_evidence_assertion": "Red: GoalBudget could not bind an account snapshot. The ledger now rejects a goal above the observed credit ceiling before creating its database, persists only sanitized derived constraints in the same transaction as the immutable policy, and rejects changed or omitted binding on reopen. Restart preserves actual usage. A caller-supplied snapshot can drift, excluded BYOK remains unknown, and this binding does not itself authorize hosted dispatch; refresh and complete pre-dispatch bounds remain open."
+    },
+    {
+      "id": "R08K",
+      "status": "unverified",
+      "task_ids": [
+        "R08K"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_goal_budget.py::test_refresh_restricts_remaining_account_budget_without_reset -q",
+      "queue_evidence_assertion": "Red: account-bound ledger lacked a refresh mechanism. A quiescent baseline and caller-supplied subsequent snapshot now yield a persisted non-increasing ceiling of known prior goal spend plus observed remaining account credit; ledger changes invalidate the baseline. Tests cover restart, higher subsequent observations, unknown pending usage, unbound policies and preallocated required work. Snapshot order, authenticity and freshness remain caller responsibilities; concurrent external spend and BYOK billing are unverified. This does not authorize hosted dispatch."
+    },
+    {
+      "id": "R08L",
+      "status": "unverified",
+      "task_ids": [
+        "R08L"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_account_limits.py::test_account_refresh_fetches_after_baseline_and_keeps_only_constraints -q",
+      "queue_evidence_assertion": "Red: no account refresh client existed. The client acquires a ledger baseline, reads the two fixed HTTPS endpoints with bounded responses and no redirects, validates both responses and applies the existing transactional restriction. Synthetic tests cover successful restriction, invalid and redirect failures, private-field exclusion, ledger changes during fetch, and a real local HTTP redirect. Tests use no provider network or model calls. Account data is not atomic across endpoints and may drift; BYOK costs and full pre-dispatch bounds remain unknown, and hosted dispatch stays gated."
+    },
+    {
+      "id": "R08M",
+      "status": "unverified",
+      "task_ids": [
+        "R08M"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_account_limits.py::test_initial_account_snapshot_is_sanitized_and_can_bind_goal -q",
+      "queue_evidence_assertion": "Red: no reusable initial account snapshot acquisition existed. The client now returns only validated key/credit fields and can initialize the goal ledger; refresh reuses the same acquisition after its baseline. Synthetic tests confirm account labels and credentials are excluded. Provider observations can drift and cannot authorize hosted dispatch; BYOK and complete token/cost bounds remain open."
+    },
+    {
+      "id": "R08N",
+      "status": "unverified",
+      "task_ids": [
+        "R08N"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_goal_budget.py::test_resume_account_bound_policy_from_persisted_constraints -q",
+      "queue_evidence_assertion": "Red: account-bound policy required the original snapshot to reopen. Resume now reads existing derived constraints through a read-only connection, reconstructs only the equivalent sanitized binding, and reuses transactional immutable-policy comparison. Tests preserve decimal precision, prior usage and lower restrictions and reject missing, unbound, invalid and mismatched policies. The ledger is not authenticated, and stored observations are historical rather than proof of current balance or authorization."
+    },
+    {
+      "id": "R08O",
+      "status": "unverified",
+      "task_ids": [
+        "R08O"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_providers.py::test_openrouter_receipt_binds_exact_sent_payload_without_credentials -q",
+      "queue_evidence_assertion": "Red: fake-HTTP response metadata had no digest binding the sent request body. Receipt metadata now records the SHA-256 of the exact UTF-8 JSON payload passed to the adapter; existing archive tests verify metadata retention and credential exclusion. This is post-dispatch evidence, not a pre-dispatch verified wire configuration or authorization. In a separate read-only check, configured account initialization, refresh and restart succeeded using a temporary zero-spend ledger; BYOK assurance remained unknown. No model call occurred."
+    },
+    {
+      "id": "R08P",
+      "status": "unverified",
+      "task_ids": [
+        "R08P"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_replay.py::test_replay_rejects_response_wire_digest_that_differs_from_request -q",
+      "queue_evidence_assertion": "Red: replay accepted a changed wire payload digest. A stable v1 serializer now constructs the body sent by the adapter and replay compares its digest with the retained response metadata; unversioned or missing OpenRouter digest is incomplete. A second red exposed price-key ordering differences after archive serialization; v1 now specifies key order. Fake HTTP and tampered synthetic archive only; this does not authenticate evidence, verify pre-dispatch bounds or authorize hosted calls."
+    },
+    {
+      "id": "R09",
+      "status": "unverified",
+      "task_ids": [
+        "R09"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_repo_audit.py::test_completed_and_pending_tasks_are_valid -q",
+      "queue_evidence_assertion": "Historical task statuses retained; initial active documentation reconciled and historical plan/report labeled. Red: verifier accepted empty or wrong focused commands and nested non-collectable test names. Green: exact focused command and top-level test checks added; dependency/evidence fixtures still reject errors. Focused 2 passed; full offline suite 372 passed; queue verifier checked 102 tasks. It checks structural presence, not actual execution or evidence truth; final documentation reconciliation remains at T073-T074."
+    },
+    {
+      "id": "T049",
+      "status": "unverified",
+      "task_ids": [
+        "T049"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_escalation.py::test_hy4_separate_outcome -q",
+      "queue_evidence_assertion": "Partial: synthetic paired escalation preserves standalone result, uses same request ledger, and now binds each prior side to its recorded prompt hash and serialized evidence-packet provenance. Changed question, revision metadata and swapped sides refuse before call. Focused 79 passed before additional swapped-side assertion; full suite 388 passed. Applicability decision, full corpus, original response authenticity, archive replay and real-provider integration remain unverified; T049 pending. Synthetic escalation now also freezes and compares packet-revision applicability verdicts, rejecting changed verdicts before dispatch; full suite 389 passed. Verdicts remain assertions, and full corpus and response authenticity remain open. Synthetic escalation now reconstructs both standalone sides from uniquely bound journal receipts and refuses altered results; full suite 390 passed. Validated journal values are assertions, not authenticated original raw responses; old incomplete receipts fail closed. Successful judge receipts now retain response text; escalation checks its recorded hash, HTTP status, revalidates and compares stored values. Synthetic altered validation and missing raw response refuse; full suite 392 passed. Both raw and hash can be rewritten together, and archive replay and hosted execution remain open."
+    },
+    {
+      "id": "T050",
+      "status": "unverified",
+      "task_ids": [
+        "T050"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_assurance.py::test_instruction_contamination_case -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T051",
+      "status": "unverified",
+      "task_ids": [
+        "T051"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_replay.py::test_verify_saved_structure -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T052",
+      "status": "unverified",
+      "task_ids": [
+        "T052"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_costs.py::test_unknown_not_zero -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T053",
+      "status": "unverified",
+      "task_ids": [
+        "T053"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_service.py::test_loopback_routes -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T054",
+      "status": "unverified",
+      "task_ids": [
+        "T054"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_web.py::test_source_to_decision -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T055",
+      "status": "unverified",
+      "task_ids": [
+        "T055"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_web.py::test_inspect_unknowns -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T056",
+      "status": "unverified",
+      "task_ids": [
+        "T056"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_interventions.py::test_decisive_and_irrelevant_changes -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T057",
+      "status": "unverified",
+      "task_ids": [
+        "T057"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_programs.py::test_reviewed_exact_binding -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T058",
+      "status": "unverified",
+      "task_ids": [
+        "T058"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_agents.py::test_two_roles_shared_evidence -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T059",
+      "status": "unverified",
+      "task_ids": [
+        "T059"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_writer.py::test_serialized_idempotent_writes -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T060",
+      "status": "unverified",
+      "task_ids": [
+        "T060"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_claims.py::test_claim_is_not_source -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T061",
+      "status": "unverified",
+      "task_ids": [
+        "T061"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_export.py::test_trace_export_roundtrip -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T062",
+      "status": "unverified",
+      "task_ids": [
+        "T062"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_acceptance.py::test_complete_local_workflow -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T063",
+      "status": "unverified",
+      "task_ids": [
+        "T063"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_exclude_gold_from_index -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T064",
+      "status": "unverified",
+      "task_ids": [
+        "T064"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_grouped_frozen_cases -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T065",
+      "status": "unverified",
+      "task_ids": [
+        "T065"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_competent_direct_arm -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T066",
+      "status": "unverified",
+      "task_ids": [
+        "T066"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_factorial_arms -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T067",
+      "status": "unverified",
+      "task_ids": [
+        "T067"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_separate_reuse_escalation -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T068",
+      "status": "unverified",
+      "task_ids": [
+        "T068"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_all_assigned_denominator -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T069",
+      "status": "unverified",
+      "task_ids": [
+        "T069"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_review_provenance -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T070",
+      "status": "unverified",
+      "task_ids": [
+        "T070"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_intervention_pair_report -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T071",
+      "status": "unverified",
+      "task_ids": [
+        "T071"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_locked_pilot -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T072",
+      "status": "unverified",
+      "task_ids": [
+        "T072"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_evaluation.py::test_benefit_decision -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T073",
+      "status": "unverified",
+      "task_ids": [
+        "T073"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_release.py::test_clean_install_smoke -q",
+      "queue_evidence_assertion": null
+    },
+    {
+      "id": "T074",
+      "status": "unverified",
+      "task_ids": [
+        "T074"
+      ],
+      "evidence": [],
+      "queue_status": "pending",
+      "queue_command": "python -m pytest tests/test_documentation.py::test_evidence_audit -q",
+      "queue_evidence_assertion": null
+    }
+  ],
+  "assurance": "queue_assertions_not_verified",
+  "complete": false
+}

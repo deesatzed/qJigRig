@@ -1342,7 +1342,8 @@
       "depends_on": [
         "T073",
         "R09",
-        "R01B"
+        "R01B",
+        "G01"
       ],
       "status": "pending",
       "files": [
@@ -3674,6 +3675,23 @@
       "acceptance": "Two role clients and the browser share a source-linked interpretation, a claim-only query does not become source evidence, and the records remain distinct after service restart.",
       "command": "python -m pytest tests/test_source_browser.py::test_browser_and_two_role_clients_keep_interpretation_separate_after_restart -q",
       "evidence": "Independent synthetic local verification while R08 remains open. A builder client imported a source and shared a span-linked interpretation, a reviewer client observed it and a claim-only query deferred without source evidence, and Chrome displayed the interpretation separately before and after service restart; keyboard inspection retained only original source text. The first test attempt failed from a local variable shadowing its startup helper; corrected. Role identities are caller assertions, no provider call occurred, and full workflow/semantic acceptance remains open."
+    },
+    {
+      "id": "G01",
+      "phase": "verification",
+      "depends_on": [
+        "R09"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/gates.py"
+      ],
+      "test_file": "tests/test_gates.py",
+      "test_name": "test_inventory_covers_goal_findings_repairs_and_original_tasks_without_claiming_proof",
+      "action": "Create an explicitly unverified machine-readable gate inventory",
+      "acceptance": "Inventory F01-F09, all repair tasks, and T049-T074 from the current queue, bind source hashes, and refuse to treat queue assertions as completion evidence.",
+      "command": "python -m pytest tests/test_gates.py::test_inventory_covers_goal_findings_repairs_and_original_tasks_without_claiming_proof -q",
+      "evidence": "Independent inventory while R08 remains open, as directed by GOAL.md. Red: no gate inventory module existed. The initial machine-readable inventory records queue assertions as unverified and hashes current goal and task queue; tests reject missing/duplicate tasks, stale inputs and attempted promotion. It does not validate receipts or prove completion, and later batches must regenerate it."
     }
   ]
 }
