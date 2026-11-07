@@ -38,6 +38,9 @@ def check_archive_config(frozen: dict, context: dict, assignment: dict) -> None:
         if applicability_digest(ApplicabilityInputs.from_dict(metadata)) != frozen['case_applicability'][assignment['case_id']]:
             raise ContractError('archive applicability binding differs')
     if arm in ('combined','decomposition_only'):
+        if (context.get('schema') != 'qjig.applicability-deferral.v1'
+                and context.get('planner_prompt_version','legacy_v1') != frozen.get('planner_prompt_version','legacy_v1')):
+            raise ContractError('archive planner prompt version differs')
         for name in ('planner','judge','reviewer'):
             actual=context.get(name);spec=stages[name]
             if (not isinstance(actual,dict) or actual.get('provider') != spec['provider']
@@ -125,7 +128,7 @@ class EvaluationCampaign:
                 raise ContractError('invalid campaign event kind')
         return manifest,assignments,started,scored
 
-    def freeze_config(self, config: dict, *, want: int, max_bytes: int, case_applicability: dict) -> str:
+    def freeze_config(self, config: dict, *, want: int, max_bytes: int, case_applicability: dict, planner_prompt_version: str = 'legacy_v1') -> str:
         """Persist declared stage settings and shared packet limits before claims."""
         from .direct_preflight import direct_run_allocations
         from .fresh_preflight import fresh_run_allocations
@@ -134,11 +137,16 @@ class EvaluationCampaign:
                 or any(not isinstance(v,dict) or set(v) != {'provider','model','input_tokens','output_tokens','max_price'}
                        for v in config.values())):
             raise ContractError('invalid campaign configuration')
+        if planner_prompt_version not in ('legacy_v1', 'exception_applicability_v2'):
+            raise ContractError('unsupported planner prompt version')
         direct,planner,judge,reviewer=(config[k] for k in ('direct','planner','judge','reviewer'))
         if planner['provider'] != judge['provider']:
             raise ContractError('fresh planner and judge providers must match')
         payload={'schema':'qjig.campaign-config.v2','plan_sha256':self._digest,'want':want,'max_bytes':max_bytes,
                  'stages':config,'case_applicability':case_applicability}
+        if planner_prompt_version != 'legacy_v1':
+            payload['schema']='qjig.campaign-config.v3'
+            payload['planner_prompt_version']=planner_prompt_version
         try:
             encoded=json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
             digest=hashlib.sha256(encoded.encode('utf-8')).hexdigest()
@@ -196,9 +204,11 @@ class EvaluationCampaign:
             raise ContractError('campaign configuration anchor differs')
         try:
             frozen=json.loads(encoded)
-            expected=json.dumps({'schema':'qjig.campaign-config.v2','plan_sha256':self._digest,'want':want,
-                                 'max_bytes':max_bytes,'stages':config,'case_applicability':frozen['case_applicability']},
-                                sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
+            payload={'schema':'qjig.campaign-config.v2','plan_sha256':self._digest,'want':want,
+                     'max_bytes':max_bytes,'stages':config,'case_applicability':frozen['case_applicability']}
+            if frozen.get('schema') == 'qjig.campaign-config.v3' and frozen.get('planner_prompt_version') == 'exception_applicability_v2':
+                payload.update(schema='qjig.campaign-config.v3', planner_prompt_version='exception_applicability_v2')
+            expected=json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
         except (KeyError,TypeError,ValueError,UnicodeError) as exc:
             raise ContractError('campaign configuration is not finite JSON') from exc
         if encoded != expected:
@@ -382,7 +392,8 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             judge_max_tokens=judge['output_tokens'],reviewer_max_tokens=reviewer['output_tokens'],
             planner_max_price=planner['max_price'],judge_max_price=judge['max_price'],reviewer_max_price=reviewer['max_price'],
             reservation_factory=factory,review_reservation_factory=factory,want=want,max_bytes=max_bytes,
-            assignment_binding=binding,evidence_mode='full' if arm=='decomposition_only' else 'catalog')
+            assignment_binding=binding,evidence_mode='full' if arm=='decomposition_only' else 'catalog',
+            planner_prompt_version=frozen_config.get('planner_prompt_version','legacy_v1'))
         replay=verify_archive(archive)
         if replay.status not in ('unanchored','incomplete') or replay.digest is None:
             raise ContractError('campaign fresh archive is not replayable')

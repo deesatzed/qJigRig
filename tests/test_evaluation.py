@@ -1537,7 +1537,7 @@ def test_factorial_allocation_enumerates_real_arm_work_before_reservation(tmp_pa
         assert goal._con.execute('SELECT COUNT(*) FROM evaluation_plans').fetchone()[0]==0
 
 
-@pytest.mark.parametrize('driver',['manual','runner'])
+@pytest.mark.parametrize('driver',['manual','runner','runner_v2'])
 def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,driver):
     import json
     from contextlib import ExitStack
@@ -1592,7 +1592,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
         campaign=EvaluationCampaign(goal,'factorial',expected_plan_sha256=plan['sha256'])
         from qjig.evaluation_campaign import applicability_digest
         metadata_hashes={case['id']:applicability_digest(inputs) for case in design['cases']}
-        config_digest = campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,case_applicability=metadata_hashes) if driver=='runner' else None
+        config_digest = campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,case_applicability=metadata_hashes, **({'planner_prompt_version':'exception_applicability_v2'} if driver=='runner_v2' else {})) if driver!='manual' else None
         if driver=='runner':
             assert campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,case_applicability=metadata_hashes)==config_digest
             with pytest.raises(ContractError):
@@ -1603,7 +1603,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
         for arm in design['arms']:
             assignment=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==arm and a['repeat']==1)
             rid=assignment['request_id'];ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout')
-            if driver=='runner':
+            if driver!='manual':
                 archive=stack.enter_context(RunArchive.open(tmp_path/('archive-'+arm)))
                 if arm in ('combined','decomposition_only'):
                     responses=[raw({'predicates':[{'id':'p','question':'Do tests pass?'}],'expression':{'ref':'p'}}),
@@ -1641,6 +1641,13 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                     applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
                     config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,expected_config_sha256=config_digest)
                 assert receipt['status']=='scored' and transport.calls_made==(4 if arm in ('combined','decomposition_only') else 1)
+                if driver=='runner_v2' and arm in ('combined','decomposition_only'):
+                    assert archive.context()['planner_prompt_version']=='exception_applicability_v2'
+                    from qjig.evaluation_campaign import check_archive_config
+                    frozen=campaign.require_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,expected_config_sha256=config_digest)
+                    changed_context={**archive.context(), 'planner_prompt_version':'legacy_v1'}
+                    with pytest.raises(ContractError, match='prompt version'):
+                        check_archive_config(frozen,changed_context,assignment)
                 prompts=[e['data']['prompt'] for e in archive.events() if e['kind']=='request']
                 assert all(gold.decode() not in p and rid not in p and arm not in p for p in prompts)
                 entries[arm]={'archive':archive,'journal':journal,'reference':ref,'run_sha256':receipt['run_sha256'],

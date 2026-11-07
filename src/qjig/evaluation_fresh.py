@@ -22,7 +22,7 @@ def run_locked_fresh(root, design: dict, lock: dict, reference: dict, protected:
                      judge_max_tokens: int | None = None, reviewer_max_tokens: int = 800,
                      planner_max_price=None, judge_max_price=None, reviewer_max_price=None,
                      reservation_factory=None, review_reservation_factory=None, want: int = 3, max_bytes: int = 3000,
-                     assignment_binding=None, evidence_mode: str = 'catalog'):
+                     assignment_binding=None, evidence_mode: str = 'catalog', planner_prompt_version: str = 'legacy_v1'):
     """Run one checked case in an isolated catalog with explicit source metadata.
 
     Metadata and protected-manifest completeness are caller assertions. This
@@ -82,6 +82,7 @@ def run_locked_fresh(root, design: dict, lock: dict, reference: dict, protected:
                          planner=planner, judge=judge, reviewer=reviewer, archive=archive,
                          revision_applicability=checked.verdict, applicability_inputs=checked,
                          evaluation_case_binding=binding, evaluation_assignment=assignment_binding, required_run_set=required_set,
+                         planner_prompt_version=planner_prompt_version,
                          full_source_evidence=evidence_mode == 'full',
                          planner_max_tokens=planner_max_tokens,
                          judge_max_tokens=judge_max_tokens, reviewer_max_tokens=reviewer_max_tokens,

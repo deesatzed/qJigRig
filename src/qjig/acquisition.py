@@ -398,8 +398,30 @@ def run_fresh(
     """
     if planner_prompt_version not in PLANNER_PROMPT_VERSIONS:
         raise ContractError('unsupported planner prompt version')
-    if evaluation_case_binding is not None and planner_prompt_version != 'legacy_v1':
-        raise ContractError('evaluation configuration does not bind this planner prompt version')
+    if evaluation_case_binding is not None:
+        import hashlib
+        goal = ledger._goal_budget
+        binding = evaluation_assignment if isinstance(evaluation_assignment, dict) else {}
+        row = None
+        if goal is not None and binding.get('plan_id') and goal._con.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='evaluation_campaign_config'").fetchone():
+            row = goal._con.execute('SELECT value,sha256 FROM evaluation_campaign_config WHERE plan_id=?',
+                                    (binding['plan_id'],)).fetchone()
+        if row is not None or planner_prompt_version != 'legacy_v1':
+            try:
+                encoded, digest = row
+                config = json.loads(encoded)
+                event = goal._con.execute("SELECT payload FROM evaluation_campaign_events WHERE plan_id=? AND request_id=? AND kind='started'", (binding['plan_id'], ledger._request_id)).fetchone()
+                claim = json.loads(event[0])
+                version = config.get('planner_prompt_version', 'legacy_v1')
+                schema = 'qjig.campaign-config.v2' if version == 'legacy_v1' else 'qjig.campaign-config.v3'
+                if (hashlib.sha256(encoded.encode('utf-8')).hexdigest() != digest
+                        or config.get('schema') != schema or version != planner_prompt_version
+                        or config.get('plan_sha256') != binding['plan_sha256']
+                        or claim != {'plan_sha256':binding['plan_sha256'], 'config_sha256':digest}):
+                    raise ValueError('campaign binding differs')
+            except (AttributeError, TypeError, KeyError, ValueError, IndexError) as exc:
+                raise ContractError('evaluation configuration does not bind this planner prompt version') from exc
     if type(full_source_evidence) is not bool or (full_source_evidence and evaluation_case_binding is None):
         raise ContractError('full source mode requires a checked evaluation case')
     if evaluation_case_binding is not None:
