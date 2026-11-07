@@ -91,3 +91,19 @@ def test_max_tokens_override_reaches_the_request_and_default_is_unchanged(tmp_pa
         request_fresh_plan(ledger, t, REQUEST, corpus_revision_ids=["r"], provider="stand-in", model="m")
         request_fresh_plan(ledger, t, REQUEST, corpus_revision_ids=["r"], provider="stand-in", model="m", max_tokens=6000)
     assert seen == [1500, 6000]
+
+
+def test_prompt_asks_for_an_exception_predicate(tmp_path):
+    seen = []
+
+    class Spy(StandInTransport):
+        def send(self, request):
+            seen.append(request.prompt)
+            return super().send(request)
+
+    j = Journal.open(tmp_path / "j.sqlite")
+    ledger = BudgetLedger(Budget(2, 20000, 1.0), j, "req-1")
+    with j:
+        request_fresh_plan(ledger, Spy([RawResponse(200, json.dumps(PLAN_JSON), USAGE)]), REQUEST, corpus_revision_ids=["r"], provider="s", model="m")
+    # the prompt tells the model to cover exceptions, and to never rely on that for completeness
+    assert "exception" in seen[0].lower() and "waiver" in seen[0].lower()

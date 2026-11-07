@@ -44,7 +44,8 @@ def _planner_prompt(request: Request, corpus_sha: str) -> str:
     return (
         "Break the question into 1 to 6 yes/no predicates and one expression over them using only "
         'and/or/not. Return ONLY JSON {"predicates":[{"id","question","depends_on"?,"exact_operator"?}],'
-        '"expression":{"op":"and|or|not","args":[...]} | {"ref":"id"}}. Do not include code, origin or comments.\n'
+        '"expression":{"op":"and|or|not","args":[...]} | {"ref":"id"}}. Do not include code, origin or comments. '
+        "Always include one predicate asking whether any exception, waiver or special case could change the answer.\n"
         f"Question: {request.question}\nRole: {request.role} v{request.role_version}\nScope: {request.scope}\n"
         f"Corpus manifest: {corpus_sha}"
     )

@@ -1,0 +1,193 @@
+{
+ "label": "LIVE: openrouter, real model call",
+ "corpus": "SYNTHETIC authored sample",
+ "runs": [
+  {
+   "status": "deferred",
+   "reasons": [
+    "plan_coverage_unestablished",
+    "outcome_not_determined",
+    "material_obligation_unresolved"
+   ],
+   "plan_failure": null,
+   "predicates": [
+    [
+     "p1",
+     "Is customer 42 eligible to request a refund under the applicable refund policy?"
+    ],
+    [
+     "p2",
+     "Does the applicable standard refund policy allow a refund when the request is made 20 days after purchase?"
+    ],
+    [
+     "p3",
+     "Is there any exception, waiver, or special case that could change whether customer 42 can get a refund 20 days after purchase?"
+    ],
+    [
+     "p4",
+     "If any such exception, waiver, or special case applies, does it allow customer 42 to get the refund 20 days after purchase?"
+    ]
+   ],
+   "expression": {
+    "op": "and",
+    "args": [
+     {
+      "ref": "p1"
+     },
+     {
+      "op": "or",
+      "args": [
+       {
+        "op": "and",
+        "args": [
+         {
+          "ref": "p2"
+         },
+         {
+          "op": "not",
+          "args": [
+           {
+            "ref": "p3"
+           }
+          ]
+         }
+        ]
+       },
+       {
+        "op": "and",
+        "args": [
+         {
+          "ref": "p3"
+         },
+         {
+          "ref": "p4"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "observations": {
+    "p1": [
+     "unknown",
+     "no_retrieval_hit"
+    ],
+    "p2": [
+     "false",
+     "judge_negative_supported"
+    ],
+    "p3": [
+     "true",
+     "judge_positive_supported"
+    ],
+    "p4": [
+     "unknown",
+     "provider_malformed_output"
+    ]
+   },
+   "quote_refs": {
+    "p2": [
+     {
+      "entry_id": "59e173de4423eb99283763da8d58fd55911c59d528c8527954b2c869bdc26368",
+      "revision_id": "rev1:dc850b1c77bd35e85fe105def11678c22226cdb562fffc64a9f9850c8e70184f",
+      "start": 10,
+      "end": 58
+     }
+    ],
+    "p3": [
+     {
+      "entry_id": "a1dc0da997b0ea78365f1cdac1eaf6b87a4cb18af612aff604007c03c1025cd1",
+      "revision_id": "rev1:dc850b1c77bd35e85fe105def11678c22226cdb562fffc64a9f9850c8e70184f",
+      "start": 60,
+      "end": 120
+     }
+    ],
+    "p4": []
+   },
+   "coverage_candidates": [
+    "a1dc0da997b0ea78365f1cdac1eaf6b87a4cb18af612aff604007c03c1025cd1"
+   ],
+   "calls": 7,
+   "cost_usd": 0.0225775325,
+   "cost_status": "known"
+  },
+  {
+   "status": "deferred",
+   "reasons": [
+    "plan_coverage_unestablished",
+    "outcome_not_determined",
+    "material_obligation_unresolved"
+   ],
+   "plan_failure": null,
+   "predicates": [
+    [
+     "p1",
+     "Does customer 42 have a purchase that is eligible for a refund under the applicable project policy?"
+    ],
+    [
+     "p2",
+     "Is a refund request 20 days after purchase within the applicable refund period?"
+    ],
+    [
+     "p3",
+     "Does customer 42 meet all other standard refund conditions under the applicable project policy?"
+    ],
+    [
+     "p4",
+     "Could any exception, waiver, or special case change whether customer 42 can get a refund?"
+    ]
+   ],
+   "expression": {
+    "op": "and",
+    "args": [
+     {
+      "ref": "p1"
+     },
+     {
+      "ref": "p2"
+     },
+     {
+      "ref": "p3"
+     },
+     {
+      "op": "not",
+      "args": [
+       {
+        "ref": "p4"
+       }
+      ]
+     }
+    ]
+   },
+   "observations": {
+    "p1": [
+     "unknown",
+     "judge_no_support"
+    ],
+    "p2": [
+     "unknown",
+     "judge_no_support"
+    ],
+    "p3": [
+     "unknown",
+     "no_retrieval_hit"
+    ],
+    "p4": [
+     "unknown",
+     "no_retrieval_hit"
+    ]
+   },
+   "quote_refs": {
+    "p1": [],
+    "p2": []
+   },
+   "coverage_candidates": [
+    "a1dc0da997b0ea78365f1cdac1eaf6b87a4cb18af612aff604007c03c1025cd1"
+   ],
+   "calls": 5,
+   "cost_usd": 0.006906038,
+   "cost_status": "known"
+  }
+ ]
+}
