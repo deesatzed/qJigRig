@@ -59,7 +59,7 @@ def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha2
             or not hmac.compare_digest(ref_hash, expected_reference_sha256)):
         raise ContractError('reference digest mismatch')
     replay = verify_direct_archive(archive, journal, expected_digest=expected_run_sha256)
-    if replay['status'] != 'structurally_verified':
+    if replay['status'] not in ('structurally_verified', 'incomplete') or replay.get('sha256') != expected_run_sha256:
         raise ContractError('direct run is not structurally verified')
     context = archive.context()
     request, applicability = context['request'], context['applicability']
@@ -72,6 +72,13 @@ def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha2
     for requirement in reference['evidence']:
         if requirement['quote'] not in revisions[requirement['revision_id']].decoded.text:
             raise ContractError('reference quote not in source')
+    if replay['status'] == 'incomplete':
+        return {'case_id': reference['case_id'], 'run_sha256': expected_run_sha256, 'reference_sha256': ref_hash,
+                'reference_provenance': reference['provenance'], 'classification': replay.get('classification', 'unknown_review'),
+                'answer_matches_reference': None, 'required_evidence_covered': None,
+                'failure_verified': replay.get('failure_verified', False),
+                'reconciliation_required': bool(journal.pending(request['request_id'])) or replay.get('reconciliation_required', False),
+                'semantic_assurance': 'not_assessed'}
     result = next(event['data'] for event in archive.events() if event['kind'] == 'run_result')
     cited = [(entries[c['entry_id']].revision_id, c['quote']) for c in result['citations']]
     covered = all(any(revision == required['revision_id'] and required['quote'] in quote for revision, quote in cited)

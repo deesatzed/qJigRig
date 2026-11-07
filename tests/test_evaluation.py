@@ -236,7 +236,7 @@ def test_direct_agent_searches_and_answers_with_auditable_synthetic_calls(tmp_pa
         assert verify_direct_archive(archive, journal)['status'] == 'unanchored'
 
 
-@pytest.mark.parametrize('mode', ['malformed', 'unsupported', 'timeout', 'budget'])
+@pytest.mark.parametrize('mode', ['malformed', 'unsupported', 'timeout', 'unavailable', 'budget'])
 def test_direct_agent_preserves_failures_without_inventing_an_answer(tmp_path, mode):
     import json
     from qjig.budgets import BudgetLedger
@@ -244,7 +244,7 @@ def test_direct_agent_preserves_failures_without_inventing_an_answer(tmp_path, m
     from qjig.evaluation import DirectRetrieval
     from qjig.evaluation_direct import run_direct
     from qjig.journal import Journal
-    from qjig.providers import RawResponse, StandInTransport
+    from qjig.providers import RawResponse, StandInTransport, ProviderUnavailable
     from qjig.run_archive import RunArchive
     code, secret = b'Checks must pass.', b'PRIVATE_REFERENCE_ANSWER'
     (tmp_path / 'code').write_bytes(code); (tmp_path / 'label').write_bytes(secret)
@@ -252,7 +252,8 @@ def test_direct_agent_preserves_failures_without_inventing_an_answer(tmp_path, m
     search = DirectRetrieval(tmp_path, [item('code', code)], [item('label', secret)], want=1, max_bytes=3000, followups=1)
     body = 'not json' if mode == 'malformed' else json.dumps({'action': 'answer', 'query': None, 'answer': 'yes',
                                                                'citations': [{'entry_id': 'made-up', 'quote': 'Checks'}]})
-    response = TimeoutError('synthetic timeout') if mode == 'timeout' else RawResponse(200, body, {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01})
+    response = (TimeoutError('synthetic timeout') if mode == 'timeout' else ProviderUnavailable('synthetic') if mode == 'unavailable'
+                else RawResponse(200, body, {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01}))
     with Journal.open(tmp_path / 'j.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
         ledger = BudgetLedger(Budget(0 if mode == 'budget' else 2, 10000, 1), journal, 'r')
         transport = StandInTransport([response])
@@ -260,12 +261,24 @@ def test_direct_agent_preserves_failures_without_inventing_an_answer(tmp_path, m
                             archive=archive, provider='stand-in', model='test', max_tokens=100, as_of='2026-11-07', entities=['admin'])
         assert result['status'] == 'unavailable' and result['answer'] is None
         assert result['failure'] == {'malformed': 'malformed_output', 'unsupported': 'unsupported_citation',
-                                     'timeout': 'UncertainOutcome', 'budget': 'BudgetExceeded'}[mode]
+                                     'timeout': 'UncertainOutcome', 'unavailable': 'ProviderUnavailable', 'budget': 'BudgetExceeded'}[mode]
         assert len(result['call_ids']) == (0 if mode == 'budget' else 1)
         assert archive.events()[-1]['data'] == result
         assert bool(journal.pending('r')) == (mode == 'timeout')
         from qjig.evaluation_replay import verify_direct_archive
-        assert verify_direct_archive(archive, journal)['status'] == 'incomplete'
+        from qjig.evaluation_scoring import reference_digest, score_direct_archive
+        report = verify_direct_archive(archive, journal)
+        assert report['status'] == 'incomplete'
+        ref = {'case_id': 'case-1', 'question': 'Checks?', 'role': 'reviewer', 'role_version': '1', 'scope': 'project',
+               'as_of': '2026-11-07', 'entities': ['admin'], 'historical_as_known': False,
+               'source_revisions': [archive.revision_ids()[0]], 'expected_answer': 'yes',
+               'provenance': 'authored_unvalidated', 'evidence': [{'revision_id': archive.revision_ids()[0], 'quote': 'Checks'}]}
+        score = score_direct_archive(archive, journal, ref, expected_run_sha256=report['sha256'],
+                                     expected_reference_sha256=reference_digest(ref))
+        assert score['classification'] == {'malformed': 'malformed', 'unsupported': 'unsupported',
+                                           'timeout': 'uncertain_outcome', 'unavailable': 'provider_failure', 'budget': 'unknown_review'}[mode]
+        assert score['answer_matches_reference'] is None and score['required_evidence_covered'] is None
+        assert score['reconciliation_required'] is (mode == 'timeout')
 
 
 def test_direct_replay_checks_search_and_source_tampering(tmp_path):
@@ -482,3 +495,41 @@ def test_private_reference_binds_allowlisted_source_snapshots(tmp_path):
         make_reference(case_id='c', request=request, sources=forged, as_of='2026-11-07', entities=[],
                        historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
                        evidence=[{'path': 'code', 'quote': 'other'}])
+
+
+def test_failed_followup_remains_assigned_and_tampering_is_rejected(tmp_path):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Budget, Request
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_direct import run_direct
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.evaluation_scoring import reference_digest, score_direct_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse, StandInTransport
+    from qjig.run_archive import RunArchive
+    code, secret = b'Checks must pass.', b'private labels'
+    (tmp_path / 'code').write_bytes(code); (tmp_path / 'label').write_bytes(secret)
+    item = lambda path, raw: {'path': path, 'sha256': hashlib.sha256(raw).hexdigest()}
+    search = DirectRetrieval(tmp_path, [item('code', code)], [item('label', secret)], want=1, max_bytes=3000, followups=1)
+    usage = {'prompt_tokens': 5, 'completion_tokens': 3, 'cost_usd': 0.01}
+    first = RawResponse(200, json.dumps({'action': 'search', 'query': 'Checks', 'answer': None, 'citations': []}), usage)
+    with Journal.open(tmp_path / 'j.sqlite') as journal, RunArchive.open(tmp_path / 'archive') as archive:
+        request = Request('r', 'Checks?', 'reviewer', '1', 'project')
+        result = run_direct(search, request, BudgetLedger(Budget(2, 10000, 1), journal, 'r'),
+                            StandInTransport([first, RawResponse(200, 'not json', usage)]), archive=archive,
+                            provider='stand-in', model='test', max_tokens=100, as_of='2026-11-07', entities=[])
+        report = verify_direct_archive(archive, journal)
+        assert report['status'] == 'incomplete' and report['failure_verified'] and report['classification'] == 'malformed'
+        assert len(result['call_ids']) == 2 and len(result['searches']) == 2
+        rev = archive.revision_ids()[0]
+        ref = {'case_id':'c','question':'Checks?','role':'reviewer','role_version':'1','scope':'project',
+               'as_of':'2026-11-07','entities':[],'historical_as_known':False,'source_revisions':[rev],
+               'expected_answer':'yes','provenance':'authored_unvalidated','evidence':[{'revision_id':rev,'quote':'Checks'}]}
+        assert score_direct_archive(archive, journal, ref, expected_run_sha256=report['sha256'],
+                                    expected_reference_sha256=reference_digest(ref))['classification'] == 'malformed'
+        original = archive._con.execute("SELECT data FROM events WHERE kind='run_result'").fetchone()[0]
+        altered = json.loads(original); altered['failure'] = 'unsupported_citation'
+        archive._con.execute('DROP TRIGGER event_no_update')
+        archive._con.execute("UPDATE events SET data=? WHERE kind='run_result'", (json.dumps(altered),))
+        assert verify_direct_archive(archive, journal)['status'] == 'invalid'

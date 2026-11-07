@@ -1205,7 +1205,8 @@
         "T066",
         "T052",
         "T068A",
-        "T068B"
+        "T068B",
+        "T068C"
       ],
       "status": "pending",
       "files": [
@@ -2634,6 +2635,24 @@
       "acceptance": "A reference records explicit provenance and binds the exact decoded source revisions and quoted evidence from allowlisted bytes, without putting reference data in provider input.",
       "command": "python -m pytest tests/test_evaluation.py::test_private_reference_binds_allowlisted_source_snapshots -q",
       "evidence": "Red: private reference records could not be constructed from isolated source snapshots. Green: builder binds attributed references to verified bytes, exact revisions, request context and source quotations; rejects protected paths, changed bytes and absent quotations. Created 16 local authored-unvalidated references with 17 indexable quotes. Two stand-in end-to-end checks produced one matching reference and one unknown review. Focused 18 passed; full offline 505 passed. Protected-manifest completeness, semantic labels, full failure scoring and actual comparison remain open."
+    },
+    {
+      "id": "T068C",
+      "phase": "P6",
+      "depends_on": [
+        "T068B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_replay.py",
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_direct_agent_preserves_failures_without_inventing_an_answer",
+      "action": "Retain and classify verified failed direct assignments",
+      "acceptance": "Malformed and unsupported outputs, provider failure and uncertain calls remain distinct; unverified refusal stays unknown and no missing answer is fabricated.",
+      "command": "python -m pytest tests/test_evaluation.py::test_direct_agent_preserves_failures_without_inventing_an_answer -q",
+      "evidence": "Red: direct reference scoring rejected all failed or uncertain runs. Green: replay checks failed search/prompt/receipt chains and distinguishes malformed output, unsupported citation, provider failure and uncertain outcome; timeout remains pending reconciliation and unverified budget refusal stays unknown review. Synthetic tests include failure on the second call and tampering. Focused evaluation/replay/ledger suite 72 passed before additional cases; full offline 506 passed before final provider-unavailable parameter, then focused 5 passed. This does not validate missing policy evidence, reconcile calls, authenticate providers or complete the full assigned comparison."
     }
   ]
 }

@@ -49,8 +49,12 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
                                             or not hmac.compare_digest(digest, expected_digest)):
             raise ContractError('direct archive digest mismatch')
         results = [e for e in events if e['kind'] == 'run_result']
-        if len(results) != 1 or results[0]['data'].get('status') != 'recorded_unvalidated':
+        if len(results) != 1:
             return {'status': 'incomplete', 'sha256': digest, 'semantic_assurance': 'not_assessed'}
+        if results[0]['data'].get('status') == 'unavailable':
+            return _verify_failure(context, events, journal_events, revisions, request, digest)
+        if results[0]['data'].get('status') != 'recorded_unvalidated':
+            raise ContractError('invalid direct result status')
         result = results[0]['data']
         call_ids = result['call_ids']
         if (not isinstance(call_ids, list) or not 1 <= len(call_ids) <= 1 + context['followups']
@@ -116,3 +120,105 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
                 'sha256': digest, 'semantic_assurance': 'not_assessed'}
     except (ContractError, KeyError, ValueError, TypeError, AttributeError, UnicodeError, OverflowError):
         return invalid
+
+
+def _verify_failure(context, events, journal_events, revisions, request, digest):
+    """Check recorded failure mechanics without claiming that an uncertain call finished."""
+    result = events[-1]['data']
+    if events[-1]['kind'] != 'run_result' or events[-1]['call_id'] != request.request_id:
+        raise ContractError('failure result missing')
+    if set(result) != {'status', 'failure', 'answer', 'call_ids', 'searches'} or result['answer'] is not None:
+        raise ContractError('invalid failure result')
+    calls = result['call_ids']
+    if (not isinstance(calls, list) or len(calls) > 1 + context['followups'] or len(set(calls)) != len(calls)
+            or len(journal_events) != len(calls) * 2):
+        raise ContractError('invalid failed call set')
+    search = object.__new__(DirectRetrieval)
+    search._revisions = tuple(revisions)
+    search._entries = [entry for revision in revisions for entry in index_entries(revision)]
+    search._want, search._max_bytes = context['want'], context['max_bytes']
+    search._max_rounds, search._expanded, search._trace = 1 + context['followups'], context['expanded'], []
+    packets, query, cursor, terminal_failure = [], request.question, 0, None
+    for step in range(1 + context['followups']):
+        found = search.search(query)
+        packets.append(found['packet'])
+        trace = {k: v for k, v in found.items() if k != 'packet'}
+        trace['packet'] = json.loads(serialize_packet(found['packet']))
+        if cursor >= len(events) - 1 or events[cursor]['kind'] != 'trace' or events[cursor]['call_id'] != f'{request.request_id}#{step + 1}' or events[cursor]['data'] != trace:
+            raise ContractError('failure search differs')
+        cursor += 1
+        if step >= len(calls):
+            if result['failure'] not in ('BudgetExceeded', 'ReconciliationRequired') or cursor != len(events) - 1:
+                raise ContractError('missing direct attempt')
+            break  # policy and prior unresolved calls are not fully archived here
+        call_id = calls[step]
+        if cursor >= len(events) - 1 or events[cursor]['kind'] != 'request':
+            raise ContractError('failure request missing')
+        sent = events[cursor]; cursor += 1
+        allow = step + 1 < search._max_rounds
+        pr = ProviderRequest('direct_initial' if step == 0 else 'direct_final', context['provider'], context['model'],
+                             _prompt(request, context['applicability'], packets, allow, legacy_request_id=context['schema'].endswith('.v1')),
+                             context['max_tokens'], max_price=context['max_price'])
+        expected_request = {'stage': pr.stage, 'provider': pr.provider, 'model': pr.model, 'prompt': pr.prompt,
+                            'max_tokens': pr.max_tokens, 'input_sha256': pr.input_sha256()}
+        if pr.max_price is not None:
+            expected_request['max_price'] = dict(pr.max_price)
+        intent, terminal = journal_events[step * 2:step * 2 + 2]
+        identity = (pr.stage, pr.provider, pr.model, pr.input_sha256())
+        if (sent['call_id'] != call_id or sent['data'] != expected_request or intent.kind != 'intent'
+                or intent.call_id != call_id or terminal.call_id != call_id
+                or (intent.stage, intent.provider, intent.model, intent.input_sha256) != identity
+                or (terminal.stage, terminal.provider, terminal.model, terminal.input_sha256) != identity
+                or intent.payload.get('request_max_price') != context['max_price'] or cursor >= len(events) - 1):
+            raise ContractError('failure request binding differs')
+        event = events[cursor]; cursor += 1
+        if event['call_id'] != call_id:
+            raise ContractError('failure call identity differs')
+        if event['kind'] == 'failure':
+            recorded = event['data'].get('failure')
+            if (terminal.kind == 'uncertain' and recorded == 'uncertain_outcome' and result['failure'] == 'UncertainOutcome'):
+                terminal_failure = 'uncertain_outcome'
+            elif (terminal.kind == 'failure' and terminal.payload.get('error') == 'ProviderUnavailable'
+                  and recorded == 'provider_failure' and result['failure'] == 'ProviderUnavailable'):
+                terminal_failure = 'provider_failure'
+            else:
+                raise ContractError('failure terminal differs')
+            if step != len(calls) - 1 or cursor != len(events) - 1:
+                raise ContractError('work continues after failure')
+            break
+        if event['kind'] != 'response' or terminal.kind != 'receipt' or cursor >= len(events) - 1:
+            raise ContractError('failure response missing')
+        validated = events[cursor]; cursor += 1
+        response = event['data']; body = response['body']; raw_hash = hashlib.sha256(body.encode('utf-8')).hexdigest()
+        if validated['kind'] != 'validation' or validated['call_id'] != call_id or response['body_sha256'] != raw_hash:
+            raise ContractError('failure response differs')
+        if 200 <= response['http_status'] < 300:
+            try:
+                value, failure = _validator(packets, allow)(body)
+            except Exception:
+                value, failure = None, 'validator_error'
+        else:
+            value, failure = None, 'http_error'
+        if (validated['data'] != {'value': value, 'failure': failure} or terminal.payload.get('validation') != (failure or 'ok')
+                or terminal.payload.get('raw_sha256') != raw_hash or terminal.payload.get('usage') != (response['usage'] or {})
+                or terminal.payload.get('http_status') != response['http_status']
+                or terminal.payload.get('metadata') != response['metadata'] or terminal.payload.get('note') != response['note']):
+            raise ContractError('failure receipt differs')
+        if failure is not None:
+            if result['failure'] != failure or step != len(calls) - 1 or cursor != len(events) - 1:
+                raise ContractError('failure classification differs')
+            terminal_failure = ('malformed' if failure in ('malformed_output', 'schema_violation', 'invalid_followup')
+                                else 'unsupported' if failure == 'unsupported_citation' else 'provider_failure' if failure == 'http_error'
+                                else 'unknown_review' if failure == 'validator_error' else None)
+            if terminal_failure is None:
+                raise ContractError('unrecognized failure')
+            break
+        if value['action'] != 'search' or step + 1 >= search._max_rounds:
+            raise ContractError('unexpected successful result in failure path')
+        query = value['query']
+    if result['searches'] != list(search.trace):
+        raise ContractError('failure searches differ')
+    return {'status': 'incomplete', 'sha256': digest, 'semantic_assurance': 'not_assessed',
+            'failure_verified': terminal_failure is not None,
+            'classification': terminal_failure or 'unknown_review',
+            'reconciliation_required': terminal_failure == 'uncertain_outcome'}
