@@ -931,7 +931,8 @@
       "id": "T054",
       "phase": "P5",
       "depends_on": [
-        "T053"
+        "T053",
+        "T054A"
       ],
       "status": "pending",
       "files": [
@@ -1816,6 +1817,24 @@
       "acceptance": "A scope mismatch or unknown scope cannot be presented as applicable planner or judge evidence; exact scope behavior and provenance remain explicit.",
       "command": "python -m pytest tests/test_fresh_pipeline.py::test_fresh_scope_mismatch_never_reaches_planner -q",
       "evidence": "Red: wrong-scope and missing-scope synthetic passages reached fresh planner despite callback MATCH. Green: exact non-empty catalog scope is combined with entity/date applicability before planner/judge acquisition; mismatch is no_match, missing scope unknown. Archive records separate scope verdicts; replay detects altered scope even with a rewritten context hash. Focused fresh/replay/CLI/service 48 passed; full offline suite 361 passed. Scope metadata is recorded provenance, not authenticated authority; full R04 remains pending."
+    },
+    {
+      "id": "T054A",
+      "phase": "P5",
+      "depends_on": [
+        "T053B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/web.py",
+        "src/qjig/service.py"
+      ],
+      "test_file": "tests/test_web.py",
+      "test_name": "test_browser_workspace_served_from_loopback",
+      "action": "Build browser workspace over catalog and deterministic question APIs",
+      "acceptance": "A real loopback browser can import a source, run a scoped authored control, and inspect evidence and deferral.",
+      "command": "python -m pytest tests/test_web.py::test_browser_workspace_served_from_loopback -q",
+      "evidence": "Red: browser workspace returned 404. Green: local HTML/CSS/JS connects to actual catalog and deterministic authored-question APIs. Headless Chromium imported and inspected a synthetic source, produced a supported no and deferred an inapplicable entity; 390px viewport had no horizontal overflow. Focused tests 6 passed; full offline suite 362 passed. See docs/verification/2026-11-07-browser-foundation.md. Full T054, accessibility review, hosted path and independent outcome evidence remain pending."
     }
   ]
 }

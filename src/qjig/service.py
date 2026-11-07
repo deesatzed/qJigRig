@@ -54,6 +54,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if not self._trusted_host():
             self._reply(403, {"error": "untrusted host"})
+        elif self.path in ("/", "/app.css", "/app.js"):
+            from .web import CSS, HTML, JS
+            content, content_type = {"/": (HTML, "text/html"), "/app.css": (CSS, "text/css"), "/app.js": (JS, "text/javascript")}[self.path]
+            body = content.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", content_type + "; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Security-Policy", "default-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path == "/api/health":
             self._reply(200, {"ok": True, "service": "qjig"})
         elif self.path == "/api/sources":
