@@ -1286,7 +1286,8 @@
       "id": "T072",
       "phase": "P6",
       "depends_on": [
-        "T071"
+        "T071",
+        "T072A"
       ],
       "status": "pending",
       "files": [
@@ -3057,6 +3058,23 @@
       "acceptance": "Per-assignment physical calls, usage, unknown values and observed latency come from the pinned request journal and exclude unrelated requests.",
       "command": "python -m pytest tests/test_evaluation.py::test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping -q",
       "evidence": "Red: assignment-linked scores omitted physical resources, and journal aggregation could not select one request. Direct and combined scores now include request-scoped journal totals and stage breakdowns; fresh scoring requires an independently supplied matching journal digest. Synthetic tests cover direct and combined usage, missing/wrong anchors and exclusion of a separate uncertain request. Focused costs/evaluation/goal/replay 101 passed; full offline 540 passed. Values are reported usage, latency is observed call time, and anchor and quiescence are caller assumptions; missing assignments and actual hosted outcomes remain open."
+    },
+    {
+      "id": "T072A",
+      "phase": "evaluation",
+      "depends_on": [
+        "T064C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_decision_criteria_partition_and_incomplete_evidence",
+      "action": "Validate exact non-overlapping decision thresholds",
+      "acceptance": "Outcome-support criteria partition the entire 0-to-1 domain without overlaps or gaps; missing or incomplete inputs remain inconclusive.",
+      "command": "python -m pytest tests/test_evaluation.py::test_decision_criteria_partition_and_incomplete_evidence -q",
+      "evidence": "Red: no check existed for the overlapping draft thresholds. A separate anchored criteria validator now checks that single outcome-support rules cover [0,1] exactly once with every decision reachable; range lower bounds are inclusive and upper bounds exclusive. A decision helper returns inconclusive for missing or incomplete inputs. Synthetic boundaries, overlapping/gapped/mismatched rules, invalid values and absent anchors are checked. Focused evaluation/audit 48 passed; full offline suite 541 passed. Input metric and completeness remain caller assertions, existing draft thresholds still overlap, and no criteria were chosen or experiment frozen."
     }
   ]
 }

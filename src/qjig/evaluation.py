@@ -154,8 +154,12 @@ def validate_evaluation_design(design: dict, *, expected_digest: str | None = No
         fail()
     for rule in criteria.values():
         if (not isinstance(rule, dict) or set(rule) != {'metric', 'operator', 'threshold'} or
-                rule['metric'] not in design['metrics'] or rule['operator'] not in ('<', '<=', '>', '>=', '==') or
-                type(rule['threshold']) not in (int, float) or not math.isfinite(rule['threshold'])):
+                rule['metric'] not in design['metrics'] or rule['operator'] not in ('<', '<=', '>', '>=', '==', 'range')):
+            fail()
+        threshold = rule['threshold']
+        values = threshold if rule['operator'] == 'range' and isinstance(threshold, list) and len(threshold) == 2 else [threshold]
+        if (any(type(value) not in (int, float) or not math.isfinite(value) for value in values)
+                or (rule['operator'] == 'range' and (len(values) != 2 or values[0] >= values[1]))):
             fail()
     families, hashes, groups = {}, {}, {}
     def find(key):
@@ -237,6 +241,61 @@ def validate_evaluation_design(design: dict, *, expected_digest: str | None = No
     if expected_digest is not None and (not isinstance(expected_digest, str) or not _SHA.fullmatch(expected_digest) or not hmac.compare_digest(digest, expected_digest)):
         raise ContractError('evaluation design digest differs')
     return digest
+
+
+
+def _criteria_match(rule, value):
+    from decimal import Decimal
+    op, threshold = rule['operator'], rule['threshold']
+    if op == 'range':
+        return Decimal(str(threshold[0])) <= value < Decimal(str(threshold[1]))
+    bound = Decimal(str(threshold))
+    return {'<': value < bound, '<=': value <= bound, '>': value > bound,
+            '>=': value >= bound, '==': value == bound}[op]
+
+
+def validate_decision_criteria(design: dict, *, expected_design_sha256: str) -> None:
+    """Verify exact, disjoint and exhaustive outcome-support rules over [0, 1].
+
+    This validates a policy, not a frozen experiment or the quality of its metric.
+    """
+    from decimal import Decimal, localcontext
+    if not isinstance(expected_design_sha256, str) or not _SHA.fullmatch(expected_design_sha256):
+        raise ContractError('decision design anchor required')
+    validate_evaluation_design(design, expected_digest=expected_design_sha256)
+    rules = design['criteria']
+    if any(rule['metric'] != 'outcome_support' for rule in rules.values()):
+        raise ContractError('decision rules require a common outcome support metric')
+    cuts = {Decimal(0), Decimal(1)}
+    for rule in rules.values():
+        values = rule['threshold'] if rule['operator'] == 'range' else [rule['threshold']]
+        for value in values:
+            bound = Decimal(str(value))
+            if not Decimal(0) <= bound <= Decimal(1):
+                raise ContractError('decision threshold outside metric domain')
+            cuts.add(bound)
+    ordered = sorted(cuts)
+    with localcontext() as ctx:
+        ctx.prec = 800  # preserve distinct intervals even at finite-float extremes
+        probes = ordered + [(left + right) / 2 for left, right in zip(ordered, ordered[1:])]
+    matches = [{name for name, rule in rules.items() if _criteria_match(rule, probe)} for probe in probes]
+    if any(len(match) != 1 for match in matches) or set().union(*matches) != set(rules):
+        raise ContractError('decision criteria overlap, leave a gap or make a decision unreachable')
+
+
+def decide_from_criteria(design: dict, value, *, expected_design_sha256: str,
+                         assignments_complete: bool, resources_complete: bool) -> str:
+    """Apply predeclared criteria to an asserted proportion and completeness flags."""
+    import math
+    from decimal import Decimal
+    validate_decision_criteria(design, expected_design_sha256=expected_design_sha256)
+    if type(assignments_complete) is not bool or type(resources_complete) is not bool:
+        raise ContractError('explicit completeness flags required')
+    if value is not None and (type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1):
+        raise ContractError('invalid outcome support proportion')
+    if value is None or not assignments_complete or not resources_complete:
+        return 'inconclusive'
+    return next(name for name, rule in design['criteria'].items() if _criteria_match(rule, Decimal(str(value))))
 
 
 def summarize_evaluation_assignments(design: dict, results: list[dict], *, expected_digest: str) -> dict:

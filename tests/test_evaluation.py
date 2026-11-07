@@ -1210,3 +1210,34 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
         with pytest.raises(ContractError):
             score_reserved_assignment(goal,archive,journal,ref,partition='development',expected_plan_sha256=plan['sha256'],
                 expected_run_sha256=tampered.digest,expected_reference_sha256=reference_digest(ref))
+
+
+def test_decision_criteria_partition_and_incomplete_evidence():
+    import copy
+    from qjig.evaluation import validate_decision_criteria, decide_from_criteria, validate_evaluation_design
+    design = _sample_design()
+    # The historical >= thresholds overlap and must not qualify as frozen criteria.
+    with pytest.raises(ContractError):
+        validate_decision_criteria(design,expected_design_sha256=validate_evaluation_design(design))
+    design['criteria'] = {
+        'remove':{'metric':'outcome_support','operator':'<','threshold':0.5},
+        'revise':{'metric':'outcome_support','operator':'range','threshold':[0.5,0.8]},
+        'retain':{'metric':'outcome_support','operator':'>=','threshold':0.8}}
+    digest = validate_evaluation_design(design)
+    validate_decision_criteria(design,expected_design_sha256=digest)
+    with pytest.raises(ContractError):
+        validate_decision_criteria(design,expected_design_sha256=None)
+    for value, expected in [(0,'remove'),(0.499,'remove'),(0.5,'revise'),(0.799,'revise'),(0.8,'retain'),(1,'retain')]:
+        assert decide_from_criteria(design,value,expected_design_sha256=digest,assignments_complete=True,resources_complete=True)==expected
+    assert decide_from_criteria(design,None,expected_design_sha256=digest,assignments_complete=True,resources_complete=True)=='inconclusive'
+    assert decide_from_criteria(design,0.9,expected_design_sha256=digest,assignments_complete=False,resources_complete=True)=='inconclusive'
+    for bad in (float('nan'),-0.1,1.1,True):
+        with pytest.raises(ContractError):
+            decide_from_criteria(design,bad,expected_design_sha256=digest,assignments_complete=True,resources_complete=True)
+    for rule in ({'metric':'outcome_support','operator':'>=','threshold':0.5},
+                 {'metric':'outcome_support','operator':'range','threshold':[0.6,0.8]},
+                 {'metric':'outcome_support','operator':'range','threshold':[0.4,0.8]},
+                 {'metric':'source_coverage','operator':'range','threshold':[0.5,0.8]}):
+        changed = copy.deepcopy(design); changed['criteria']['revise'] = rule
+        with pytest.raises(ContractError):
+            validate_decision_criteria(changed,expected_design_sha256=validate_evaluation_design(changed))
