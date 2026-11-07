@@ -3822,6 +3822,23 @@
       "acceptance": "Start the CLI with a validated local configuration, reject excessive budgets and unapproved models, and refuse hosted requests before spending while bounds remain unverified.",
       "command": "python -m pytest tests/test_fresh_config.py::test_cli_configures_fresh_backend_but_refuses_unverified_hosted_calls -q",
       "evidence": "Red: serve rejected --fresh-config. CLI subprocess and loopback request now return preflight refusal without opening a goal ledger; separate cases reject excessive budgets, wrong model and extra fields. Synthetic Chrome exercised the configured injected pipeline and rendered deferred result, review and source quote. User-supplied config is not verified pricing, prior-spend reconciliation, real-provider authorization, or live outcome evidence."
+    },
+    {
+      "id": "T055D",
+      "phase": "P5",
+      "depends_on": [
+        "T053D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/web.py"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Track source freshness for fresh browser results",
+      "acceptance": "After an actual synthetic fresh pipeline run, mark external source changes and distinguish inability to check current catalog state while preserving prior evidence.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: Chrome fresh result remained unmarked after another client replaced a source. Green: actual synthetic fresh run displays a stale-source note on external change, distinguishes transient source-status failure and recovers after reconnect. Existing fresh, browser and web regressions passed; this is not hosted or independent outcome evidence."
     }
   ]
 }

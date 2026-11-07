@@ -74,6 +74,14 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     assert 'synthetic_unvalidated' in page.locator('#fresh-result').inner_text()
                     assert quote in page.locator('#fresh-result').inner_text()
                     assert browser_transport.calls_made == 4
+                    page.route('**/api/catalog-state', lambda route: route.fulfill(status=503, json={'error': 'unavailable'}))
+                    page.get_by_text('Fresh run source status is unknown; reconnect and check the catalog.').wait_for(timeout=7000)
+                    page.unroute('**/api/catalog-state')
+                    page.get_by_text('Fresh run source status is unknown; reconnect and check the catalog.').wait_for(state='hidden', timeout=7000)
+                    client.import_source({'source_id': 'policy.md', 'text': '# Policy\nRefunds are accepted within 30 days.\n',
+                        'scope': 'project', 'entities': [], 'effective_from': '2026-01-01', 'effective_to': 'open',
+                        'observed_at': None, 'authority': None})
+                    page.get_by_text('Sources changed since this fresh run. Rerun to inspect the current revision.').wait_for(timeout=7000)
                 finally:
                     browser.close()
     finally:
