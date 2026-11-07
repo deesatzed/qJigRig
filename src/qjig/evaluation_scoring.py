@@ -309,48 +309,73 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
 
 
 def _score_fresh_receipt_failure(context, events, journal, reference, run_hash, ref_hash):
-    """Retain malformed post-planning receipts without inferring a graph result."""
+    """Retain verified post-planning failures without inferring a graph result."""
     request_id = context['request']['request_id']
-    if journal.pending(request_id):
-        raise ContractError('pending fresh failure requires reconciliation')
+    pending = {event.call_id for event in journal.pending(request_id)}
     sent = [event for event in events if event['kind'] == 'request']
     recorded = journal.events(request_id)
     if not sent or len(recorded) != 2 * len(sent):
-        raise ContractError('incomplete fresh journal call count differs')
+        raise ContractError('incomplete fresh journal call count or reconciliation differs')
     responses = {e['call_id']:e['data'] for e in events if e['kind'] == 'response'}
     validations = {e['call_id']:e['data'] for e in events if e['kind'] == 'validation'}
-    malformed = False
+    failures = {e['call_id']:e['data'] for e in events if e['kind'] == 'failure'}
+    outcomes, uncertain = [], set()
     for i, event in enumerate(sent):
         data, call_id = event['data'], event['call_id']
         intent, terminal = recorded[2*i:2*i+2]
         response, validation = responses.get(call_id), validations.get(call_id)
         identity = (data['stage'], data['provider'], data['model'], data['input_sha256'])
-        if (not isinstance(response, dict) or not isinstance(validation, dict)
-                or intent.kind != 'intent' or terminal.kind != 'receipt'
-                or intent.call_id != call_id or terminal.call_id != call_id
+        if (intent.kind != 'intent' or intent.call_id != call_id or terminal.call_id != call_id
                 or (intent.stage, intent.provider, intent.model, intent.input_sha256) != identity
                 or (terminal.stage, terminal.provider, terminal.model, terminal.input_sha256) != identity
-                or intent.payload.get('request_max_price') != data.get('max_price')
-                or terminal.payload.get('raw_sha256') != response['body_sha256']
-                or terminal.payload.get('usage') != (response['usage'] or {})
-                or terminal.payload.get('http_status') != response['http_status']
-                or terminal.payload.get('metadata') != response['metadata']
-                or terminal.payload.get('note') != response['note']
-                or terminal.payload.get('validation') != (validation.get('failure') or 'ok')):
-            raise ContractError('incomplete fresh receipt differs')
-        failure = validation.get('failure')
-        if data['stage'] in ('judge_positive', 'judge_negative') and failure in ('malformed_output', 'schema_violation'):
-            malformed = True
-        elif failure is not None:
-            raise ContractError('unsupported incomplete fresh failure')
-    if not malformed:
-        raise ContractError('verified malformed judge receipt required')
+                or intent.payload.get('request_max_price') != data.get('max_price')):
+            raise ContractError('incomplete fresh journal identity differs')
+        if terminal.kind == 'receipt':
+            if (not isinstance(response, dict) or not isinstance(validation, dict) or call_id in failures
+                    or terminal.payload.get('raw_sha256') != response['body_sha256']
+                    or terminal.payload.get('usage') != (response['usage'] or {})
+                    or terminal.payload.get('http_status') != response['http_status']
+                    or terminal.payload.get('metadata') != response['metadata']
+                    or terminal.payload.get('note') != response['note']
+                    or terminal.payload.get('validation') != (validation.get('failure') or 'ok')):
+                raise ContractError('incomplete fresh receipt differs')
+            failure = validation.get('failure')
+            if failure is None:
+                continue
+            if data['stage'] not in ('judge_positive', 'judge_negative', 'plan_review'):
+                raise ContractError('unsupported incomplete fresh stage')
+            if failure in ('malformed_output', 'schema_violation'):
+                outcome = 'malformed'
+            elif failure == 'http_error':
+                outcome = 'provider_failure'
+            else:
+                raise ContractError('unsupported incomplete fresh failure')
+        elif terminal.kind in ('failure', 'uncertain'):
+            if response is not None or validation is not None or data['stage'] not in ('judge_positive', 'judge_negative', 'plan_review'):
+                raise ContractError('incomplete fresh failure differs')
+            archived = failures.get(call_id)
+            if terminal.kind == 'uncertain' and archived == {'failure':'uncertain_outcome'}:
+                outcome = 'uncertain_outcome'
+                uncertain.add(call_id)
+            elif (terminal.kind == 'failure' and archived == {'failure':'provider_failure'}
+                  and terminal.payload.get('error') == 'ProviderUnavailable'):
+                outcome = 'provider_failure'
+            else:
+                raise ContractError('incomplete fresh terminal differs')
+        else:
+            raise ContractError('unsupported incomplete fresh terminal')
+        outcomes.append({'call_id':call_id, 'stage':data['stage'], 'classification':outcome})
+    if not outcomes or pending != uncertain:
+        raise ContractError('fresh failure reconciliation state differs')
+    classes = {item['classification'] for item in outcomes}
+    classification = ('uncertain_outcome' if 'uncertain_outcome' in classes else
+                      'provider_failure' if 'provider_failure' in classes else 'malformed')
     return {'case_id':reference['case_id'], 'run_sha256':run_hash, 'reference_sha256':ref_hash,
-            'reference_provenance':reference['provenance'], 'classification':'malformed',
+            'reference_provenance':reference['provenance'], 'classification':classification,
             'request_status':'deferred', 'request_answer':None, 'conditional_answer':None,
             'conditional_comparison':'unknown_review', 'reference_expected_answer':reference['expected_answer'],
-            'required_evidence_covered':None, 'failure_verified':True, 'reconciliation_required':False,
-            'semantic_assurance':'not_assessed'}
+            'required_evidence_covered':None, 'failures':outcomes, 'failure_verified':True,
+            'reconciliation_required':bool(pending), 'semantic_assurance':'not_assessed'}
 
 
 def _score_fresh_planner_failure(context, events, journal, reference, run_hash, ref_hash):

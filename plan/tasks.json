@@ -1216,7 +1216,8 @@
         "T068D",
         "T068E",
         "T068F",
-        "T068G"
+        "T068G",
+        "T068H"
       ],
       "status": "pending",
       "files": [
@@ -2982,6 +2983,23 @@
       "acceptance": "An incomplete fresh run with a malformed judge receipt is scored as failed without fabricating an answer; altered journal receipts reject.",
       "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
       "evidence": "Red: incomplete fresh results containing malformed judge receipts were incorrectly treated as planner failures and rejected. A replayed result with a malformed judge receipt is now retained as malformed with no request or conditional answer, after all recorded receipts match the journal; changed journal usage refuses. Focused evaluation/replay/acquisition suite 62 passed; full offline suite 531 passed. Other judge/reviewer provider failures and uncertain outcomes remain unsupported and are not inferred; no real provider called."
+    },
+    {
+      "id": "T068H",
+      "phase": "evaluation",
+      "depends_on": [
+        "T068G"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_fresh_planner_failure_scoring_retains_uncertainty",
+      "action": "Preserve incomplete judge provider failures and uncertain calls",
+      "acceptance": "Journal-linked provider errors, HTTP errors and pending timeouts remain distinct and cannot produce a conditional answer; mismatched reconciliation or receipts refuse.",
+      "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
+      "evidence": "Red: incomplete fresh judge HTTP failures, provider unavailability and timeouts were rejected instead of retained. Scoring now checks every call identity and receipt or failure terminal against its journal, preserves per-call failures, and distinguishes malformed, HTTP/provider failure and pending uncertain outcomes for synthetic judge and reviewer attempts. Mixed malformed plus HTTP failures remain individually recorded. Changed journal data and stale reconciliation reject. Focused evaluation/replay/acquisition 70 passed; full offline suite 539 passed. Reconciled-call recovery, unrecorded budget refusals and unknown validator failures remain unscored; no provider calls were made."
     }
   ]
 }

@@ -745,7 +745,11 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
 
 
 @pytest.mark.parametrize(('mode','expected'), [('malformed','malformed'),('http_error','provider_failure'),('unavailable','provider_failure'),
-                                              ('timeout','uncertain_outcome'),('budget','unknown_review'),('judge_malformed','malformed')])
+                                              ('timeout','uncertain_outcome'),('budget','unknown_review'),('judge_malformed','malformed'),('judge_http','provider_failure'),
+                                              ('judge_unavailable','provider_failure'),('judge_timeout','uncertain_outcome'),
+                                              ('review_malformed','malformed'),('review_http','provider_failure'),
+                                              ('review_unavailable','provider_failure'),('review_timeout','uncertain_outcome'),
+                                              ('judge_mixed','provider_failure')])
 def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expected):
     import json
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
@@ -777,26 +781,44 @@ def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expec
     response = {'malformed':RawResponse(200,'not json',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
                 'http_error':RawResponse(502,'upstream error',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
                 'unavailable':ProviderUnavailable('synthetic'), 'timeout':TimeoutError('synthetic'), 'budget':None,
-                'judge_malformed':RawResponse(200,'not json',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01})}[mode]
+                'judge_malformed':RawResponse(200,'not json',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
+                'judge_mixed':RawResponse(200,'not json',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
+                'judge_http':RawResponse(502,'unavailable',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
+                'judge_unavailable':ProviderUnavailable('synthetic'), 'judge_timeout':TimeoutError('synthetic'),
+                'review_malformed':RawResponse(200,'not json',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
+                'review_http':RawResponse(502,'unavailable',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
+                'review_unavailable':ProviderUnavailable('synthetic'), 'review_timeout':TimeoutError('synthetic')}[mode]
     responses = ([RawResponse(200,json.dumps({'predicates':[{'id':'p','question':'Do tests pass?'}],'expression':{'ref':'p'}}),
                               {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}), response,
                   RawResponse(200,json.dumps({'supported':False,'quote':'','reason':'synthetic'}),
-                              {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01})] if mode=='judge_malformed' else [response])
+                              {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01})] if mode.startswith('judge_') else [response])
+    if mode == 'judge_mixed':
+        responses[2] = RawResponse(502,'unavailable',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01})
+    if mode.startswith('review_'):
+        responses = [RawResponse(200,json.dumps({'predicates':[{'id':'p','question':'Do tests pass?'}],'expression':{'ref':'p'}}),
+                                 {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
+                     RawResponse(200,json.dumps({'supported':True,'quote':'Tests must pass.','reason':'synthetic'}),
+                                 {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
+                     RawResponse(200,json.dumps({'supported':False,'quote':'','reason':'synthetic'}),
+                                 {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}), response]
     with Journal.open(tmp_path/'j.sqlite') as journal, RunArchive.open(tmp_path/'archive') as archive:
         result = run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=d,expected_case_sha256=case_lock_digest(lock),
                                   applicability_inputs=inputs,ledger=BudgetLedger(Budget(0 if mode=='budget' else 8,50000,1),journal,'r'),
-                                  transport=StandInTransport(responses),archive=archive,planner=('stand-in','planner'),judge=('stand-in','judge'))
+                                  transport=StandInTransport(responses),archive=archive,planner=('stand-in','planner'),judge=('stand-in','judge'),
+                                  reviewer=('stand-in','reviewer') if mode.startswith('review_') else None)
         replay=verify_archive(archive); assert replay.status=='incomplete'
         score=score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
         assert score['classification']==expected and score['request_status']=='deferred' and score['request_answer'] is None
         assert score['conditional_answer'] is None and score['required_evidence_covered'] is None
-        assert score['reconciliation_required'] is (mode=='timeout')
+        assert score['reconciliation_required'] is (mode in ('timeout','judge_timeout','review_timeout'))
         assert score['failure_verified'] is (mode!='budget')
-        if mode=='timeout':
+        if mode == 'judge_mixed':
+            assert [f['classification'] for f in score['failures']] == ['malformed','provider_failure']
+        if mode in ('timeout','judge_timeout','review_timeout'):
             journal.reconcile(journal.pending('r')[0].call_id, resolution='not_executed', detail='synthetic verification')
             with pytest.raises(ContractError, match='reconciliation'):
                 score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,expected_reference_sha256=reference_digest(ref))
-        if mode in ('malformed', 'judge_malformed'):
+        if mode in ('malformed', 'judge_malformed', 'judge_http'):
             saved = journal._con.execute("SELECT payload FROM events WHERE kind='receipt'").fetchone()[0]
             tampered = json.loads(saved); tampered['usage']['cost_usd']=0
             journal._con.execute('DROP TRIGGER events_no_update')
