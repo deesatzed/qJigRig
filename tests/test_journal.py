@@ -3,7 +3,7 @@ import sqlite3
 import pytest
 
 from qjig.contracts import ContractError
-from qjig.journal import Journal, run_journaled
+from qjig.journal import Journal, ReconciliationRequired, UncertainOutcome, resume_report, run_journaled
 
 INTENT = dict(request_id="req-1", stage="judge", provider="stand-in", model="stand-in-model", input_sha256="a" * 64)
 
@@ -67,3 +67,69 @@ def test_invalid_intents_rejected_before_any_call(tmp_path):
             with pytest.raises(ContractError):
                 run_journaled(j, call=lambda: calls.append(1), **{**INTENT, **bad})
         assert calls == [] and j.events("req-1") == []
+
+
+def crash_once(db):
+    with Journal.open(db) as j:
+        with pytest.raises(Crash):
+            run_journaled(j, call=lambda: (_ for _ in ()).throw(Crash()), **INTENT)
+
+
+def test_uncertain_resume(tmp_path):
+    db = tmp_path / "j.sqlite"
+    crash_once(db)
+    calls = []
+    with Journal.open(db) as j:
+        report = resume_report(j, "req-1")
+        assert report.reconciliation_required is True and [e.call_id for e in report.unresolved] == ["req-1#1"]
+        # the same call is NOT blindly repeated: refused, with no second invocation
+        with pytest.raises(ReconciliationRequired) as exc:
+            run_journaled(j, call=lambda: calls.append(1) or ("x", {}), **INTENT)
+        assert calls == [] and "req-1#1" in str(exc.value)
+        assert len(j.events("req-1")) == 1  # the refusal did not even write a new intent
+        # a different input is a different call and is allowed
+        run_journaled(j, call=lambda: calls.append(2) or ("y", {}), **{**INTENT, "input_sha256": "b" * 64})
+        assert calls == [2]
+        # after an operator verifies the first call did NOT execute, a retry is allowed and journaled
+        j.reconcile("req-1#1", resolution="not_executed", detail="provider dashboard shows no request")
+        assert resume_report(j, "req-1").reconciliation_required is False
+        run_journaled(j, call=lambda: calls.append(3) or ("z", {}), **INTENT)
+        assert calls == [2, 3]
+        rec = [e for e in j.events("req-1") if e.kind == "reconciled"][0]
+        assert rec.payload == {"resolution": "not_executed", "detail": "provider dashboard shows no request"}
+
+
+def test_uncertain_outcome_is_journaled_and_blocks_retry(tmp_path):
+    db = tmp_path / "j.sqlite"
+    calls = []
+
+    def timeout():
+        calls.append(1)
+        raise UncertainOutcome("read timeout after request sent")
+
+    with Journal.open(db) as j:
+        with pytest.raises(UncertainOutcome):
+            run_journaled(j, call=timeout, **INTENT)
+        kinds = [e.kind for e in j.events("req-1")]
+        assert kinds == ["intent", "uncertain"]
+        assert [e.call_id for e in j.pending("req-1")] == ["req-1#1"]  # still unresolved
+        with pytest.raises(ReconciliationRequired):
+            run_journaled(j, call=timeout, **INTENT)
+        assert calls == [1]
+        j.reconcile("req-1#1", resolution="executed", detail="billing shows one call")
+        assert j.pending("req-1") == []
+        assert [e.payload["resolution"] for e in j.events("req-1") if e.kind == "reconciled"] == ["executed"]
+
+
+def test_reconcile_validates(tmp_path):
+    with Journal.open(tmp_path / "j.sqlite") as j:
+        with pytest.raises(KeyError):
+            j.reconcile("nope#1", resolution="executed", detail="x")
+        run_journaled(j, call=lambda: ("x", {}), **INTENT)
+        with pytest.raises(ContractError):
+            j.reconcile("req-1#1", resolution="executed", detail="already has a receipt")  # nothing to reconcile
+        crash_once(tmp_path / "j.sqlite")
+        with pytest.raises(ContractError):
+            j.reconcile("req-1#3", resolution="maybe", detail="x")
+        with pytest.raises(ContractError):
+            j.reconcile("req-1#3", resolution="executed", detail="  ")

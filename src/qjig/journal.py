@@ -48,6 +48,20 @@ class Event:
     recorded_at: float
 
 
+class UncertainOutcome(Exception):
+    """Raised by a transport when it cannot tell whether the provider executed the call."""
+
+
+class ReconciliationRequired(Exception):
+    """An earlier identical call is unresolved; repeating it blindly could be a second paid call."""
+
+
+@dataclass(frozen=True)
+class ResumeReport:
+    unresolved: tuple[Event, ...]
+    reconciliation_required: bool
+
+
 class Journal:
     def __init__(self, con: sqlite3.Connection, clock: Callable[[], float]) -> None:
         self._con, self._clock = con, clock
@@ -106,6 +120,20 @@ class Journal:
         ).fetchall()
         return [Event(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], json.loads(r[8]), r[9]) for r in rows]
 
+    def reconcile(self, call_id: str, *, resolution: str, detail: str) -> Event:
+        """Record an operator's verified finding about an unresolved call: executed or not_executed."""
+        if resolution not in ("executed", "not_executed"):
+            raise ContractError("resolution must be 'executed' or 'not_executed'")
+        if not detail.strip():
+            raise ContractError("reconciliation needs a recorded detail (what was checked)")
+        request_id = call_id.rsplit("#", 1)[0]
+        match = [e for e in self.pending(request_id) if e.call_id == call_id]
+        if not match:
+            if not any(e.call_id == call_id for e in self.events(request_id)):
+                raise KeyError(call_id)
+            raise ContractError(f"{call_id} is not unresolved")
+        return self.record_terminal(match[0], "reconciled", {"resolution": resolution, "detail": detail})
+
     def pending(self, request_id: str) -> list[Event]:
         """Intents with no receipt, failure or reconciliation yet."""
         evs = self.events(request_id)
@@ -117,11 +145,26 @@ def run_journaled(
     journal: Journal, *, call: Callable[[], Any], request_id: str, stage: str, provider: str, model: str, input_sha256: str
 ) -> Any:
     """Write the intent, then call. `call` returns (result, usage). A crash leaves the intent pending."""
+    blocking = [e for e in journal.pending(request_id) if (e.stage, e.provider, e.model, e.input_sha256) == (stage, provider, model, input_sha256)]
+    if blocking:
+        raise ReconciliationRequired(
+            "unresolved earlier call(s) with the same input: " + ", ".join(e.call_id for e in blocking)
+            + "; verify whether they executed, then reconcile before retrying"
+        )
     intent = journal.record_intent(request_id=request_id, stage=stage, provider=provider, model=model, input_sha256=input_sha256)
     try:
         result, usage = call()
+    except UncertainOutcome as exc:  # sent, outcome unknown: stays unresolved
+        journal.record_terminal(intent, "uncertain", {"detail": str(exc)})
+        raise
     except Exception as exc:  # a definite failure; BaseException (a crash) deliberately leaves it pending
         journal.record_terminal(intent, "failure", {"error": type(exc).__name__, "detail": str(exc)})
         raise
     journal.record_terminal(intent, "receipt", {"usage": usage})
     return result
+
+
+def resume_report(journal: Journal, request_id: str) -> ResumeReport:
+    """After a restart: which calls are unresolved. Nothing here ever invokes a provider."""
+    unresolved = tuple(journal.pending(request_id))
+    return ResumeReport(unresolved, bool(unresolved))
