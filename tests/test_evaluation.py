@@ -749,7 +749,7 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
                                               ('judge_unavailable','provider_failure'),('judge_timeout','uncertain_outcome'),
                                               ('review_malformed','malformed'),('review_http','provider_failure'),
                                               ('review_unavailable','provider_failure'),('review_timeout','uncertain_outcome'),
-                                              ('judge_mixed','provider_failure')])
+                                              ('judge_mixed','provider_failure'),('review_empty_packet','unknown_review')])
 def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expected):
     import json
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
@@ -769,11 +769,12 @@ def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expec
     sources, protected = [item('code',code)], [item('label',gold)]
     design = _sample_design(); design['families'][0]['source_hashes'] = [sources[0]['sha256']]
     d = validate_evaluation_design(design)
-    ref = make_reference(case_id='dev',request=Request('hidden','Do tests pass?','reviewer','1','project'),
+    question = 'Unmatched zyzzword?' if mode=='review_empty_packet' else 'Do tests pass?'
+    ref = make_reference(case_id='dev',request=Request('hidden',question,'reviewer','1','project'),
                          sources=load_isolated_sources(tmp_path,sources,protected),as_of='2026-11-07',entities=[],
                          historical_as_known=False,expected_answer='yes',provenance='authored_unvalidated',
                          evidence=[{'path':'code','quote':'Tests must pass.'}])
-    lock = {'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':d,'question':'Do tests pass?',
+    lock = {'schema':'qjig.evaluation-case.v1','case_id':'dev','design_sha256':d,'question':question,
             'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
             'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
     inputs = ApplicabilityInputs(Collection((MemberMetadata(ref['source_revisions'][0],'project',Interval('2020-01-01',OPEN)),)),
@@ -787,7 +788,8 @@ def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expec
                 'judge_unavailable':ProviderUnavailable('synthetic'), 'judge_timeout':TimeoutError('synthetic'),
                 'review_malformed':RawResponse(200,'not json',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
                 'review_http':RawResponse(502,'unavailable',{'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}),
-                'review_unavailable':ProviderUnavailable('synthetic'), 'review_timeout':TimeoutError('synthetic')}[mode]
+                'review_unavailable':ProviderUnavailable('synthetic'), 'review_timeout':TimeoutError('synthetic'),
+                'review_empty_packet':None}[mode]
     responses = ([RawResponse(200,json.dumps({'predicates':[{'id':'p','question':'Do tests pass?'}],'expression':{'ref':'p'}}),
                               {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.01}), response,
                   RawResponse(200,json.dumps({'supported':False,'quote':'','reason':'synthetic'}),
@@ -811,7 +813,10 @@ def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expec
         assert score['classification']==expected and score['request_status']=='deferred' and score['request_answer'] is None
         assert score['conditional_answer'] is None and score['required_evidence_covered'] is None
         assert score['reconciliation_required'] is (mode in ('timeout','judge_timeout','review_timeout'))
-        assert score['failure_verified'] is (mode!='budget')
+        assert score['failure_verified'] is (mode not in ('budget','review_empty_packet'))
+        if mode=='review_empty_packet':
+            assert result.review.status=='unavailable' and result.review.failure=='review_context_or_storage_error'
+            assert score['review_status']=='unavailable' and score['review_failure']=='review_context_or_storage_error'
         if mode == 'judge_mixed':
             assert [f['classification'] for f in score['failures']] == ['malformed','provider_failure']
         if mode in ('timeout','judge_timeout','review_timeout'):
@@ -835,7 +840,7 @@ def test_fresh_planner_failure_scoring_retains_uncertainty(tmp_path, mode, expec
             with pytest.raises(ContractError):
                 score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
                     expected_reference_sha256=reference_digest(ref),expected_journal_sha256=anchor)
-        if mode in ('malformed', 'judge_malformed', 'judge_http'):
+        if mode in ('malformed', 'judge_malformed', 'judge_http', 'review_empty_packet'):
             saved = journal._con.execute("SELECT payload FROM events WHERE kind='receipt'").fetchone()[0]
             tampered = json.loads(saved); tampered['usage']['cost_usd']=0
             journal._con.execute('DROP TRIGGER events_no_update')

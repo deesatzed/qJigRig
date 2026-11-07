@@ -404,16 +404,24 @@ def _score_fresh_receipt_failure(context, events, journal, reference, run_hash, 
         else:
             raise ContractError('unsupported incomplete fresh terminal')
         outcomes.append({'call_id':call_id, 'stage':data['stage'], 'classification':outcome})
-    if not outcomes or pending != uncertain - {r['call_id'] for r in reconciliations}:
+    results=[e['data'] for e in events if e['kind']=='run_result']
+    review=results[0].get('review') if len(results)==1 else None
+    no_call_review = (isinstance(review,dict) and review.get('status')=='unavailable'
+                      and review.get('call_id') is None and review.get('review_id') is None
+                      and isinstance(review.get('failure'),str) and bool(review['failure'])
+                      and not any(e['data']['stage']=='plan_review' for e in sent))
+    if (not outcomes and not no_call_review) or pending != uncertain - {r['call_id'] for r in reconciliations}:
         raise ContractError('fresh failure reconciliation state differs')
     classes = {item['classification'] for item in outcomes}
     classification = ('uncertain_outcome' if 'uncertain_outcome' in classes else
-                      'provider_failure' if 'provider_failure' in classes else 'malformed')
+                      'provider_failure' if 'provider_failure' in classes else 'malformed' if classes else 'unknown_review')
     return {'case_id':reference['case_id'], 'run_sha256':run_hash, 'reference_sha256':ref_hash,
             'reference_provenance':reference['provenance'], 'classification':classification,
             'request_status':'deferred', 'request_answer':None, 'conditional_answer':None,
             'conditional_comparison':'unknown_review', 'reference_expected_answer':reference['expected_answer'],
-            'required_evidence_covered':None, 'failures':outcomes, 'failure_verified':True,
+            'required_evidence_covered':None, 'failures':outcomes, 'failure_verified':bool(outcomes),
+            'review_status':'unavailable' if no_call_review else None,
+            'review_failure':review['failure'] if no_call_review else None,
             'reconciliation_required':bool(pending), 'reconciliations':reconciliations,
             'semantic_assurance':'not_assessed'}
 

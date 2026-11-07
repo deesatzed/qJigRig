@@ -1283,7 +1283,8 @@
         "T071C",
         "T071D",
         "T071E",
-        "T071F"
+        "T071F",
+        "T071G"
       ],
       "status": "pending",
       "files": [
@@ -3346,6 +3347,41 @@
       "acceptance": "A nonmatching source does not block unrelated assignments or reach a judge; its own assignment is archived, scored unknown and retained in the denominator.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "Red: batch preflight rejected the entire experiment when one full-source case had nonmatching applicability. The batch now preserves such cases; a decomposition-only assignment with a nonmatching or unknown source is durably archived as a no-call deferral, with per-source scope/entity-date verdicts reconstructed on replay and scored as unknown review. Synthetic wrong-scope, wrong-date, wrong-entity and unknown-input cases passed; zero calls, resumed receipt verification, changed verdict rejection and full denominator preservation were checked. Focused evaluation/goal/replay/fresh-preflight 119 passed before final score assertions; final four cases passed; full offline suite 554 passed. Metadata and anchors remain caller assertions; this does not adjudicate whether the deferral is justified or establish provider outcomes."
+    },
+    {
+      "id": "T071G",
+      "phase": "evaluation",
+      "depends_on": [
+        "T071F",
+        "T068N"
+      ],
+      "status": "complete",
+      "files": [
+        "scripts/smoke_factorial_synthetic.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Exercise the complete draft assignment denominator with a synthetic transport",
+      "acceptance": "All draft assignments are accounted for through bounded batches and replay or remain explicitly incomplete; this does not claim real model evaluation.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Synthetic verification: the local draft ran all 105 case/arm/repeat assignments in bounded batches with 1197 reserved synthetic slots and 228 synthetic call attempts; 39 of 42 possible reviews produced calls and the remaining unavailable reviews were retained as unknown. The interrupted run was resumed from its existing claim/archive after T068N, then reopening it rechecked all 105 receipts without new work. Evidence: .local/verification/full-factorial-synthetic-jdzwm67v. Focused evaluation/goal/replay/fresh-preflight 120 passed; full offline 555 passed. This is synthetic mechanics only, with synthetic token/pricing bounds and authored unvalidated labels; no real provider, comparison or semantic assurance is established. Synthetic command: PYTHONPATH=src python scripts/smoke_factorial_synthetic.py --resume .local/verification/full-factorial-synthetic-jdzwm67v."
+    },
+    {
+      "id": "T068N",
+      "phase": "evaluation",
+      "depends_on": [
+        "T068H"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_fresh_planner_failure_scoring_retains_uncertainty",
+      "action": "Retain no-call unavailable review in incomplete fresh scores",
+      "acceptance": "An unavailable review with no recorded call stays unknown review after journal checks, without fabricating an answer or verified cause.",
+      "command": "python -m pytest tests/test_evaluation.py::test_fresh_planner_failure_scoring_retains_uncertainty -q",
+      "evidence": "Red: an incomplete fresh run with an empty planning packet had unavailable review without a provider-call failure, and its score was rejected. Journal-linked prior calls are now retained while a recorded no-call review remains unknown review with unverified failure cause and no conditional answer. Targeted empty-packet and altered-journal checks passed; focused evaluation/goal/replay/fresh-preflight 120 passed; full offline suite 555 passed. This does not establish review quality or validate the cause of the broad review error."
     }
   ]
 }
