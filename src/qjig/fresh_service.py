@@ -202,9 +202,19 @@ class FreshWorkbench:
                 after = catalog.source_state()
                 records = []
                 if run.state is not None:
-                    for trace in run.state.trace:
+                    last_trace = {trace.predicate_id: index for index, trace in enumerate(run.state.trace)}
+                    for index, trace in enumerate(run.state.trace):
+                        judgment = run.judgments.get(trace.predicate_id) if last_trace[trace.predicate_id] == index else None
+                        def side_view(side):
+                            return {'support': side.support.value, 'reason': side.reason, 'failure': side.failure,
+                                    'call_id': side.call_id,
+                                    'quote': side.quote if side.quote_ref is not None else None,
+                                    'quote_ref': asdict(side.quote_ref) if side.quote_ref is not None else None}
                         records.append({'predicate_id': trace.predicate_id, 'outcome': trace.observation.outcome.value,
                                         'reason': trace.observation.reason,
+                                        'judgment': {'positive': side_view(judgment.positive),
+                                                     'negative': side_view(judgment.negative),
+                                                     'caveats': list(judgment.caveats)} if judgment else None,
                                         'evidence': [{'revision_id': item.revision_id, 'start': item.start, 'end': item.end,
                                                       'text': item.text, 'truncated': item.truncated} for item in trace.evidence],
                                         'exclusions': [{'reason': item.reason} for item in trace.exclusions]})

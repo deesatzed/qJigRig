@@ -4075,6 +4075,25 @@
       "acceptance": "Install current package in an isolated environment, run synthetic fresh export and verification, and exercise the installed offline/browser suite from a staging directory without source checkout imports.",
       "command": "python -m pytest tests/test_clean_install.py::test_clean_install_cli_and_loopback_service -q",
       "evidence": "Opt-in clean-install test: 1 passed, including installed synthetic fresh run, export and CLI verification. A separate current-package isolated staged suite with local Chrome: 596 passed, 1 skipped in 80.33s; skipped clean-install test was run separately. Import resolved to site-packages. No hosted call or final T073 acceptance established."
+    },
+    {
+      "id": "T055F",
+      "phase": "P5",
+      "depends_on": [
+        "T053D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/fresh_service.py",
+        "src/qjig/web.py",
+        "docs/workflows/fresh-configuration.md"
+      ],
+      "test_file": "tests/test_fresh_service.py",
+      "test_name": "test_configured_service_runs_fresh_pipeline_and_preserves_deferral",
+      "action": "Distinguish retrieved passages from model-cited fresh judgments",
+      "acceptance": "Expose final positive and negative model-side outcomes and source-bound cited quote separately from retrieved passages without assigning later judgments to earlier rounds.",
+      "command": "python -m pytest tests/test_fresh_service.py::test_configured_service_runs_fresh_pipeline_and_preserves_deferral -q",
+      "evidence": "Red: immediate fresh results lacked judgment and quote references. Synthetic actual-pipeline and Chrome checks show positive and negative outcomes, exact cited quote and a separate retrieved passage containing extra text. Focused Chrome/fresh/judge checks: 56 passed. Model judgment remains unvalidated; saved replay does not yet reconstruct cited-quote presentation."
     }
   ]
 }

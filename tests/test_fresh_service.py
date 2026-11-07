@@ -44,7 +44,7 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
     thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
     try:
         client = RoleClient(server.server_address[1], RoleDefinition('reviewer', '1', 'Review'))
-        imported = client.import_source({'source_id': 'policy.md', 'text': '# Policy\n'+quote+'\n', 'scope': 'project',
+        imported = client.import_source({'source_id': 'policy.md', 'text': '# Policy\n'+quote+'\nContact support for help.\n', 'scope': 'project',
                               'entities': [], 'effective_from': '2026-01-01', 'effective_to': 'open',
                               'observed_at': None, 'authority': None})
         result = client.ask_fresh('fresh-1', 'Refund limit?', 'project', as_of='2026-11-15', entities=[])
@@ -53,6 +53,13 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
         assert result['review']['status'] == 'recorded' and result['review']['assurance'] == 'synthetic_review_unvalidated'
         assert result['review']['assessment'] == 'uncertain' and result['review']['reason'] == 'fixture review'
         assert result['review']['review_id']
+        judgment = result['records'][0]['judgment']
+        assert judgment['positive']['support'] == 'supported'
+        assert judgment['positive']['quote'] == quote
+        assert judgment['positive']['quote_ref']['revision_id'] == imported['revision_id']
+        assert judgment['negative']['support'] == 'unknown' and judgment['negative']['quote'] is None
+        assert any('Contact support for help.' in item['text'] for item in result['records'][0]['evidence'])
+        assert 'Contact support' not in judgment['positive']['quote']
         assert any(quote in item['text'] for record in result['records'] for item in record['evidence'])
         assert transport.calls_made == 4
         assert (tmp_path / 'fresh' / 'journal.sqlite').is_file()
@@ -92,6 +99,8 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     assert 'Conditional outcome: true' in page.locator('#fresh-result').inner_text()
                     assert 'synthetic_review_unvalidated' in page.locator('#fresh-result').inner_text()
                     assert 'fixture review' in page.locator('#fresh-result').inner_text()
+                    assert 'Model-cited passage' in page.locator('#fresh-result').inner_text()
+                    assert 'Retrieved passages' in page.locator('#fresh-result').inner_text()
                     assert quote in page.locator('#fresh-result').inner_text()
                     assert browser_transport.calls_made == 4
                     page.route('**/api/catalog-state', lambda route: route.fulfill(status=503, json={'error': 'unavailable'}))
@@ -111,7 +120,7 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
                     backend.transport_factory = lambda: rerun_transport
                     prior_runs = {item['run_id'] for item in client.list_fresh_runs()}
                     form.get_by_role('button', name='Run fresh planning').click()
-                    page.locator('#fresh-result').get_by_text(updated_quote).wait_for(timeout=7000)
+                    page.locator('#fresh-result').get_by_text(updated_quote).first.wait_for(timeout=7000)
                     assert quote not in page.locator('#fresh-result').inner_text()
                     assert page.locator('#fresh-source-change').count() == 0
                     assert 'Deferred' in page.locator('#fresh-message').inner_text()
