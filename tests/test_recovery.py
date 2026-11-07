@@ -63,3 +63,53 @@ def test_all_unavailable_gives_empty_packet_and_no_alternative(tmp_path):
         result = recover_packet(cat, candidates(), want=1, max_bytes=5000)
     assert result.packet.items == ()
     assert len(result.exclusions) == 3 and result.alternatives == {}
+
+
+from qjig.applicability import OPEN, Collection, Interval, MemberMetadata
+from qjig.recovery import applicability_filter
+
+
+def meta(revision, entities, start="2026-01-01", end=OPEN):
+    return MemberMetadata(
+        revision.revision_id, "project", Interval(start, end), entity_keys=frozenset(entities)
+    )
+
+
+def test_no_suitable_alternative(tmp_path):
+    # the top source is gone; the others are about a different customer or have no recorded subject
+    coll = Collection((meta(ALT, {"customer:7"}), meta(WEAK, set())))
+    check = applicability_filter(coll, frozenset({"customer:42"}), "2026-06-01", historical_as_known=False)
+    with Catalog.open(tmp_path / "c.sqlite") as cat:
+        cat.add_revision(ALT)
+        cat.add_revision(WEAK)
+        result = recover_packet(cat, candidates(), want=1, max_bytes=5000, applicability=check)
+    assert result.packet.items == ()  # nothing fills the decisive slot
+    assert result.unfilled == 1
+    reasons = {e.entry_id: e.reason for e in result.exclusions}
+    by_rev = {c.entry_id: c.revision_id for c in candidates()}
+    assert sorted(reasons.values()) == ["applicability_unknown", "inapplicable", "source_missing"]
+    assert reasons[next(k for k, v in by_rev.items() if v == ALT.revision_id)] == "inapplicable"
+    assert reasons[next(k for k, v in by_rev.items() if v == WEAK.revision_id)] == "applicability_unknown"
+    assert result.alternatives == {}
+
+
+def test_applicable_alternative_is_still_used(tmp_path):
+    coll = Collection((meta(ALT, {"customer:42"}), meta(WEAK, {"customer:7"})))
+    check = applicability_filter(coll, frozenset({"customer:42"}), "2026-06-01", historical_as_known=False)
+    with Catalog.open(tmp_path / "c.sqlite") as cat:
+        cat.add_revision(ALT)
+        cat.add_revision(WEAK)
+        result = recover_packet(cat, candidates(), want=1, max_bytes=5000, applicability=check)
+    assert result.unfilled == 0
+    assert [i.span.revision_id for i in result.packet.items] == [ALT.revision_id]
+
+
+def test_date_inapplicable_and_missing_metadata_are_not_accepted(tmp_path):
+    coll = Collection((meta(ALT, {"customer:42"}, start="2026-09-01"),))  # not yet effective; WEAK has no metadata
+    check = applicability_filter(coll, frozenset({"customer:42"}), "2026-06-01", historical_as_known=False)
+    with Catalog.open(tmp_path / "c.sqlite") as cat:
+        cat.add_revision(ALT)
+        cat.add_revision(WEAK)
+        result = recover_packet(cat, candidates(), want=2, max_bytes=5000, applicability=check)
+    assert result.packet.items == () and result.unfilled == 2
+    assert sorted(e.reason for e in result.exclusions) == ["applicability_unknown", "inapplicable", "source_missing"]

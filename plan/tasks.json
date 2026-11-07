@@ -382,7 +382,7 @@
       "depends_on": [
         "T022"
       ],
-      "status": "pending",
+      "status": "complete",
       "files": [
         "src/qjig/recovery.py"
       ],
@@ -390,7 +390,8 @@
       "test_name": "test_no_suitable_alternative",
       "action": "Keep insufficient evidence when only wrong-subject candidates remain",
       "acceptance": "Unrelated or inapplicable text does not fill a decisive evidence slot",
-      "command": "python -m pytest tests/test_recovery.py::test_no_suitable_alternative -q"
+      "command": "python -m pytest tests/test_recovery.py::test_no_suitable_alternative -q",
+      "evidence": "Red: ImportError applicability_filter (initial contract). Green: focused 1 passed in 0.04s; tests/test_recovery.py 7 passed in 0.06s; full suite 94 passed in 0.16s. 2026-11-06."
     },
     {
       "id": "T024",
