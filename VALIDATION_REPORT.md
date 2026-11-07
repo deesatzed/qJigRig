@@ -1,6 +1,6 @@
 # Validation report: 2026-11-06 review checkpoint
 
-No qJig runtime has been implemented or claimed. These checks assess source baselines, compatibility and the planning packet.
+This is a historical pre-implementation report, not the current qJig status. At this checkpoint no qJig runtime had been implemented; these checks assess source baselines, compatibility and the planning packet. See PROGRESS.md and plan/tasks.json for subsequent implementation evidence.
 
 | Check | Actual command / context | Result / limits |
 |---|---|---|

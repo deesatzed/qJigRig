@@ -1,6 +1,6 @@
 # Decisions
 
-Status: recommended technical design for review; no combined runtime implemented yet.
+Status: the original decisions below began as design recommendations. The deterministic core, local service and browser foundation now exist; consult GOAL.md, PROGRESS.md and plan/tasks.json for current implementation and remaining gates.
 
 - D001: Use qJig as the new repository root and keep both source checkpoints with provenance. QUIXER stays at a named remote checkpoint; source application results are not pooled.
 - D002: Build a small modular core behind contracts. Adapt QUIXER's catalog/retrieval and JIG's bounded decision methods through explicit adapters before selective extraction. Avoid merging the two monolithic entry points or giving both stores ownership of the same fact.

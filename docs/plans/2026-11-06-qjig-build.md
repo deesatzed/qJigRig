@@ -10,7 +10,7 @@
 
 ---
 
-Status: proposed build sequence for review. No runtime tasks are marked complete. Use the dependencies in `plan/tasks.json`; a later task cannot close before its prerequisites. Tests below are planned names and commands, not present tests. A first missing import is acceptable to establish the boundary; all subsequent red tests must fail because the named behavior is absent. Commit subjects are suggestions.
+Historical snapshot: this plan was written before implementation; its per-task pending labels and statements about absent tests describe that time. Current task status, inserted repairs and dependencies are in `plan/tasks.json`; GOAL.md governs the amended sequence. Some tests below now exist, but their presence alone does not prove completion. A first missing import is acceptable to establish the boundary; all subsequent red tests must fail because the named behavior is absent. Commit subjects are suggestions.
 
 The fixtures in tests should be a few lines, not copied live provider output. For provider-bound tasks a deterministic transport proves mapping and accounting only; the separate opt-in real smoke must run before claiming model integration. Every task's acceptance sentence is the implementation contract; when insufficient to resolve a semantic choice, add the smallest counterexample and record the decision before writing code.
 

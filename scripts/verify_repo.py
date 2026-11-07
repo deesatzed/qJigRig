@@ -39,12 +39,14 @@ def audit_tasks(tasks: list[dict], root: Path) -> list[str]:
             if not path.is_relative_to(root.resolve()) or not path.is_file():
                 errors.append(f"{ident}: missing or invalid file {name}")
         test_name, test_file = task.get("test_name"), task.get("test_file")
+        if task.get("command") != f"python -m pytest {test_file}::{test_name} -q":
+            errors.append(f"{ident}: command does not match named focused test")
         try:
             path = (root / test_file).resolve()
             if not path.is_relative_to(root.resolve()):
                 raise OSError("outside repository")
             tree = ast.parse(path.read_text(encoding="utf-8"))
-            if not any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == test_name for node in ast.walk(tree)):
+            if not any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == test_name for node in tree.body):
                 errors.append(f"{ident}: missing test {test_file}::{test_name}")
         except (OSError, SyntaxError, TypeError):
             errors.append(f"{ident}: unreadable test {test_file}")

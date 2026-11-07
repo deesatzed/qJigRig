@@ -1439,14 +1439,22 @@
       "depends_on": [
         "T048"
       ],
-      "status": "pending",
-      "files": [],
+      "status": "complete",
+      "files": [
+        "README.md",
+        "IMPLEMENT.md",
+        "DECISIONS.md",
+        "TASK_QUEUE.md",
+        "VALIDATION_REPORT.md",
+        "docs/plans/2026-11-06-qjig-build.md",
+        "scripts/verify_repo.py"
+      ],
       "test_file": "tests/test_repo_audit.py",
       "test_name": "test_completed_and_pending_tasks_are_valid",
       "action": "Reconcile active documentation and verify queue",
       "acceptance": "Verifier detects broken dependencies and evidence without resetting historical tasks.",
       "command": "python -m pytest tests/test_repo_audit.py::test_completed_and_pending_tasks_are_valid -q",
-      "evidence": ""
+      "evidence": "Historical task statuses retained; initial active documentation reconciled and historical plan/report labeled. Red: verifier accepted empty or wrong focused commands and nested non-collectable test names. Green: exact focused command and top-level test checks added; dependency/evidence fixtures still reject errors. Focused 2 passed; full offline suite 372 passed; queue verifier checked 102 tasks. It checks structural presence, not actual execution or evidence truth; final documentation reconciliation remains at T073-T074."
     },
     {
       "id": "R01B",

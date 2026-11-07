@@ -1,12 +1,12 @@
 # qJig task queue
 
-This queue implements GOAL.md. T001–T048 are complete; T049–T074 remain pending. The machine-readable queue includes nine inserted repair tasks R01–R09 for findings F01–F09. Historical task identities and evidence remain intact.
+This queue implements GOAL.md. T001–T048 are complete; T049–T074 remain pending. The machine-readable queue includes repair tasks R01–R09 for findings F01–F09 and additional bounded subtasks; its statuses are authoritative. Historical task identities and evidence remain intact.
 
 Authoritative dependencies: [plan/tasks.json](plan/tasks.json). The [detailed build plan](docs/plans/2026-11-06-qjig-build.md) is historical for completed work; GOAL.md and the repair queue govern the amended sequence.
 
 ## Next tasks
 
-R01 → R02 → R06 → R08 → R07 → R03 → R04 → R05 precede T049–T051; R09 may proceed independently after T048. T057 must integrate the exact review binding from R01. This ordering repairs decision and transport boundaries, accounting and persistence before retrieval experiments or paid runs. The stand-in transport remains labeled and live calls remain opt-in and budgeted.
+R01, R02 and R06 are complete; R08, R07, R03, R04 and R05 remain open before T049–T051. R09 completed the queue audit and initial documentation reconciliation; final reconciliation remains required at T073–T074. T057 must integrate the exact review binding from R01. This ordering repairs decision and transport boundaries, accounting and persistence before retrieval experiments or paid runs. The stand-in transport remains labeled and live calls remain opt-in and budgeted.
 
 ## Phase gates
 
