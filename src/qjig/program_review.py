@@ -47,7 +47,7 @@ def _review_prompt(binding: dict, packet: dict, *, legacy_request_id: bool = Fal
 
 def review_plan(catalog: Catalog, ledger: BudgetLedger, transport, binding: dict, packet: EvidencePacket, *,
                 provider: str, model: str, archive: RunArchive, max_tokens: int = 800,
-                max_price: dict | None = None, reservation_factory: ReservationFactory | None = None) -> PlanReviewOutcome:
+                max_price: dict | None = None, reservation_factory: ReservationFactory | None = None, route: str | None = None) -> PlanReviewOutcome:
     """Review supplied source passages as untrusted data; no result activates a plan.
 
     Local metadata and span checks precede dispatch. Matching metadata does not
@@ -63,7 +63,8 @@ def review_plan(catalog: Catalog, ledger: BudgetLedger, transport, binding: dict
         raise ContractError('review provider and model required')
     kind = 'synthetic' if isinstance(transport, StandInTransport) else 'ai'
     actor = {'kind': kind, 'provider': provider, 'model': model, 'prompt_sha256': '0' * 64,
-             'config': {'max_tokens': max_tokens, 'max_price': max_price, 'prompt_version': 'request_id_redacted_v2'}}
+             'config': {'max_tokens': max_tokens, 'max_price': max_price, 'prompt_version': 'request_id_redacted_v2',
+                        **({'route':route} if route is not None else {})}}
     canonical = make_review(binding, actor, {'assessment': 'uncertain'})['payload']['binding']
     if ledger._request_id != canonical['request']['request_id']:
         raise ContractError('review request differs from ledger')
@@ -95,7 +96,7 @@ def review_plan(catalog: Catalog, ledger: BudgetLedger, transport, binding: dict
     for revision in revisions.values():
         archive.add_revision(revision)
     prompt = _review_prompt(canonical, json.loads(serialized))
-    request = ProviderRequest('plan_review', provider, model, prompt, max_tokens, max_price=max_price)
+    request = ProviderRequest('plan_review', provider, model, prompt, max_tokens, max_price=max_price,route=route)
     actor['prompt_sha256'] = hashlib.sha256(prompt.encode('utf-8')).hexdigest()
     try:
         reservation = reservation_factory(request) if reservation_factory is not None else None

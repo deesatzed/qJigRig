@@ -375,6 +375,9 @@ def run_fresh(
     judge_max_tokens: int | None = None,
     planner_max_price: dict | None = None,
     judge_max_price: dict | None = None,
+    planner_route: str | None = None,
+    judge_route: str | None = None,
+    reviewer_route: str | None = None,
     reviewer: tuple[str, str] | None = None,
     reviewer_max_tokens: int = 800,
     reviewer_max_price: dict | None = None,
@@ -458,6 +461,17 @@ def run_fresh(
             return None
         return dict(ProviderRequest('', '', '', '', 1, max_price=value).max_price)
     planner_max_price, judge_max_price, reviewer_max_price = freeze_price(planner_max_price), freeze_price(judge_max_price), freeze_price(reviewer_max_price)
+    if planner_route is not None:
+        ProviderRequest('planner',planner[0],planner[1],'',planner_max_tokens or PLANNER_MAX_TOKENS,
+                        max_price=planner_max_price,route=planner_route)
+    if judge_route is not None:
+        ProviderRequest('judge_positive',judge[0],judge[1],'',judge_max_tokens or JUDGE_MAX_TOKENS,
+                        max_price=judge_max_price,route=judge_route)
+    if reviewer_route is not None:
+        if not isinstance(reviewer,tuple) or len(reviewer)!=2:
+            raise ContractError('reviewer route requires a reviewer')
+        ProviderRequest('plan_review',reviewer[0],reviewer[1],'',reviewer_max_tokens,
+                        max_price=reviewer_max_price,route=reviewer_route)
     if reviewer is not None:
         if (not isinstance(reviewer, tuple) or len(reviewer) != 2 or
                 any(not isinstance(value, str) or not value.strip() for value in reviewer) or
@@ -472,7 +486,7 @@ def run_fresh(
             try:
                 if review_reservation_factory is None:
                     raise ContractError('review reservation is required')
-                probe = ProviderRequest('plan_review', reviewer[0], reviewer[1], '', reviewer_max_tokens, max_price=reviewer_max_price)
+                probe = ProviderRequest('plan_review', reviewer[0], reviewer[1], '', reviewer_max_tokens, max_price=reviewer_max_price,route=reviewer_route)
                 held = review_reservation_factory(probe)
                 if (not isinstance(held, CallReservation) or held.request_sha256 != probe.input_sha256()
                         or held.required_id is None or held.work_binding_sha256 is None
@@ -494,10 +508,10 @@ def run_fresh(
         try:
             probes = [ProviderRequest('planner', planner[0], planner[1], '',
                                       planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS,
-                                      max_price=planner_max_price)]
+                                      max_price=planner_max_price,route=planner_route)]
             probes += [ProviderRequest(stage, judge[0], judge[1], '',
                                        judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS,
-                                       max_price=judge_max_price) for stage in ('judge_positive', 'judge_negative')]
+                                       max_price=judge_max_price,route=judge_route) for stage in ('judge_positive', 'judge_negative')]
             sets = {check_fresh_stage_slots(ledger._goal_budget, request_id=request.request_id, partition=ledger._partition,
                                            request=probe, reservation_factory=reservation_factory,
                                            count=1 if probe.stage == 'planner' else (MAX_PREDICATES * MAX_ROUNDS if max_judge_pairs is None else max_judge_pairs))
@@ -551,8 +565,8 @@ def run_fresh(
             **({"evaluation_case_binding": evaluation_case_binding} if evaluation_case_binding is not None else {}),
             **({"evaluation_assignment": evaluation_assignment} if evaluation_assignment is not None else {}),
             "budget": ledger.budget.to_dict() if ledger.budget else None,
-            "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS, **({"max_price": planner_max_price} if planner_max_price is not None else {})},
-            "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS, **({"max_price": judge_max_price} if judge_max_price is not None else {})},
+            "planner": {"provider": planner[0], "model": planner[1], "max_tokens": planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS, **({"max_price": planner_max_price} if planner_max_price is not None else {}), **({"route":planner_route} if planner_route is not None else {})},
+            "judge": {"provider": judge[0], "model": judge[1], "max_tokens": judge_max_tokens if judge_max_tokens is not None else JUDGE_MAX_TOKENS, **({"max_price": judge_max_price} if judge_max_price is not None else {}), **({"route":judge_route} if judge_route is not None else {})},
             "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": "full_source_v1" if full_source_evidence else EXPANDED_BM25_METHOD,
             "followup_policy": "none_full_source_v1" if full_source_evidence else "request_question_on_no_primary_hit_v2",
             "reservation_factory_configured": reservation_factory is not None, "role_priors": role_priors or {},
@@ -566,7 +580,8 @@ def run_fresh(
             "planning_evidence": planning_evidence,
             **({'fresh_run_set': fresh_set} if fresh_set is not None else {}),
             **({"reviewer": {"provider": reviewer[0], "model": reviewer[1], "max_tokens": reviewer_max_tokens,
-                             "max_price": reviewer_max_price, "prompt_version": "request_id_redacted_v2"}} if reviewer is not None else {}),
+                             "max_price": reviewer_max_price, "prompt_version": "request_id_redacted_v2",
+                             **({"route":reviewer_route} if reviewer_route is not None else {})}} if reviewer is not None else {}),
         })
         for revision_id in revision_ids:
             archive.add_revision(catalog.get_revision(revision_id))
@@ -585,7 +600,7 @@ def run_fresh(
         outcome = request_fresh_plan(
             ledger, transport, request, corpus_revision_ids=sorted({e.span.revision_id for e in entries}),
             provider=planner[0], model=planner[1], reservation_factory=reservation_factory, archive=archive,
-            planning_evidence=planning_evidence, max_price=planner_max_price, prompt_version=planner_prompt_version, **kw,
+            planning_evidence=planning_evidence, max_price=planner_max_price, prompt_version=planner_prompt_version,route=planner_route, **kw,
         )
     except (BudgetExceeded, ProviderUnavailable, UncertainOutcome, ReconciliationRequired) as exc:
         failure = {BudgetExceeded: "budget_exceeded", ProviderUnavailable: "provider_unavailable",
@@ -608,7 +623,7 @@ def run_fresh(
                 return EvalResult(Outcome.UNKNOWN, "reconciliation_required")
             result = judge_predicate(
                 ledger, transport, question, packet, provider=judge[0], model=judge[1],
-                applicability=bound_applicability, reservation_factory=reservation_factory, archive=archive, max_price=judge_max_price, **jkw,
+                applicability=bound_applicability, reservation_factory=reservation_factory, archive=archive, max_price=judge_max_price,route=judge_route, **jkw,
             )
             halted = any(side.failure in ("uncertain_outcome", "reconciliation_required")
                          for side in (result.positive, result.negative))
@@ -673,10 +688,10 @@ def run_fresh(
                                   'planner': {'provider': planner[0], 'model': planner[1],
                                               'prompt_sha256': hashlib.sha256(planner_prompt.encode('utf-8')).hexdigest(),
                                               'config': {'max_tokens': planner_max_tokens if planner_max_tokens is not None else PLANNER_MAX_TOKENS,
-                                                         'max_price': planner_max_price}}}
+                                                         'max_price': planner_max_price, **({'route':planner_route} if planner_route is not None else {})}}}
                 review = review_plan(catalog, ledger, transport, review_binding, packet, provider=reviewer[0], model=reviewer[1],
                                      archive=archive, max_tokens=reviewer_max_tokens, max_price=reviewer_max_price,
-                                     reservation_factory=review_reservation_factory)
+                                     reservation_factory=review_reservation_factory,route=reviewer_route)
             except (ContractError, KeyError, TypeError, ValueError):
                 review = PlanReviewOutcome('unavailable', None, None, 'review_context_or_storage_error')
     if archive is not None:

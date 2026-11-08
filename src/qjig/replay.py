@@ -52,7 +52,8 @@ def _check_review(record, call_id, request, response, validation, context, plan)
                 'historical_as_known': inputs.historical_as_known,
                 'planner': {'provider': planner['provider'], 'model': planner['model'],
                             'prompt_sha256': hashlib.sha256(planner_prompt.encode('utf-8')).hexdigest(),
-                            'config': {'max_tokens': planner['max_tokens'], 'max_price': planner.get('max_price')}}}
+                            'config': {'max_tokens': planner['max_tokens'], 'max_price': planner.get('max_price'),
+                                       **({'route':planner['route']} if planner.get('route') is not None else {})}}}
     settings = context['reviewer']
     prompt_version = settings.get('prompt_version')
     if prompt_version not in (None, 'request_id_redacted_v2'):
@@ -64,7 +65,8 @@ def _check_review(record, call_id, request, response, validation, context, plan)
     if (expected_kind is None or actor != {'kind': expected_kind, 'provider': settings['provider'], 'model': settings['model'],
             'prompt_sha256': hashlib.sha256(request.prompt.encode('utf-8')).hexdigest(),
             'config': {'max_tokens': settings['max_tokens'], 'max_price': settings.get('max_price'),
-                       **({'prompt_version': prompt_version} if prompt_version is not None else {})}}):
+                       **({'prompt_version': prompt_version} if prompt_version is not None else {}),
+                       **({'route':settings['route']} if settings.get('route') is not None else {})}}):
         raise ContractError('reviewer provenance differs')
     expected_result = {**validation['value'], 'call_id': call_id, 'raw_sha256': response['body_sha256'], 'usage': response['usage']}
     if payload['result'] != expected_result:
@@ -192,8 +194,8 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
                 elif data["stage"] == "plan_review":
                     settings = context.get('reviewer')
                     if (not isinstance(settings, dict) or review_call is not None or
-                            (request.provider, request.model, request.max_tokens, request.max_price) !=
-                            (settings['provider'], settings['model'], settings['max_tokens'], settings.get('max_price'))):
+                            (request.provider, request.model, request.max_tokens, request.max_price, request.route) !=
+                            (settings['provider'], settings['model'], settings['max_tokens'], settings.get('max_price'),settings.get('route'))):
                         raise ContractError('review request differs from context')
                     review_call = call_id
                 elif data["stage"] != "planner":
@@ -210,7 +212,7 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
                                                           prompt_version=context.get('planner_prompt_version', 'legacy_v1'))
                         if (request.prompt != expected_prompt or request.model != settings["model"] or
                             request.provider != settings["provider"] or request.max_tokens != settings["max_tokens"] or
-                            request.max_price != settings.get("max_price")):
+                            request.max_price != settings.get("max_price") or request.route != settings.get("route")):
                             raise ContractError("planner request does not match recorded context")
             elif kind == "response":
                 if call_id not in requests or requests[call_id] >= event["seq"]:
@@ -348,7 +350,7 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
                     settings = context["judge"]
                     if (side in seen_sides or judge_request.prompt != expected or judge_request.model != settings["model"] or
                         judge_request.provider != settings["provider"] or judge_request.max_tokens != settings["max_tokens"] or
-                        judge_request.max_price != settings.get("max_price")):
+                        judge_request.max_price != settings.get("max_price") or judge_request.route != settings.get("route")):
                         issues.append(f"invalid_judge_binding:{judge_id}")
                     seen_sides.add(side)
                     side_ids[side] = judge_id

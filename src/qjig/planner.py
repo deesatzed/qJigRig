@@ -89,10 +89,10 @@ def request_fresh_plan(
     ledger: BudgetLedger, transport: Transport, request: Request, *, corpus_revision_ids: Iterable[str], provider: str, model: str,
     max_tokens: int = PLANNER_MAX_TOKENS, reservation_factory: ReservationFactory | None = None, archive=None,
     planning_evidence: dict | None = None, max_price: dict | None = None,
-    prompt_version: str = 'legacy_v1',
+    prompt_version: str = 'legacy_v1', route: str | None = None,
 ) -> PlannerOutcome:
     corpus_sha = corpus_manifest_sha256(corpus_revision_ids)
-    pr = ProviderRequest("planner", provider, model, _planner_prompt(request, corpus_sha, planning_evidence, prompt_version=prompt_version), max_tokens, max_price=max_price)
+    pr = ProviderRequest("planner", provider, model, _planner_prompt(request, corpus_sha, planning_evidence, prompt_version=prompt_version), max_tokens, max_price=max_price,route=route)
     reservation = reservation_factory(pr) if reservation_factory else None
     call = call_typed(ledger, transport, pr, _plan_validator, reservation=reservation, archive=archive)
     if not call.ok:

@@ -988,3 +988,67 @@ def test_frozen_evaluation_rejects_unbound_new_planner_prompt(tmp_path):
                 revision_applicability=lambda rid: Applicability.MATCH,
                 evaluation_case_binding={'case_id':'locked'},planner_prompt_version='exception_applicability_v2')
         assert transport.calls_made == 0 and journal.events(REQUEST.request_id) == []
+
+
+def test_fresh_pipeline_binds_distinct_reserved_provider_routes_and_replays(tmp_path):
+    import hashlib
+    from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
+    from qjig.fresh_preflight import fresh_run_allocations,fresh_slot_reservation
+    from qjig.goal_budget import GoalBudget
+    from qjig.providers import openrouter_wire_payload_v5
+    from qjig.replay import verify_archive
+    from qjig.run_archive import RunArchive
+    responses=[raw(PLAN),side(False),side(True,QUOTE),raw({'assessment':'uncertain','reason':'fixture'})]
+    cat,entries,journal,_,_=build(tmp_path,responses)
+    class RoutedStandIn(StandInTransport):
+        def send(self,request):
+            result=super().send(request)
+            return RawResponse(result.http_status,result.body,result.usage,metadata={
+                'wire_payload_format':'openrouter.chat.v5',
+                'wire_payload_sha256':hashlib.sha256(openrouter_wire_payload_v5(request).encode()).hexdigest()})
+    transport=RoutedStandIn(responses)
+    def model(ident):return {'id':ident,'context_length':10000,'top_provider':{'max_completion_tokens':1000},
+                             'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    models={name:model(name) for name in ('planner','judge','reviewer')};cap={'prompt':2,'completion':3}
+    routes={'planner':'provider-a/fp4','judge':'provider-b/fp8','reviewer':'provider-c/fp4'}
+    review={'provider':'openrouter','model':models['reviewer'],'input_tokens':1000,'output_tokens':50,
+            'max_price':cap,'route':routes['reviewer']}
+    slots=fresh_run_allocations(request_id=REQUEST.request_id,partition='smoke',provider='openrouter',
+        planner_model=models['planner'],judge_model=models['judge'],planner_input=1000,planner_output=50,
+        judge_input=1000,judge_output=50,planner_price=cap,judge_price=cap,reviewer=review,
+        planner_route=routes['planner'],judge_route=routes['judge'])
+    inputs=ApplicabilityInputs(Collection((MemberMetadata(REV.revision_id,'project',Interval('2026-01-01',OPEN)),)),
+                               frozenset(),'2026-11-07',False)
+    limit=Budget(30,50000,1)
+    with cat,journal,RunArchive.open(tmp_path/'archive') as archive,GoalBudget.open(tmp_path/'goal.sqlite',total=limit,per_request=limit,allocations={'smoke':limit}) as goal:
+        goal.reserve_run_set('fresh-run',slots)
+        def reserve(req):return fresh_slot_reservation(goal,'fresh-run',request_id=REQUEST.request_id,partition='smoke',
+            request=req,model=models[req.model],input_tokens=1000,input_bound_provenance='synthetic')
+        with RunArchive.open(tmp_path/'bad-route') as bad_archive:
+            blocked=StandInTransport([])
+            rejected=run_fresh(request=REQUEST,catalog=cat,entries=entries,ledger=BudgetLedger(limit,journal,REQUEST.request_id,goal_budget=goal,partition='smoke'),
+                transport=blocked,planner=('openrouter','planner'),judge=('openrouter','judge'),reviewer=('openrouter','reviewer'),
+                planner_route='provider-a/fp8',judge_route=routes['judge'],reviewer_route=routes['reviewer'],
+                revision_applicability=lambda _:Applicability.MATCH,applicability_inputs=inputs,archive=bad_archive,
+                reservation_factory=reserve,review_reservation_factory=reserve,planner_max_tokens=50,judge_max_tokens=50,
+                reviewer_max_tokens=50,planner_max_price=cap,judge_max_price=cap,reviewer_max_price=cap)
+            assert rejected.plan_failure=='fresh_preflight_unavailable' and blocked.calls_made==0 and not journal.events(REQUEST.request_id)
+        run=run_fresh(request=REQUEST,catalog=cat,entries=entries,ledger=BudgetLedger(limit,journal,REQUEST.request_id,goal_budget=goal,partition='smoke'),
+            transport=transport,planner=('openrouter','planner'),judge=('openrouter','judge'),reviewer=('openrouter','reviewer'),
+            planner_route=routes['planner'],judge_route=routes['judge'],reviewer_route=routes['reviewer'],
+            revision_applicability=lambda _:Applicability.MATCH,applicability_inputs=inputs,archive=archive,
+            reservation_factory=reserve,review_reservation_factory=reserve,planner_max_tokens=50,judge_max_tokens=50,
+            reviewer_max_tokens=50,planner_max_price=cap,judge_max_price=cap,reviewer_max_price=cap)
+        assert run.status=='deferred' and run.review.status=='recorded' and transport.calls_made==4
+        recorded=[e['data'] for e in archive.events() if e['kind']=='request']
+        assert [r['route'] for r in recorded]==[routes['planner'],routes['judge'],routes['judge'],routes['reviewer']]
+        report=verify_archive(archive)
+        assert report.status=='unanchored',report.issues
+        old=archive._con.execute('SELECT data,sha256 FROM run_context WHERE id=1').fetchone()
+        archive._con.execute('DROP TRIGGER context_no_update')
+        for stage in ('planner','judge','reviewer'):
+            altered=json.loads(old[0]);altered[stage]['route']='other-provider/fp4'
+            encoded=json.dumps(altered,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+            archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',(encoded,hashlib.sha256(encoded.encode()).hexdigest()))
+            assert verify_archive(archive).status=='invalid'
+        archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',old)
