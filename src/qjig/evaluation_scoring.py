@@ -655,8 +655,11 @@ def unavailable_failure_review(goal,archive,journal,reference,review_archive,*,p
         expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
         expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256)
     result=score['score'];context=archive.context();rid=context['request']['request_id']
-    if (result.get('failure_verified') is not True or result.get('reconciliation_required') is not False
-            or result.get('classification') not in ('malformed','provider_failure')
+    settled_failure=(result.get('failure_verified') is True and result.get('classification') in ('malformed','provider_failure'))
+    unavailable_review=(context.get('schema')=='qjig.fresh-context.v1' and result.get('classification')=='unknown_review'
+                        and result.get('review_status')=='unavailable'
+                        and result.get('review_failure')=='review_context_or_storage_error')
+    if (not (settled_failure or unavailable_review) or result.get('reconciliation_required') is not False
             or result.get('recorded_answer') is not None or result.get('conditional_answer') is not None):
         raise ContractError('verified settled failure without an answer required')
     slot=semantic_review_allocation(request_id=rid,partition=partition,spec=reviewer_spec)
@@ -668,7 +671,8 @@ def unavailable_failure_review(goal,archive,journal,reference,review_archive,*,p
         raise ContractError('unavailable review slot differs')
     saved={'schema':'qjig.semantic-review-failure.v1','request_id':rid,'reviewed_run_sha256':expected_run_sha256,
            'reference_sha256':expected_reference_sha256,'journal_sha256':expected_journal_sha256,
-           'work_id':slot['work_id'],'reason':'original_'+result['classification']}
+           'work_id':slot['work_id'],
+           'reason':'original_review_unavailable' if unavailable_review else 'original_'+result['classification']}
     outcome={'assessment':'uncertain','assurance':'not_reviewed','reason':saved['reason']}
     if record:
         if (review_archive.events() or review_archive.revision_ids() or review_archive.source_ids()

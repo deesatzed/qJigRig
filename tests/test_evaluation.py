@@ -1888,7 +1888,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             reopened._con.execute("UPDATE evaluation_campaign_events SET payload='{}' WHERE kind='started'")
 
 
-@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout'])
+@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet'])
 def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path,mismatch):
     import copy,json
     from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN,UNKNOWN_BOUND
@@ -1921,6 +1921,11 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                                    frozenset(),'2026-11-07',False)
         cases[ident]={'lock':lock,'reference':ref,'protected':protected,'applicability_inputs':inputs}
         hashes[ident]=case_lock_digest(lock);metadata[ident]=applicability_digest(inputs)
+    if mismatch=='semantic_no_packet':
+        cases['holdout']['reference']['question']='Unmatched zyzzword?'
+        cases['holdout']['lock']['question']='Unmatched zyzzword?'
+        cases['holdout']['lock']['reference_sha256']=reference_digest(cases['holdout']['reference'])
+        hashes['holdout']=case_lock_digest(cases['holdout']['lock'])
     wrong=cases['holdout']['applicability_inputs'];rev=wrong.collection.members[0].revision_id
     if mismatch=='entity':
         cases['holdout']['reference']['entities']=['target']
@@ -1935,7 +1940,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
            'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
-    config={k:dict(spec) for k in (('direct','planner','judge','reviewer','semantic_reviewer') if mismatch in ('semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout') else ('direct','planner','judge','reviewer'))}
+    config={k:dict(spec) for k in (('direct','planner','judge','reviewer','semantic_reviewer') if mismatch in ('semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet') else ('direct','planner','judge','reviewer'))}
     plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'private-synthetic-batch-secret-32-bytes')
     total=Budget(800,200000,10);per=Budget(30,6000,1)
     allocations={'development':Budget(200,50000,2),'pilot':Budget(200,50000,2),'holdout':Budget(400,100000,6)}
@@ -1949,7 +1954,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                        raw({'supported':True,'quote':text,'reason':'synthetic'}),
                        raw({'supported':False,'quote':'','reason':'synthetic'}),raw({'assessment':'uncertain','reason':'synthetic'})]
         else:responses=[raw({'action':'answer','query':None,'answer':'unknown','citations':[]})]
-        if mismatch in ('semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout'):responses.append(raw({'assessment':'uncertain','reason':'synthetic review'}))
+        if mismatch in ('semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet'):responses.append(raw({'assessment':'uncertain','reason':'synthetic review'}))
         return StandInTransport(responses)
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal,Journal.open(tmp_path/'journal.sqlite') as journal:
         reserve_evaluation_plan(goal,'batch',plan,expected_plan_sha256=plan['sha256'])
@@ -1986,13 +1991,16 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                         expected_reference_sha256=reference_digest(data['reference']),expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=spec)
             assert campaign.status()['scored']==1 and campaign.status()['in_progress']==[]
             return
-        if mismatch in ('semantic_failure','semantic_failure_fresh','semantic_timeout'):
+        if mismatch in ('semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet'):
             from qjig.evaluation_campaign import run_campaign_assignment
             from qjig.run_archive import RunArchive
             from qjig.evaluation_scoring import score_reviewed_reserved_assignment
-            target=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==('combined' if mismatch=='semantic_failure_fresh' else 'direct_full_evidence') and a['repeat']==1)
+            target=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==('combined' if mismatch in ('semantic_failure_fresh','semantic_no_packet') else 'direct_full_evidence') and a['repeat']==1)
             data=cases['holdout'];rid=target['request_id']
-            transport=StandInTransport([TimeoutError('synthetic timeout') if mismatch=='semantic_timeout' else RawResponse(200,'not json',usage)])
+            response=(RawResponse(200,json.dumps({'predicates':[{'id':'p','question':'unmatched zyzzword'}],'expression':{'ref':'p'}}),usage)
+                      if mismatch=='semantic_no_packet' else TimeoutError('synthetic timeout') if mismatch=='semantic_timeout'
+                      else RawResponse(200,'not json',usage))
+            transport=StandInTransport([response])
             with RunArchive.open(tmp_path/'failed') as archive,RunArchive.open(tmp_path/'unavailable') as review_archive:
                 kwargs=dict(applicability_inputs=data['applicability_inputs'],transport=transport,archive=archive,journal=journal,
                     config=config,want=1,max_bytes=5000,expected_config_sha256=config_hash,semantic_review_archive=review_archive)
@@ -2008,7 +2016,8 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                     partition='holdout',expected_plan_sha256=plan['sha256'],expected_run_sha256=receipt['run_sha256'],
                     expected_reference_sha256=reference_digest(data['reference']),expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=spec,
                     expected_journal_sha256=receipt['journal_sha256'])
-                assert result['score']['classification']=='malformed' and result['score']['failure_verified']
+                assert result['score']['classification']==('unknown_review' if mismatch=='semantic_no_packet' else 'malformed')
+                assert result['score']['failure_verified'] is (mismatch!='semantic_no_packet')
                 assert result['review']['assurance']=='not_reviewed' and result['review']['assessment']=='uncertain'
                 with pytest.raises(ContractError):
                     score_reviewed_reserved_assignment(goal,archive,journal,data['reference'],review_archive,

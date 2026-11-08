@@ -31,9 +31,15 @@ from qjig.sources import SourceRevision, decode_source
 DRAFT = Path('.local/evaluation-draft-20261107')
 
 
+def stage_configuration(spec, *, semantic):
+    names=('direct','planner','judge','reviewer','semantic_reviewer') if semantic else ('direct','planner','judge','reviewer')
+    return {name:dict(spec) for name in names}
+
+
 def main():
     parser=argparse.ArgumentParser(description='Run only synthetic draft responses; no provider calls.')
     parser.add_argument('--resume',type=Path,help='Existing synthetic verification directory to resume')
+    parser.add_argument('--semantic',action='store_true',help='Reserve and execute semantic-review slots')
     args=parser.parse_args()
     design=json.loads((DRAFT/'design.json').read_text())
     locks=json.loads((DRAFT/'private/case_locks.json').read_text())
@@ -58,7 +64,7 @@ def main():
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
            'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':{'prompt':2,'completion':3}}
-    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')}
+    config=stage_configuration(spec,semantic=args.semantic)
     plan=build_factorial_allocation(design,case_hashes,config,expected_design_sha256=design_hash,
                                     assignment_secret=b'synthetic-campaign-fixture-secret-only')
     parent=Path('.local/verification');parent.mkdir(parents=True,exist_ok=True)
@@ -68,8 +74,9 @@ def main():
             raise ValueError('existing synthetic verification directory required')
     else:
         directory=Path(tempfile.mkdtemp(prefix='full-factorial-synthetic-',dir=parent))
-    total=Budget(1300,260000,20);per=Budget(30,6000,1)
-    allocations={'development':Budget(400,80000,5),'pilot':Budget(300,60000,5),'holdout':Budget(600,120000,10)}
+    total=Budget(1500,300000,20) if args.semantic else Budget(1300,260000,20);per=Budget(30,6000,1)
+    allocations=({'development':Budget(450,90000,5),'pilot':Budget(350,70000,5),'holdout':Budget(700,140000,10)} if args.semantic else
+                 {'development':Budget(400,80000,5),'pilot':Budget(300,60000,5),'holdout':Budget(600,120000,10)})
     counts=Counter()
     class SyntheticTransport(StandInTransport):
         def __init__(self):
@@ -84,7 +91,7 @@ def main():
                         'expression':{'ref':'p'}}
             elif request.stage in ('judge_positive','judge_negative'):
                 result={'supported':False,'quote':'','reason':'synthetic fixture'}
-            elif request.stage=='plan_review':
+            elif request.stage in ('plan_review','semantic_review'):
                 result={'assessment':'uncertain','reason':'synthetic fixture'}
             else:
                 raise ValueError('unexpected synthetic stage')
@@ -109,8 +116,22 @@ def main():
                 if run_hash is None:
                     raise RuntimeError('interrupted synthetic archive cannot be replayed; no retry attempted')
                 ref=cases[assignment['case_id']]['reference']
-                campaign.finish(rid,archive,journal,ref,expected_run_sha256=run_hash,
-                                expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash)
+                if args.semantic:
+                    from qjig.evaluation_scoring import unavailable_failure_review
+                    review_path=archive_path/'semantic-review'
+                    if review_path.is_symlink() or not (review_path/'run.sqlite').is_file():
+                        raise RuntimeError('interrupted semantic review archive unavailable; no retry attempted')
+                    with RunArchive.open(review_path) as review_archive:
+                        review=unavailable_failure_review(goal,archive,journal,ref,review_archive,
+                            partition=assignment['work'][0]['partition'],expected_plan_sha256=plan['sha256'],
+                            expected_run_sha256=run_hash,expected_reference_sha256=reference_digest(ref),
+                            expected_journal_sha256=journal_hash,reviewer_spec=config['semantic_reviewer'],record=True)['review']
+                        campaign.finish(rid,archive,journal,ref,expected_run_sha256=run_hash,
+                            expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash,
+                            semantic_review_archive=review_archive,expected_review_sha256=review['sha256'])
+                else:
+                    campaign.finish(rid,archive,journal,ref,expected_run_sha256=run_hash,
+                                    expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash)
             print(json.dumps({'recovered_existing_assignment':True,'provider_calls':0}),flush=True)
         while True:
             result=run_campaign_batch(campaign,DRAFT,design,cases,journal=journal,archive_root=directory/'archives',
