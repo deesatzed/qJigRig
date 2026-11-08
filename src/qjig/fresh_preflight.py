@@ -14,7 +14,7 @@ from .acquisition import MAX_ROUNDS
 from .contracts import ContractError
 from .plans import MAX_PREDICATES
 from .providers import CallReservation, ProviderRequest, _ceiling_token_cost, fresh_work_binding, make_call_reservation
-from .budgets import _valid_cost
+from .budgets import BudgetExceeded, _valid_cost
 
 
 def _slot_id(request_id, partition, request, input_tokens, pricing_sha256, index):
@@ -29,7 +29,8 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
                           planner_model: dict, judge_model: dict,
                           planner_input: int, planner_output: int,
                           judge_input: int, judge_output: int,
-                          planner_price: dict, judge_price: dict, reviewer: dict | None = None) -> list[dict]:
+                          planner_price: dict, judge_price: dict, reviewer: dict | None = None,
+                          max_judge_pairs: int | None = None) -> list[dict]:
     """Enumerate one planner and a pair of judges per possible predicate/round.
 
     The upper bound intentionally holds slots even when a no-hit round makes no
@@ -37,8 +38,11 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
     """
     if any(not isinstance(v, str) or not v.strip() for v in (request_id, partition, provider)):
         raise ContractError('invalid fresh allocation identity')
+    if max_judge_pairs is not None and (type(max_judge_pairs) is not int or not 1 <= max_judge_pairs <= MAX_PREDICATES * MAX_ROUNDS):
+        raise ContractError('invalid judge pair quota')
+    pair_count = MAX_PREDICATES * MAX_ROUNDS if max_judge_pairs is None else max_judge_pairs
     slots = [('planner', 0, provider, planner_model, planner_input, planner_output, planner_price)]
-    for index in range(MAX_PREDICATES * MAX_ROUNDS):
+    for index in range(pair_count):
         slots.extend((stage, index, provider, judge_model, judge_input, judge_output, judge_price)
                      for stage in ('judge_positive', 'judge_negative'))
     if reviewer is not None:
@@ -66,7 +70,7 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
 
 def fresh_slot_reservation(goal, set_id: str, *, request_id: str, partition: str,
                            request: ProviderRequest, model: dict, input_tokens: int,
-                           input_bound_provenance: str):
+                           input_bound_provenance: str, max_judge_pairs: int | None = None, journal=None):
     """Select a persisted slot for one request; the ledger consumes it atomically.
 
     This does not establish the truth of the supplied model or input bound.
@@ -75,15 +79,33 @@ def fresh_slot_reservation(goal, set_id: str, *, request_id: str, partition: str
         raise ContractError('capped provider request required')
     if request.stage not in ('planner', 'judge_positive', 'judge_negative', 'plan_review'):
         raise ContractError('unsupported fresh request stage')
+    if max_judge_pairs is not None and (type(max_judge_pairs) is not int or not 1 <= max_judge_pairs <= MAX_PREDICATES * MAX_ROUNDS):
+        raise ContractError('invalid judge pair quota')
+    if max_judge_pairs is not None:
+        from .journal import Journal, ReconciliationRequired
+        if not isinstance(journal,Journal):
+            raise ContractError('judge quota requires its original journal')
+        if goal.audit_journal(journal)['status'] != 'verified':
+            raise ReconciliationRequired('goal and journal require reconciliation before quota selection')
     bound = make_call_reservation(request, model, input_tokens=input_tokens,
                                   input_bound_provenance=input_bound_provenance)
-    count = 1 if request.stage in ('planner', 'plan_review') else MAX_PREDICATES * MAX_ROUNDS
+    count = 1 if request.stage in ('planner', 'plan_review') else (MAX_PREDICATES * MAX_ROUNDS if max_judge_pairs is None else max_judge_pairs)
     allowed = {_slot_id(request_id, partition, request, input_tokens, bound.pricing_sha256, index)
                for index in range(count)}
-    ident = goal.select_required_work(set_id, request_id=request_id, partition=partition,
-                                      stage=request.stage, provider=request.provider, model=request.model,
-                                      tokens=input_tokens + request.max_tokens, cost_usd=bound.cost_usd,
-                                      allowed_work_ids=allowed)
+    try:
+        ident = goal.select_required_work(set_id, request_id=request_id, partition=partition,
+                                          stage=request.stage, provider=request.provider, model=request.model,
+                                          tokens=input_tokens + request.max_tokens, cost_usd=bound.cost_usd,
+                                          allowed_work_ids=allowed)
+    except ContractError:
+        if max_judge_pairs is not None and request.stage in ('judge_positive','judge_negative'):
+            rows=goal._con.execute('SELECT w.work_id,w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id '
+                'WHERE s.set_id=? AND w.request_id=? AND w.partition=? AND w.stage=? AND w.provider=? AND w.model=?',
+                (set_id,request_id,partition,request.stage,request.provider,request.model)).fetchall()
+            matching={ident:attempt for ident,attempt in rows if ident in allowed}
+            if len(rows)==count and set(matching)==allowed and all(attempt is not None for attempt in matching.values()):
+                raise BudgetExceeded('reserved_judge_work','declared judge quota exhausted') from None
+        raise
     return replace(bound, required_id=ident,
                    work_binding_sha256=fresh_work_binding(request, input_tokens, bound.pricing_sha256))
 

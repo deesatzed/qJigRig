@@ -230,3 +230,61 @@ def test_direct_preflight_requires_all_possible_slots_before_dispatch(tmp_path):
                 assert result['status'] == 'unavailable' and result['failure'] == 'preflight_unavailable'
                 assert transport.calls_made == 0 and journal.events('r') == []
                 assert replay['status'] == 'incomplete' and replay['classification'] == 'unknown_review'
+
+
+def test_explicit_judge_quota_reserves_both_sides_and_reports_exhaustion_without_call(tmp_path):
+    import json
+    from qjig.budgets import BudgetLedger
+    from qjig.fresh_preflight import fresh_run_allocations, fresh_slot_reservation
+    from qjig.journal import Journal
+    from qjig.providers import FieldSpec, ProviderRequest, RawResponse, StandInTransport, call_typed
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    cap={'prompt':2,'completion':3}
+    args=dict(request_id='r',partition='pilot',provider='stand-in',planner_model=model,judge_model=model,
+              planner_input=100,planner_output=50,judge_input=100,judge_output=50,planner_price=cap,judge_price=cap)
+    work=fresh_run_allocations(**args,max_judge_pairs=2)
+    assert len(work)==5 and sum(s['stage']=='judge_positive' for s in work)==2
+    assert sum(s['stage']=='judge_negative' for s in work)==2
+    for invalid in (0,13,True):
+        with pytest.raises(ContractError):fresh_run_allocations(**args,max_judge_pairs=invalid)
+    budget=Budget(10,10000,1);request=ProviderRequest('judge_positive','stand-in',model['id'],'claim',50,max_price=cap)
+    response=RawResponse(200,json.dumps({'ok':True}),{'prompt_tokens':4,'completion_tokens':2,'cost_usd':0.0001})
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=budget,per_request=budget,allocations={'pilot':budget}) as goal, Journal.open(tmp_path/'journal.sqlite') as journal:
+        goal.reserve_run_set('limited',work)
+        ledger=BudgetLedger(budget,journal,'r',goal_budget=goal,partition='pilot')
+        transport=StandInTransport([response,response])
+        def reserve(req):return fresh_slot_reservation(goal,'limited',request_id='r',partition='pilot',request=req,
+            model=model,input_tokens=100,input_bound_provenance='fixture',max_judge_pairs=2,journal=journal)
+        for _ in range(2):assert call_typed(ledger,transport,request,{'ok':FieldSpec(bool)},reservation=reserve(request)).ok
+        with pytest.raises(BudgetExceeded):reserve(request)
+        with pytest.raises(ContractError):
+            fresh_slot_reservation(goal,'limited',request_id='r',partition='pilot',request=request,
+                model=model,input_tokens=100,input_bound_provenance='fixture',max_judge_pairs=1,journal=journal)
+        assert transport.calls_made==2 and len(journal.events('r'))==4 and goal.audit_journal(journal)['status']=='verified'
+        changed=ProviderRequest('judge_positive','stand-in',model['id'],'claim',49,max_price=cap)
+        with pytest.raises(ContractError):reserve(changed)
+
+
+def test_judge_quota_does_not_hide_an_unreconciled_attempt(tmp_path):
+    from qjig.fresh_preflight import fresh_run_allocations, fresh_slot_reservation
+    from qjig.journal import Journal, ReconciliationRequired
+    from qjig.providers import ProviderRequest
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    cap={'prompt':2,'completion':3};budget=Budget(5,10000,1)
+    slots=fresh_run_allocations(request_id='r',partition='pilot',provider='stand-in',planner_model=model,judge_model=model,
+        planner_input=100,planner_output=50,judge_input=100,judge_output=50,planner_price=cap,judge_price=cap,max_judge_pairs=1)
+    request=ProviderRequest('judge_positive','stand-in',model['id'],'claim',50,max_price=cap)
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=budget,per_request=budget,allocations={'pilot':budget}) as goal, Journal.open(tmp_path/'journal.sqlite') as journal:
+        goal.reserve_run_set('limited',slots)
+        with pytest.raises(ContractError,match='original journal'):
+            fresh_slot_reservation(goal,'limited',request_id='r',partition='pilot',request=request,model=model,
+                                   input_tokens=100,input_bound_provenance='fixture',max_judge_pairs=1)
+        bound=fresh_slot_reservation(goal,'limited',request_id='r',partition='pilot',request=request,model=model,
+                                     input_tokens=100,input_bound_provenance='fixture',max_judge_pairs=1,journal=journal)
+        goal.reserve('uncertain','r','pilot',tokens=150,cost_usd=bound.cost_usd,required_id=bound.required_id,
+                     stage=request.stage,provider=request.provider,model=request.model,work_binding_sha256=bound.work_binding_sha256)
+        with pytest.raises(ReconciliationRequired):
+            fresh_slot_reservation(goal,'limited',request_id='r',partition='pilot',request=request,model=model,
+                                   input_tokens=100,input_bound_provenance='fixture',max_judge_pairs=1,journal=journal)
