@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "babffccd5e66b62f0101eb96968d91fc73dfe968c841d29b367ca72c8004a8cf",
-  "queue_sha256": "16229c662f8930c70541d403853fd39783c8b44435bce0846b488ab6acb54014",
+  "queue_sha256": "c676ee7e826142687b5251cbc3ec6b0e8954f5e7b90840f8b26255409162eb43",
   "gates": [
     {
       "id": "F01",
@@ -110,7 +110,8 @@
         "R08S",
         "R08T",
         "R08U",
-        "R08V"
+        "R08V",
+        "R08W"
       ],
       "evidence": []
     },
@@ -726,6 +727,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_providers.py::test_oversized_http_response_remains_uncertain -q",
       "queue_evidence_assertion": "Red: fake 200 and 429 responses were read without a size bound. Green: both oversized bodies raise an uncertain-outcome signal after a bounded read; provider/budget/preflight/replay regressions 97 passed, including existing journal timeout handling. No hosted inference occurred; actual guarded dispatch remains unavailable."
+    },
+    {
+      "id": "R08W",
+      "status": "unverified",
+      "task_ids": [
+        "R08W"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_providers.py::test_response_read_connection_failure_is_uncertain -q",
+      "queue_evidence_assertion": "Red: connection errors while reading fake 200 and 429 responses became definite pre-send failures. Green: both are outcome-unknown; provider/budget/preflight/replay regressions 99 passed, including existing uncertain journal and refusal handling. No inference occurred and the hosted path remains disabled."
     },
     {
       "id": "R09",

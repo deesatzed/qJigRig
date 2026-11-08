@@ -1468,7 +1468,8 @@
         "R08S",
         "R08T",
         "R08U",
-        "R08V"
+        "R08V",
+        "R08W"
       ],
       "status": "pending",
       "files": [],
@@ -5047,6 +5048,23 @@
       "acceptance": "Success and HTTP-error response bodies exceeding the limit stop with an uncertain outcome, with bounded reads and no blind retry.",
       "command": "python -m pytest tests/test_providers.py::test_oversized_http_response_remains_uncertain -q",
       "evidence": "Red: fake 200 and 429 responses were read without a size bound. Green: both oversized bodies raise an uncertain-outcome signal after a bounded read; provider/budget/preflight/replay regressions 97 passed, including existing journal timeout handling. No hosted inference occurred; actual guarded dispatch remains unavailable."
+    },
+    {
+      "id": "R08W",
+      "phase": "repair",
+      "depends_on": [
+        "R08V"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_response_read_connection_failure_is_uncertain",
+      "action": "Preserve uncertain outcome when connection fails while reading a response",
+      "acceptance": "Read failures after successful or HTTP-error responses remain uncertain and never become definite pre-send failure.",
+      "command": "python -m pytest tests/test_providers.py::test_response_read_connection_failure_is_uncertain -q",
+      "evidence": "Red: connection errors while reading fake 200 and 429 responses became definite pre-send failures. Green: both are outcome-unknown; provider/budget/preflight/replay regressions 99 passed, including existing uncertain journal and refusal handling. No inference occurred and the hosted path remains disabled."
     }
   ]
 }

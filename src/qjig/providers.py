@@ -275,7 +275,11 @@ _MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024
 
 
 def _read_provider_response(response) -> str:
-    body = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+    try:
+        body = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+    except Exception:
+        # A response exists, so even a connection error can follow a paid send.
+        raise TimeoutError("provider response read failed; outcome unknown") from None
     if len(body) > _MAX_PROVIDER_RESPONSE_BYTES:
         # The request may have been processed; missing usage cannot be settled.
         raise TimeoutError("provider response too large; outcome unknown")

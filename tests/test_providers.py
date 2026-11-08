@@ -562,3 +562,28 @@ def test_oversized_http_response_remains_uncertain(monkeypatch, status):
     monkeypatch.setattr(providers.urllib.request, 'build_opener', lambda *a: Opener())
     with pytest.raises(TimeoutError, match='response'):
         providers._urllib_post('https://openrouter.ai/api/v1/chat/completions', {}, '{}', 1)
+
+
+@pytest.mark.parametrize('status', [200, 429])
+def test_response_read_connection_failure_is_uncertain(tmp_path, monkeypatch, status):
+    import io
+    import urllib.error
+    import qjig.providers as providers
+
+    class BrokenResponse(io.BytesIO):
+        def __init__(self):
+            super().__init__(b'')
+            self.status = status
+        def read(self, size=-1):
+            raise ConnectionRefusedError('connection broke after response')
+
+    response = BrokenResponse()
+    class Opener:
+        def open(self, *args, **kwargs):
+            if status == 429:
+                raise urllib.error.HTTPError('https://openrouter.ai', status, 'error', {}, response)
+            return response
+    monkeypatch.setattr(providers.urllib.request, 'build_opener', lambda *a: Opener())
+    transport = providers.OpenRouterTransport(_env(tmp_path))
+    with pytest.raises(TimeoutError, match='outcome unknown'):
+        transport._send_unchecked(REQ, expected_credential='sk-test-SECRET')
