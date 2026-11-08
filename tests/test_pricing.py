@@ -62,11 +62,13 @@ def test_capped_routing_reservation_covers_ceiling_and_snapshot():
     assert Decimal(str(reservation.cost_usd)) >= snapshot_cost + ceiling_cost
 
 
-def test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse():
+def test_discounts_reserve_at_least_the_undiscounted_price():
     model = {'id':'synthetic/model','context_length':1000,'top_provider':{'max_completion_tokens':100},
              'pricing':{'prompt':'0.000001','completion':'0.000002','input_cache_read':'0.0000001','discount':0}}
     assert upper_cost(model,input_tokens=100,output_tokens=50) == Decimal('0.0002100')
-    for value in (0.1, -1, True, '0', None, float('nan')):
+    discounted = {**model, 'pricing': {**model['pricing'], 'discount': 0.5}}
+    assert upper_cost(discounted,input_tokens=100,output_tokens=50) >= Decimal('0.0004200')
+    for value in (-1, 1, 2, True, '0', None, float('nan')):
         with pytest.raises(ContractError):
             upper_cost({**model,'pricing':{**model['pricing'],'discount':value}},input_tokens=100,output_tokens=50)
     with pytest.raises(ContractError):
@@ -111,7 +113,7 @@ def test_endpoint_snapshot_model_reserves_across_all_routes_and_rejects_unknown_
                           max_price={'prompt':10,'completion':20})
     bound = make_call_reservation(req,model,input_tokens=100,input_bound_provenance='synthetic estimate')
     assert Decimal(str(bound.cost_usd)) >= Decimal('0.0005')
-    changed = {**snapshot,'endpoints':[first,{**second,'pricing':{**second['pricing'],'discount':0.5}}]}
+    changed = {**snapshot,'endpoints':[first,{**second,'pricing':{**second['pricing'],'discount':1}}]}
     with pytest.raises(ContractError):
         model_from_endpoint_snapshot(changed,now=now,max_age_seconds=30)
     with pytest.raises(ContractError):

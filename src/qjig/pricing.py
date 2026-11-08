@@ -31,6 +31,26 @@ def _rate(value) -> Decimal:
     return result
 
 
+def _discount_fraction(pricing: dict) -> Decimal:
+    value = pricing.get('discount', 0)
+    if type(value) not in (int, float):
+        raise ContractError('unsupported pricing discount')
+    fraction = Decimal(str(value))
+    if not fraction.is_finite() or not Decimal(0) <= fraction < Decimal(1):
+        raise ContractError('unsupported pricing discount')
+    return fraction
+
+
+def _undiscounted_rate(value, fraction: Decimal) -> Decimal:
+    # OpenRouter documents a fractional discount applied to every priced SKU.
+    # Inverting the reported rate is conservative whether that rate is already
+    # discounted or is a base price; it is not a guarantee of future pricing.
+    with localcontext() as ctx:
+        ctx.prec = 80
+        ctx.rounding = ROUND_CEILING
+        return _rate(value) / (Decimal(1) - fraction)
+
+
 def upper_cost(model: dict, *, input_tokens: int, output_tokens: int) -> Decimal:
     """Bound token-based charges using maximum rates across all listed overrides.
 
@@ -58,14 +78,13 @@ def upper_cost(model: dict, *, input_tokens: int, output_tokens: int) -> Decimal
     if not isinstance(overrides, list) or not all(isinstance(item, dict) for item in overrides):
         raise ContractError("invalid pricing overrides")
     rates = {}
+    discount = _discount_fraction(pricing)
     for index, item in enumerate([pricing, *overrides]):
         allowed = _INPUT_RATES | _OUTPUT_RATES | ({"overrides", "discount"} if index == 0 else _CONDITIONS)
         if set(item) - allowed:
             raise ContractError("unsupported pricing category")
-        if index == 0 and "discount" in item and (type(item["discount"]) not in (int, float) or item["discount"] != 0):
-            raise ContractError("unsupported pricing discount")
         for name in (_INPUT_RATES | _OUTPUT_RATES) & item.keys():
-            rates[name] = max(rates.get(name, Decimal(0)), _rate(item[name]))
+            rates[name] = max(rates.get(name, Decimal(0)), _undiscounted_rate(item[name], discount))
     with localcontext() as ctx:
         ctx.rounding = ROUND_CEILING
         input_rate = sum((rates.get(name, Decimal(0)) for name in _INPUT_RATES), Decimal(0))
@@ -161,9 +180,10 @@ def model_from_endpoint_snapshot(snapshot: dict, *, now: datetime, max_age_secon
             # that a route excluded by today's prices will stay excluded later.
             upper_cost(model, input_tokens=1, output_tokens=1)
             pricing = endpoint['pricing']
+            discount = _discount_fraction(pricing)
             for item in [pricing, *pricing.get('overrides', [])]:
                 for key in (_INPUT_RATES | _OUTPUT_RATES) & item.keys():
-                    maxima[key] = max(maxima.get(key, Decimal(0)), _rate(item[key]))
+                    maxima[key] = max(maxima.get(key, Decimal(0)), _undiscounted_rate(item[key], discount))
         return {'id':checked['model'],
                 'context_length':min(e['context_length'] for e in checked['endpoints']),
                 'top_provider':{'max_completion_tokens':min(e['max_completion_tokens'] for e in checked['endpoints'])},
