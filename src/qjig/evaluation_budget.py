@@ -168,8 +168,11 @@ def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
     if not isinstance(assignment_secret,bytes) or not 32 <= len(assignment_secret) <= 4096:
         raise ContractError('private assignment secret required')
     if not isinstance(config,dict) or set(config) not in ({'direct','planner','judge','reviewer'},
-                                                               {'direct','planner','judge','reviewer','semantic_reviewer'}):
+                                                               {'direct','planner','judge','reviewer','semantic_reviewer'},
+                                                               {'direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer'}):
         raise ContractError('complete factorial model configuration required')
+    if 'outcome_reviewer' in config and max_judge_pairs is None:
+        raise ContractError('outcome review requires bounded judge work')
     if max_judge_pairs is not None and 'semantic_reviewer' not in config:
         raise ContractError('bounded judge work requires semantic review configuration')
     for spec in config.values():
@@ -206,6 +209,10 @@ def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
                     from .semantic_preflight import semantic_review_allocation
                     work.append(semantic_review_allocation(request_id=request_id,partition=partition,
                                                            spec=config['semantic_reviewer']))
+                if 'outcome_reviewer' in config:
+                    from .outcome_preflight import outcome_review_allocation
+                    work.append(outcome_review_allocation(request_id=request_id,partition=partition,
+                                                         spec=config['outcome_reviewer']))
                 counts = dict(Counter(slot['stage'] for slot in work))
                 if arm in templates and templates[arm] != counts:
                     raise ContractError('factorial stage template changed')

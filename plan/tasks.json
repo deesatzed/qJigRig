@@ -1252,7 +1252,8 @@
         "T069A",
         "T069B",
         "T069C",
-        "T069D"
+        "T069D",
+        "T069E"
       ],
       "status": "pending",
       "files": [
@@ -4400,6 +4401,26 @@
       "acceptance": "A separate blind fresh review shares the request budget, retains deferral, and replays after conditional review with anchored original journal and unchanged private labels.",
       "command": "python -m pytest tests/test_evaluation.py::test_locked_fresh_run_uses_only_checked_sources_and_hides_reference -q",
       "evidence": "Red: separate fresh outcome reviewer absent. Green: stand-in routed and legacy reviews independently assess applicable sources without private labels or conditional answer, remain deferred, replay against original run and journal after conditional review, preserve malformed responses as uncertain and reject changed references/records. Evaluation/review/replay/fresh regressions passed 168; final targeted 12 passed. No independent semantic correctness, missing-source review, goal-bound campaign integration or hosted execution established."
+    },
+    {
+      "id": "T069E",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069B",
+        "T069C",
+        "T069D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_budget.py",
+        "src/qjig/evaluation_campaign.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_freezes_distinct_outcome_review_work_before_execution",
+      "action": "Freeze outcome review work for every evaluation assignment",
+      "acceptance": "All assignments reserve one separate outcome review with frozen reviewer and route, while execution refuses until outcome scoring and receipt replay are integrated.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_freezes_distinct_outcome_review_work_before_execution -q",
+      "evidence": "Red: factorial configuration rejected a separate outcome reviewer. Green: each stand-in or routed assignment reserves a distinct outcome review alongside semantic review, freezes v7 configuration with bounded quota, rejects altered reviewer work and refuses claims before integration; evaluation/review/goal regressions passed 142. Execution, review receipts, affordability and hosted billing remain open."
     }
   ]
 }

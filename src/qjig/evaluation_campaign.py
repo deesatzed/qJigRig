@@ -139,11 +139,14 @@ class EvaluationCampaign:
         from .fresh_preflight import fresh_run_allocations
         if (type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024
                 or not isinstance(config,dict) or set(config) not in ({'direct','planner','judge','reviewer'},
-                                                                      {'direct','planner','judge','reviewer','semantic_reviewer'})
+                                                                      {'direct','planner','judge','reviewer','semantic_reviewer'},
+                                                                      {'direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer'})
                 or any(not isinstance(v,dict) or set(v) not in ({'provider','model','input_tokens','output_tokens','max_price'},
                                                                {'provider','model','input_tokens','output_tokens','max_price','route'})
                        for v in config.values())):
             raise ContractError('invalid campaign configuration')
+        if 'outcome_reviewer' in config and max_judge_pairs is None:
+            raise ContractError('outcome review requires bounded judge work')
         has_routes=any('route' in spec for spec in config.values())
         if has_routes and (max_judge_pairs is None or 'semantic_reviewer' not in config
                            or any(not spec.get('route') or spec['provider']!='openrouter' for spec in config.values())):
@@ -162,7 +165,7 @@ class EvaluationCampaign:
         payload={'schema':'qjig.campaign-config.v2','plan_sha256':self._digest,'want':want,'max_bytes':max_bytes,
                  'stages':config,'case_applicability':case_applicability}
         if 'semantic_reviewer' in config:
-            payload['schema']='qjig.campaign-config.v6' if has_routes else 'qjig.campaign-config.v5' if max_judge_pairs is not None else 'qjig.campaign-config.v4'
+            payload['schema']='qjig.campaign-config.v7' if 'outcome_reviewer' in config else 'qjig.campaign-config.v6' if has_routes else 'qjig.campaign-config.v5' if max_judge_pairs is not None else 'qjig.campaign-config.v4'
             if max_judge_pairs is not None:
                 payload['max_judge_pairs']=max_judge_pairs
             payload['planner_prompt_version']=planner_prompt_version
@@ -209,6 +212,9 @@ class EvaluationCampaign:
                 if 'semantic_reviewer' in config:
                     from .semantic_preflight import semantic_review_allocation
                     work.append(semantic_review_allocation(request_id=rid,partition=partition,spec=config['semantic_reviewer']))
+                if 'outcome_reviewer' in config:
+                    from .outcome_preflight import outcome_review_allocation
+                    work.append(outcome_review_allocation(request_id=rid,partition=partition,spec=config['outcome_reviewer']))
                 if sorted(work,key=lambda x:x['work_id']) != assignment['work']:
                     raise ContractError('campaign configuration differs from reserved work')
             con.execute('INSERT INTO evaluation_campaign_config VALUES(?,?,?)',(self._plan_id,encoded,digest))
@@ -251,6 +257,12 @@ class EvaluationCampaign:
                   and all(isinstance(spec,dict) and spec.get('route') and spec.get('provider')=='openrouter' for spec in config.values())):
                 payload.update(schema='qjig.campaign-config.v6', planner_prompt_version=frozen['planner_prompt_version'],
                                max_judge_pairs=frozen['max_judge_pairs'])
+            elif (frozen.get('schema') == 'qjig.campaign-config.v7'
+                  and frozen.get('planner_prompt_version') in ('legacy_v1','exception_applicability_v2')
+                  and type(frozen.get('max_judge_pairs')) is int and 1 <= frozen['max_judge_pairs'] <= 12
+                  and isinstance(config,dict) and set(config)=={'direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer'}):
+                payload.update(schema='qjig.campaign-config.v7', planner_prompt_version=frozen['planner_prompt_version'],
+                               max_judge_pairs=frozen['max_judge_pairs'])
             expected=json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
         except (KeyError,TypeError,ValueError,UnicodeError) as exc:
             raise ContractError('campaign configuration is not finite JSON') from exc
@@ -268,6 +280,8 @@ class EvaluationCampaign:
         con.execute('BEGIN IMMEDIATE')
         try:
             manifest,assignments,started,scored = self._snapshot()
+            if any('outcome_review' in template for template in manifest['stage_templates'].values()):
+                raise ContractError('outcome campaign execution is not yet implemented')
             if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
                 raise ContractError('assignment unavailable or already claimed')
             if started-scored:
@@ -303,6 +317,8 @@ class EvaluationCampaign:
             raise ContractError('archive request differs from claim')
         config_row=self._goal._con.execute('SELECT value FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
         frozen = json.loads(config_row[0]) if config_row is not None else None
+        if frozen is not None and frozen.get('schema')=='qjig.campaign-config.v7':
+            raise ContractError('outcome campaign execution is not yet implemented')
         if frozen is not None:
             check_archive_config(frozen, archive.context(), assignment)
         family = next(c['family'] for c in manifest['design']['cases'] if c['id']==assignment['case_id'])
@@ -368,6 +384,8 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             or type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024):
         raise ContractError('invalid campaign run inputs')
     frozen_config=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
+    if frozen_config['schema']=='qjig.campaign-config.v7':
+        raise ContractError('outcome campaign execution is not yet implemented')
     semantic = frozen_config['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6')
     quota = frozen_config.get('max_judge_pairs')
     if semantic and (not isinstance(semantic_review_archive,RunArchive) or semantic_review_archive is archive
@@ -543,6 +561,8 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
             or not callable(transport_factory) or type(max_assignments) is not int or not 1 <= max_assignments <= 100):
         raise ContractError('invalid campaign batch inputs')
     frozen=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
+    if frozen['schema']=='qjig.campaign-config.v7':
+        raise ContractError('outcome campaign execution is not yet implemented')
     semantic = frozen['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6')
     manifest,assignments,started,scored=campaign._snapshot()
     if design != manifest['design'] or set(cases) != {case['id'] for case in design['cases']}:
