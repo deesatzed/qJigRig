@@ -2471,14 +2471,14 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                         resource_total={'calls':1,'input_tokens':10,'output_tokens':5,'cost_usd':0.01,
                             'known_input_tokens':10,'known_output_tokens':5,'known_cost_usd':0.01,'unknown_usage_calls':0,'latency_seconds':0.1}
                         fake_records=[{'arm':arm,'repeat':repeat,'score':{'case_id':case['id'],'required_evidence_covered':None,
-                            'resources':{'total':resource_total}},'outcome_category':'unknown_assessment','outcome_assurance':'synthetic_unvalidated'}
+                            'resources':{'total':resource_total,'stages':{'synthetic':dict(resource_total)}}},'outcome_category':'unknown_assessment','outcome_assurance':'synthetic_unvalidated'}
                             for case in design['cases'] for arm in design['arms']
                             for repeat in range(1,design['repeats'][family_partitions[case['family']]]+1)]
                         patch.setattr('qjig.evaluation_recommendation.inspect_campaign_receipts',lambda *a,**k:{'status':'structurally_complete','issues':[],'scored_records':fake_records})
                         def fake_comparison(baseline,metric,candidate='combined'):
                             total={'calls':3,'input_tokens':10,'output_tokens':5,'cost_usd':0.02,'known_input_tokens':10,
                                    'known_output_tokens':5,'known_cost_usd':0.02,'unknown_usage_calls':0,'latency_seconds':0.1}
-                            def entry(arm): return {'arm':arm,'repeat':1,'score':{'case_id':'holdout','required_evidence_covered':True,'resources':{'total':total}}}
+                            def entry(arm): return {'arm':arm,'repeat':1,'score':{'case_id':'holdout','required_evidence_covered':True,'resources':{'total':total,'stages':{'synthetic':dict(total)}}}}
                             def outcome(arm): return {'case_id':'holdout','repeat':1,'arm':arm,'category':'supported_match','assurance':'synthetic_unvalidated'}
                             return {'outcome_reviews':{'paired':{'outcome_support':metric},'records':[outcome(candidate),outcome(baseline)]},
                                     'scored_assignments':[entry(candidate),entry(baseline)],'semantic_reviews':{'assurance':'unvalidated'}}

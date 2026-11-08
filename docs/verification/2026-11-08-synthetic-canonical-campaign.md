@@ -31,3 +31,7 @@ A later read-only reconstruction included all fully inspected assignments, parti
 ## Configured arm-access disclosure
 
 The current report also describes the frozen fixture configuration: direct full-evidence uses full source with no direct followup; direct retrieval uses lexical retrieval with one followup; retrieval-only uses catalog retrieval with one followup; decomposition-only uses full source and a two-pair judge quota; combined uses catalog retrieval and the same two-pair quota. It lists each stage's configured model, route, token bounds and context metadata. These are frozen assertions, not evidence that real providers honored limits or that work was equivalent. The historical run remains incomplete for synthetic attribution and source-contract drift.
+
+## Recorded stage-resource diagnostic
+
+The current companion reconstructs stage totals per unique arm and reconciles each assignment's stage counts and usage totals. For this retained synthetic run, the combined holdout arm recorded 10 planner, 10 positive judge, 10 negative judge, 8 plan-review, 8 semantic-review and 8 outcome-review calls: 54 fixture calls in total. These are stand-in records, not observed provider use or cost. The run remains incomplete because provider attribution is synthetic and its frozen source contract differs from current files.

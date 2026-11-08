@@ -901,7 +901,8 @@
       "depends_on": [
         "T041",
         "T049",
-        "T052A"
+        "T052A",
+        "T052B"
       ],
       "status": "pending",
       "files": [
@@ -4918,6 +4919,23 @@
       "acceptance": "The five arms report their distinct source mode, followup, planner/judge, model, routing and configured limits without presenting assertions as observed provider behavior.",
       "command": "python -m pytest tests/test_evaluation_companion.py::test_arm_configuration_discloses_access_and_work_differences -q",
       "evidence": "Red: no per-arm configuration disclosure existed. Green: five source modes, direct followups, judge quotas, stages, model/route and configured input/output limits are shown in the inspected campaign report; missing review stage is rejected. Evaluation/review/replay/gate regressions passed 157. A prior synthetic campaign showed the expected arm differences, but attribution and source-contract drift keep it incomplete. Configuration is an assertion, not observed provider compliance."
+    },
+    {
+      "id": "T052B",
+      "phase": "evaluation",
+      "depends_on": [
+        "T072K"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_companion.py"
+      ],
+      "test_file": "tests/test_evaluation_companion.py",
+      "test_name": "test_companion_counts_unique_arms_and_preserves_unknown_usage",
+      "action": "Summarize recorded stage resources per unique arm",
+      "acceptance": "Per-arm stage totals preserve unknown usage, reconcile assignment call counts, and do not double-count shared comparison records.",
+      "command": "python -m pytest tests/test_evaluation_companion.py::test_companion_counts_unique_arms_and_preserves_unknown_usage -q",
+      "evidence": "Red: per-arm stage totals were absent; additional tests exposed unchecked inconsistent token and cost totals. Green: stage counts and known/unknown usage reconcile to each assignment and shared arms remain deduplicated; evaluation/review/replay/goal regressions passed 197. A prior synthetic run reconstructed combined holdout stage calls, but its provider attribution and source contract remain incomplete. No real cost or provider behavior is established."
     }
   ]
 }

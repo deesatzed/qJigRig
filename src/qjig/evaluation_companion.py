@@ -7,6 +7,38 @@ from decimal import Decimal
 from .contracts import ContractError
 
 
+
+def _aggregate_resource_totals(totals: list[dict]) -> dict:
+    """Add complete recorded subtotals without replacing unknown values with zero."""
+    for total in totals:
+        if not isinstance(total,dict):raise ContractError('assignment resources required')
+        for name in ('calls','known_input_tokens','known_output_tokens','unknown_usage_calls'):
+            if type(total.get(name)) is not int or total[name]<0:raise ContractError('invalid resource count')
+        if total['unknown_usage_calls']>total['calls']:raise ContractError('invalid unknown usage count')
+        for name in ('input_tokens','output_tokens'):
+            if total.get(name) is not None and (type(total[name]) is not int or total[name]<0):raise ContractError('invalid token total')
+        for name in ('cost_usd','known_cost_usd','latency_seconds'):
+            value=total.get(name)
+            if (value is None and name=='known_cost_usd') or (value is not None and (type(value) not in (int,float) or not math.isfinite(value) or value<0)):
+                raise ContractError('invalid resource value')
+        for name,known in (('input_tokens','known_input_tokens'),('output_tokens','known_output_tokens'),('cost_usd','known_cost_usd')):
+            value=total.get(name)
+            if value is not None and Decimal(str(value))!=Decimal(str(total[known])):
+                raise ContractError('resource known subtotal differs')
+            if total['unknown_usage_calls']==0 and value is None:
+                raise ContractError('complete usage total unavailable')
+    def exact(name):
+        values=[item.get(name) for item in totals]
+        return None if any(value is None for value in values) else sum(values)
+    costs=[item.get('cost_usd') for item in totals]
+    return {'calls':sum(item['calls'] for item in totals),'input_tokens':exact('input_tokens'),
+        'output_tokens':exact('output_tokens'),'cost_usd':None if any(value is None for value in costs) else float(sum((Decimal(str(value)) for value in costs),Decimal(0))),
+        'known_input_tokens':sum(item['known_input_tokens'] for item in totals),
+        'known_output_tokens':sum(item['known_output_tokens'] for item in totals),
+        'known_cost_usd':float(sum((Decimal(str(item['known_cost_usd'])) for item in totals),Decimal(0))),
+        'unknown_usage_calls':sum(item['unknown_usage_calls'] for item in totals),'latency_seconds':exact('latency_seconds')}
+
+
 def summarize_companion_assertions(reports: dict, *, additional_reports: dict | None = None) -> dict:
     """Summarize supplied comparison records; caller must establish provenance."""
     baselines=('direct_full_evidence','direct_retrieval')
@@ -60,38 +92,32 @@ def summarize_companion_assertions(reports: dict, *, additional_reports: dict | 
     arms=(*baselines,'combined') + (('retrieval_only','decomposition_only') if additional_reports is not None else ())
     for arm in arms:
         keys=sorted(key for key in records if key[2]==arm)
-        totals=[]; coverage={'covered':0,'not_covered':0,'unknown':0};cases=[]
+        totals=[]; stages={}; coverage={'covered':0,'not_covered':0,'unknown':0};cases=[]
         for key in keys:
             score=records[key]['score']; covered=score.get('required_evidence_covered')
             if type(covered) not in (bool,type(None)):
                 raise ContractError('invalid evidence coverage')
             coverage['covered' if covered is True else 'not_covered' if covered is False else 'unknown']+=1
-            total=score.get('resources',{}).get('total')
-            if not isinstance(total,dict):raise ContractError('assignment resources required')
-            for name in ('calls','known_input_tokens','known_output_tokens','unknown_usage_calls'):
-                if type(total.get(name)) is not int or total[name]<0:raise ContractError('invalid resource count')
-            for name in ('input_tokens','output_tokens'):
-                if total.get(name) is not None and (type(total[name]) is not int or total[name]<0):raise ContractError('invalid token total')
-            for name in ('cost_usd','known_cost_usd','latency_seconds'):
-                value=total.get(name)
-                if (value is None and name=='known_cost_usd') or (value is not None and (type(value) not in (int,float) or not math.isfinite(value) or value<0)):
-                    raise ContractError('invalid resource value')
+            resources=score.get('resources')
+            if not isinstance(resources,dict) or not isinstance(resources.get('stages'),dict):
+                raise ContractError('assignment stages required')
+            total=resources.get('total'); _aggregate_resource_totals([total])
+            stage_values=resources['stages']
+            if any(not isinstance(name,str) or not name for name in stage_values):
+                raise ContractError('invalid resource stage')
+            stage_aggregate=_aggregate_resource_totals(list(stage_values.values()))
+            for name in ('calls','input_tokens','output_tokens','cost_usd','known_input_tokens','known_output_tokens','known_cost_usd','unknown_usage_calls'):
+                if stage_aggregate[name]!=total[name]:
+                    raise ContractError('stage resources differ from total')
+            for name,value in stage_values.items():
+                stages.setdefault(name,[]).append(value)
             totals.append(total)
             cases.append({'case_id':key[0],'repeat':key[1],'category':outcomes[key]['category'],
                           'review_assurance':outcomes[key].get('assurance'),'evidence_covered':covered,
                           'request_status':score.get('request_status'),'classification':score.get('classification')})
-        def exact(name):
-            values=[item.get(name) for item in totals]
-            return None if any(value is None for value in values) else sum(values)
-        known_cost=sum((Decimal(str(item['known_cost_usd'])) for item in totals),Decimal(0))
-        costs=[item.get('cost_usd') for item in totals]
         summaries[arm]={'assignments':len(keys),'outcomes':{category:sum(outcomes[key]['category']==category for key in keys) for category in categories},
-            'evidence_coverage':coverage,'cases':cases,
-            'resources':{'calls':sum(item['calls'] for item in totals),'input_tokens':exact('input_tokens'),
-                'output_tokens':exact('output_tokens'),'cost_usd':None if any(value is None for value in costs) else float(sum((Decimal(str(value)) for value in costs),Decimal(0))),
-                'known_input_tokens':sum(item['known_input_tokens'] for item in totals),
-                'known_output_tokens':sum(item['known_output_tokens'] for item in totals),'known_cost_usd':float(known_cost),
-                'unknown_usage_calls':sum(item['unknown_usage_calls'] for item in totals),'latency_seconds':exact('latency_seconds')}}
+            'evidence_coverage':coverage,'cases':cases,'resources':_aggregate_resource_totals(totals),
+            'stages':{name:_aggregate_resource_totals(values) for name,values in sorted(stages.items())}}
     return {'schema':'qjig.holdout-companion.v1','arms':summaries,'assurance':'caller_asserted_unverified',
             'scope':'holdout_five_arms_only' if additional_reports is not None else 'holdout_three_arms_only'}
 

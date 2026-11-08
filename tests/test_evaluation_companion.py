@@ -11,7 +11,7 @@ def test_companion_counts_unique_arms_and_preserves_unknown_usage():
                'known_input_tokens':10,'known_output_tokens':5,'known_cost_usd':cost if cost is not None else 0,
                'unknown_usage_calls':int(cost is None),'latency_seconds':0.2}
         return {'arm':arm,'repeat':1,'score':{'case_id':'case','required_evidence_covered':covered,
-                'resources':{'total':total,'stages':{}}}}
+                'resources':{'total':total,'stages':{'direct_initial':dict(total)}}}}
     combined=record('combined',None,None)
     def report(baseline, category):
         return {'scored_assignments':[record(baseline,0.1,True),copy.deepcopy(combined)],
@@ -25,10 +25,21 @@ def test_companion_counts_unique_arms_and_preserves_unknown_usage():
     assert result['arms']['combined']['outcomes']['unknown_assessment']==1
     assert result['arms']['combined']['resources']['calls']==1
     assert result['arms']['combined']['resources']['cost_usd'] is None
+    assert result['arms']['combined']['stages']['direct_initial']['calls']==1
+    assert result['arms']['combined']['stages']['direct_initial']['cost_usd'] is None
     assert result['arms']['direct_full_evidence']['resources']['cost_usd']==0.1
     assert result['arms']['direct_retrieval']['outcomes']['failed']==1
     changed=copy.deepcopy(reports);changed['direct_retrieval']['scored_assignments'][1]['score']['required_evidence_covered']=True
     with pytest.raises(ContractError): summarize_companion_assertions(changed)
+    bad_stages=copy.deepcopy(reports)
+    bad_stages['direct_full_evidence']['scored_assignments'][0]['score']['resources']['stages']={}
+    with pytest.raises(ContractError): summarize_companion_assertions(bad_stages)
+    bad_total=copy.deepcopy(reports)
+    bad_total['direct_full_evidence']['scored_assignments'][0]['score']['resources']['total']['input_tokens']=11
+    with pytest.raises(ContractError): summarize_companion_assertions(bad_total)
+    bad_stage_cost=copy.deepcopy(reports)
+    bad_stage_cost['direct_full_evidence']['scored_assignments'][0]['score']['resources']['stages']['direct_initial']['cost_usd']=0.2
+    with pytest.raises(ContractError): summarize_companion_assertions(bad_stage_cost)
     missing=copy.deepcopy(reports);missing['direct_retrieval']['scored_assignments'].pop(1);missing['direct_retrieval']['outcome_reviews']['records'].pop(1)
     with pytest.raises(ContractError): summarize_companion_assertions(missing)
     def ablation(arm):
@@ -85,7 +96,7 @@ def test_campaign_companion_preserves_partitions_and_pilot_interventions():
         for arm in design['arms']:
             for repeat in range(1,design['repeats'][partition]+1):
                 records.append({'arm':arm,'repeat':repeat,'score':{'case_id':case['id'],
-                    'required_evidence_covered':None,'resources':{'total':dict(total)}},
+                    'required_evidence_covered':None,'resources':{'total':dict(total),'stages':{'synthetic':dict(total)}}},
                     'outcome_category':'unknown_assessment','outcome_assurance':'synthetic_unvalidated'})
     result=summarize_campaign_assertions(design,records,expected_design_sha256=digest)
     assert result['assurance']=='caller_asserted_unverified'
