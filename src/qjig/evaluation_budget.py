@@ -167,7 +167,8 @@ def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
         raise ContractError('factorial allocation requires the five specified arms')
     if not isinstance(assignment_secret,bytes) or not 32 <= len(assignment_secret) <= 4096:
         raise ContractError('private assignment secret required')
-    if not isinstance(config,dict) or set(config) != {'direct','planner','judge','reviewer'}:
+    if not isinstance(config,dict) or set(config) not in ({'direct','planner','judge','reviewer'},
+                                                               {'direct','planner','judge','reviewer','semantic_reviewer'}):
         raise ContractError('complete factorial model configuration required')
     for spec in config.values():
         if not isinstance(spec,dict) or set(spec) != {'provider','model','input_tokens','output_tokens','max_price'}:
@@ -193,6 +194,10 @@ def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
                     work = direct_run_allocations(request_id=request_id,partition=partition,provider=direct['provider'],
                         model=direct['model'],input_tokens=direct['input_tokens'],output_tokens=direct['output_tokens'],
                         max_price=direct['max_price'],followups=0 if arm=='direct_full_evidence' else 1)
+                if 'semantic_reviewer' in config:
+                    from .semantic_preflight import semantic_review_allocation
+                    work.append(semantic_review_allocation(request_id=request_id,partition=partition,
+                                                           spec=config['semantic_reviewer']))
                 counts = dict(Counter(slot['stage'] for slot in work))
                 if arm in templates and templates[arm] != counts:
                     raise ContractError('factorial stage template changed')

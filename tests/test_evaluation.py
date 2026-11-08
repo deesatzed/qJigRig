@@ -1515,6 +1515,12 @@ def test_factorial_allocation_enumerates_real_arm_work_before_reservation(tmp_pa
     config={name:dict(spec) for name in ('direct','planner','judge','reviewer')}
     plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'x'*32)
     assert len(plan['manifest']['assignments'])==60
+    with_semantic = build_factorial_allocation(design,hashes,{**config,'semantic_reviewer':dict(spec)},
+                                               expected_design_sha256=digest,assignment_secret=b'x'*32)
+    assert all(a['work'] and sum(w['stage']=='semantic_review' for w in a['work'])==1
+               for a in with_semantic['manifest']['assignments'])
+    assert all(template['semantic_review']==1 for template in with_semantic['manifest']['stage_templates'].values())
+    assert with_semantic['sha256'] != plan['sha256']
     templates=plan['manifest']['stage_templates']
     assert templates['direct_full_evidence']=={'direct_initial':1}
     assert templates['direct_retrieval']==templates['retrieval_only']=={'direct_initial':1,'direct_final':1}

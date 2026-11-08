@@ -5,7 +5,7 @@ import json
 import pytest
 
 from qjig.budgets import BudgetExceeded, BudgetLedger
-from qjig.contracts import Budget, Request
+from qjig.contracts import Budget, ContractError, Request
 from qjig.evaluation import DirectRetrieval
 from qjig.evaluation_direct import run_direct
 from qjig.evaluation_replay import verify_direct_archive
@@ -92,3 +92,25 @@ def test_direct_semantic_review_excludes_private_reference_and_replays_original(
         changed=json.loads(encoded); changed['assessment']='unsupported'
         review_archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),seq))
         assert verify_direct_semantic_review(archive,journal,review_archive,expected_run_sha256=digest)['status']=='invalid'
+
+
+def test_semantic_review_uses_its_frozen_goal_slot(tmp_path):
+    from qjig.goal_budget import GoalBudget
+    from qjig.semantic_preflight import semantic_review_allocation, semantic_review_reservation
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,
+          'max_price':{'prompt':2,'completion':3}}
+    request=ProviderRequest('semantic_review','stand-in','synthetic/model','review',100,max_price=spec['max_price'])
+    slot=semantic_review_allocation(request_id='r',partition='holdout',spec=spec)
+    limit=Budget(2,1000,1)
+    usage={'prompt_tokens':5,'completion_tokens':3,'cost_usd':0.0001}
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=limit,per_request=limit,allocations={'holdout':limit}) as goal, Journal.open(tmp_path/'journal.sqlite') as journal:
+        goal.reserve_run_set('evaluation:test',[slot])
+        ledger=BudgetLedger(limit,journal,'r',goal_budget=goal,partition='holdout')
+        bound=semantic_review_reservation(goal,'evaluation:test',request_id='r',partition='holdout',request=request,spec=spec)
+        response=RawResponse(200,json.dumps({'assessment':'uncertain'}),usage)
+        call=call_typed(ledger,StandInTransport([response]),request,{'assessment':FieldSpec(str,('uncertain',))},reservation=bound)
+        assert call.ok and goal.audit_journal(journal)['status']=='verified'
+        with pytest.raises(ContractError, match="unconsumed"):
+            semantic_review_reservation(goal,'evaluation:test',request_id='r',partition='holdout',request=request,spec=spec)
