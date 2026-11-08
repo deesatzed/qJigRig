@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
-  "goal_sha256": "06b304728a2dd9f465a4089d0e79d9f4d505a302db5d6d62f5b5cd54f491a905",
-  "queue_sha256": "92817031747375181b36231bc579283c6919502a3e1570ad127af72fa4307d5a",
+  "goal_sha256": "babffccd5e66b62f0101eb96968d91fc73dfe968c841d29b367ca72c8004a8cf",
+  "queue_sha256": "f67b576b794b794f1251f332f07960e702eaa65a5f62686878c477caac503825",
   "gates": [
     {
       "id": "F01",
@@ -532,8 +532,8 @@
       ],
       "evidence": [],
       "queue_status": "complete",
-      "queue_command": "python -m pytest tests/test_pricing.py::test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse -q",
-      "queue_evidence_assertion": "Red: synthetic current-shape endpoint pricing with numeric zero discount was rejected as an unknown category. Zero is now accepted without price reduction; nonzero, malformed discounts and unrecognized charges still refuse. Focused pricing/goal/evaluation suite 89 passed; full offline suite 540 passed. Public endpoint catalog read found configured model IDs and discount metadata; availability, token bounds, provider enforcement and complete billing remain unverified and hosted dispatch stays disabled."
+      "queue_command": "python -m pytest tests/test_pricing.py::test_discounts_reserve_at_least_the_undiscounted_price -q",
+      "queue_evidence_assertion": "Red: synthetic current-shape endpoint pricing with numeric zero discount was rejected as an unknown category. Zero is now accepted without price reduction; nonzero, malformed discounts and unrecognized charges still refuse. Focused pricing/goal/evaluation suite 89 passed; full offline suite 540 passed. Public endpoint catalog read found configured model IDs and discount metadata; availability, token bounds, provider enforcement and complete billing remain unverified and hosted dispatch stays disabled. Subsequent pricing work replaced the zero-only rule with a conservatively inferred undiscounted estimate; its current focused test is test_discounts_reserve_at_least_the_undiscounted_price. The discount interpretation remains an assumption, not verified billing enforcement."
     },
     {
       "id": "R08F",

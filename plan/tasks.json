@@ -1231,7 +1231,8 @@
         "T068J",
         "T068K",
         "T068L",
-        "T068M"
+        "T068M",
+        "T068O"
       ],
       "status": "pending",
       "files": [
@@ -4324,6 +4325,24 @@
       "acceptance": "Ask for case-specific material exception applicability and enabling/restricting composition, retain exact legacy prompt replay, and refuse unbound prompt changes in frozen evaluation paths.",
       "command": "python -m pytest tests/test_planner.py::test_planner_prompt_distinguishes_exception_applicability_and_legacy -q",
       "evidence": "Red: no versioned applicability prompt existed. Workbench synthetic calls record v2; old prompt text and replay remain supported, reclassifying v2 as legacy is rejected, and frozen evaluation refuses the unbound v2 before calls. Chrome/planner/fresh/replay/evaluation checks: 146 passed. Prompt compliance and semantic improvement by real models remain unproven; R05 and hosted gates remain open."
+    },
+    {
+      "id": "T068O",
+      "phase": "evaluation",
+      "depends_on": [
+        "T068K",
+        "T068M"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_paired_outcome_metric_keeps_assigned_denominator_and_unknowns",
+      "action": "Calculate draft paired outcome metric without promoting caller assertions to verified results",
+      "acceptance": "Enumerate all case and repeat pairs; classify missing and unknown as incomplete; preserve separately scoped comparison and caller attribution.",
+      "command": "python -m pytest tests/test_evaluation.py::test_paired_outcome_metric_keeps_assigned_denominator_and_unknowns -q",
+      "evidence": "Red: paired outcome assertion calculator was absent. Green: design-anchored six-pair fixture preserves missing and unknown outcomes, rejects duplicate or invalid pairs, and computes tie/win/loss arithmetic; evaluation/gates/semantic-review/replay regressions passed 112. Categories are caller assertions, not review records or a recommendation; full T068 remains open."
     }
   ]
 }

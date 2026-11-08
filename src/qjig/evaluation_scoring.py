@@ -947,3 +947,58 @@ def build_reserved_holdout_comparison(goal, design: dict, entries: list[dict], *
             'not_reviewed':sum(review['assurance']=='not_reviewed' for review in reviews),
             'records':reviews,'pairs':review_pairs}
     return report
+
+
+def summarize_paired_outcome_assertions(design: dict, records: list[dict], *, expected_design_sha256: str,
+                                        baseline_arm: str, candidate_arm: str) -> dict:
+    """Apply draft pair arithmetic to caller assertions, never to an unverified decision.
+
+    This function does not inspect receipts, perform outcome review, or establish
+    the truth of categories. Missing and unknown pairs prevent a numeric metric.
+    """
+    from .evaluation import validate_evaluation_design
+    if not isinstance(expected_design_sha256,str) or not _SHA.fullmatch(expected_design_sha256):
+        raise ContractError('design anchor required')
+    validate_evaluation_design(design,expected_digest=expected_design_sha256)
+    if (baseline_arm not in ('direct_full_evidence','direct_retrieval') or candidate_arm != 'combined'
+            or not isinstance(records,list)):
+        raise ContractError('unsupported paired comparison')
+    partition={family['id']:family['partition'] for family in design['families']}
+    cases=sorted(case['id'] for case in design['cases'] if partition[case['family']]=='holdout')
+    repeats=design['repeats']['holdout']
+    if len(cases)*repeats>100_000:
+        raise ContractError('holdout comparison exceeds limit')
+    possible={(case,repeat) for case in cases for repeat in range(1,repeats+1)}
+    ranks={'supported_match':2,'reference_misaligned':1,'failed':0}
+    categories=set(ranks)|{'unknown_assessment'}
+    indexed={}
+    for record in records:
+        if not isinstance(record,dict) or set(record)!={'case_id','repeat','baseline','candidate'}:
+            raise ContractError('invalid paired outcome record')
+        case,repeat=record['case_id'],record['repeat']
+        if (not isinstance(case,str) or type(repeat) is not int or (case,repeat) not in possible
+                or not isinstance(record['baseline'],str) or record['baseline'] not in categories
+                or not isinstance(record['candidate'],str) or record['candidate'] not in categories
+                or (case,repeat) in indexed):
+            raise ContractError('invalid or duplicate paired outcome')
+        indexed[(case,repeat)]=record
+    pairs=[]; points=0; unknown=0; missing=0
+    for case,repeat in sorted(possible):
+        record=indexed.get((case,repeat))
+        if record is None:
+            missing+=1
+            pairs.append({'case_id':case,'repeat':repeat,'baseline':None,'candidate':None,'points':None})
+            continue
+        before,after=record['baseline'],record['candidate']
+        if before=='unknown_assessment' or after=='unknown_assessment':
+            unknown+=1; value=None
+        else:
+            value=1 if ranks[after]>ranks[before] else 0.5 if ranks[after]==ranks[before] else 0
+            points+=value
+        pairs.append({'case_id':case,'repeat':repeat,'baseline':before,'candidate':after,'points':value})
+    total=len(pairs)
+    return {'schema':'qjig.paired-outcome-assertions.v1','design_sha256':expected_design_sha256,
+            'baseline_arm':baseline_arm,'candidate_arm':candidate_arm,'assigned_pairs':total,
+            'recorded_pairs':len(indexed),'missing_pairs':missing,'unknown_pairs':unknown,
+            'outcome_support':points/total if total and not missing and not unknown else None,
+            'pairs':pairs,'assurance':'caller_asserted_unverified','decision':None}

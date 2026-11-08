@@ -2414,3 +2414,26 @@ def test_campaign_archive_configuration_rejects_changed_frozen_routes():
     for name in ('planner','judge','reviewer'):
         with pytest.raises(ContractError,match='configuration'):
             check_archive_config(frozen,{**fresh,name:{**stage,'route':'provider-b/fp8'}},assignment)
+
+
+def test_paired_outcome_metric_keeps_assigned_denominator_and_unknowns():
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_scoring import summarize_paired_outcome_assertions
+    design=_sample_design();digest=validate_evaluation_design(design)
+    cases=sorted(c['id'] for c in design['cases'] if c['family'].startswith('holdout'))
+    pairs=[{'case_id':case,'repeat':repeat,'baseline':'reference_misaligned','candidate':'supported_match'}
+           for case in cases for repeat in (1,2)]
+    opts={'expected_design_sha256':digest,'baseline_arm':'direct_retrieval','candidate_arm':'combined'}
+    report=summarize_paired_outcome_assertions(design,pairs,**opts)
+    assert report['assigned_pairs']==6 and report['outcome_support']==1
+    assert report['assurance']=='caller_asserted_unverified' and report['decision'] is None
+    pairs[0]['candidate']='reference_misaligned';pairs[1]['candidate']='failed'
+    assert summarize_paired_outcome_assertions(design,pairs,**opts)['outcome_support']==0.75
+    pairs[0]['candidate']='unknown_assessment'
+    unknown=summarize_paired_outcome_assertions(design,pairs,**opts)
+    assert unknown['outcome_support'] is None and unknown['unknown_pairs']==1
+    missing=summarize_paired_outcome_assertions(design,pairs[1:],**opts)
+    assert missing['outcome_support'] is None and missing['assigned_pairs']==6 and missing['missing_pairs']==1
+    for bad in (pairs+[pairs[0]], [{**pairs[0],'repeat':3}], [{**pairs[0],'candidate':'invented'}]):
+        with pytest.raises(ContractError):
+            summarize_paired_outcome_assertions(design,bad,**opts)
