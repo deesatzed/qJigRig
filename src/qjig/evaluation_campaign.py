@@ -133,7 +133,8 @@ class EvaluationCampaign:
         from .direct_preflight import direct_run_allocations
         from .fresh_preflight import fresh_run_allocations
         if (type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024
-                or not isinstance(config,dict) or set(config) != {'direct','planner','judge','reviewer'}
+                or not isinstance(config,dict) or set(config) not in ({'direct','planner','judge','reviewer'},
+                                                                      {'direct','planner','judge','reviewer','semantic_reviewer'})
                 or any(not isinstance(v,dict) or set(v) != {'provider','model','input_tokens','output_tokens','max_price'}
                        for v in config.values())):
             raise ContractError('invalid campaign configuration')
@@ -144,7 +145,10 @@ class EvaluationCampaign:
             raise ContractError('fresh planner and judge providers must match')
         payload={'schema':'qjig.campaign-config.v2','plan_sha256':self._digest,'want':want,'max_bytes':max_bytes,
                  'stages':config,'case_applicability':case_applicability}
-        if planner_prompt_version != 'legacy_v1':
+        if 'semantic_reviewer' in config:
+            payload['schema']='qjig.campaign-config.v4'
+            payload['planner_prompt_version']=planner_prompt_version
+        elif planner_prompt_version != 'legacy_v1':
             payload['schema']='qjig.campaign-config.v3'
             payload['planner_prompt_version']=planner_prompt_version
         try:
@@ -183,6 +187,9 @@ class EvaluationCampaign:
                         followups=0 if arm=='direct_full_evidence' else 1)
                 else:
                     raise ContractError('unsupported campaign arm')
+                if 'semantic_reviewer' in config:
+                    from .semantic_preflight import semantic_review_allocation
+                    work.append(semantic_review_allocation(request_id=rid,partition=partition,spec=config['semantic_reviewer']))
                 if sorted(work,key=lambda x:x['work_id']) != assignment['work']:
                     raise ContractError('campaign configuration differs from reserved work')
             con.execute('INSERT INTO evaluation_campaign_config VALUES(?,?,?)',(self._plan_id,encoded,digest))
@@ -208,6 +215,10 @@ class EvaluationCampaign:
                      'max_bytes':max_bytes,'stages':config,'case_applicability':frozen['case_applicability']}
             if frozen.get('schema') == 'qjig.campaign-config.v3' and frozen.get('planner_prompt_version') == 'exception_applicability_v2':
                 payload.update(schema='qjig.campaign-config.v3', planner_prompt_version='exception_applicability_v2')
+            elif (frozen.get('schema') == 'qjig.campaign-config.v4'
+                  and frozen.get('planner_prompt_version') in ('legacy_v1','exception_applicability_v2')
+                  and isinstance(config,dict) and 'semantic_reviewer' in config):
+                payload.update(schema='qjig.campaign-config.v4', planner_prompt_version=frozen['planner_prompt_version'])
             expected=json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
         except (KeyError,TypeError,ValueError,UnicodeError) as exc:
             raise ContractError('campaign configuration is not finite JSON') from exc
@@ -229,6 +240,8 @@ class EvaluationCampaign:
                 raise ContractError('assignment unavailable or already claimed')
             if started-scored:
                 raise ContractError('campaign recovery required before another assignment')
+            if 'semantic_review' in manifest['stage_templates'][assignments[request_id]['arm']]:
+                raise ContractError('semantic review campaign execution is not implemented')
             if con.execute('SELECT 1 FROM required_work WHERE request_id=? AND attempt_id IS NOT NULL LIMIT 1',(request_id,)).fetchone():
                 raise ContractError('assignment already has consumed work')
             assignment = assignments[request_id]
@@ -311,6 +324,8 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             or type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024):
         raise ContractError('invalid campaign run inputs')
     frozen_config=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
+    if frozen_config['schema']=='qjig.campaign-config.v4':
+        raise ContractError('semantic review campaign execution is not implemented')
     manifest,assignments,started,_ = campaign._snapshot()
     if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
         raise ContractError('campaign assignment unavailable')
@@ -439,6 +454,8 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
             or not callable(transport_factory) or type(max_assignments) is not int or not 1 <= max_assignments <= 100):
         raise ContractError('invalid campaign batch inputs')
     frozen=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
+    if frozen['schema']=='qjig.campaign-config.v4':
+        raise ContractError('semantic review campaign execution is not implemented')
     manifest,assignments,started,scored=campaign._snapshot()
     if design != manifest['design'] or set(cases) != {case['id'] for case in design['cases']}:
         raise ContractError('campaign batch case set differs')

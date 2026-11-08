@@ -1954,3 +1954,36 @@ def test_retained_campaign_inspection_refuses_unstarted_work_without_creating_ar
         assert 'unstarted_assignments' in report['issues']
         assert report['provider_authenticity'] == 'not_established'
         assert not archive_root.exists()
+
+
+def test_semantic_campaign_configuration_freezes_review_slots_and_refuses_premature_claim(tmp_path):
+    from qjig.contracts import Budget
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_budget import build_factorial_allocation, reserve_evaluation_plan
+    from qjig.evaluation_campaign import EvaluationCampaign
+    from qjig.goal_budget import GoalBudget
+    design=_sample_design(); design_hash=validate_evaluation_design(design)
+    hashes={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']}
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':{'prompt':2,'completion':3}}
+    config={name:dict(spec) for name in ('direct','planner','judge','reviewer','semantic_reviewer')}
+    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=design_hash,assignment_secret=b'x'*32)
+    total=Budget(1000,300000,12); per=Budget(30,6000,1)
+    allocations={'development':Budget(250,75000,3),'pilot':Budget(250,75000,3),'holdout':Budget(500,150000,6)}
+    metadata={case['id']:hashlib.sha256(('metadata:'+case['id']).encode()).hexdigest() for case in design['cases']}
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal:
+        reserve_evaluation_plan(goal,'semantic',plan,expected_plan_sha256=plan['sha256'])
+        campaign=EvaluationCampaign(goal,'semantic',expected_plan_sha256=plan['sha256'])
+        digest=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,
+                                      planner_prompt_version='exception_applicability_v2')
+        frozen=campaign.require_config(config,want=1,max_bytes=5000,expected_config_sha256=digest)
+        assert frozen['schema']=='qjig.campaign-config.v4'
+        assert frozen['stages']['semantic_reviewer']==spec
+        assert frozen['planner_prompt_version']=='exception_applicability_v2'
+        with pytest.raises(ContractError,match='semantic review'):
+            campaign.claim(plan['manifest']['assignments'][0]['request_id'])
+        assert campaign.status()['in_progress']==[]
+        altered={**config,'semantic_reviewer':{**spec,'output_tokens':99}}
+        with pytest.raises(ContractError):
+            campaign.require_config(altered,want=1,max_bytes=5000,expected_config_sha256=digest)
