@@ -577,7 +577,8 @@ def summarize_fresh_intervention_pairs(design: dict, records: list[dict], *, exp
 
 def score_reserved_assignment(goal, archive, journal, reference: dict, *, partition: str,
                               expected_plan_sha256: str, expected_run_sha256: str,
-                              expected_reference_sha256: str, expected_journal_sha256: str | None = None) -> dict:
+                              expected_reference_sha256: str, expected_journal_sha256: str | None = None,
+                              original_run_only: bool = False) -> dict:
     """Score an archived assignment against an externally anchored reserved plan.
 
     This verifies structural bindings and ledger consistency, not source authority,
@@ -628,7 +629,11 @@ def score_reserved_assignment(goal, archive, journal, reference: dict, *, partit
         raise ContractError('this scoring path binds the journal in its run digest')
     if scorer is score_fresh_archive and expected_journal_sha256 is None:
         raise ContractError('fresh assignment resources require a journal anchor')
+    if type(original_run_only) is not bool or (original_run_only and scorer not in (score_direct_archive, score_fresh_archive)):
+        raise ContractError('original run prefix unsupported for this assignment')
     options = {'expected_journal_sha256':expected_journal_sha256} if scorer is score_fresh_archive else {}
+    if original_run_only:
+        options['original_run_only'] = True
     score = scorer(archive, journal, reference, expected_run_sha256=expected_run_sha256,
                    expected_reference_sha256=expected_reference_sha256, **options)
     from .costs import summarize_resources

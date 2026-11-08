@@ -1104,21 +1104,24 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,
           'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
           'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
     case_hashes={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']};case_hashes['holdout']=case_lock_digest(lock)
-    templates={arm:{'direct_initial':1} for arm in design['arms']}
+    templates={arm:{'direct_initial':1,'semantic_review':1} for arm in design['arms']}
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},'pricing':{'prompt':'0.000001','completion':'0.000002'}}
-    cap={'prompt':2,'completion':3};families={f['id']:f['partition'] for f in design['families']};assignments=[]
+    cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
+    from qjig.semantic_preflight import semantic_review_allocation,semantic_review_reservation
+    families={f['id']:f['partition'] for f in design['families']};assignments=[]
     for case in design['cases']:
         partition=families[case['family']]
         for assigned_arm in design['arms']:
             for repeat in range(1,design['repeats'][partition]+1):
                 rid='opaque-'+str(len(assignments));work=direct_run_allocations(request_id=rid,partition=partition,provider='stand-in',model=model,
                          input_tokens=100,output_tokens=100,max_price=cap,followups=0)
+                work.append(semantic_review_allocation(request_id=rid,partition=partition,spec=spec))
                 assignments.append({'case_id':case['id'],'arm':assigned_arm,'repeat':repeat,'request_id':rid,'work':work})
     plan=make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=d)
     inputs=ApplicabilityInputs(Collection(tuple(MemberMetadata(rev,'project',Interval('2020-01-01',OPEN))
                                                for rev in ref['source_revisions'])),frozenset(),'2026-11-07',False)
     target=next(x for x in assignments if x['case_id']=='holdout' and x['arm']==arm);rid=target['request_id']
-    total=Budget(60,12000,1);per=Budget(1,200,0.1);alloc={'development':Budget(15,3000,0.2),'pilot':Budget(15,3000,0.2),'holdout':Budget(30,6000,0.2)}
+    total=Budget(120,24000,1);per=Budget(2,400,0.1);alloc={'development':Budget(30,6000,0.2),'pilot':Budget(30,6000,0.2),'holdout':Budget(60,12000,0.2)}
     response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),{'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.0001})
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=alloc) as goal,Journal.open(tmp_path/'j.sqlite') as journal,RunArchive.open(tmp_path/'archive') as archive:
         reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])
@@ -1164,6 +1167,22 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,
         with pytest.raises(ContractError):
             score_reserved_assignment(goal,archive,journal,ref,partition='holdout',expected_plan_sha256='0'*64,
                 expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
+        from qjig.evaluation_semantic_review import review_direct_semantics
+        opinion=RawResponse(200,json.dumps({'assessment':'uncertain','reason':'synthetic'}),
+                            {'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.0001})
+        with RunArchive.open(tmp_path/'review') as review_archive:
+            def review_factory(req):
+                return semantic_review_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',request=req,spec=spec)
+            review_direct_semantics(archive,journal,ledger,StandInTransport([opinion]),review_archive=review_archive,
+                expected_run_sha256=replay['sha256'],provider='stand-in',model=model['id'],max_tokens=100,
+                max_price=cap,reservation_factory=review_factory)
+            with pytest.raises(ContractError):
+                score_reserved_assignment(goal,archive,journal,ref,partition='holdout',expected_plan_sha256=plan['sha256'],
+                    expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref))
+            reviewed=score_reserved_assignment(goal,archive,journal,ref,partition='holdout',expected_plan_sha256=plan['sha256'],
+                expected_run_sha256=replay['sha256'],expected_reference_sha256=reference_digest(ref),original_run_only=True)
+            assert reviewed['score']['journal_scope']=='original_run_prefix'
+            assert reviewed['score']['resources']['total']['calls']==2
         prompt=next(e['data']['prompt'] for e in archive.events() if e['kind']=='request')
         assert plan['sha256'] not in prompt and rid not in prompt and arm not in prompt
 
