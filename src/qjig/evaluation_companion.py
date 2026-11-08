@@ -96,16 +96,18 @@ def summarize_companion_assertions(reports: dict, *, additional_reports: dict | 
             'scope':'holdout_five_arms_only' if additional_reports is not None else 'holdout_three_arms_only'}
 
 
-def group_holdout_interventions(design: dict, companion: dict, *, expected_design_sha256: str) -> dict:
+def group_holdout_interventions(design: dict, companion: dict, *, expected_design_sha256: str, partition: str = 'holdout') -> dict:
     """Group caller-asserted request outcomes by frozen intervention links."""
     from .evaluation import validate_evaluation_design
     validate_evaluation_design(design,expected_digest=expected_design_sha256)
+    if partition not in ('development','pilot','holdout'):
+        raise ContractError('invalid intervention partition')
     arms=companion.get('arms') if isinstance(companion,dict) else None
     if not isinstance(arms,dict) or set(arms)!=set(design['arms']):
         raise ContractError('all intervention arms required')
     families={item['id']:item['partition'] for item in design['families']}
-    cases={case['id']:case for case in design['cases'] if families[case['family']]=='holdout'}
-    repeats=design['repeats']['holdout']
+    cases={case['id']:case for case in design['cases'] if families[case['family']]==partition}
+    repeats=design['repeats'][partition]
     categories={'supported_match','reference_misaligned','failed','unknown_assessment'}
     indexed={}
     for arm,summary in arms.items():
@@ -132,5 +134,44 @@ def group_holdout_interventions(design: dict, companion: dict, *, expected_desig
                         'parent':before,'intervention':after,
                         'category_changed':before['category']!=after['category'] if known else None})
     return {'schema':'qjig.grouped-holdout-interventions.v1','design_sha256':expected_design_sha256,
-            'groups':groups,'assurance':'caller_asserted_unverified',
+            'groups':groups,'partition':partition,'assurance':'caller_asserted_unverified',
             'interpretation':'category_changes_are_not_semantic_accuracy'}
+
+
+def summarize_campaign_assertions(design: dict, records: list[dict], *, expected_design_sha256: str) -> dict:
+    """Summarize every assigned partition from caller-asserted scored records."""
+    from .evaluation import validate_evaluation_design
+    validate_evaluation_design(design,expected_digest=expected_design_sha256)
+    if not isinstance(records,list):raise ContractError('campaign records required')
+    families={item['id']:item['partition'] for item in design['families']}
+    cases={case['id']:families[case['family']] for case in design['cases']}
+    if sum(design['repeats'][partition] for partition in cases.values())*len(design['arms'])>100000:
+        raise ContractError('campaign companion exceeds limit')
+    expected={(case,arm,repeat) for case,partition in cases.items() for arm in design['arms']
+              for repeat in range(1,design['repeats'][partition]+1)}
+    indexed={}
+    for record in records:
+        if not isinstance(record,dict) or not isinstance(record.get('score'),dict):
+            raise ContractError('invalid campaign record')
+        score=record['score'];key=(score.get('case_id'),record.get('arm'),record.get('repeat'))
+        if key not in expected or key in indexed or record.get('outcome_category') not in (
+                'supported_match','reference_misaligned','failed','unknown_assessment'):
+            raise ContractError('invalid or duplicate campaign assignment')
+        indexed[key]=record
+    if set(indexed)!=expected:
+        raise ContractError('campaign assignment set incomplete')
+    partitions={};interventions={}
+    for partition in ('development','pilot','holdout'):
+        def report(baseline,candidate):
+            selected=[indexed[key] for key in sorted(indexed) if cases[key[0]]==partition and key[1] in (baseline,candidate)]
+            return {'scored_assignments':[{'arm':r['arm'],'repeat':r['repeat'],'score':r['score']} for r in selected],
+                'outcome_reviews':{'records':[{'case_id':r['score']['case_id'],'repeat':r['repeat'],'arm':r['arm'],
+                    'category':r['outcome_category'],'assurance':r.get('outcome_assurance')} for r in selected]}}
+        comparisons={baseline:report(baseline,'combined') for baseline in ('direct_full_evidence','direct_retrieval')}
+        ablations={arm:report('direct_retrieval',arm) for arm in ('retrieval_only','decomposition_only')}
+        summary=summarize_companion_assertions(comparisons,additional_reports=ablations)
+        summary['scope']=partition+'_five_arms_only'
+        partitions[partition]=summary
+        interventions[partition]=group_holdout_interventions(design,summary,expected_design_sha256=expected_design_sha256,partition=partition)
+    return {'schema':'qjig.campaign-companion.v1','design_sha256':expected_design_sha256,
+            'partitions':partitions,'interventions':interventions,'assurance':'caller_asserted_unverified'}

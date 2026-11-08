@@ -4581,7 +4581,8 @@
         "T072G",
         "T072H",
         "T072I",
-        "T072J"
+        "T072J",
+        "T072K"
       ],
       "status": "pending",
       "files": [
@@ -4879,6 +4880,25 @@
       "acceptance": "Changed, missing and irrelevant interventions remain grouped by case, arm and repeat; missing or unknown outcomes stay explicit without claiming semantic truth.",
       "command": "python -m pytest tests/test_evaluation_companion.py::test_group_holdout_interventions_preserves_missing_and_unknown -q",
       "evidence": "Red: no grouped five-arm request-outcome intervention report existed. Green: design-anchored changed, missing and irrelevant intervention groups retain parent/child rows by arm and repeat; missing or unknown outcomes remain explicit. Evaluation/review/replay/gate regressions passed 155. The previous synthetic campaign reconstructed ten unknown pairs per group, with source drift and synthetic attribution; live and semantic evidence remain open."
+    },
+    {
+      "id": "T072K",
+      "phase": "evaluation",
+      "depends_on": [
+        "T070C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_companion.py",
+        "src/qjig/live_receipts.py",
+        "src/qjig/evaluation_recommendation.py"
+      ],
+      "test_file": "tests/test_evaluation_companion.py",
+      "test_name": "test_campaign_companion_preserves_partitions_and_pilot_interventions",
+      "action": "Summarize inspected development, pilot and holdout outcomes and interventions",
+      "acceptance": "Only fully inspected records cover the frozen assignment denominator; each partition reports five unique arms and grouped interventions with unknown usage preserved.",
+      "command": "python -m pytest tests/test_evaluation_companion.py::test_campaign_companion_preserves_partitions_and_pilot_interventions -q",
+      "evidence": "Red: campaign partition aggregation and optional inspected records were absent. Green: exact assigned denominator and duplicate checks, separate five-arm summaries, grouped pilot/holdout interventions and refusal to expose partial/invalid inspected records; evaluation/review/replay/gate regressions passed 156. A retained synthetic campaign reconstructed development 6, pilot 5 and holdout 10 assignments per arm; attribution and changed source contract keep it incomplete. Access differences, live evidence and final report remain open."
     }
   ]
 }

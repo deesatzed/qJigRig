@@ -23,3 +23,7 @@ After adding the two ablation comparisons, read-only reconstruction of this reta
 ## Grouped holdout intervention diagnostic
 
 The current read-only reconstruction groups changed-decisive, missing-decisive and irrelevant-change holdout interventions by parent/child, arm and repeat. The retained fixture has 10 pairs in each group; all have an unknown or missing category comparison. This is a comparison of attributed categories, not proof of semantic accuracy. The retained run still has synthetic attribution and a source-contract mismatch, so it remains incomplete and yields no recommendation.
+
+## Full-campaign companion diagnostic
+
+A later read-only reconstruction included all fully inspected assignments, partitioned by the frozen design. It reported 6 development, 5 pilot and 10 holdout assignments per arm; each partition covers all five arms. Pilot groups contained 5 pairs each for changed-decisive, missing-decisive and irrelevant-change interventions; holdout groups contained 10 pairs each. These are locally reconstructed synthetic records and their categories remain unknown, not real outcome evidence. The run remains incomplete for synthetic attribution and a changed source contract; no recommendation is produced. Reported source access differences, live evidence and final acceptance remain open.

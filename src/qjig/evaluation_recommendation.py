@@ -110,8 +110,16 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
         expected_config_sha256=expected_config_sha256,expected_run_sha256=expected_run_sha256,
         expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256,
         expected_review_sha256=expected_review_sha256,expected_outcome_review_sha256=expected_outcome_review_sha256,
-        case_root=case_root,case_inputs=case_inputs)
+        case_root=case_root,case_inputs=case_inputs,include_records=True)
+    campaign_records=inspection.pop('scored_records',None)
     issues=list(inspection['issues'])
+    campaign_companion=None
+    if campaign_records is not None:
+        from .evaluation_companion import summarize_campaign_assertions
+        campaign_companion=summarize_campaign_assertions(design,campaign_records,expected_design_sha256=expected_design_sha256)
+        campaign_companion['assurance']='structurally_reconstructed_unvalidated'
+    elif inspection['status']=='structurally_complete':
+        issues.append('campaign_records_unavailable')
     rubric_checked=None
     if frozen['schema']=='qjig.campaign-config.v7':
         issues.append('frozen_rubric_binding_unavailable')
@@ -180,11 +188,11 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
         recommendation=result['decision']
         return {'status':'evaluated' if recommendation is not None else 'inconclusive',
                 'recommendation':recommendation,'baseline_decisions':result['baseline_decisions'],
-                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,
+                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,'campaign_companion':campaign_companion,
                 'resource_scope':'campaign_totals_in_inspection_shared_arms_repeated_in_comparisons',
                 'assurance':'structural_and_ai_reviewed_unvalidated',
                 'rubric_assurance':rubric_checked['assurance']}
     return {'status':'invalid' if inspection['status']=='invalid' else 'incomplete','recommendation':None,
-            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,
+            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,'campaign_companion':campaign_companion,
             'resource_scope':'campaign_totals_in_inspection_shared_arms_repeated_in_comparisons',
             'assurance':'no_recommendation'}

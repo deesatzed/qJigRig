@@ -22,13 +22,14 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
                               expected_config_sha256: str | None = None, expected_run_sha256: dict | None = None,
                               expected_reference_sha256: dict | None = None, expected_journal_sha256: dict | None = None,
                               expected_review_sha256: dict | None = None, expected_outcome_review_sha256: dict | None = None,
-                              case_root: Path | None = None, case_inputs: dict | None = None) -> dict:
+                              case_root: Path | None = None, case_inputs: dict | None = None,
+                              include_records: bool = False) -> dict:
     """Inspect assigned work and retained scores without creating archives or calling providers.
 
     Callers must quiesce the separate stores and supply trusted external plan and
     reference anchors. Recorded transport labels remain caller assertions.
     """
-    if not isinstance(campaign, EvaluationCampaign) or not isinstance(journal, Journal) or not isinstance(references, dict):
+    if not isinstance(campaign, EvaluationCampaign) or not isinstance(journal, Journal) or not isinstance(references, dict) or type(include_records) is not bool:
         raise ContractError('campaign, journal and reference mapping are required')
     manifest, assignments, started, scored = campaign._snapshot()
     issues, invalid = [], []
@@ -139,6 +140,7 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
     if base.is_symlink():
         raise ContractError('campaign archive root must not be a symlink')
     checked = 0
+    checked_records = []
     for request_id in sorted(scored):
         if not re.fullmatch(r'qj-[0-9a-f]{64}', request_id):
             invalid.append('unsafe_request_identity')
@@ -208,10 +210,16 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
             if outcome_enabled and score.get('outcome_review',{}).get('reason')=='original_followup_refusal_unverified':
                 issues.append('followup_refusal_unverified')
             checked += 1
+            if include_records and outcome_enabled:
+                checked_records.append(score)
         except (OSError, sqlite3.Error, ContractError, ValueError, TypeError, KeyError, IndexError):
             invalid.append('scored_receipt_invalid')
-    return {'status': 'invalid' if invalid else 'incomplete' if issues else 'structurally_complete',
+    result={'status': 'invalid' if invalid else 'incomplete' if issues else 'structurally_complete',
             'assigned': len(assignments), 'scored': len(scored), 'checked': checked, 'checked_cases': checked_cases,
             'issues': sorted(set(invalid + issues)), 'resources': resources,
             'provider_authenticity': 'not_established', 'semantic_assurance': 'not_assessed',
             'label_isolation': 'declared_exact_artifacts_only'}
+    if include_records:
+        result['scored_records']=(checked_records if outcome_enabled and not invalid
+            and set(issues)<= {'provider_attribution_not_live'} and len(checked_records)==len(assignments) else None)
+    return result

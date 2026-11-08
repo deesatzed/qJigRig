@@ -69,3 +69,31 @@ def test_group_holdout_interventions_preserves_missing_and_unknown():
     duplicate=copy.deepcopy(arms);duplicate['combined']['cases'].append(row('holdout',1,'failed'))
     with pytest.raises(ContractError):
         group_holdout_interventions(design,{'arms':duplicate},expected_design_sha256=digest)
+
+
+def test_campaign_companion_preserves_partitions_and_pilot_interventions():
+    from test_evaluation import _sample_design
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_companion import summarize_campaign_assertions
+    design=_sample_design();digest=validate_evaluation_design(design)
+    partitions={f['id']:f['partition'] for f in design['families']}
+    total={'calls':1,'input_tokens':10,'output_tokens':5,'cost_usd':0.1,'known_input_tokens':10,
+           'known_output_tokens':5,'known_cost_usd':0.1,'unknown_usage_calls':0,'latency_seconds':0.2}
+    records=[]
+    for case in design['cases']:
+        partition=partitions[case['family']]
+        for arm in design['arms']:
+            for repeat in range(1,design['repeats'][partition]+1):
+                records.append({'arm':arm,'repeat':repeat,'score':{'case_id':case['id'],
+                    'required_evidence_covered':None,'resources':{'total':dict(total)}},
+                    'outcome_category':'unknown_assessment','outcome_assurance':'synthetic_unvalidated'})
+    result=summarize_campaign_assertions(design,records,expected_design_sha256=digest)
+    assert result['assurance']=='caller_asserted_unverified'
+    assert result['partitions']['pilot']['arms']['combined']['assignments']==3
+    assert result['partitions']['holdout']['arms']['combined']['assignments']==6
+    assert result['partitions']['pilot']['arms']['direct_retrieval']['resources']['calls']==3
+    assert len(result['interventions']['pilot']['groups']['changed_decisive'])==5
+    assert len(result['interventions']['holdout']['groups']['changed_decisive'])==10
+    assert all(row['category_changed'] is None for row in result['interventions']['pilot']['groups']['changed_decisive'])
+    with pytest.raises(ContractError): summarize_campaign_assertions(design,records[:-1],expected_design_sha256=digest)
+    with pytest.raises(ContractError): summarize_campaign_assertions(design,records+[records[0]],expected_design_sha256=digest)

@@ -2419,6 +2419,13 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                 checked=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,
                                                  expected_outcome_review_sha256=outcome_hashes)
                 assert checked['checked']==4 and 'outcome_review_anchor_unavailable' not in checked['issues']
+                partial_records=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,
+                    expected_outcome_review_sha256=outcome_hashes,include_records=True)
+                assert partial_records['scored_records'] is None
+                assert 'scored_records' not in checked
+                bad_records=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,
+                    expected_outcome_review_sha256={**outcome_hashes,calls[0]:'0'*64},include_records=True)
+                assert bad_records['status']=='invalid' and bad_records['scored_records'] is None
                 if rubric_bound:
                     from qjig.evaluation_recommendation import build_verified_recommendation
                     partial=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
@@ -2460,7 +2467,14 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                     assert bad_cli.returncode==1 and json.loads(bad_cli.stdout)['status']=='invalid'
                     # Test the decision gate with explicitly simulated verifier and comparison results.
                     with monkeypatch.context() as patch:
-                        patch.setattr('qjig.evaluation_recommendation.inspect_campaign_receipts',lambda *a,**k:{'status':'structurally_complete','issues':[]})
+                        family_partitions={f['id']:f['partition'] for f in design['families']}
+                        resource_total={'calls':1,'input_tokens':10,'output_tokens':5,'cost_usd':0.01,
+                            'known_input_tokens':10,'known_output_tokens':5,'known_cost_usd':0.01,'unknown_usage_calls':0,'latency_seconds':0.1}
+                        fake_records=[{'arm':arm,'repeat':repeat,'score':{'case_id':case['id'],'required_evidence_covered':None,
+                            'resources':{'total':resource_total}},'outcome_category':'unknown_assessment','outcome_assurance':'synthetic_unvalidated'}
+                            for case in design['cases'] for arm in design['arms']
+                            for repeat in range(1,design['repeats'][family_partitions[case['family']]]+1)]
+                        patch.setattr('qjig.evaluation_recommendation.inspect_campaign_receipts',lambda *a,**k:{'status':'structurally_complete','issues':[],'scored_records':fake_records})
                         def fake_comparison(baseline,metric,candidate='combined'):
                             total={'calls':3,'input_tokens':10,'output_tokens':5,'cost_usd':0.02,'known_input_tokens':10,
                                    'known_output_tokens':5,'known_cost_usd':0.02,'unknown_usage_calls':0,'latency_seconds':0.1}
@@ -2482,6 +2496,8 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                         assert evaluated['companion']['arms']['retrieval_only']['assignments']==1
                         assert evaluated['companion']['arms']['decomposition_only']['assignments']==1
                         assert evaluated['companion']['arms']['direct_retrieval']['resources']['calls']==3
+                        assert evaluated['campaign_companion']['partitions']['pilot']['arms']['combined']['assignments']==3
+                        assert len(evaluated['campaign_companion']['interventions']['pilot']['groups']['changed_decisive'])==5
                         assert len(evaluated['interventions']['groups']['changed_decisive'])==10
                         assert all(row['category_changed'] is None for row in evaluated['interventions']['groups']['changed_decisive'])
                         patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:fake_comparison(k['baseline_arm'],None,k['candidate_arm']))
