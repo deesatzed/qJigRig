@@ -120,7 +120,7 @@ def verify_fresh_receipt(receipt: object, *, expected_digest: str | None = None)
                     incomplete = True
                 else:
                     request = ProviderRequest(data['stage'], data['provider'], data['model'], data['prompt'],
-                                              data['max_tokens'], max_price=data['max_price'])
+                                              data['max_tokens'], max_price=data['max_price'], route=data.get('route'))
                     if Decimal(str(cost)) < _ceiling_token_cost(request, inp):
                         raise ContractError('reservation below declared routing ceiling')
             archived_calls = {event['call_id'] for event in archived if event['kind']=='request'}

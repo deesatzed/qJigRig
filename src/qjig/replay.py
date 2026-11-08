@@ -12,7 +12,7 @@ from .judge import SIDE_SCHEMA, _PROMPT, _combine_sides, _side_from_value
 from .packets import EvidencePacket, PacketItem
 from .planner import _plan_validator, _planner_prompt, corpus_manifest_sha256
 from .plans import parse_plan
-from .providers import ProviderRequest, _validate, openrouter_wire_payload_v1, openrouter_wire_payload_v2, openrouter_wire_payload_v3, openrouter_wire_payload_v4
+from .providers import ProviderRequest, _validate, openrouter_wire_payload_v1, openrouter_wire_payload_v2, openrouter_wire_payload_v3, openrouter_wire_payload_v4, openrouter_wire_payload_v5
 from .program_review import _REVIEW_SCHEMA, _review_prompt
 from .programs import make_draft, verify_review
 from .run_archive import RunArchive
@@ -180,7 +180,7 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
         kind, call_id, data = event["kind"], event["call_id"], event["data"]
         try:
             if kind == "request":
-                request = ProviderRequest(data["stage"], data["provider"], data["model"], data["prompt"], data["max_tokens"], max_price=data.get("max_price"))
+                request = ProviderRequest(data["stage"], data["provider"], data["model"], data["prompt"], data["max_tokens"], max_price=data.get("max_price"), route=data.get("route"))
                 if request.input_sha256() != data["input_sha256"]:
                     raise ContractError("request hash mismatch")
                 requests[call_id] = event["seq"]
@@ -222,8 +222,12 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
                     serializers = {'openrouter.chat.v1': openrouter_wire_payload_v1,
                                    'openrouter.chat.v2': openrouter_wire_payload_v2,
                                    'openrouter.chat.v3': openrouter_wire_payload_v3,
-                                   'openrouter.chat.v4': openrouter_wire_payload_v4}
-                    serializer = serializers.get(metadata.get('wire_payload_format'))
+                                   'openrouter.chat.v4': openrouter_wire_payload_v4,
+                                   'openrouter.chat.v5': openrouter_wire_payload_v5}
+                    wire_format=metadata.get('wire_payload_format')
+                    if request_data[call_id].route is not None and wire_format != 'openrouter.chat.v5':
+                        raise ContractError('restricted route absent from recorded wire format')
+                    serializer = serializers.get(wire_format)
                     if serializer is None:
                         incomplete.append(f'wire_payload_format_unavailable:{call_id}')
                     else:

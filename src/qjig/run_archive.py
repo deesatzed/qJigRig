@@ -147,6 +147,8 @@ class RunArchive:
                 "prompt": request.prompt, "max_tokens": request.max_tokens, "input_sha256": request.input_sha256()}
         if request.max_price is not None:
             data["max_price"] = dict(request.max_price)
+        if request.route is not None:
+            data["route"] = request.route
         self._event("request", call_id, data)
 
     def record_response(self, call_id: str, response: RawResponse) -> None:

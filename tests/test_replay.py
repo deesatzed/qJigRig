@@ -337,3 +337,31 @@ def test_replay_accepts_historical_openrouter_wire_receipt(tmp_path, version):
         archive.record_request('r#1', request)
         archive.record_response('r#1', response)
         assert verify_archive(archive).status != 'invalid'
+
+
+def test_replay_checks_restricted_provider_route_against_wire_digest(tmp_path):
+    import hashlib,json
+    from qjig.providers import ProviderRequest,RawResponse,openrouter_wire_payload_v5
+    request=ProviderRequest('planner','openrouter','vendor/model','question',20,
+                            max_price={'prompt':2,'completion':3},route='relace/fp4')
+    digest=hashlib.sha256(openrouter_wire_payload_v5(request).encode()).hexdigest()
+    with RunArchive.open(tmp_path/'route') as archive:
+        archive.record_context({'schema':'qjig.fresh-context.v1','corpus':{}})
+        archive.record_request('r#1',request)
+        archive.record_response('r#1',RawResponse(200,'{}',None,metadata={
+            'wire_payload_format':'openrouter.chat.v5','wire_payload_sha256':digest}))
+        assert verify_archive(archive).status!='invalid'
+        archive._con.execute('DROP TRIGGER event_no_update')
+        seq,encoded=archive._con.execute("SELECT seq,data FROM events WHERE kind='request'").fetchone()
+        data=json.loads(encoded);data['route']='relace/fp8'
+        changed=ProviderRequest('planner','openrouter','vendor/model','question',20,
+                                max_price={'prompt':2,'completion':3},route='relace/fp8')
+        data['input_sha256']=changed.input_sha256()
+        archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(data),seq))
+        assert verify_archive(archive).status=='invalid'
+        from qjig.providers import openrouter_wire_payload_v4
+        seq,encoded=archive._con.execute("SELECT seq,data FROM events WHERE kind='response'").fetchone()
+        response=json.loads(encoded);response['metadata']['wire_payload_format']='openrouter.chat.v4'
+        response['metadata']['wire_payload_sha256']=hashlib.sha256(openrouter_wire_payload_v4(changed).encode()).hexdigest()
+        archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(response),seq))
+        assert verify_archive(archive).status=='invalid'

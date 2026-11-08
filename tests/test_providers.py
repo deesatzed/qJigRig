@@ -497,3 +497,30 @@ def test_hosted_request_refuses_underestimated_input_before_provider_call(tmp_pa
             call_typed(ledger, OpenRouterTransport(_env(tmp_path), post=lambda *a: sent.append(a)),
                        req, SCHEMA, reservation=reservation)
         assert sent == [] and journal.events('r') == []
+
+
+def test_provider_route_is_bound_to_request_wire_and_work_identity(tmp_path):
+    from qjig.contracts import ContractError
+    from qjig.run_archive import RunArchive
+    from qjig.providers import fresh_work_binding
+    seen={}
+    def post(url,headers,payload,timeout):
+        seen['body']=payload
+        return 200,LIVE_BODY
+    price={'prompt':2,'completion':3}
+    request=ProviderRequest('judge','openrouter','vendor/model-x','Question?',50,max_price=price,route='relace/fp4')
+    other=ProviderRequest('judge','openrouter','vendor/model-x','Question?',50,max_price=price,route='relace/fp8')
+    assert request.input_sha256()!=other.input_sha256()
+    assert fresh_work_binding(request,100,'a'*64)!=fresh_work_binding(other,100,'a'*64)
+    with RunArchive.open(tmp_path/'run') as archive:
+        archive.record_request('r',request)
+        assert archive.events()[0]['data']['route']=='relace/fp4'
+    response=OpenRouterTransport(_env(tmp_path),post=post)._send_unchecked(request)
+    body=json.loads(seen['body'])
+    assert body['provider']['only']==['relace/fp4'] and body['provider']['allow_fallbacks'] is False
+    assert response.metadata['wire_payload_format']=='openrouter.chat.v5'
+    for bad in ('', 'relace/*', 'relace,other', 'Relace'):
+        with pytest.raises(ContractError):
+            ProviderRequest('judge','openrouter','vendor/model-x','Question?',50,max_price=price,route=bad)
+    with pytest.raises(ContractError):
+        ProviderRequest('judge','openrouter','vendor/model-x','Question?',50,route='relace')

@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from decimal import Decimal, ROUND_CEILING, localcontext
 import socket
 import urllib.error
@@ -36,8 +37,13 @@ class ProviderRequest:
     prompt: str
     max_tokens: int
     max_price: dict[str, float] | None = None
+    route: str | None = None
 
     def __post_init__(self) -> None:
+        if self.route is not None and (self.provider != 'openrouter' or self.max_price is None
+                or not isinstance(self.route,str)
+                or not re.fullmatch(r'[a-z0-9][a-z0-9-]*(?:/[a-z0-9][a-z0-9-]*)*',self.route)):
+            raise ContractError('invalid restricted provider route')
         if self.max_price is not None:
             value = self.max_price
             if (not isinstance(value, dict) or set(value) != {"prompt", "completion"}
@@ -49,6 +55,8 @@ class ProviderRequest:
         data = {"stage": self.stage, "provider": self.provider, "model": self.model, "prompt": self.prompt, "max_tokens": self.max_tokens}
         if self.max_price is not None:
             data["max_price"] = dict(self.max_price)
+        if self.route is not None:
+            data["route"] = self.route
         blob = json.dumps(data, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
@@ -107,6 +115,15 @@ def openrouter_wire_payload_v4(request: ProviderRequest) -> str:
     return json.dumps(body, ensure_ascii=False)
 
 
+def openrouter_wire_payload_v5(request: ProviderRequest) -> str:
+    """Request one provider route with no fallback; the provider must enforce it."""
+    if request.route is None or request.max_price is None:
+        raise ContractError('a capped restricted route is required')
+    body=json.loads(openrouter_wire_payload_v4(request))
+    body['provider'].update(only=[request.route],allow_fallbacks=False)
+    return json.dumps(body,ensure_ascii=False)
+
+
 @dataclass(frozen=True)
 class CallReservation:
     """A calculated reservation bound to one request; provenance is an assertion, not verification."""
@@ -127,6 +144,9 @@ def fresh_work_binding(request: ProviderRequest, input_tokens: int, pricing_sha2
         raise ContractError("fresh work requires a routing price ceiling")
     data = ['qjig.fresh-work-config.v1', request.stage, request.provider, request.model,
             input_tokens, request.max_tokens, dict(request.max_price), pricing_sha256]
+    if request.route is not None:
+        data[0]='qjig.fresh-work-config.v2'
+        data.append(request.route)
     return hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')).hexdigest()
 
 
@@ -289,7 +309,7 @@ class OpenRouterTransport:
         if (parsed.scheme != "https" or parsed.netloc != "openrouter.ai"
                 or parsed.path != "/api/v1" or parsed.query or parsed.fragment):
             raise ProviderUnavailable("untrusted provider endpoint; nothing was sent")
-        payload = openrouter_wire_payload_v4(request)
+        payload = openrouter_wire_payload_v5(request) if request.route is not None else openrouter_wire_payload_v4(request)
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         try:
             status, body = self._post(f"{base}/chat/completions", headers, payload, self._timeout)
@@ -308,7 +328,7 @@ class OpenRouterTransport:
         metadata = self._response_metadata(parsed_body) or {}
         # Hash the exact UTF-8 request body passed to the HTTP adapter, excluding headers.
         metadata['wire_payload_sha256'] = hashlib.sha256(payload.encode('utf-8')).hexdigest()
-        metadata['wire_payload_format'] = 'openrouter.chat.v4'
+        metadata['wire_payload_format'] = 'openrouter.chat.v5' if request.route is not None else 'openrouter.chat.v4'
         if not 200 <= status < 300:
             return RawResponse(status, body, self._usage(body), metadata=metadata)
         try:
