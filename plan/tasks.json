@@ -4579,7 +4579,8 @@
         "T072F",
         "T072G",
         "T072H",
-        "T072I"
+        "T072I",
+        "T072J"
       ],
       "status": "pending",
       "files": [
@@ -4841,6 +4842,24 @@
       "acceptance": "Reconstructed comparisons produce per-arm categories, repeat records and resource totals without double-counting the combined arm; unknown usage remains unknown and inconsistent duplicate records refuse.",
       "command": "python -m pytest tests/test_evaluation_companion.py::test_companion_counts_unique_arms_and_preserves_unknown_usage -q",
       "evidence": "Red: companion aggregation did not exist; a later missing-pair test exposed an incomplete-set gap. Green: unique three-arm outcomes, repeat records, evidence coverage and per-arm resources preserve unknowns and reject inconsistent duplicate or missing pairs. Evaluation/review/replay/gate regressions passed 154, with the expanded focused test passing again. A prior synthetic run yielded 10 unknown outcomes per arm; its source-bound contract now differs. All five-arm and grouped-intervention reporting and live evidence remain open."
+    },
+    {
+      "id": "T072J",
+      "phase": "evaluation",
+      "depends_on": [
+        "T072I"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_companion.py",
+        "src/qjig/evaluation_recommendation.py"
+      ],
+      "test_file": "tests/test_evaluation_companion.py",
+      "test_name": "test_companion_counts_unique_arms_and_preserves_unknown_usage",
+      "action": "Include both ablation arms in the holdout companion summary",
+      "acceptance": "All five holdout arms retain unique outcomes and resources, shared baseline and candidate records are not double counted, and conflicting or missing pairs fail.",
+      "command": "python -m pytest tests/test_evaluation_companion.py::test_companion_counts_unique_arms_and_preserves_unknown_usage -q",
+      "evidence": "Red: the companion accepted only three arms and the recommendation omitted ablations. Green: both ablation comparisons feed a five-arm summary, shared records are deduplicated and inconsistent or missing pairs refuse; evaluation/review/replay/gate regressions passed 154. The retained synthetic run reconstructed 10 unknown holdout assignments per arm and remained incomplete for synthetic attribution and source drift. Grouped interventions, full campaign reporting and live evidence remain open."
     }
   ]
 }

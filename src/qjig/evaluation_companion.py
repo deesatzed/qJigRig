@@ -7,15 +7,21 @@ from decimal import Decimal
 from .contracts import ContractError
 
 
-def summarize_companion_assertions(reports: dict) -> dict:
+def summarize_companion_assertions(reports: dict, *, additional_reports: dict | None = None) -> dict:
     """Summarize supplied comparison records; caller must establish provenance."""
     baselines=('direct_full_evidence','direct_retrieval')
     if not isinstance(reports,dict) or set(reports)!=set(baselines):
         raise ContractError('both comparison reports required')
+    if additional_reports is not None and (not isinstance(additional_reports,dict)
+            or set(additional_reports)!={'retrieval_only','decomposition_only'}):
+        raise ContractError('both ablation reports required')
+    comparison_specs=[(baseline,'combined',reports[baseline]) for baseline in baselines]
+    if additional_reports is not None:
+        comparison_specs.extend(('direct_retrieval',arm,additional_reports[arm]) for arm in ('retrieval_only','decomposition_only'))
     records={}
     outcomes={}
-    for baseline in baselines:
-        report=reports[baseline]
+    reference_pairs=None
+    for baseline,candidate,report in comparison_specs:
         if not isinstance(report,dict) or not isinstance(report.get('scored_assignments'),list):
             raise ContractError('comparison assignments required')
         review=report.get('outcome_reviews')
@@ -27,7 +33,7 @@ def summarize_companion_assertions(reports: dict) -> dict:
                 raise ContractError('invalid companion assignment')
             arm,repeat,score=entry.get('arm'),entry.get('repeat'),entry['score']
             case=score.get('case_id')
-            if arm not in (baseline,'combined') or type(repeat) is not int or repeat<1 or not isinstance(case,str) or not case:
+            if arm not in (baseline,candidate) or type(repeat) is not int or repeat<1 or not isinstance(case,str) or not case:
                 raise ContractError('invalid companion assignment identity')
             key=(case,repeat,arm)
             if key in seen or (key in records and records[key]!=entry):
@@ -45,12 +51,14 @@ def summarize_companion_assertions(reports: dict) -> dict:
         if seen_outcomes!=seen:
             raise ContractError('companion outcome set differs')
         baseline_pairs={(case,repeat) for case,repeat,arm in seen if arm==baseline}
-        candidate_pairs={(case,repeat) for case,repeat,arm in seen if arm=='combined'}
-        if not baseline_pairs or baseline_pairs!=candidate_pairs:
+        candidate_pairs={(case,repeat) for case,repeat,arm in seen if arm==candidate}
+        if not baseline_pairs or baseline_pairs!=candidate_pairs or (reference_pairs is not None and baseline_pairs!=reference_pairs):
             raise ContractError('companion pair set incomplete')
+        reference_pairs=baseline_pairs
     summaries={}
     categories=('supported_match','reference_misaligned','failed','unknown_assessment')
-    for arm in (*baselines,'combined'):
+    arms=(*baselines,'combined') + (('retrieval_only','decomposition_only') if additional_reports is not None else ())
+    for arm in arms:
         keys=sorted(key for key in records if key[2]==arm)
         totals=[]; coverage={'covered':0,'not_covered':0,'unknown':0};cases=[]
         for key in keys:
@@ -85,4 +93,4 @@ def summarize_companion_assertions(reports: dict) -> dict:
                 'known_output_tokens':sum(item['known_output_tokens'] for item in totals),'known_cost_usd':float(known_cost),
                 'unknown_usage_calls':sum(item['unknown_usage_calls'] for item in totals),'latency_seconds':exact('latency_seconds')}}
     return {'schema':'qjig.holdout-companion.v1','arms':summaries,'assurance':'caller_asserted_unverified',
-            'scope':'holdout_three_arms_only'}
+            'scope':'holdout_five_arms_only' if additional_reports is not None else 'holdout_three_arms_only'}

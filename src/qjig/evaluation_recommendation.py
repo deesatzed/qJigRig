@@ -125,6 +125,7 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
             issues.append('rubric_contract_invalid')
     comparisons=None
     comparison_details=None
+    ablation_details=None
     companion=None
     # A fully anchored synthetic campaign can produce diagnostics, but never a
     # recommendation. All other incomplete or invalid inspection blocks reads.
@@ -142,7 +143,7 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
                 return RunArchive(stack.enter_context(closing(sqlite3.connect(db.resolve().as_uri()+'?mode=ro',uri=True,isolation_level=None))))
             for rid in sorted(scored):
                 assignment=assignments[rid]
-                if assignment['case_id'] not in holdout or assignment['arm'] not in ('direct_full_evidence','direct_retrieval','combined'):
+                if assignment['case_id'] not in holdout or assignment['arm'] not in ('direct_full_evidence','direct_retrieval','combined','retrieval_only','decomposition_only'):
                     continue
                 if not re.fullmatch(r'qj-[0-9a-f]{64}',rid):
                     raise ContractError('unsafe request identity')
@@ -161,8 +162,14 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
                     baseline_arm=baseline,candidate_arm='combined',expected_config_sha256=expected_config_sha256)
                 comparisons[baseline]=report['outcome_reviews']['paired']
                 comparison_details[baseline]=report
+            ablation_details={}
+            for arm in ('retrieval_only','decomposition_only'):
+                selected=[entry for (_,_,kind),entry in entries.items() if kind in ('direct_retrieval',arm)]
+                ablation_details[arm]=build_reserved_holdout_comparison(campaign._goal,design,selected,plan_id=campaign._plan_id,
+                    expected_plan_sha256=campaign._digest,expected_design_sha256=expected_design_sha256,
+                    baseline_arm='direct_retrieval',candidate_arm=arm,expected_config_sha256=expected_config_sha256)
             from .evaluation_companion import summarize_companion_assertions
-            companion=summarize_companion_assertions(comparison_details)
+            companion=summarize_companion_assertions(comparison_details,additional_reports=ablation_details)
             companion['assurance']='structurally_reconstructed_unvalidated'
     if inspection['status']=='structurally_complete' and not issues and rubric_checked is not None and comparisons is not None:
         result=provisional_pair_decision(design,{name:value['outcome_support'] for name,value in comparisons.items()},
@@ -170,11 +177,11 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
         recommendation=result['decision']
         return {'status':'evaluated' if recommendation is not None else 'inconclusive',
                 'recommendation':recommendation,'baseline_decisions':result['baseline_decisions'],
-                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'companion':companion,
-                'resource_scope':'campaign_totals_in_inspection_combined_arm_repeated_in_comparisons',
+                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,
+                'resource_scope':'campaign_totals_in_inspection_shared_arms_repeated_in_comparisons',
                 'assurance':'structural_and_ai_reviewed_unvalidated',
                 'rubric_assurance':rubric_checked['assurance']}
     return {'status':'invalid' if inspection['status']=='invalid' else 'incomplete','recommendation':None,
-            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'companion':companion,
-            'resource_scope':'campaign_totals_in_inspection_combined_arm_repeated_in_comparisons',
+            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,
+            'resource_scope':'campaign_totals_in_inspection_shared_arms_repeated_in_comparisons',
             'assurance':'no_recommendation'}

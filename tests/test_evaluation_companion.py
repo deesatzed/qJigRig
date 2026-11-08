@@ -31,3 +31,16 @@ def test_companion_counts_unique_arms_and_preserves_unknown_usage():
     with pytest.raises(ContractError): summarize_companion_assertions(changed)
     missing=copy.deepcopy(reports);missing['direct_retrieval']['scored_assignments'].pop(1);missing['direct_retrieval']['outcome_reviews']['records'].pop(1)
     with pytest.raises(ContractError): summarize_companion_assertions(missing)
+    def ablation(arm):
+        return {'scored_assignments':[record('direct_retrieval',0.1,True),record(arm,0.2,False)],
+                'outcome_reviews':{'records':[{'case_id':'case','repeat':1,'arm':'direct_retrieval','category':'failed','assurance':'synthetic_unvalidated'},
+                    {'case_id':'case','repeat':1,'arm':arm,'category':'reference_misaligned','assurance':'synthetic_unvalidated'}]}}
+    extras={arm:ablation(arm) for arm in ('retrieval_only','decomposition_only')}
+    full=summarize_companion_assertions(reports,additional_reports=extras)
+    assert full['scope']=='holdout_five_arms_only' and len(full['arms'])==5
+    assert full['arms']['direct_retrieval']['assignments']==1 and full['arms']['direct_retrieval']['resources']['calls']==1
+    assert full['arms']['retrieval_only']['resources']['cost_usd']==0.2
+    assert full['arms']['decomposition_only']['outcomes']['reference_misaligned']==1
+    with pytest.raises(ContractError): summarize_companion_assertions(reports,additional_reports={'retrieval_only':extras['retrieval_only']})
+    changed=copy.deepcopy(extras);changed['retrieval_only']['scored_assignments'][0]['score']['required_evidence_covered']=False
+    with pytest.raises(ContractError): summarize_companion_assertions(reports,additional_reports=changed)

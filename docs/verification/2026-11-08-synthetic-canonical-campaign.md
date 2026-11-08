@@ -15,3 +15,7 @@ After the recommendation implementation was extended to retain detailed comparis
 ## Holdout companion diagnostic
 
 After the companion-summary implementation changed, the prior frozen rubric no longer matches the selected source files. A current read-only diagnostic still reconstructs 10 assignments for each of the two direct baselines and the combined arm; all 30 classifications are unknown. Fixture journal totals were 30, 30 and 54 calls respectively, with the combined arm counted once. These are synthetic calls, not provider usage. The command remains incomplete with `provider_attribution_not_live` and `rubric_contract_invalid`, and produces no recommendation. This three-arm holdout summary is not the complete five-arm or intervention report.
+
+## Five-arm holdout diagnostic
+
+After adding the two ablation comparisons, read-only reconstruction of this retained synthetic run reported 10 holdout assignments and 10 unknown outcomes for each of the five arms. Fixture call counts were 30 direct full-evidence, 30 direct retrieval, 30 retrieval-only, 60 decomposition-only and 54 combined, counted once per arm. The current source differs from the frozen rubric and attribution is synthetic, so the result remains incomplete with no recommendation. This is holdout-only diagnostic evidence, not a full campaign/intervention report or real spending.
