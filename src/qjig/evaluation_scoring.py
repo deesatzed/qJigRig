@@ -655,7 +655,7 @@ def unavailable_failure_review(goal,archive,journal,reference,review_archive,*,p
         expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
         expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256)
     result=score['score'];context=archive.context();rid=context['request']['request_id']
-    settled_failure=(result.get('failure_verified') is True and result.get('classification') in ('malformed','provider_failure'))
+    settled_failure=(result.get('failure_verified') is True and result.get('classification') in ('malformed','provider_failure','unsupported'))
     unavailable_review=(context.get('schema')=='qjig.fresh-context.v1' and result.get('classification')=='unknown_review'
                         and result.get('review_status')=='unavailable'
                         and result.get('review_failure')=='review_context_or_storage_error')
@@ -783,7 +783,7 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
     score=result['score']
     applicability=(context.get('schema')=='qjig.applicability-deferral.v1' and not journal.events(request_id)
                    and score.get('request_status')=='deferred')
-    settled=(score.get('failure_verified') is True and score.get('classification') in ('malformed','provider_failure')
+    settled=(score.get('failure_verified') is True and score.get('classification') in ('malformed','provider_failure','unsupported')
              and score.get('reconciliation_required') is False and not journal.pending(request_id)
              and score.get('recorded_answer') is None and score.get('conditional_answer') is None
              and not any(e.stage=='outcome_review' for e in journal.events(request_id)))

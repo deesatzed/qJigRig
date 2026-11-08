@@ -1259,7 +1259,8 @@
         "T069H",
         "T069I",
         "T069J",
-        "T069K"
+        "T069K",
+        "T069L"
       ],
       "status": "pending",
       "files": [
@@ -4653,6 +4654,23 @@
       "acceptance": "Synthetic v8 full denominator resumes without additional calls, and all local anchors and limitations are recorded; no paid inference or draft mutation.",
       "command": "python -m pytest tests/test_factorial_synthetic.py::test_synthetic_rubric_design_rebinds_without_mutating_draft -q",
       "evidence": "Red: synthetic rubric design derivation was absent. Green: original draft and lock integrity validated and copies rebound without mutation; v8 synthetic run scored all 105 assignments using 567 reserved slots and 432 stand-in calls, and restart retained identical cumulative calls. Harness/evaluation/review regressions passed 128. Evidence: docs/verification/2026-11-08-synthetic-v8-campaign.md. Independent provenance, full-manifest inspection, rubric validity and real inference remain open."
+    },
+    {
+      "id": "T069L",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069K"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Preserve verified settled unsupported-citation failures through reserved review stages",
+      "acceptance": "A direct invalid citation with a verified settled receipt is scored failed with both review slots unconsumed; uncertain attempts remain unresolved.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Red: a settled direct unsupported citation was rejected before semantic non-review. Green: campaign archives a failed outcome with both review slots unconsumed, no pending call and a replayable score; existing uncertain timeout remains pending. Evaluation, review, replay and goal regressions passed 190. This does not resolve budget-refusal policy or provider billing."
     }
   ]
 }
