@@ -380,6 +380,7 @@ def run_fresh(
     reviewer_max_price: dict | None = None,
     review_reservation_factory: ReservationFactory | None = None,
     require_complete_reservations: bool = False,
+    max_judge_pairs: int | None = None,
     reservation_factory: ReservationFactory | None = None, archive=None,
     evaluation_case_binding: dict | None = None,
     evaluation_assignment: dict | None = None,
@@ -398,6 +399,9 @@ def run_fresh(
     """
     if planner_prompt_version not in PLANNER_PROMPT_VERSIONS:
         raise ContractError('unsupported planner prompt version')
+    from .plans import MAX_PREDICATES
+    if max_judge_pairs is not None and (type(max_judge_pairs) is not int or not 1 <= max_judge_pairs <= MAX_PREDICATES * MAX_ROUNDS or evaluation_case_binding is None):
+        raise ContractError('invalid evaluation judge quota')
     if evaluation_case_binding is not None:
         import hashlib
         goal = ledger._goal_budget
@@ -407,7 +411,7 @@ def run_fresh(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='evaluation_campaign_config'").fetchone():
             row = goal._con.execute('SELECT value,sha256 FROM evaluation_campaign_config WHERE plan_id=?',
                                     (binding['plan_id'],)).fetchone()
-        if row is not None or planner_prompt_version != 'legacy_v1':
+        if row is not None or planner_prompt_version != 'legacy_v1' or max_judge_pairs is not None:
             try:
                 encoded, digest = row
                 config = json.loads(encoded)
@@ -416,7 +420,9 @@ def run_fresh(
                 version = config.get('planner_prompt_version', 'legacy_v1')
                 schema = 'qjig.campaign-config.v2' if version == 'legacy_v1' else 'qjig.campaign-config.v3'
                 if (hashlib.sha256(encoded.encode('utf-8')).hexdigest() != digest
-                        or config.get('schema') not in (schema, 'qjig.campaign-config.v4') or version != planner_prompt_version
+                        or config.get('schema') not in (schema, 'qjig.campaign-config.v4','qjig.campaign-config.v5') or version != planner_prompt_version
+                        or config.get('max_judge_pairs') != max_judge_pairs
+                        or (max_judge_pairs is not None and config.get('schema') != 'qjig.campaign-config.v5')
                         or config.get('plan_sha256') != binding['plan_sha256']
                         or claim != {'plan_sha256':binding['plan_sha256'], 'config_sha256':digest}):
                     raise ValueError('campaign binding differs')
@@ -484,7 +490,6 @@ def run_fresh(
                                 'review_preflight_unavailable', None, None, None, {}, {}, (), None, unavailable)
     if ledger._goal_budget is not None and (reviewer is not None or require_complete_reservations):
         from .fresh_preflight import check_fresh_stage_slots
-        from .plans import MAX_PREDICATES
         from .program_review import PlanReviewOutcome
         try:
             probes = [ProviderRequest('planner', planner[0], planner[1], '',
@@ -495,7 +500,7 @@ def run_fresh(
                                        max_price=judge_max_price) for stage in ('judge_positive', 'judge_negative')]
             sets = {check_fresh_stage_slots(ledger._goal_budget, request_id=request.request_id, partition=ledger._partition,
                                            request=probe, reservation_factory=reservation_factory,
-                                           count=1 if probe.stage == 'planner' else MAX_PREDICATES * MAX_ROUNDS)
+                                           count=1 if probe.stage == 'planner' else (MAX_PREDICATES * MAX_ROUNDS if max_judge_pairs is None else max_judge_pairs))
                     for probe in probes}
             if review_set is not None:
                 sets.add(review_set)
@@ -551,6 +556,7 @@ def run_fresh(
             "transport": transport.label, "want": want, "max_bytes": max_bytes, "retrieval_method": "full_source_v1" if full_source_evidence else EXPANDED_BM25_METHOD,
             "followup_policy": "none_full_source_v1" if full_source_evidence else "request_question_on_no_primary_hit_v2",
             "reservation_factory_configured": reservation_factory is not None, "role_priors": role_priors or {},
+            **({"max_judge_pairs":max_judge_pairs} if max_judge_pairs is not None else {}),
             "corpus": {key: value.value for key, value in applicability.items()},
             "scope_policy": "exact_nonempty_v1", "source_scopes": scopes,
             "scope_verdicts": {key: value.value for key, value in scope_verdicts.items()},

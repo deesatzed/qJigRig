@@ -94,6 +94,13 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
         events = archive.events()
         if context.get("schema") != "qjig.fresh-context.v1" or not isinstance(context.get("corpus"), dict):
             raise ContractError("unsupported or missing context schema")
+        quota=context.get('max_judge_pairs')
+        if quota is not None:
+            from .acquisition import MAX_ROUNDS
+            from .plans import MAX_PREDICATES
+            if (type(quota) is not int or not 1 <= quota <= MAX_PREDICATES*MAX_ROUNDS
+                    or 'evaluation_assignment' not in context):
+                raise ContractError('invalid recorded judge quota')
         if 'evaluation_case_binding' in context:
             import re
             b = context['evaluation_case_binding']
@@ -179,6 +186,8 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
                 requests[call_id] = event["seq"]
                 request_data[call_id] = request
                 if data["stage"] in ("judge_positive", "judge_negative"):
+                    if quota is not None and sum(r.stage==request.stage for r in request_data.values()) > quota:
+                        raise ContractError('judge quota exceeded in archive')
                     pending_judges.append((call_id, request))
                 elif data["stage"] == "plan_review":
                     settings = context.get('reviewer')
@@ -320,6 +329,11 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
                     trace_rounds[data['predicate_id']] = 1
                 elif policy is not None:
                     incomplete.append("followup_policy_unavailable")
+                if quota is not None and data['observation'].get('reason') == 'provider_budget_exceeded':
+                    counts={stage:sum(r.stage==stage for r in request_data.values()) for stage in ('judge_positive','judge_negative')}
+                    if (pending_judges or data['observation'].get('outcome')!='unknown'
+                            or any(counts[stage]!=quota for stage in counts)):
+                        raise ContractError('judge quota exhaustion is not supported by prior calls')
                 trace_observations[data["predicate_id"]] = data["observation"]
                 rendered = "\n".join(f"[{item['entry_id'][:12]}]\n{item['text']}" for item in data["evidence"])
                 seen_sides = set()

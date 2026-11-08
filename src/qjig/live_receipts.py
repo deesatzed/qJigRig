@@ -71,7 +71,7 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
     if (not isinstance(expected_review_sha256, dict) or any(key not in assignments for key in expected_review_sha256)
             or any(not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value) for value in expected_review_sha256.values())):
         raise ContractError('invalid external review anchors')
-    semantic = frozen is not None and frozen.get('schema') == 'qjig.campaign-config.v4'
+    semantic = frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5')
     if semantic and scored - set(expected_review_sha256):
         issues.append('review_anchor_unavailable')
     checked_cases = 0
