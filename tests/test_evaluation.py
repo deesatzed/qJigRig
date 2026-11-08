@@ -2788,6 +2788,42 @@ def test_campaign_freezes_distinct_outcome_review_work_before_execution(tmp_path
         assert campaign.status()['in_progress']==[rid]
 
 
+def test_campaign_freezes_rubric_before_any_claim(tmp_path):
+    from qjig.contracts import Budget
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_budget import build_factorial_allocation,reserve_evaluation_plan
+    from qjig.evaluation_campaign import EvaluationCampaign
+    from qjig.goal_budget import GoalBudget
+    design=_sample_design()
+    design['criteria']={'remove':{'metric':'outcome_support','operator':'<','threshold':0.4},
+        'revise':{'metric':'outcome_support','operator':'range','threshold':[0.4,0.6]},
+        'retain':{'metric':'outcome_support','operator':'>=','threshold':0.6}}
+    digest=validate_evaluation_design(design)
+    hashes={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']}
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':{'prompt':2,'completion':3}}
+    config={name:dict(spec) for name in ('direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer')}
+    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'x'*32,max_judge_pairs=1)
+    alloc={'development':Budget(250,75000,3),'pilot':Budget(250,75000,3),'holdout':Budget(500,150000,6)}
+    rubric='Synthetic provisional rubric for frozen binding.'
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=Budget(1000,300000,12),per_request=Budget(30,6000,1),allocations=alloc) as goal:
+        reserve_evaluation_plan(goal,'bound',plan,expected_plan_sha256=plan['sha256'])
+        campaign=EvaluationCampaign(goal,'bound',expected_plan_sha256=plan['sha256'])
+        opts=dict(want=1,max_bytes=5000,case_applicability=hashes,max_judge_pairs=1,rubric_text=rubric)
+        anchor=campaign.freeze_config(config,**opts)
+        frozen=campaign.require_config(config,want=1,max_bytes=5000,expected_config_sha256=anchor)
+        assert frozen['schema']=='qjig.campaign-config.v8'
+        assert frozen['rubric_sha256']==hashlib.sha256(rubric.encode()).hexdigest()
+        assert frozen['decision_policy']=='qjig.provisional-pair-decision.v1'
+        assert campaign.freeze_config(config,**opts)==anchor
+        with pytest.raises(ContractError):
+            campaign.require_config(config,want=1,max_bytes=5000,expected_config_sha256='0'*64)
+        with pytest.raises(ContractError): campaign.freeze_config(config,**{**opts,'rubric_text':rubric+' altered'})
+        with pytest.raises(ContractError,match='rubric-bound campaign execution unavailable'):
+            campaign.claim(plan['manifest']['assignments'][0]['request_id'])
+        assert campaign.status()['in_progress']==[]
+
+
 def test_two_baseline_provisional_decision_policy():
     from qjig.evaluation import validate_evaluation_design
     from qjig.evaluation_recommendation import provisional_pair_decision

@@ -133,7 +133,7 @@ class EvaluationCampaign:
                 raise ContractError('invalid campaign event kind')
         return manifest,assignments,started,scored
 
-    def freeze_config(self, config: dict, *, want: int, max_bytes: int, case_applicability: dict, planner_prompt_version: str = 'legacy_v1', max_judge_pairs: int | None = None) -> str:
+    def freeze_config(self, config: dict, *, want: int, max_bytes: int, case_applicability: dict, planner_prompt_version: str = 'legacy_v1', max_judge_pairs: int | None = None, rubric_text: str | None = None) -> str:
         """Persist declared stage settings and shared packet limits before claims."""
         from .direct_preflight import direct_run_allocations
         from .fresh_preflight import fresh_run_allocations
@@ -172,6 +172,13 @@ class EvaluationCampaign:
         elif planner_prompt_version != 'legacy_v1':
             payload['schema']='qjig.campaign-config.v3'
             payload['planner_prompt_version']=planner_prompt_version
+        if rubric_text is not None:
+            if ('outcome_reviewer' not in config or not isinstance(rubric_text,str)
+                    or not rubric_text.strip() or len(rubric_text.encode('utf-8')) > 100000):
+                raise ContractError('bounded outcome review rubric required')
+            payload.update(schema='qjig.campaign-config.v8', rubric_text=rubric_text,
+                           rubric_sha256=hashlib.sha256(rubric_text.encode('utf-8')).hexdigest(),
+                           decision_policy='qjig.provisional-pair-decision.v1')
         try:
             encoded=json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
             digest=hashlib.sha256(encoded.encode('utf-8')).hexdigest()
@@ -181,6 +188,10 @@ class EvaluationCampaign:
         con.execute('BEGIN IMMEDIATE')
         try:
             manifest,assignments,started,_=self._snapshot()
+            if rubric_text is not None:
+                from .evaluation_recommendation import provisional_pair_decision
+                provisional_pair_decision(manifest['design'],{'direct_full_evidence':None,'direct_retrieval':None},
+                                          expected_design_sha256=manifest['design_sha256'])
             case_ids={c['id'] for c in manifest['design']['cases']}
             if (not isinstance(case_applicability,dict) or set(case_applicability)!=case_ids
                     or any(not isinstance(v,str) or len(v)!=64 or any(c not in '0123456789abcdef' for c in v)
@@ -263,6 +274,18 @@ class EvaluationCampaign:
                   and isinstance(config,dict) and set(config)=={'direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer'}):
                 payload.update(schema='qjig.campaign-config.v7', planner_prompt_version=frozen['planner_prompt_version'],
                                max_judge_pairs=frozen['max_judge_pairs'])
+            if frozen.get('schema') == 'qjig.campaign-config.v8':
+                rubric=frozen.get('rubric_text')
+                if (not isinstance(rubric,str) or not rubric.strip() or len(rubric.encode('utf-8'))>100000
+                        or frozen.get('rubric_sha256')!=hashlib.sha256(rubric.encode('utf-8')).hexdigest()
+                        or frozen.get('decision_policy')!='qjig.provisional-pair-decision.v1'
+                        or frozen.get('planner_prompt_version') not in ('legacy_v1','exception_applicability_v2')
+                        or type(frozen.get('max_judge_pairs')) is not int or not 1 <= frozen['max_judge_pairs'] <= 12
+                        or not isinstance(config,dict) or set(config)!={'direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer'}):
+                    raise ContractError('invalid rubric-bound campaign configuration')
+                payload.update(schema='qjig.campaign-config.v8',planner_prompt_version=frozen['planner_prompt_version'],
+                               max_judge_pairs=frozen['max_judge_pairs'],rubric_text=rubric,
+                               rubric_sha256=frozen['rubric_sha256'],decision_policy=frozen['decision_policy'])
             expected=json.dumps(payload,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
         except (KeyError,TypeError,ValueError,UnicodeError) as exc:
             raise ContractError('campaign configuration is not finite JSON') from exc
@@ -280,6 +303,9 @@ class EvaluationCampaign:
         con.execute('BEGIN IMMEDIATE')
         try:
             manifest,assignments,started,scored = self._snapshot()
+            config_row=con.execute('SELECT value FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
+            if config_row is not None and json.loads(config_row[0]).get('schema')=='qjig.campaign-config.v8':
+                raise ContractError('rubric-bound campaign execution unavailable')
             if any('outcome_review' in template for template in manifest['stage_templates'].values()) and con.execute('SELECT 1 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone() is None:
                 raise ContractError('outcome campaign configuration required')
             if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
