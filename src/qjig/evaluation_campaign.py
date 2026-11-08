@@ -96,10 +96,12 @@ class EvaluationCampaign:
         rows = self._goal._con.execute('SELECT request_id,kind,payload FROM evaluation_campaign_events WHERE plan_id=? ORDER BY seq',(self._plan_id,)).fetchall()
         config_row = self._goal._con.execute('SELECT value,sha256 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
         config_digest = None
+        config_schema = None
         if config_row is not None:
             config_value,config_digest = config_row
             if hashlib.sha256(config_value.encode('utf-8')).hexdigest() != config_digest:
                 raise ContractError('campaign configuration integrity differs')
+            config_schema = json.loads(config_value).get('schema')
         started, scored = set(), set()
         for request_id,kind,payload in rows:
             if request_id not in assignments:
@@ -115,10 +117,10 @@ class EvaluationCampaign:
                 started.add(request_id)
             elif kind == 'scored':
                 if (request_id not in started or request_id in scored or not isinstance(data,dict)
-                        or set(data) != {'plan_sha256','run_sha256','reference_sha256','journal_sha256','score_sha256'}
+                        or set(data) != ({'plan_sha256','run_sha256','reference_sha256','journal_sha256','score_sha256'} | ({'semantic_review_sha256'} if config_schema == 'qjig.campaign-config.v4' else set()))
                         or data['plan_sha256'] != digest
                         or any(not isinstance(data[k],str) or len(data[k]) != 64 or any(c not in '0123456789abcdef' for c in data[k])
-                               for k in ('run_sha256','reference_sha256','score_sha256'))
+                               for k in (('run_sha256','reference_sha256','score_sha256','semantic_review_sha256') if config_schema == 'qjig.campaign-config.v4' else ('run_sha256','reference_sha256','score_sha256')))
                         or (data['journal_sha256'] is not None and
                             (not isinstance(data['journal_sha256'],str) or len(data['journal_sha256']) != 64
                              or any(c not in '0123456789abcdef' for c in data['journal_sha256'])))):
@@ -240,8 +242,9 @@ class EvaluationCampaign:
                 raise ContractError('assignment unavailable or already claimed')
             if started-scored:
                 raise ContractError('campaign recovery required before another assignment')
-            if 'semantic_review' in manifest['stage_templates'][assignments[request_id]['arm']]:
-                raise ContractError('semantic review campaign execution is not implemented')
+            if ('semantic_review' in manifest['stage_templates'][assignments[request_id]['arm']]
+                    and con.execute('SELECT 1 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone() is None):
+                raise ContractError('semantic review campaign configuration required')
             if con.execute('SELECT 1 FROM required_work WHERE request_id=? AND attempt_id IS NOT NULL LIMIT 1',(request_id,)).fetchone():
                 raise ContractError('assignment already has consumed work')
             assignment = assignments[request_id]
@@ -260,7 +263,8 @@ class EvaluationCampaign:
                 'plan_id':self._plan_id,'plan_sha256':self._digest,'design_sha256':manifest['design_sha256']}
 
     def finish(self, request_id: str, archive, journal, reference: dict, *, expected_run_sha256: str,
-               expected_reference_sha256: str, expected_journal_sha256: str | None = None) -> dict:
+               expected_reference_sha256: str, expected_journal_sha256: str | None = None,
+               semantic_review_archive=None, expected_review_sha256: str | None = None) -> dict:
         manifest,assignments,started,scored = self._snapshot()
         if request_id not in assignments or request_id not in started or request_id in scored:
             raise ContractError('assignment is not an unfinished claim')
@@ -268,13 +272,21 @@ class EvaluationCampaign:
         if archive.context().get('request',{}).get('request_id') != request_id:
             raise ContractError('archive request differs from claim')
         config_row=self._goal._con.execute('SELECT value FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
-        if config_row is not None:
-            check_archive_config(json.loads(config_row[0]), archive.context(), assignment)
+        frozen = json.loads(config_row[0]) if config_row is not None else None
+        if frozen is not None:
+            check_archive_config(frozen, archive.context(), assignment)
         family = next(c['family'] for c in manifest['design']['cases'] if c['id']==assignment['case_id'])
         partition = next(f['partition'] for f in manifest['design']['families'] if f['id']==family)
-        score = score_reserved_assignment(self._goal,archive,journal,reference,partition=partition,
-            expected_plan_sha256=self._digest,expected_run_sha256=expected_run_sha256,
+        scoring_options=dict(partition=partition,expected_plan_sha256=self._digest,expected_run_sha256=expected_run_sha256,
             expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256)
+        if frozen is not None and frozen.get('schema') == 'qjig.campaign-config.v4':
+            from .evaluation_scoring import score_reviewed_reserved_assignment
+            score = score_reviewed_reserved_assignment(self._goal,archive,journal,reference,semantic_review_archive,
+                expected_review_sha256=expected_review_sha256,reviewer_spec=frozen['stages']['semantic_reviewer'],**scoring_options)
+        else:
+            if semantic_review_archive is not None or expected_review_sha256 is not None:
+                raise ContractError('semantic review requires a v4 campaign')
+            score = score_reserved_assignment(self._goal,archive,journal,reference,**scoring_options)
         if (score['score']['case_id'],score['arm'],score['repeat']) != (assignment['case_id'],assignment['arm'],assignment['repeat']):
             raise ContractError('scored assignment differs from claim')
         if score['score'].get('reconciliation_required') is True:
@@ -283,6 +295,8 @@ class EvaluationCampaign:
         score_hash = hashlib.sha256(encoded).hexdigest()
         payload = {'plan_sha256':self._digest,'run_sha256':expected_run_sha256,'reference_sha256':expected_reference_sha256,
                    'journal_sha256':expected_journal_sha256,'score_sha256':score_hash}
+        if frozen is not None and frozen.get('schema') == 'qjig.campaign-config.v4':
+            payload['semantic_review_sha256']=expected_review_sha256
         con = self._goal._con
         con.execute('BEGIN IMMEDIATE')
         try:
@@ -301,7 +315,7 @@ class EvaluationCampaign:
 def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root, design: dict,
                             lock: dict, reference: dict, protected: list[dict], *,
                             applicability_inputs, transport, archive, journal, config: dict,
-                            want: int, max_bytes: int, expected_config_sha256: str) -> dict:
+                            want: int, max_bytes: int, expected_config_sha256: str, semantic_review_archive=None) -> dict:
     """Run and score one claimed factorial assignment; never retry an interrupted claim.
 
     Input/price bounds, evidence configuration and external anchors are caller
@@ -324,8 +338,13 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             or type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024):
         raise ContractError('invalid campaign run inputs')
     frozen_config=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
-    if frozen_config['schema']=='qjig.campaign-config.v4':
-        raise ContractError('semantic review campaign execution is not implemented')
+    semantic = frozen_config['schema']=='qjig.campaign-config.v4'
+    if semantic and (not isinstance(semantic_review_archive,RunArchive) or semantic_review_archive is archive
+                     or semantic_review_archive.events() or semantic_review_archive.revision_ids() or semantic_review_archive.source_ids()
+                     or semantic_review_archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0]):
+        raise ContractError('new semantic review archive required')
+    if not semantic and semantic_review_archive is not None:
+        raise ContractError('semantic review archive requires v4 campaign')
     manifest,assignments,started,_ = campaign._snapshot()
     if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
         raise ContractError('campaign assignment unavailable')
@@ -353,7 +372,7 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             applicability_deferral = any(combine_applicability(applicability_inputs.verdict(revision.revision_id),
                 scope_applicability(prepared.scope,applicability_inputs.collection.member(revision.revision_id).scope))
                 is not Applicability.MATCH for revision in revisions)
-    if (not isinstance(config,dict) or set(config) != {'direct','planner','judge','reviewer'}
+    if (not isinstance(config,dict) or set(config) != ({'direct','planner','judge','reviewer','semantic_reviewer'} if semantic else {'direct','planner','judge','reviewer'})
             or any(not isinstance(spec,dict) or set(spec) != {'provider','model','input_tokens','output_tokens','max_price'}
                    for spec in config.values())):
         raise ContractError('invalid campaign stage configuration')
@@ -372,6 +391,9 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             followups=0 if arm=='direct_full_evidence' else 1)
     else:
         raise ContractError('unsupported campaign arm')
+    if semantic:
+        from .semantic_preflight import semantic_review_allocation
+        expected.append(semantic_review_allocation(request_id=request_id,partition=partition,spec=config['semantic_reviewer']))
     if sorted(expected,key=lambda x:x['work_id']) != assignment['work']:
         raise ContractError('campaign configuration differs from reserved work')
     if (archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0] or archive.events()
@@ -427,9 +449,33 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
         if replay['status'] not in ('unanchored','incomplete') or replay['sha256'] is None:
             raise ContractError('campaign direct archive is not replayable')
         run_hash,journal_hash=replay['sha256'],None
+    review_hash = None
+    if semantic:
+        from .evaluation_semantic_review import (review_direct_semantics,review_fresh_semantics,
+                                                  verify_direct_semantic_review,verify_fresh_semantic_review)
+        from .semantic_preflight import semantic_review_reservation
+        spec=config['semantic_reviewer']
+        def review_factory(req):
+            return semantic_review_reservation(campaign._goal,set_id,request_id=request_id,partition=partition,request=req,spec=spec)
+        opts=dict(review_archive=semantic_review_archive,expected_run_sha256=run_hash,provider=spec['provider'],
+                  model=spec['model']['id'],max_tokens=spec['output_tokens'],max_price=spec['max_price'],reservation_factory=review_factory)
+        if arm in ('combined','decomposition_only') and not applicability_deferral:
+            review_fresh_semantics(archive,journal,ledger,transport,reference=reference,expected_reference_sha256=reference_digest(reference),
+                                   expected_journal_sha256=journal_hash,**opts)
+            checked=verify_fresh_semantic_review(archive,journal,semantic_review_archive,reference=reference,
+                expected_reference_sha256=reference_digest(reference),expected_run_sha256=run_hash,expected_journal_sha256=journal_hash)
+        elif not applicability_deferral:
+            review_direct_semantics(archive,journal,ledger,transport,**opts)
+            checked=verify_direct_semantic_review(archive,journal,semantic_review_archive,expected_run_sha256=run_hash)
+        else:
+            raise ContractError('semantic review unavailable for applicability deferral; recovery required')
+        if checked.get('status') != 'unanchored':
+            raise ContractError('semantic review unavailable or invalid; recovery required')
+        review_hash=checked['sha256']
     receipt=campaign.finish(request_id,archive,journal,reference,expected_run_sha256=run_hash,
-        expected_reference_sha256=reference_digest(reference),expected_journal_sha256=journal_hash)
-    return {**receipt,'run_sha256':run_hash,'journal_sha256':journal_hash}
+        expected_reference_sha256=reference_digest(reference),expected_journal_sha256=journal_hash,
+        **({'semantic_review_archive':semantic_review_archive,'expected_review_sha256':review_hash} if semantic else {}))
+    return {**receipt,'run_sha256':run_hash,'journal_sha256':journal_hash,**({'semantic_review_sha256':review_hash} if semantic else {})}
 
 
 def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: dict, *, journal,

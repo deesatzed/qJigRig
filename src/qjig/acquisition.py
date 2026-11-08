@@ -416,7 +416,7 @@ def run_fresh(
                 version = config.get('planner_prompt_version', 'legacy_v1')
                 schema = 'qjig.campaign-config.v2' if version == 'legacy_v1' else 'qjig.campaign-config.v3'
                 if (hashlib.sha256(encoded.encode('utf-8')).hexdigest() != digest
-                        or config.get('schema') != schema or version != planner_prompt_version
+                        or config.get('schema') not in (schema, 'qjig.campaign-config.v4') or version != planner_prompt_version
                         or config.get('plan_sha256') != binding['plan_sha256']
                         or claim != {'plan_sha256':binding['plan_sha256'], 'config_sha256':digest}):
                     raise ValueError('campaign binding differs')

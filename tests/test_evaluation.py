@@ -1646,7 +1646,7 @@ def test_factorial_allocation_enumerates_real_arm_work_before_reservation(tmp_pa
         assert goal._con.execute('SELECT COUNT(*) FROM evaluation_plans').fetchone()[0]==0
 
 
-@pytest.mark.parametrize('driver',['manual','runner','runner_v2'])
+@pytest.mark.parametrize('driver',['manual','runner','runner_v2','runner_semantic'])
 def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,driver):
     import json
     from contextlib import ExitStack
@@ -1687,7 +1687,8 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
            'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
-    plan=build_factorial_allocation(design,case_hashes,{k:dict(spec) for k in ('direct','planner','judge','reviewer')},
+    stage_names=('direct','planner','judge','reviewer','semantic_reviewer') if driver=='runner_semantic' else ('direct','planner','judge','reviewer')
+    plan=build_factorial_allocation(design,case_hashes,{k:dict(spec) for k in stage_names},
                                     expected_design_sha256=digest,assignment_secret=b'synthetic-private-test-secret-32-bytes')
     usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
     raw=lambda value:RawResponse(200,json.dumps(value),usage)
@@ -1701,14 +1702,14 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
         campaign=EvaluationCampaign(goal,'factorial',expected_plan_sha256=plan['sha256'])
         from qjig.evaluation_campaign import applicability_digest
         metadata_hashes={case['id']:applicability_digest(inputs) for case in design['cases']}
-        config_digest = campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,case_applicability=metadata_hashes, **({'planner_prompt_version':'exception_applicability_v2'} if driver=='runner_v2' else {})) if driver!='manual' else None
+        config_digest = campaign.freeze_config({k:dict(spec) for k in stage_names},want=1,max_bytes=5000,case_applicability=metadata_hashes, **({'planner_prompt_version':'exception_applicability_v2'} if driver in ('runner_v2','runner_semantic') else {})) if driver!='manual' else None
         if driver=='runner':
-            assert campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,case_applicability=metadata_hashes)==config_digest
+            assert campaign.freeze_config({k:dict(spec) for k in stage_names},want=1,max_bytes=5000,case_applicability=metadata_hashes)==config_digest
             with pytest.raises(ContractError):
-                campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,
+                campaign.freeze_config({k:dict(spec) for k in stage_names},want=1,max_bytes=5000,
                                        case_applicability={'holdout':metadata_hashes['holdout']})
             with pytest.raises(ContractError):
-                campaign.freeze_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=2,max_bytes=5000,case_applicability=metadata_hashes)
+                campaign.freeze_config({k:dict(spec) for k in stage_names},want=2,max_bytes=5000,case_applicability=metadata_hashes)
         for arm in design['arms']:
             assignment=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==arm and a['repeat']==1)
             rid=assignment['request_id'];ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout')
@@ -1720,15 +1721,24 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                         raw({'supported':False,'quote':'','reason':'synthetic'}),raw({'assessment':'uncertain','reason':'synthetic'})]
                 else:
                     responses=[raw({'action':'answer','query':None,'answer':'unknown','citations':[]})]
+                if driver=='runner_semantic':
+                    responses.append(raw({'assessment':'uncertain','reason':'synthetic review'}))
+                    semantic_archive=stack.enter_context(RunArchive.open(tmp_path/('semantic-'+arm)))
                 transport=StandInTransport(responses)
+                if driver=='runner_semantic':
+                    with pytest.raises(ContractError,match='semantic review archive'):
+                        run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
+                            applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
+                            config={k:dict(spec) for k in stage_names},want=1,max_bytes=5000,expected_config_sha256=config_digest)
+                    assert campaign.status()['in_progress']==[] and transport.calls_made==0
                 changed_inputs=ApplicabilityInputs(Collection((MemberMetadata(ref['source_revisions'][0],'other',Interval('2020-01-01',OPEN)),)),frozenset(),'2026-11-07',False)
                 with pytest.raises(ContractError):
                     run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
                         applicability_inputs=changed_inputs,transport=transport,archive=archive,journal=journal,
-                        config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,
+                        config={k:dict(spec) for k in stage_names},want=1,max_bytes=5000,
                         expected_config_sha256=config_digest)
                 assert campaign.status()['in_progress']==[] and transport.calls_made==0
-                bad_config={k:dict(spec) for k in ('direct','planner','judge','reviewer')}
+                bad_config={k:dict(spec) for k in stage_names}
                 changed='planner' if arm in ('combined','decomposition_only') else 'direct'
                 bad_config[changed]['input_tokens']=99
                 with pytest.raises(ContractError):
@@ -1739,21 +1749,34 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                 with pytest.raises(ContractError):
                     run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
                         applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
-                        config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=2,max_bytes=5000,
+                        config={k:dict(spec) for k in stage_names},want=2,max_bytes=5000,
                         expected_config_sha256=config_digest)
                 with pytest.raises(ContractError):
                     run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
                         applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
-                        config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,
+                        config={k:dict(spec) for k in stage_names},want=1,max_bytes=5000,
                         expected_config_sha256='0'*64)
                 receipt=run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
                     applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
-                    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,expected_config_sha256=config_digest)
-                assert receipt['status']=='scored' and transport.calls_made==(4 if arm in ('combined','decomposition_only') else 1)
+                    config={k:dict(spec) for k in stage_names},want=1,max_bytes=5000,expected_config_sha256=config_digest,
+                    **({'semantic_review_archive':semantic_archive} if driver=='runner_semantic' else {}))
+                assert receipt['status']=='scored' and transport.calls_made==((4 if arm in ('combined','decomposition_only') else 1)+(driver=='runner_semantic'))
+                if driver=='runner_semantic':
+                    from qjig.evaluation_scoring import score_reviewed_reserved_assignment
+                    review_kwargs=dict(partition='holdout',expected_plan_sha256=plan['sha256'],
+                        expected_run_sha256=receipt['run_sha256'],expected_journal_sha256=receipt['journal_sha256'],
+                        expected_reference_sha256=reference_digest(ref),expected_review_sha256=receipt['semantic_review_sha256'],
+                        reviewer_spec=spec)
+                    verified=score_reviewed_reserved_assignment(goal,archive,journal,ref,semantic_archive,**review_kwargs)
+                    assert verified['review']['assessment']=='uncertain'
+                    with pytest.raises(ContractError):
+                        score_reviewed_reserved_assignment(goal,archive,journal,ref,semantic_archive,
+                            **{**review_kwargs,'expected_review_sha256':'0'*64})
+                    assert EvaluationCampaign(goal,'factorial',expected_plan_sha256=plan['sha256']).status()['scored'] >= 1
                 if driver=='runner_v2' and arm in ('combined','decomposition_only'):
                     assert archive.context()['planner_prompt_version']=='exception_applicability_v2'
                     from qjig.evaluation_campaign import check_archive_config
-                    frozen=campaign.require_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,expected_config_sha256=config_digest)
+                    frozen=campaign.require_config({k:dict(spec) for k in stage_names},want=1,max_bytes=5000,expected_config_sha256=config_digest)
                     changed_context={**archive.context(), 'planner_prompt_version':'legacy_v1'}
                     with pytest.raises(ContractError, match='prompt version'):
                         check_archive_config(frozen,changed_context,assignment)
@@ -1808,6 +1831,9 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             assert receipt['status']=='scored' and len(receipt['score_sha256'])==64
             with pytest.raises(ContractError):campaign.claim(rid)
         assert goal.audit_journal(journal)['status']=='verified'
+        if driver=='runner_semantic':
+            assert campaign.status()['scored']==5
+            return
         for arm in ('direct_full_evidence','retrieval_only','decomposition_only','combined'):
             report=build_reserved_holdout_comparison(goal,design,[entries['direct_retrieval'],entries[arm]],plan_id='factorial',
                 expected_plan_sha256=plan['sha256'],expected_design_sha256=digest,baseline_arm='direct_retrieval',candidate_arm=arm)
@@ -1819,7 +1845,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             with pytest.raises(ContractError):
                 run_campaign_assignment(campaign,pending['request_id'],tmp_path,design,lock,ref,protected,
                     applicability_inputs=inputs,transport=timed_out,archive=interrupted,journal=journal,
-                    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')},want=1,max_bytes=5000,expected_config_sha256=config_digest)
+                    config={k:dict(spec) for k in stage_names},want=1,max_bytes=5000,expected_config_sha256=config_digest)
             assert timed_out.calls_made==1 and journal.pending(pending['request_id'])
         else:
             campaign.claim(pending['request_id'])
@@ -1833,7 +1859,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
         assert recovered.status()['scored']==5 and recovered.status()['in_progress']==[pending['request_id']]
         if driver=='runner':
             import sqlite3
-            recovered.require_config({k:dict(spec) for k in ('direct','planner','judge','reviewer')},
+            recovered.require_config({k:dict(spec) for k in stage_names},
                                      want=1,max_bytes=5000,expected_config_sha256=config_digest)
             with pytest.raises(sqlite3.IntegrityError):
                 reopened._con.execute("UPDATE evaluation_campaign_config SET value='{}'")
@@ -2059,7 +2085,7 @@ def test_retained_campaign_inspection_refuses_unstarted_work_without_creating_ar
         assert not archive_root.exists()
 
 
-def test_semantic_campaign_configuration_freezes_review_slots_and_refuses_premature_claim(tmp_path):
+def test_semantic_campaign_configuration_freezes_review_slots_before_claim(tmp_path):
     from qjig.contracts import Budget
     from qjig.evaluation import validate_evaluation_design
     from qjig.evaluation_budget import build_factorial_allocation, reserve_evaluation_plan
@@ -2084,9 +2110,9 @@ def test_semantic_campaign_configuration_freezes_review_slots_and_refuses_premat
         assert frozen['schema']=='qjig.campaign-config.v4'
         assert frozen['stages']['semantic_reviewer']==spec
         assert frozen['planner_prompt_version']=='exception_applicability_v2'
-        with pytest.raises(ContractError,match='semantic review'):
-            campaign.claim(plan['manifest']['assignments'][0]['request_id'])
-        assert campaign.status()['in_progress']==[]
+        rid=plan['manifest']['assignments'][0]['request_id']
+        campaign.claim(rid)
+        assert campaign.status()['in_progress']==[rid]
         altered={**config,'semantic_reviewer':{**spec,'output_tokens':99}}
         with pytest.raises(ContractError):
             campaign.require_config(altered,want=1,max_bytes=5000,expected_config_sha256=digest)
