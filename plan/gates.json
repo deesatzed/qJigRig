@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "babffccd5e66b62f0101eb96968d91fc73dfe968c841d29b367ca72c8004a8cf",
-  "queue_sha256": "d8ca84f651b50d8ae2df95d10bb8b9931c907ffd70b8d732fbbe2a1f10768e47",
+  "queue_sha256": "16229c662f8930c70541d403853fd39783c8b44435bce0846b488ab6acb54014",
   "gates": [
     {
       "id": "F01",
@@ -109,7 +109,8 @@
         "R08R",
         "R08S",
         "R08T",
-        "R08U"
+        "R08U",
+        "R08V"
       ],
       "evidence": []
     },
@@ -714,6 +715,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
       "queue_evidence_assertion": "Red: rotation after the typed entrypoint credential read still allowed an account observation. Green: rotation refuses before account observation or restriction change without exposing dummy credentials; preflight/account/provider/goal/config/service regressions 122 passed, 1 skipped. Dispatch remains disabled; this check does not resolve billing, physical-send integration, switch-and-restore races or later credential changes."
+    },
+    {
+      "id": "R08V",
+      "status": "unverified",
+      "task_ids": [
+        "R08V"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_providers.py::test_oversized_http_response_remains_uncertain -q",
+      "queue_evidence_assertion": "Red: fake 200 and 429 responses were read without a size bound. Green: both oversized bodies raise an uncertain-outcome signal after a bounded read; provider/budget/preflight/replay regressions 97 passed, including existing journal timeout handling. No hosted inference occurred; actual guarded dispatch remains unavailable."
     },
     {
       "id": "R09",

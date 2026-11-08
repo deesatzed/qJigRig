@@ -536,3 +536,29 @@ def test_adapter_requires_same_credential_before_http(tmp_path):
         adapter._send_unchecked(REQ,expected_credential='synthetic-old')
     assert not sent
     assert all(secret not in str(error.value) for error in (missing,changed) for secret in ('synthetic-old','synthetic-new'))
+
+
+@pytest.mark.parametrize('status', [200, 429])
+def test_oversized_http_response_remains_uncertain(monkeypatch, status):
+    import io
+    import urllib.error
+    import qjig.providers as providers
+
+    class Response(io.BytesIO):
+        def __init__(self):
+            super().__init__(b'x' * 1025)
+            self.status = status
+        def read(self, size=-1):
+            assert size == 1025  # one byte beyond the permitted body
+            return super().read(size)
+
+    response = Response()
+    class Opener:
+        def open(self, *args, **kwargs):
+            if status == 429:
+                raise urllib.error.HTTPError('https://openrouter.ai', status, 'error', {}, response)
+            return response
+    monkeypatch.setattr(providers, '_MAX_PROVIDER_RESPONSE_BYTES', 1024, raising=False)
+    monkeypatch.setattr(providers.urllib.request, 'build_opener', lambda *a: Opener())
+    with pytest.raises(TimeoutError, match='response'):
+        providers._urllib_post('https://openrouter.ai/api/v1/chat/completions', {}, '{}', 1)

@@ -271,15 +271,26 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+_MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024
+
+
+def _read_provider_response(response) -> str:
+    body = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+    if len(body) > _MAX_PROVIDER_RESPONSE_BYTES:
+        # The request may have been processed; missing usage cannot be settled.
+        raise TimeoutError("provider response too large; outcome unknown")
+    return body.decode("utf-8", "replace")
+
+
 def _urllib_post(url: str, headers: dict, payload: str, timeout: float) -> tuple[int, str]:
     req = urllib.request.Request(url, data=payload.encode("utf-8"), headers=headers, method="POST")
     try:
         with urllib.request.build_opener(_NoRedirect).open(req, timeout=timeout) as resp:
-            return resp.status, resp.read().decode("utf-8", "replace")
+            return resp.status, _read_provider_response(resp)
     except urllib.error.HTTPError as exc:
         if 300 <= exc.code < 400:
             return exc.code, "redirect refused"
-        return exc.code, exc.read().decode("utf-8", "replace")
+        return exc.code, _read_provider_response(exc)
     except urllib.error.URLError as exc:
         if isinstance(exc.reason, (socket.gaierror, ConnectionRefusedError)):
             raise ConnectionRefusedError(str(exc.reason)) from exc  # never reached the provider
