@@ -97,3 +97,28 @@ def test_campaign_companion_preserves_partitions_and_pilot_interventions():
     assert all(row['category_changed'] is None for row in result['interventions']['pilot']['groups']['changed_decisive'])
     with pytest.raises(ContractError): summarize_campaign_assertions(design,records[:-1],expected_design_sha256=digest)
     with pytest.raises(ContractError): summarize_campaign_assertions(design,records+[records[0]],expected_design_sha256=digest)
+
+
+def test_arm_configuration_discloses_access_and_work_differences():
+    from qjig.evaluation_companion import summarize_arm_configuration
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    stage={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':50,'max_price':{'prompt':2,'completion':3}}
+    config={'schema':'qjig.campaign-config.v8','want':3,'max_bytes':6000,'max_judge_pairs':2,
+            'planner_prompt_version':'legacy_v1','stages':{name:dict(stage) for name in
+            ('direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer')}}
+    result=summarize_arm_configuration(config)
+    assert result['assurance']=='frozen_configuration_assertion'
+    assert result['arms']['direct_full_evidence']['source_mode']=='full_source'
+    assert result['arms']['direct_full_evidence']['direct_followups']==0
+    assert result['arms']['direct_retrieval']['source_mode']=='lexical_retrieval'
+    assert result['arms']['retrieval_only']['source_mode']=='catalog_retrieval'
+    assert result['arms']['combined']['source_mode']=='catalog_retrieval'
+    assert result['arms']['decomposition_only']['source_mode']=='full_source'
+    assert result['arms']['combined']['max_judge_pairs']==2
+    assert result['arms']['combined']['stages']['planner']['model']=='synthetic/model'
+    assert result['arms']['direct_retrieval']['direct_followups']==1
+    assert set(result['arms']['combined']['stages'])=={'planner','judge','reviewer','semantic_reviewer','outcome_reviewer'}
+    assert result['arms']['combined']['stages']['planner']['input_tokens_assurance']=='configured_not_provider_verified'
+    changed=copy.deepcopy(config);del changed['stages']['outcome_reviewer']
+    with pytest.raises(ContractError): summarize_arm_configuration(changed)

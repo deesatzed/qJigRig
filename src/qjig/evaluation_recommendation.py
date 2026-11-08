@@ -114,10 +114,13 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
     campaign_records=inspection.pop('scored_records',None)
     issues=list(inspection['issues'])
     campaign_companion=None
+    arm_configuration=None
     if campaign_records is not None:
-        from .evaluation_companion import summarize_campaign_assertions
+        from .evaluation_companion import summarize_campaign_assertions,summarize_arm_configuration
         campaign_companion=summarize_campaign_assertions(design,campaign_records,expected_design_sha256=expected_design_sha256)
         campaign_companion['assurance']='structurally_reconstructed_unvalidated'
+        if frozen['schema']=='qjig.campaign-config.v8':
+            arm_configuration=summarize_arm_configuration(frozen)
     elif inspection['status']=='structurally_complete':
         issues.append('campaign_records_unavailable')
     rubric_checked=None
@@ -188,11 +191,11 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
         recommendation=result['decision']
         return {'status':'evaluated' if recommendation is not None else 'inconclusive',
                 'recommendation':recommendation,'baseline_decisions':result['baseline_decisions'],
-                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,'campaign_companion':campaign_companion,
+                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,'campaign_companion':campaign_companion,'arm_configuration':arm_configuration,
                 'resource_scope':'campaign_totals_in_inspection_shared_arms_repeated_in_comparisons',
                 'assurance':'structural_and_ai_reviewed_unvalidated',
                 'rubric_assurance':rubric_checked['assurance']}
     return {'status':'invalid' if inspection['status']=='invalid' else 'incomplete','recommendation':None,
-            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,'campaign_companion':campaign_companion,
+            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,'campaign_companion':campaign_companion,'arm_configuration':arm_configuration,
             'resource_scope':'campaign_totals_in_inspection_shared_arms_repeated_in_comparisons',
             'assurance':'no_recommendation'}

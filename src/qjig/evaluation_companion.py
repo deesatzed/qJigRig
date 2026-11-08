@@ -175,3 +175,44 @@ def summarize_campaign_assertions(design: dict, records: list[dict], *, expected
         interventions[partition]=group_holdout_interventions(design,summary,expected_design_sha256=expected_design_sha256,partition=partition)
     return {'schema':'qjig.campaign-companion.v1','design_sha256':expected_design_sha256,
             'partitions':partitions,'interventions':interventions,'assurance':'caller_asserted_unverified'}
+
+
+def summarize_arm_configuration(frozen: dict) -> dict:
+    """Describe configured arm access and work without asserting provider compliance."""
+    names={'direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer'}
+    if (not isinstance(frozen,dict) or frozen.get('schema')!='qjig.campaign-config.v8'
+            or type(frozen.get('want')) is not int or frozen['want']<1
+            or type(frozen.get('max_bytes')) is not int or frozen['max_bytes']<1
+            or type(frozen.get('max_judge_pairs')) is not int or frozen['max_judge_pairs']<1
+            or frozen.get('planner_prompt_version') not in ('legacy_v1','exception_applicability_v2')
+            or not isinstance(frozen.get('stages'),dict) or set(frozen['stages'])!=names):
+        raise ContractError('complete reviewed campaign configuration required')
+    stages={}
+    for name,spec in frozen['stages'].items():
+        model=spec.get('model') if isinstance(spec,dict) else None
+        if (not isinstance(model,dict) or not isinstance(model.get('id'),str) or not model['id']
+                or not isinstance(spec.get('provider'),str) or not spec['provider']
+                or type(spec.get('input_tokens')) is not int or spec['input_tokens']<0
+                or type(spec.get('output_tokens')) is not int or spec['output_tokens']<1
+                or (spec.get('route') is not None and not isinstance(spec['route'],str))):
+            raise ContractError('invalid configured stage')
+        stages[name]={'provider':spec['provider'],'model':model['id'],'route':spec.get('route'),
+            'context_length':model.get('context_length'),'input_tokens':spec['input_tokens'],
+            'output_tokens':spec['output_tokens'],'max_price':spec.get('max_price'),
+            'input_tokens_assurance':'configured_not_provider_verified'}
+    definitions={
+        'direct_full_evidence':('full_source',0,('direct','semantic_reviewer','outcome_reviewer')),
+        'direct_retrieval':('lexical_retrieval',1,('direct','semantic_reviewer','outcome_reviewer')),
+        'retrieval_only':('catalog_retrieval',1,('direct','semantic_reviewer','outcome_reviewer')),
+        'decomposition_only':('full_source',None,('planner','judge','reviewer','semantic_reviewer','outcome_reviewer')),
+        'combined':('catalog_retrieval',None,('planner','judge','reviewer','semantic_reviewer','outcome_reviewer'))}
+    arms={}
+    for arm,(mode,followups,used) in definitions.items():
+        fresh=arm in ('decomposition_only','combined')
+        arms[arm]={'source_mode':mode,'direct_followups':followups,'want':frozen['want'],'max_bytes':frozen['max_bytes'],
+            'max_judge_pairs':frozen['max_judge_pairs'] if fresh else None,
+            'planner_prompt_version':frozen['planner_prompt_version'] if fresh else None,
+            'stages':{name:stages[name] for name in used}}
+    return {'schema':'qjig.arm-configuration-summary.v1','arms':arms,
+            'assurance':'frozen_configuration_assertion',
+            'limitations':'configured access and limits do not establish actual provider compliance or comparable work'}

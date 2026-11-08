@@ -2498,6 +2498,8 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                         assert evaluated['companion']['arms']['direct_retrieval']['resources']['calls']==3
                         assert evaluated['campaign_companion']['partitions']['pilot']['arms']['combined']['assignments']==3
                         assert len(evaluated['campaign_companion']['interventions']['pilot']['groups']['changed_decisive'])==5
+                        assert evaluated['arm_configuration']['arms']['combined']['source_mode']=='catalog_retrieval'
+                        assert evaluated['arm_configuration']['arms']['direct_full_evidence']['direct_followups']==0
                         assert len(evaluated['interventions']['groups']['changed_decisive'])==10
                         assert all(row['category_changed'] is None for row in evaluated['interventions']['groups']['changed_decisive'])
                         patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:fake_comparison(k['baseline_arm'],None,k['candidate_arm']))

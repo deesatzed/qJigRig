@@ -4582,7 +4582,8 @@
         "T072H",
         "T072I",
         "T072J",
-        "T072K"
+        "T072K",
+        "T072L"
       ],
       "status": "pending",
       "files": [
@@ -4899,6 +4900,24 @@
       "acceptance": "Only fully inspected records cover the frozen assignment denominator; each partition reports five unique arms and grouped interventions with unknown usage preserved.",
       "command": "python -m pytest tests/test_evaluation_companion.py::test_campaign_companion_preserves_partitions_and_pilot_interventions -q",
       "evidence": "Red: campaign partition aggregation and optional inspected records were absent. Green: exact assigned denominator and duplicate checks, separate five-arm summaries, grouped pilot/holdout interventions and refusal to expose partial/invalid inspected records; evaluation/review/replay/gate regressions passed 156. A retained synthetic campaign reconstructed development 6, pilot 5 and holdout 10 assignments per arm; attribution and changed source contract keep it incomplete. Access differences, live evidence and final report remain open."
+    },
+    {
+      "id": "T072L",
+      "phase": "evaluation",
+      "depends_on": [
+        "T072K"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_companion.py",
+        "src/qjig/evaluation_recommendation.py"
+      ],
+      "test_file": "tests/test_evaluation_companion.py",
+      "test_name": "test_arm_configuration_discloses_access_and_work_differences",
+      "action": "Disclose frozen per-arm source access and work settings",
+      "acceptance": "The five arms report their distinct source mode, followup, planner/judge, model, routing and configured limits without presenting assertions as observed provider behavior.",
+      "command": "python -m pytest tests/test_evaluation_companion.py::test_arm_configuration_discloses_access_and_work_differences -q",
+      "evidence": "Red: no per-arm configuration disclosure existed. Green: five source modes, direct followups, judge quotas, stages, model/route and configured input/output limits are shown in the inspected campaign report; missing review stage is rejected. Evaluation/review/replay/gate regressions passed 157. A prior synthetic campaign showed the expected arm differences, but attribution and source-contract drift keep it incomplete. Configuration is an assertion, not observed provider compliance."
     }
   ]
 }

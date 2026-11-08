@@ -27,3 +27,7 @@ The current read-only reconstruction groups changed-decisive, missing-decisive a
 ## Full-campaign companion diagnostic
 
 A later read-only reconstruction included all fully inspected assignments, partitioned by the frozen design. It reported 6 development, 5 pilot and 10 holdout assignments per arm; each partition covers all five arms. Pilot groups contained 5 pairs each for changed-decisive, missing-decisive and irrelevant-change interventions; holdout groups contained 10 pairs each. These are locally reconstructed synthetic records and their categories remain unknown, not real outcome evidence. The run remains incomplete for synthetic attribution and a changed source contract; no recommendation is produced. Reported source access differences, live evidence and final acceptance remain open.
+
+## Configured arm-access disclosure
+
+The current report also describes the frozen fixture configuration: direct full-evidence uses full source with no direct followup; direct retrieval uses lexical retrieval with one followup; retrieval-only uses catalog retrieval with one followup; decomposition-only uses full source and a two-pair judge quota; combined uses catalog retrieval and the same two-pair quota. It lists each stage's configured model, route, token bounds and context metadata. These are frozen assertions, not evidence that real providers honored limits or that work was equivalent. The historical run remains incomplete for synthetic attribution and source-contract drift.
