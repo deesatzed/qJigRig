@@ -1318,7 +1318,8 @@
       "phase": "P6",
       "depends_on": [
         "T071",
-        "T072A"
+        "T072A",
+        "T072B"
       ],
       "status": "pending",
       "files": [
@@ -4557,6 +4558,24 @@
       "acceptance": "Synthetic full-denominator v7 run and restart verify both review stages without hosted calls; failures remain explicit and incomplete review claims are not fabricated.",
       "command": "python -m pytest tests/test_factorial_synthetic.py::test_synthetic_factorial_configuration_has_opt_in_outcome_review -q",
       "evidence": "Red: the synthetic harness could not configure outcome reviews. Green: all 105 draft assignments completed with 567 reserved slots and 432 stand-in calls; reopening rechecked receipts with unchanged cumulative call counts. A locally generated v2 manifest checked 105 receipts and 16 cases, returning incomplete solely for provider_attribution_not_live. Evidence: docs/verification/2026-11-08-synthetic-v7-campaign.md. Harness/evaluation/review/goal tests passed 163. Synthetic mechanics only; model quality, independent provenance, real billing and provider execution remain open."
+    },
+    {
+      "id": "T072B",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069K",
+        "T072A"
+      ],
+      "status": "pending",
+      "files": [
+        "src/qjig/evaluation_recommendation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Build two-baseline recommendation from verified reserved review receipts",
+      "acceptance": "Reconstruct both baseline comparisons from a versioned rubric-bound campaign; require full anchored inspection and predeclared combination criteria before a result; missing or unknown outcomes do not yield a recommendation.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "In progress: read-only v7 inspection rejects invalid anchors and refuses recommendations because v7 does not freeze the rubric. A versioned verified rubric binding, predeclared two-baseline rule and complete decision path remain open."
     }
   ]
 }

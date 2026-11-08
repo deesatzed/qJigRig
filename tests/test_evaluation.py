@@ -2097,6 +2097,10 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     from qjig.journal import Journal
     from qjig.providers import RawResponse,StandInTransport
     design=_sample_design();sources={}
+    if mismatch=='outcome_batch':
+        design['criteria']={'remove':{'metric':'outcome_support','operator':'<','threshold':0.4},
+            'revise':{'metric':'outcome_support','operator':'range','threshold':[0.4,0.6]},
+            'retain':{'metric':'outcome_support','operator':'>=','threshold':0.6}}
     for family in design['families']:
         name=family['id'];raw=f'Checks for {name} must pass.'.encode();(tmp_path/name).write_bytes(raw)
         sources[name]={'path':name,'sha256':hashlib.sha256(raw).hexdigest()};family['source_hashes']=[sources[name]['sha256']]
@@ -2374,6 +2378,17 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                 checked=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,
                                                  expected_outcome_review_sha256=outcome_hashes)
                 assert checked['checked']==4 and 'outcome_review_anchor_unavailable' not in checked['issues']
+                from qjig.evaluation_recommendation import build_verified_recommendation
+                incomplete=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
+                    expected_design_sha256=digest,expected_config_sha256=config_hash,expected_review_sha256=reviews,
+                    expected_outcome_review_sha256=outcome_hashes)
+                assert incomplete['status']=='incomplete' and incomplete['recommendation'] is None
+                assert 'unstarted_assignments' in incomplete['issues']
+                assert 'frozen_rubric_binding_unavailable' in incomplete['issues']
+                invalid=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
+                    expected_design_sha256=digest,expected_config_sha256=config_hash,expected_review_sha256=reviews,
+                    expected_outcome_review_sha256={**outcome_hashes,calls[0]:'0'*64})
+                assert invalid['status']=='invalid' and invalid['recommendation'] is None
                 import subprocess,sys
                 rows={rid:json.loads(payload) for rid,payload in goal._con.execute(
                     "SELECT request_id,payload FROM evaluation_campaign_events WHERE plan_id=? AND kind='scored'",('batch',))}
