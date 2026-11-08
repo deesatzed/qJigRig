@@ -1254,7 +1254,8 @@
         "T069C",
         "T069D",
         "T069E",
-        "T069F"
+        "T069F",
+        "T069G"
       ],
       "status": "pending",
       "files": [
@@ -4441,6 +4442,23 @@
       "acceptance": "Only an anchored outcome review in its own consumed reserved slot may inform a labeled local outcome category; uncertain or conflicting reviews remain unknown.",
       "command": "python -m pytest tests/test_evaluation.py::test_goal_budgeted_case_requires_matching_reserved_assignment -q",
       "evidence": "Red: reserved outcome-review scorer was absent. Green: direct and fresh stand-in assignments verify separately anchored semantic and outcome reviews, exact consumed outcome slot and local reference; disagreement/uncertainty stays unknown and fresh request remains deferred. Evaluation/review/replay/goal regressions passed 167; final targeted 8 passed. This covers completed reviewable runs only, not unavailable reviews, campaign v7 execution or validated correctness."
+    },
+    {
+      "id": "T069G",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069F"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Retain unavailable request-outcome reviews for no-call applicability deferrals",
+      "acceptance": "A verified no-call applicability deferral records an anchored unknown outcome review in an unconsumed reserved slot and rejects altered references or review records.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Red: no outcome non-review existed for no-call applicability deferrals. Green: stand-in v7 plan binds unconsumed outcome slot, original/reference/semantic anchors and explicit unknown record; altered digest, reference, reviewer spec and record refuse. Evaluation/review/goal regressions passed 147. Other failure paths, v7 execution, billing and live evidence remain open."
     }
   ]
 }

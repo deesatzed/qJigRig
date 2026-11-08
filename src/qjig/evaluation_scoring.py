@@ -763,6 +763,54 @@ def score_reviewed_reserved_assignment(goal, archive, journal, reference: dict, 
 
 
 
+
+def unavailable_outcome_review(goal, archive, journal, reference: dict, review_archive, outcome_archive, *,
+                               partition: str, expected_plan_sha256: str, expected_run_sha256: str,
+                               expected_reference_sha256: str, expected_review_sha256: str, reviewer_spec: dict,
+                               outcome_reviewer_spec: dict, expected_journal_sha256: str | None = None,
+                               expected_outcome_review_sha256: str | None = None, record: bool = False) -> dict:
+    """Record a non-review only for a structurally verified no-call applicability deferral."""
+    from .outcome_preflight import outcome_review_allocation
+    from .run_archive import RunArchive
+    if (not isinstance(outcome_archive,RunArchive) or outcome_archive is archive or outcome_archive is review_archive
+            or type(record) is not bool):
+        raise ContractError('separate outcome archive required')
+    result=score_reviewed_reserved_assignment(goal,archive,journal,reference,review_archive,partition=partition,
+        expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
+        expected_reference_sha256=expected_reference_sha256,expected_review_sha256=expected_review_sha256,
+        reviewer_spec=reviewer_spec,expected_journal_sha256=expected_journal_sha256)
+    context=archive.context(); request_id=context['request']['request_id']; assignment=context['evaluation_assignment']
+    if (context.get('schema')!='qjig.applicability-deferral.v1' or result['review'].get('assurance')!='not_reviewed'
+            or journal.events(request_id) or result['score'].get('request_status')!='deferred'):
+        raise ContractError('no-call applicability deferral required')
+    slot=outcome_review_allocation(request_id=request_id,partition=partition,spec=outcome_reviewer_spec)
+    row=goal._con.execute("SELECT w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id "
+        "WHERE s.set_id=? AND w.work_id=? AND w.request_id=?",
+        ('evaluation:'+assignment['plan_id'],slot['work_id'],request_id)).fetchone()
+    if row is None or row[0] is not None:
+        raise ContractError('unavailable outcome review slot differs')
+    saved={'schema':'qjig.outcome-review-unavailable.v1','reviewed_run_sha256':expected_run_sha256,
+           'reference_sha256':expected_reference_sha256,'semantic_review_sha256':expected_review_sha256,
+           'request_id':request_id,'work_id':slot['work_id'],'reason':'source_applicability_unestablished'}
+    outcome={'assessment':'uncertain','assurance':'not_reviewed','reason':saved['reason']}
+    if record:
+        if (outcome_archive.events() or outcome_archive.revision_ids() or outcome_archive.source_ids()
+                or outcome_archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0]):
+            raise ContractError('unused outcome archive required')
+        outcome_archive.record_context(saved);outcome_archive.record_run_result(request_id,outcome)
+    if outcome_archive.context()!=saved or outcome_archive.revision_ids() or outcome_archive.source_ids():
+        raise ContractError('unavailable outcome review binding differs')
+    events=outcome_archive.events()
+    if len(events)!=1 or events[0]['kind']!='run_result' or events[0]['call_id']!=request_id or events[0]['data']!=outcome:
+        raise ContractError('unavailable outcome review record differs')
+    raw=json.dumps({'context':saved,'events':events},sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
+    digest=hashlib.sha256(raw).hexdigest()
+    if expected_outcome_review_sha256 is not None and (not isinstance(expected_outcome_review_sha256,str)
+            or not _SHA.fullmatch(expected_outcome_review_sha256) or not hmac.compare_digest(digest,expected_outcome_review_sha256)):
+        raise ContractError('outcome review digest differs')
+    review={'status':'structurally_verified' if expected_outcome_review_sha256 else 'unanchored','sha256':digest,**outcome}
+    return {**result,'outcome_review':review,'outcome_category':'unknown_assessment','outcome_assurance':'not_reviewed'}
+
 def score_outcome_reviewed_assignment(goal, archive, journal, reference: dict, review_archive, outcome_archive, *,
                                       partition: str, expected_plan_sha256: str, expected_run_sha256: str,
                                       expected_reference_sha256: str, expected_review_sha256: str,
@@ -774,6 +822,13 @@ def score_outcome_reviewed_assignment(goal, archive, journal, reference: dict, r
     from .run_archive import RunArchive
     if not isinstance(outcome_archive,RunArchive) or not isinstance(expected_outcome_review_sha256,str) or not _SHA.fullmatch(expected_outcome_review_sha256):
         raise ContractError('anchored outcome review archive required')
+    saved_outcome=outcome_archive.context()
+    if isinstance(saved_outcome,dict) and saved_outcome.get('schema')=='qjig.outcome-review-unavailable.v1':
+        return unavailable_outcome_review(goal,archive,journal,reference,review_archive,outcome_archive,
+            partition=partition,expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
+            expected_reference_sha256=expected_reference_sha256,expected_review_sha256=expected_review_sha256,
+            reviewer_spec=reviewer_spec,outcome_reviewer_spec=outcome_reviewer_spec,
+            expected_journal_sha256=expected_journal_sha256,expected_outcome_review_sha256=expected_outcome_review_sha256)
     result=score_reviewed_reserved_assignment(goal,archive,journal,reference,review_archive,partition=partition,
         expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
         expected_reference_sha256=expected_reference_sha256,expected_review_sha256=expected_review_sha256,
