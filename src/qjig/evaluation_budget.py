@@ -152,7 +152,7 @@ def validate_assignment_binding(binding: dict) -> None:
 
 
 def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
-                               expected_design_sha256: str, assignment_secret: bytes) -> dict:
+                               expected_design_sha256: str, assignment_secret: bytes, max_judge_pairs: int | None = None) -> dict:
     """Enumerate all declared five-arm physical slots from explicit bounds.
 
     The secret keeps private assignment mappings out of provider-visible IDs.
@@ -170,6 +170,8 @@ def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
     if not isinstance(config,dict) or set(config) not in ({'direct','planner','judge','reviewer'},
                                                                {'direct','planner','judge','reviewer','semantic_reviewer'}):
         raise ContractError('complete factorial model configuration required')
+    if max_judge_pairs is not None and 'semantic_reviewer' not in config:
+        raise ContractError('bounded judge work requires semantic review configuration')
     for spec in config.values():
         if not isinstance(spec,dict) or set(spec) != {'provider','model','input_tokens','output_tokens','max_price'}:
             raise ContractError('invalid factorial stage configuration')
@@ -189,7 +191,7 @@ def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
                         planner_model=planner['model'],judge_model=judge['model'],
                         planner_input=planner['input_tokens'],planner_output=planner['output_tokens'],
                         judge_input=judge['input_tokens'],judge_output=judge['output_tokens'],
-                        planner_price=planner['max_price'],judge_price=judge['max_price'],reviewer=reviewer)
+                        planner_price=planner['max_price'],judge_price=judge['max_price'],reviewer=reviewer,max_judge_pairs=max_judge_pairs)
                 else:
                     work = direct_run_allocations(request_id=request_id,partition=partition,provider=direct['provider'],
                         model=direct['model'],input_tokens=direct['input_tokens'],output_tokens=direct['output_tokens'],
