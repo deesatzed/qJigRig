@@ -71,3 +71,25 @@ def test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse():
             upper_cost({**model,'pricing':{**model['pricing'],'discount':value}},input_tokens=100,output_tokens=50)
     with pytest.raises(ContractError):
         upper_cost({**model,'pricing':{**model['pricing'],'web_search':'0.01'}},input_tokens=100,output_tokens=50)
+
+
+def test_endpoint_snapshot_checks_model_identity_and_preserves_price_categories():
+    from qjig.pricing import parse_endpoint_snapshot
+    payload = {'data': {'id': 'tencent/hy4', 'endpoints': [
+        {'provider_name':'Tencent', 'model_id':'tencent/hy4', 'context_length':10000,
+         'max_completion_tokens':1000, 'pricing':{'prompt':'0.1', 'completion':'0.2', 'discount':0.5}}]}}
+    snapshot = parse_endpoint_snapshot(payload, expected_model='tencent/hy4')
+    assert snapshot['endpoints'][0]['pricing']['discount'] == 0.5
+    changed = {'data': {**payload['data'], 'id': 'different/model'}}
+    with pytest.raises(ContractError):
+        parse_endpoint_snapshot(changed, expected_model='tencent/hy4')
+    with pytest.raises(ContractError):
+        parse_endpoint_snapshot({'data': {'id':'tencent/hy4', 'endpoints':[]}}, expected_model='tencent/hy4')
+
+
+def test_endpoint_fetch_refuses_redirect_and_does_not_return_unchecked_body():
+    from qjig.pricing import fetch_endpoint_snapshot
+    with pytest.raises(ContractError):
+        fetch_endpoint_snapshot('tencent/hy4', get=lambda url, timeout: (302, '{}'))
+    with pytest.raises(ContractError):
+        fetch_endpoint_snapshot('unapproved/model', get=lambda url, timeout: pytest.fail('unexpected request'))

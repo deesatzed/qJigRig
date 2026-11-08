@@ -5,6 +5,11 @@ and absence of other billable features before using the result in an execution p
 """
 from __future__ import annotations
 
+import json
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+
 from decimal import Decimal, InvalidOperation, ROUND_CEILING, localcontext
 
 from .contracts import ContractError
@@ -65,3 +70,64 @@ def upper_cost(model: dict, *, input_tokens: int, output_tokens: int) -> Decimal
         ctx.rounding = ROUND_CEILING
         input_rate = sum((rates.get(name, Decimal(0)) for name in _INPUT_RATES), Decimal(0))
         return input_rate * input_tokens + rates["completion"] * output_tokens
+
+
+_APPROVED_ENDPOINT_MODELS = frozenset({
+    'deepseek/deepseek-v4.1-flash-1017', 'tencent/hy4',
+    'meta/muse-spark-open', 'openai/gpt-6.1-terra',
+})
+
+
+def parse_endpoint_snapshot(payload: dict, *, expected_model: str) -> dict:
+    """Check endpoint identity while retaining pricing fields for later validation."""
+    try:
+        data = payload['data']
+        endpoints = data['endpoints']
+        if (not isinstance(expected_model, str) or not expected_model
+                or data['id'] != expected_model or not isinstance(endpoints, list) or not endpoints):
+            raise ValueError('model or endpoints differ')
+        for endpoint in endpoints:
+            if (not isinstance(endpoint, dict) or endpoint.get('model_id') != expected_model
+                    or not isinstance(endpoint.get('provider_name'), str) or not endpoint['provider_name']
+                    or type(endpoint.get('context_length')) is not int or endpoint['context_length'] < 1
+                    or type(endpoint.get('max_completion_tokens')) is not int or endpoint['max_completion_tokens'] < 1
+                    or not isinstance(endpoint.get('pricing'), dict)
+                    or not {'prompt', 'completion'} <= endpoint['pricing'].keys()):
+                raise ValueError('endpoint fields invalid')
+        # Deep-copy without reducing unknown pricing categories or permitting NaN.
+        return json.loads(json.dumps({'model': expected_model, 'endpoints': endpoints},
+                                    ensure_ascii=False, allow_nan=False))
+    except (KeyError, TypeError, ValueError, UnicodeError) as exc:
+        raise ContractError('invalid endpoint snapshot') from exc
+
+
+class _NoEndpointRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _get_endpoint_catalog(url: str, timeout: float) -> tuple[int, str]:
+    req = urllib.request.Request(url, headers={'Accept': 'application/json'})
+    try:
+        with urllib.request.build_opener(_NoEndpointRedirect).open(req, timeout=timeout) as response:
+            body = response.read(2_000_001)
+            if len(body) > 2_000_000:
+                raise ValueError('endpoint response too large')
+            return response.status, body.decode('utf-8')
+    except urllib.error.HTTPError as exc:
+        return exc.code, ''
+
+
+def fetch_endpoint_snapshot(model: str, *, get=_get_endpoint_catalog) -> dict:
+    """Read a public allowlisted model catalog; this does not authorize dispatch."""
+    if not isinstance(model, str) or model not in _APPROVED_ENDPOINT_MODELS:
+        raise ContractError('model is not approved for endpoint lookup')
+    try:
+        status, body = get('https://openrouter.ai/api/v1/models/' + model + '/endpoints', 15.0)
+        if status != 200 or not isinstance(body, str) or len(body.encode('utf-8')) > 2_000_000:
+            raise ValueError('endpoint lookup failed')
+        parsed = parse_endpoint_snapshot(json.loads(body), expected_model=model)
+        return {**parsed, 'observed_at': datetime.now(timezone.utc).isoformat(),
+                'source': 'openrouter_public_endpoint_catalog'}
+    except (OSError, ValueError, TypeError, UnicodeError, urllib.error.URLError) as exc:
+        raise ContractError('endpoint lookup unavailable or invalid') from exc
