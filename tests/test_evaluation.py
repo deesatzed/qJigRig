@@ -2379,6 +2379,17 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                                                  expected_outcome_review_sha256=outcome_hashes)
                 assert checked['checked']==4 and 'outcome_review_anchor_unavailable' not in checked['issues']
                 if rubric_bound:
+                    from qjig.evaluation_recommendation import build_verified_recommendation
+                    partial=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
+                        expected_design_sha256=digest,expected_config_sha256=config_hash,expected_review_sha256=reviews,
+                        expected_outcome_review_sha256=outcome_hashes)
+                    assert partial['status']=='incomplete' and partial['recommendation'] is None
+                    assert 'unstarted_assignments' in partial['issues']
+                    assert partial['comparisons'] is None and 'rubric_semantics_not_verified' in partial['issues']
+                    invalid=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
+                        expected_design_sha256=digest,expected_config_sha256=config_hash,expected_review_sha256=reviews,
+                        expected_outcome_review_sha256={**outcome_hashes,calls[0]:'0'*64})
+                    assert invalid['status']=='invalid' and invalid['recommendation'] is None and invalid['comparisons'] is None
                     assert checked['status']=='incomplete' and 'unstarted_assignments' in checked['issues']
                     assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_config_sha256='0'*64,expected_review_sha256=reviews,expected_outcome_review_sha256=outcome_hashes)['status']=='invalid'
                     assert {'combined','decomposition_only','direct_full_evidence','direct_retrieval'} == {next(a['arm'] for a in plan['manifest']['assignments'] if a['request_id']==rid) for rid in calls}

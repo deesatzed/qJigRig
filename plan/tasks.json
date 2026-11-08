@@ -4579,7 +4579,7 @@
       "action": "Build two-baseline recommendation from verified reserved review receipts",
       "acceptance": "Reconstruct both baseline comparisons from a versioned rubric-bound campaign; require full anchored inspection and predeclared combination criteria before a result; missing or unknown outcomes do not yield a recommendation.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
-      "evidence": "In progress: read-only v7 inspection rejects invalid anchors and refuses recommendations because v7 does not freeze the rubric. A versioned verified rubric binding, predeclared two-baseline rule and complete decision path remain open."
+      "evidence": "In progress: v7 refuses without frozen rubric; v8 inspects anchors and reconstructs both holdout comparisons only when inspection is complete apart from synthetic provider attribution. Partial or invalid runs expose no comparisons or recommendation. Full synthetic v8 reconstructed 10 unknown pairs per baseline; rubric semantics and final decision remain unverified. Evaluation/review/gate regressions passed 128."
     },
     {
       "id": "T072C",
