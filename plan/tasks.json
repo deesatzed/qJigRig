@@ -4576,7 +4576,8 @@
         "T072C",
         "T072D",
         "T072E",
-        "T072F"
+        "T072F",
+        "T072G"
       ],
       "status": "pending",
       "files": [
@@ -4785,6 +4786,24 @@
       "acceptance": "The full assigned draft runs and resumes under the canonical contract, both comparisons reconstruct, and synthetic attribution prevents a final recommendation.",
       "command": "python -m pytest tests/test_factorial_synthetic.py::test_synthetic_canonical_rubric_is_valid_and_opt_in -q",
       "evidence": "Red: the synthetic harness could not freeze the canonical source-bound rubric. Green: full synthetic campaign recorded 105 assignments, 567 reserved slots and 432 stand-in calls; resume added none. Read-only inspection checked 105 receipts and 16 cases and reported provider_attribution_not_live. Both 10-pair holdout comparisons remained unknown and yielded no recommendation. Harness/evaluation/review tests passed 133. Anchors are locally derived, not independent provenance or live evidence."
+    },
+    {
+      "id": "T072G",
+      "phase": "evaluation",
+      "depends_on": [
+        "T071J",
+        "T072F"
+      ],
+      "status": "complete",
+      "files": [
+        "scripts/verify_recommendation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Expose a read-only recommendation verifier for independently hashed manifests",
+      "acceptance": "An anchored manifest invokes the recommendation gate with retained files and outputs incomplete or invalid for partial, synthetic or changed evidence; no provider calls occur.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Red: no recommendation verifier command existed. Green: an anchored partial synthetic v8 manifest reports incomplete, and an altered manifest digest is invalid; evaluation/review/replay/gate regressions passed 153. The actual full canonical synthetic manifest checks 105 receipts and returns incomplete for provider_attribution_not_live, with both 10-pair comparisons unknown. Anchors are locally derived and do not authenticate provider or reference truth."
     }
   ]
 }

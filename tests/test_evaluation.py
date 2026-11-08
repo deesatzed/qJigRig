@@ -2436,6 +2436,26 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                     assert {'combined','decomposition_only','direct_full_evidence','direct_retrieval'} == {next(a['arm'] for a in plan['manifest']['assignments'] if a['request_id']==rid) for rid in calls}
                     bad={**outcome_hashes,calls[0]:'0'*64}
                     assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,expected_outcome_review_sha256=bad)['status']=='invalid'
+                    import subprocess,sys
+                    rows={request_id:json.loads(payload) for request_id,payload in goal._con.execute(
+                        "SELECT request_id,payload FROM evaluation_campaign_events WHERE plan_id=? AND kind='scored'",('batch',))}
+                    cli_manifest={'schema':'qjig.live-manifest.v2','goal_db':str(tmp_path/'goal.sqlite'),
+                        'journal_db':str(tmp_path/'journal.sqlite'),'archive_root':str(tmp_path/'runs'),
+                        'plan_id':'batch','plan_sha256':plan['sha256'],'config_sha256':config_hash,'references':refs,
+                        'run_sha256':{key:value['run_sha256'] for key,value in rows.items()},
+                        'reference_sha256':{key:reference_digest(value['reference']) for key,value in cases.items()},
+                        'journal_sha256':{key:value['journal_sha256'] for key,value in rows.items() if value['journal_sha256'] is not None},
+                        'review_sha256':reviews,'outcome_review_sha256':outcome_hashes,'case_root':str(tmp_path),
+                        'case_inputs':{key:{**value,'applicability_inputs':value['applicability_inputs'].to_dict()} for key,value in cases.items()}}
+                    cli_path=tmp_path/'recommendation-manifest.json';cli_path.write_text(json.dumps(cli_manifest))
+                    cli_hash=hashlib.sha256(cli_path.read_bytes()).hexdigest()
+                    command=[sys.executable,'scripts/verify_recommendation.py','--manifest',str(cli_path),'--sha256',cli_hash]
+                    process=subprocess.run(command,capture_output=True,text=True,check=False)
+                    report=json.loads(process.stdout)
+                    assert process.returncode==1 and report['status']=='incomplete' and report['recommendation'] is None
+                    assert 'unstarted_assignments' in report['issues'] and report['manifest_sha256']==cli_hash
+                    bad_cli=subprocess.run(command[:-1]+['0'*64],capture_output=True,text=True,check=False)
+                    assert bad_cli.returncode==1 and json.loads(bad_cli.stdout)['status']=='invalid'
                     # Test the decision gate with explicitly simulated verifier and comparison results.
                     with monkeypatch.context() as patch:
                         patch.setattr('qjig.evaluation_recommendation.inspect_campaign_receipts',lambda *a,**k:{'status':'structurally_complete','issues':[]})
