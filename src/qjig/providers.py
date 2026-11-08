@@ -146,6 +146,29 @@ def make_call_reservation(request: ProviderRequest, model: dict, *, input_tokens
                            input_bound_provenance, hold_back_calls, hold_back_tokens, hold_back_cost_usd, required_id)
 
 
+def check_current_endpoint_cost(request: ProviderRequest, reservation: CallReservation, *,
+                                snapshot: dict, now, max_age_seconds: int) -> dict:
+    """Check a fresh catalog against a bound reservation; does not dispatch.
+
+    Catalog completeness, future rates and routing enforcement remain provider
+    assertions. The caller must acquire and verify account state separately.
+    """
+    from .pricing import model_from_endpoint_snapshot
+    if (not isinstance(request, ProviderRequest) or request.provider != 'openrouter'
+            or request.max_price is None or not isinstance(reservation, CallReservation)
+            or reservation.request_sha256 != request.input_sha256()
+            or reservation.input_tokens < estimate_hosted_input_tokens(request.prompt)
+            or not _valid_cost(reservation.cost_usd)):
+        raise ContractError('invalid hosted reservation')
+    model = model_from_endpoint_snapshot(snapshot, now=now, max_age_seconds=max_age_seconds)
+    current = make_call_reservation(request, model, input_tokens=reservation.input_tokens,
+                                    input_bound_provenance='approved estimated input')
+    if Decimal(str(current.cost_usd)) > Decimal(str(reservation.cost_usd)):
+        raise ContractError('current endpoint prices exceed reservation')
+    return {'current_cost_usd': current.cost_usd, 'pricing_sha256': current.pricing_sha256,
+            'observed_at': snapshot['observed_at'], 'assurance': 'provider_catalog_assertion'}
+
+
 ReservationFactory = Callable[[ProviderRequest], CallReservation]
 
 

@@ -118,3 +118,24 @@ def test_endpoint_snapshot_model_reserves_across_all_routes_and_rejects_unknown_
         model_from_endpoint_snapshot(changed,now=now,max_age_seconds=30)
     with pytest.raises(ContractError):
         model_from_endpoint_snapshot(snapshot,now=now.replace(minute=1),max_age_seconds=30)
+
+
+def test_current_endpoint_prices_must_fit_the_existing_request_reservation():
+    from datetime import datetime, timezone
+    from qjig.pricing import model_from_endpoint_snapshot
+    from qjig.providers import ProviderRequest, make_call_reservation, check_current_endpoint_cost
+    now = datetime(2026, 11, 7, tzinfo=timezone.utc)
+    endpoint = {'model_id':'tencent/hy4','provider_name':'Tencent','context_length':100000,
+                'max_completion_tokens':1000,
+                'pricing':{'prompt':'0.000001','completion':'0.000002','discount':0}}
+    snapshot = {'model':'tencent/hy4','source':'openrouter_public_endpoint_catalog',
+                'observed_at':now.isoformat(),'endpoints':[endpoint]}
+    request = ProviderRequest('judge','openrouter','tencent/hy4','question',100,
+                              max_price={'prompt':10,'completion':20})
+    model = model_from_endpoint_snapshot(snapshot, now=now, max_age_seconds=30)
+    reservation = make_call_reservation(request, model, input_tokens=5000, input_bound_provenance='synthetic')
+    result = check_current_endpoint_cost(request, reservation, snapshot=snapshot, now=now, max_age_seconds=30)
+    assert result['current_cost_usd'] <= reservation.cost_usd
+    increased = {**snapshot,'endpoints':[{**endpoint,'pricing':{**endpoint['pricing'],'prompt':'0.001'}}]}
+    with pytest.raises(ContractError, match='reservation'):
+        check_current_endpoint_cost(request,reservation,snapshot=increased,now=now,max_age_seconds=30)
