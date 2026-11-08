@@ -4578,7 +4578,8 @@
         "T072E",
         "T072F",
         "T072G",
-        "T072H"
+        "T072H",
+        "T072I"
       ],
       "status": "pending",
       "files": [
@@ -4822,6 +4823,24 @@
       "acceptance": "Complete inspected comparisons retain per-assignment scores, review records and resource fields; partial or invalid inspection does not expose unverified comparison details.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "Red: recommendation output discarded reconstructed comparison details. Green: mocked verifier control-flow test retains per-assignment resources and outcome-review records and labels repeated combined-arm data; partial and invalid runs expose no comparison details. Evaluation/review/replay/gate regressions passed 153. The retained earlier canonical synthetic campaign reconstructed 20 records per comparison but now reports rubric_contract_invalid because recommendation source changed; no recommendation was emitted. Full companion aggregation and live evidence remain open."
+    },
+    {
+      "id": "T072I",
+      "phase": "evaluation",
+      "depends_on": [
+        "T072H"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_companion.py",
+        "src/qjig/evaluation_recommendation.py"
+      ],
+      "test_file": "tests/test_evaluation_companion.py",
+      "test_name": "test_companion_counts_unique_arms_and_preserves_unknown_usage",
+      "action": "Summarize unique holdout arm outcomes, evidence coverage and resources",
+      "acceptance": "Reconstructed comparisons produce per-arm categories, repeat records and resource totals without double-counting the combined arm; unknown usage remains unknown and inconsistent duplicate records refuse.",
+      "command": "python -m pytest tests/test_evaluation_companion.py::test_companion_counts_unique_arms_and_preserves_unknown_usage -q",
+      "evidence": "Red: companion aggregation did not exist; a later missing-pair test exposed an incomplete-set gap. Green: unique three-arm outcomes, repeat records, evidence coverage and per-arm resources preserve unknowns and reject inconsistent duplicate or missing pairs. Evaluation/review/replay/gate regressions passed 154, with the expanded focused test passing again. A prior synthetic run yielded 10 unknown outcomes per arm; its source-bound contract now differs. All five-arm and grouped-intervention reporting and live evidence remain open."
     }
   ]
 }

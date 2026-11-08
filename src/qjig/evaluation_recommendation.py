@@ -23,7 +23,7 @@ _RUBRIC_IMPLEMENTATION_FILES = (
     'evaluation.py', 'evaluation_recommendation.py', 'evaluation_scoring.py',
     'evaluation_outcome_review.py', 'evaluation_semantic_review.py',
     'evaluation_replay.py', 'evaluation_campaign.py', 'evaluation_budget.py',
-    'evaluation_cases.py', 'live_receipts.py',
+    'evaluation_cases.py', 'evaluation_companion.py', 'live_receipts.py',
 )
 
 
@@ -125,6 +125,7 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
             issues.append('rubric_contract_invalid')
     comparisons=None
     comparison_details=None
+    companion=None
     # A fully anchored synthetic campaign can produce diagnostics, but never a
     # recommendation. All other incomplete or invalid inspection blocks reads.
     if (frozen['schema']=='qjig.campaign-config.v8' and inspection['status']!='invalid'
@@ -160,17 +161,20 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
                     baseline_arm=baseline,candidate_arm='combined',expected_config_sha256=expected_config_sha256)
                 comparisons[baseline]=report['outcome_reviews']['paired']
                 comparison_details[baseline]=report
+            from .evaluation_companion import summarize_companion_assertions
+            companion=summarize_companion_assertions(comparison_details)
+            companion['assurance']='structurally_reconstructed_unvalidated'
     if inspection['status']=='structurally_complete' and not issues and rubric_checked is not None and comparisons is not None:
         result=provisional_pair_decision(design,{name:value['outcome_support'] for name,value in comparisons.items()},
                                          expected_design_sha256=expected_design_sha256)
         recommendation=result['decision']
         return {'status':'evaluated' if recommendation is not None else 'inconclusive',
                 'recommendation':recommendation,'baseline_decisions':result['baseline_decisions'],
-                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,
+                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'companion':companion,
                 'resource_scope':'campaign_totals_in_inspection_combined_arm_repeated_in_comparisons',
                 'assurance':'structural_and_ai_reviewed_unvalidated',
                 'rubric_assurance':rubric_checked['assurance']}
     return {'status':'invalid' if inspection['status']=='invalid' else 'incomplete','recommendation':None,
-            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,
+            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'companion':companion,
             'resource_scope':'campaign_totals_in_inspection_combined_arm_repeated_in_comparisons',
             'assurance':'no_recommendation'}

@@ -11,3 +11,7 @@ The repeatable recommendation command is `python scripts/verify_recommendation.p
 ## Source-version follow-up
 
 After the recommendation implementation was extended to retain detailed comparison records, the frozen source-bound rubric no longer matches the current recommendation file. Re-running the same recommendation command still reconstructs 20 scored records per baseline for diagnosis but now returns `rubric_contract_invalid` as well as `provider_attribution_not_live`, and no recommendation. This is expected source-drift detection; the earlier result above remains a historical checkpoint. A new campaign must freeze the current contract before execution.
+
+## Holdout companion diagnostic
+
+After the companion-summary implementation changed, the prior frozen rubric no longer matches the selected source files. A current read-only diagnostic still reconstructs 10 assignments for each of the two direct baselines and the combined arm; all 30 classifications are unknown. Fixture journal totals were 30, 30 and 54 calls respectively, with the combined arm counted once. These are synthetic calls, not provider usage. The command remains incomplete with `provider_attribution_not_live` and `rubric_contract_invalid`, and produces no recommendation. This three-arm holdout summary is not the complete five-arm or intervention report.

@@ -2461,7 +2461,14 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                     # Test the decision gate with explicitly simulated verifier and comparison results.
                     with monkeypatch.context() as patch:
                         patch.setattr('qjig.evaluation_recommendation.inspect_campaign_receipts',lambda *a,**k:{'status':'structurally_complete','issues':[]})
-                        patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:{'outcome_reviews':{'paired':{'outcome_support':0.75},'records':[{'category':'supported_match'}]},'scored_assignments':[{'arm':'combined','score':{'resources':{'total':{'calls':3,'cost_usd':0.02}}}}],'semantic_reviews':{'assurance':'unvalidated'}})
+                        def fake_comparison(baseline,metric):
+                            total={'calls':3,'input_tokens':10,'output_tokens':5,'cost_usd':0.02,'known_input_tokens':10,
+                                   'known_output_tokens':5,'known_cost_usd':0.02,'unknown_usage_calls':0,'latency_seconds':0.1}
+                            def entry(arm): return {'arm':arm,'repeat':1,'score':{'case_id':'holdout','required_evidence_covered':True,'resources':{'total':total}}}
+                            def outcome(arm): return {'case_id':'holdout','repeat':1,'arm':arm,'category':'supported_match','assurance':'synthetic_unvalidated'}
+                            return {'outcome_reviews':{'paired':{'outcome_support':metric},'records':[outcome('combined'),outcome(baseline)]},
+                                    'scored_assignments':[entry('combined'),entry(baseline)],'semantic_reviews':{'assurance':'unvalidated'}}
+                        patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:fake_comparison(k['baseline_arm'],0.75))
                         evaluated=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
                             expected_design_sha256=digest,expected_config_sha256=config_hash)
                         assert evaluated['status']=='evaluated' and evaluated['recommendation']=='retain'
@@ -2469,7 +2476,9 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                         assert evaluated['comparison_details']['direct_retrieval']['scored_assignments'][0]['score']['resources']['total']['calls']==3
                         assert evaluated['comparison_details']['direct_full_evidence']['outcome_reviews']['records'][0]['category']=='supported_match'
                         assert evaluated['resource_scope']=='campaign_totals_in_inspection_combined_arm_repeated_in_comparisons'
-                        patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:{'outcome_reviews':{'paired':{'outcome_support':None}}})
+                        assert evaluated['companion']['arms']['combined']['assignments']==1
+                        assert evaluated['companion']['arms']['combined']['resources']['calls']==3
+                        patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:fake_comparison(k['baseline_arm'],None))
                         inconclusive=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
                             expected_design_sha256=digest,expected_config_sha256=config_hash)
                         assert inconclusive['status']=='inconclusive' and inconclusive['recommendation'] is None
