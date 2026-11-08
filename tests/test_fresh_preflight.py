@@ -288,3 +288,36 @@ def test_judge_quota_does_not_hide_an_unreconciled_attempt(tmp_path):
         with pytest.raises(ReconciliationRequired):
             fresh_slot_reservation(goal,'limited',request_id='r',partition='pilot',request=request,model=model,
                                    input_tokens=100,input_bound_provenance='fixture',max_judge_pairs=1,journal=journal)
+
+
+def test_reserved_stage_slots_bind_restricted_provider_route(tmp_path):
+    from qjig.direct_preflight import direct_run_allocations,direct_slot_reservation
+    from qjig.fresh_preflight import fresh_run_allocations,fresh_slot_reservation
+    from qjig.semantic_preflight import semantic_review_allocation,semantic_review_reservation
+    from qjig.providers import ProviderRequest
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    cap={'prompt':2,'completion':3};spec={'provider':'openrouter','model':model,'input_tokens':100,
+                                          'output_tokens':50,'max_price':cap,'route':'provider-a/fp4'}
+    direct=direct_run_allocations(request_id='r',partition='pilot',provider='openrouter',model=model,
+                                  input_tokens=100,output_tokens=50,max_price=cap,followups=0,route=spec['route'])
+    fresh=fresh_run_allocations(request_id='r',partition='pilot',provider='openrouter',planner_model=model,judge_model=model,
+        planner_input=100,planner_output=50,judge_input=100,judge_output=50,planner_price=cap,judge_price=cap,
+        planner_route=spec['route'],judge_route=spec['route'],max_judge_pairs=1)
+    semantic=semantic_review_allocation(request_id='r',partition='pilot',spec=spec)
+    other_direct=direct_run_allocations(request_id='r',partition='pilot',provider='openrouter',model=model,
+                                  input_tokens=100,output_tokens=50,max_price=cap,followups=0,route='provider-a/fp8')
+    other_semantic=semantic_review_allocation(request_id='r',partition='pilot',spec={**spec,'route':'provider-a/fp8'})
+    assert direct[0]['work_id']!=other_direct[0]['work_id'] and semantic['work_id']!=other_semantic['work_id']
+    budget=Budget(10,10000,1)
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=budget,per_request=budget,allocations={'pilot':budget}) as goal:
+        goal.reserve_run_set('routes',direct+fresh+[semantic])
+        for stage,selector in [('direct_initial',lambda req:direct_slot_reservation(goal,'routes',request_id='r',partition='pilot',
+                    request=req,model=model,input_tokens=100,input_bound_provenance='fixture')),
+                ('planner',lambda req:fresh_slot_reservation(goal,'routes',request_id='r',partition='pilot',request=req,
+                    model=model,input_tokens=100,input_bound_provenance='fixture')),
+                ('semantic_review',lambda req:semantic_review_reservation(goal,'routes',request_id='r',partition='pilot',request=req,spec=spec))]:
+            allowed=ProviderRequest(stage,'openrouter',model['id'],'prompt',50,max_price=cap,route='provider-a/fp4')
+            changed=ProviderRequest(stage,'openrouter',model['id'],'prompt',50,max_price=cap,route='provider-a/fp8')
+            assert selector(allowed).required_id
+            with pytest.raises(ContractError):selector(changed)

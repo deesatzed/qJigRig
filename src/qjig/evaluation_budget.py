@@ -173,8 +173,13 @@ def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
     if max_judge_pairs is not None and 'semantic_reviewer' not in config:
         raise ContractError('bounded judge work requires semantic review configuration')
     for spec in config.values():
-        if not isinstance(spec,dict) or set(spec) != {'provider','model','input_tokens','output_tokens','max_price'}:
+        if not isinstance(spec,dict) or set(spec) not in ({'provider','model','input_tokens','output_tokens','max_price'},
+                                                          {'provider','model','input_tokens','output_tokens','max_price','route'}):
             raise ContractError('invalid factorial stage configuration')
+    has_routes=any('route' in spec for spec in config.values())
+    if has_routes and (max_judge_pairs is None or 'semantic_reviewer' not in config
+                       or any(not spec.get('route') or spec['provider']!='openrouter' for spec in config.values())):
+        raise ContractError('all bounded campaign stages require an explicit hosted route')
     direct, planner, judge, reviewer = (config[k] for k in ('direct','planner','judge','reviewer'))
     if planner['provider'] != judge['provider']:
         raise ContractError('fresh planner and judge providers must match')
@@ -191,11 +196,12 @@ def build_factorial_allocation(design: dict, case_hashes: dict, config: dict, *,
                         planner_model=planner['model'],judge_model=judge['model'],
                         planner_input=planner['input_tokens'],planner_output=planner['output_tokens'],
                         judge_input=judge['input_tokens'],judge_output=judge['output_tokens'],
-                        planner_price=planner['max_price'],judge_price=judge['max_price'],reviewer=reviewer,max_judge_pairs=max_judge_pairs)
+                        planner_price=planner['max_price'],judge_price=judge['max_price'],reviewer=reviewer,max_judge_pairs=max_judge_pairs,
+                        planner_route=planner.get('route'),judge_route=judge.get('route'))
                 else:
                     work = direct_run_allocations(request_id=request_id,partition=partition,provider=direct['provider'],
                         model=direct['model'],input_tokens=direct['input_tokens'],output_tokens=direct['output_tokens'],
-                        max_price=direct['max_price'],followups=0 if arm=='direct_full_evidence' else 1)
+                        max_price=direct['max_price'],followups=0 if arm=='direct_full_evidence' else 1,route=direct.get('route'))
                 if 'semantic_reviewer' in config:
                     from .semantic_preflight import semantic_review_allocation
                     work.append(semantic_review_allocation(request_id=request_id,partition=partition,

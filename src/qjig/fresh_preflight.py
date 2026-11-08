@@ -21,6 +21,9 @@ def _slot_id(request_id, partition, request, input_tokens, pricing_sha256, index
     identity = ['qjig.fresh-slot.v3', request_id, partition, request.stage, index,
                 request.provider, request.model, input_tokens, request.max_tokens,
                 dict(request.max_price), pricing_sha256]
+    if request.route is not None:
+        identity[0]='qjig.fresh-slot.v4'
+        identity.append(request.route)
     encoded = json.dumps(identity, ensure_ascii=False, separators=(',', ':'), sort_keys=True, allow_nan=False).encode('utf-8')
     return hashlib.sha256(encoded).hexdigest()
 
@@ -30,7 +33,8 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
                           planner_input: int, planner_output: int,
                           judge_input: int, judge_output: int,
                           planner_price: dict, judge_price: dict, reviewer: dict | None = None,
-                          max_judge_pairs: int | None = None) -> list[dict]:
+                          max_judge_pairs: int | None = None, planner_route: str | None = None,
+                          judge_route: str | None = None) -> list[dict]:
     """Enumerate one planner and a pair of judges per possible predicate/round.
 
     The upper bound intentionally holds slots even when a no-hit round makes no
@@ -46,7 +50,8 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
         slots.extend((stage, index, provider, judge_model, judge_input, judge_output, judge_price)
                      for stage in ('judge_positive', 'judge_negative'))
     if reviewer is not None:
-        if (not isinstance(reviewer, dict) or set(reviewer) != {'provider', 'model', 'input_tokens', 'output_tokens', 'max_price'}
+        if (not isinstance(reviewer, dict) or set(reviewer) not in ({'provider', 'model', 'input_tokens', 'output_tokens', 'max_price'},
+                                         {'provider', 'model', 'input_tokens', 'output_tokens', 'max_price','route'})
                 or not isinstance(reviewer['provider'], str) or not reviewer['provider'].strip()):
             raise ContractError('invalid review allocation')
         slots.append(('plan_review', 0, reviewer['provider'], reviewer['model'], reviewer['input_tokens'],
@@ -57,7 +62,8 @@ def fresh_run_allocations(*, request_id: str, partition: str, provider: str,
             raise ContractError('missing model identity')
         if price is None:
             raise ContractError('routing price ceiling required')
-        request = ProviderRequest(stage, slot_provider, model['id'], '', output_tokens, max_price=price)
+        route=planner_route if stage=='planner' else reviewer.get('route') if stage=='plan_review' else judge_route
+        request = ProviderRequest(stage, slot_provider, model['id'], '', output_tokens, max_price=price,route=route)
         bound = make_call_reservation(request, model, input_tokens=input_tokens,
                                       input_bound_provenance='declared allocation bound; not verified')
         ident = _slot_id(request_id, partition, request, input_tokens, bound.pricing_sha256, index)

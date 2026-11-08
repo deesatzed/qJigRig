@@ -14,11 +14,14 @@ from .providers import CallReservation, ProviderRequest, _ceiling_token_cost, fr
 def _slot_id(request_id, partition, request, input_tokens, pricing_sha256):
     identity = ['qjig.direct-slot.v1', request_id, partition, request.stage, request.provider, request.model,
                 input_tokens, request.max_tokens, dict(request.max_price), pricing_sha256]
+    if request.route is not None:
+        identity[0]='qjig.direct-slot.v2'
+        identity.append(request.route)
     return hashlib.sha256(json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')).hexdigest()
 
 
 def direct_run_allocations(*, request_id: str, partition: str, provider: str, model: dict,
-                           input_tokens: int, output_tokens: int, max_price: dict, followups: int) -> list[dict]:
+                           input_tokens: int, output_tokens: int, max_price: dict, followups: int, route: str | None = None) -> list[dict]:
     """Enumerate the initial call and optional final call using caller-asserted bounds."""
     if (any(not isinstance(v, str) or not v.strip() for v in (request_id, partition, provider))
             or not isinstance(model, dict) or not isinstance(model.get('id'), str) or not model['id'].strip()
@@ -26,7 +29,7 @@ def direct_run_allocations(*, request_id: str, partition: str, provider: str, mo
         raise ContractError('invalid direct allocation configuration')
     result = []
     for stage in ('direct_initial', 'direct_final')[:1 + followups]:
-        request = ProviderRequest(stage, provider, model['id'], '', output_tokens, max_price=max_price)
+        request = ProviderRequest(stage, provider, model['id'], '', output_tokens, max_price=max_price,route=route)
         bound = make_call_reservation(request, model, input_tokens=input_tokens,
                                       input_bound_provenance='declared direct allocation; not verified')
         result.append({'work_id': _slot_id(request_id, partition, request, input_tokens, bound.pricing_sha256),

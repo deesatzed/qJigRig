@@ -2303,3 +2303,40 @@ def test_campaign_freezes_bounded_judge_quota_before_execution(tmp_path):
         rid=plan['manifest']['assignments'][0]['request_id']
         campaign.claim(rid)
         assert campaign.status()['in_progress']==[rid]
+
+
+def test_campaign_freezes_provider_routes_with_bounded_quota(tmp_path):
+    from qjig.contracts import Budget
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_budget import build_factorial_allocation,reserve_evaluation_plan
+    from qjig.evaluation_campaign import EvaluationCampaign
+    from qjig.goal_budget import GoalBudget
+    design=_sample_design();digest=validate_evaluation_design(design)
+    hashes={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']}
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    spec={'provider':'openrouter','model':model,'input_tokens':100,'output_tokens':100,
+          'max_price':{'prompt':2,'completion':3},'route':'provider-a/fp4'}
+    config={name:dict(spec) for name in ('direct','planner','judge','reviewer','semantic_reviewer')}
+    for invalid in ({**config,'judge':{**spec,'route':None}},
+                    {**config,'judge':{k:v for k,v in spec.items() if k!='route'}}):
+        with pytest.raises(ContractError):
+            build_factorial_allocation(design,hashes,invalid,expected_design_sha256=digest,assignment_secret=b'x'*32,max_judge_pairs=2)
+    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'x'*32,max_judge_pairs=2)
+    changed={**config,'judge':{**spec,'route':'provider-b/fp8'}}
+    other=build_factorial_allocation(design,hashes,changed,expected_design_sha256=digest,assignment_secret=b'x'*32,max_judge_pairs=2)
+    assert other['sha256']!=plan['sha256']
+    total=Budget(1000,300000,12);per=Budget(30,6000,1)
+    alloc={'development':Budget(250,75000,3),'pilot':Budget(250,75000,3),'holdout':Budget(500,150000,6)}
+    metadata={case['id']:hashlib.sha256(case['id'].encode()).hexdigest() for case in design['cases']}
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=alloc) as goal:
+        reserve_evaluation_plan(goal,'routed',plan,expected_plan_sha256=plan['sha256'])
+        campaign=EvaluationCampaign(goal,'routed',expected_plan_sha256=plan['sha256'])
+        with pytest.raises(ContractError):
+            campaign.freeze_config(changed,want=1,max_bytes=5000,case_applicability=metadata,max_judge_pairs=2)
+        anchor=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,max_judge_pairs=2)
+        frozen=campaign.require_config(config,want=1,max_bytes=5000,expected_config_sha256=anchor)
+        assert frozen['schema']=='qjig.campaign-config.v6' and frozen['stages']['judge']['route']=='provider-a/fp4'
+        with pytest.raises(ContractError,match='route'):
+            campaign.claim(plan['manifest']['assignments'][0]['request_id'])
+        assert campaign.status()['in_progress']==[]
