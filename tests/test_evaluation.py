@@ -2427,10 +2427,12 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                     assert partial['status']=='incomplete' and partial['recommendation'] is None
                     assert 'unstarted_assignments' in partial['issues']
                     assert partial['comparisons'] is None and 'rubric_contract_invalid' not in partial['issues']
+                    assert partial['comparison_details'] is None
                     invalid=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
                         expected_design_sha256=digest,expected_config_sha256=config_hash,expected_review_sha256=reviews,
                         expected_outcome_review_sha256={**outcome_hashes,calls[0]:'0'*64})
                     assert invalid['status']=='invalid' and invalid['recommendation'] is None and invalid['comparisons'] is None
+                    assert invalid['comparison_details'] is None
                     assert checked['status']=='incomplete' and 'unstarted_assignments' in checked['issues']
                     assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_config_sha256='0'*64,expected_review_sha256=reviews,expected_outcome_review_sha256=outcome_hashes)['status']=='invalid'
                     assert {'combined','decomposition_only','direct_full_evidence','direct_retrieval'} == {next(a['arm'] for a in plan['manifest']['assignments'] if a['request_id']==rid) for rid in calls}
@@ -2459,11 +2461,14 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                     # Test the decision gate with explicitly simulated verifier and comparison results.
                     with monkeypatch.context() as patch:
                         patch.setattr('qjig.evaluation_recommendation.inspect_campaign_receipts',lambda *a,**k:{'status':'structurally_complete','issues':[]})
-                        patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:{'outcome_reviews':{'paired':{'outcome_support':0.75}}})
+                        patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:{'outcome_reviews':{'paired':{'outcome_support':0.75},'records':[{'category':'supported_match'}]},'scored_assignments':[{'arm':'combined','score':{'resources':{'total':{'calls':3,'cost_usd':0.02}}}}],'semantic_reviews':{'assurance':'unvalidated'}})
                         evaluated=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
                             expected_design_sha256=digest,expected_config_sha256=config_hash)
                         assert evaluated['status']=='evaluated' and evaluated['recommendation']=='retain'
                         assert evaluated['assurance']=='structural_and_ai_reviewed_unvalidated'
+                        assert evaluated['comparison_details']['direct_retrieval']['scored_assignments'][0]['score']['resources']['total']['calls']==3
+                        assert evaluated['comparison_details']['direct_full_evidence']['outcome_reviews']['records'][0]['category']=='supported_match'
+                        assert evaluated['resource_scope']=='campaign_totals_in_inspection_combined_arm_repeated_in_comparisons'
                         patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:{'outcome_reviews':{'paired':{'outcome_support':None}}})
                         inconclusive=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
                             expected_design_sha256=digest,expected_config_sha256=config_hash)
