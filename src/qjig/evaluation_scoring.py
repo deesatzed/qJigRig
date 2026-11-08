@@ -873,11 +873,16 @@ def score_outcome_reviewed_assignment(goal, archive, journal, reference: dict, r
         raise ContractError('outcome review is not structurally verified')
     score=result['score']; expected=score['reference_expected_answer']; assessed=review['assessment']
     category='unknown_assessment'
-    if expected in ('yes','no','conflict') and assessed==expected:
+    citations=review.get('citations',[]); required=reference['evidence']
+    review_covers_reference=bool(required) and all(any(c['revision_id']==item['revision_id'] and item['quote'] in c['quote']
+        for c in citations) for item in required)
+    if review.get('evidence_checked') is True and review_covers_reference and assessed==expected:
         actual=score.get('recorded_answer') if 'recorded_answer' in score else score.get('request_answer')
-        if actual!=expected:
+        if expected=='unknown' and actual in (None,'unknown'):
+            category='supported_match'
+        elif expected in ('yes','no','conflict') and actual!=expected:
             category='reference_misaligned'
-        elif result['review']['assessment']=='supported' and score.get('required_evidence_covered') is True:
+        elif expected in ('yes','no','conflict') and result['review']['assessment']=='supported' and score.get('required_evidence_covered') is True:
             category='supported_match'
     return {**result,'outcome_review':review,'outcome_category':category,'outcome_assurance':review['assurance']}
 

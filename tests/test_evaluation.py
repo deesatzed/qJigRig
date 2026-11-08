@@ -786,7 +786,7 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
             assert ledger.used_calls()==5
             from qjig.evaluation_outcome_review import review_fresh_outcome, verify_fresh_outcome_review
             with RunArchive.open(tmp_path/'outcome-review') as outcome_archive:
-                response=RawResponse(200,'not json',usage) if malformed_outcome else raw({'assessment':'yes','reason':'source supports answer'})
+                response=RawResponse(200,'not json',usage) if malformed_outcome else raw({'assessment':'yes','reason':'source supports answer','citations':[{'revision_id':ref['source_revisions'][0],'quote':'Tests must pass.'}]})
                 outcome_transport=RoutedStandIn([response]) if routed else StandInTransport([response])
                 outcome=review_fresh_outcome(archive,journal,ledger,outcome_transport,reference=ref,
                     expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
@@ -1131,8 +1131,8 @@ def test_complete_evaluation_reservation_is_atomic_and_restart_safe(tmp_path):
 
 
 @pytest.mark.parametrize(('mode','arm'), [('full','direct_full_evidence'),('catalog','retrieval_only')])
-@pytest.mark.parametrize('outcome_assessment',['yes','no','uncertain'])
-def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,arm,outcome_assessment):
+@pytest.mark.parametrize(('outcome_assessment','review_quote','expected_outcome'), [('yes','Tests must pass.','reference_misaligned'),('no','Tests must pass.','unknown_assessment'),('uncertain','Tests must pass.','unknown_assessment'),('yes','Tests','unknown_assessment')])
+def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,arm,outcome_assessment,review_quote,expected_outcome):
     import json
     from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
     from qjig.budgets import BudgetLedger
@@ -1253,7 +1253,7 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,
             with RunArchive.open(tmp_path/'outcome') as outcome_archive:
                 def outcome_factory(req):
                     return outcome_review_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',request=req,spec=spec)
-                outcome_raw=RawResponse(200,json.dumps({'assessment':outcome_assessment,'reason':'source'}),
+                outcome_raw=RawResponse(200,json.dumps({'assessment':outcome_assessment,'reason':'source','citations':[{'revision_id':ref['source_revisions'][0],'quote':review_quote}]}),
                                         {'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.0001})
                 review_direct_outcome(archive,journal,ledger,StandInTransport([outcome_raw]),review_archive=outcome_archive,
                     expected_run_sha256=replay['sha256'],provider='stand-in',model=model['id'],max_tokens=100,
@@ -1261,7 +1261,7 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,
                 outcome_hash=verify_direct_outcome_review(archive,journal,outcome_archive,expected_run_sha256=replay['sha256'])['sha256']
                 result=score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
                     expected_outcome_review_sha256=outcome_hash,outcome_reviewer_spec=spec,**kwargs)
-                assert result['outcome_category']==('reference_misaligned' if outcome_assessment=='yes' else 'unknown_assessment')
+                assert result['outcome_category']==expected_outcome
                 assert result['outcome_assurance']=='synthetic_unvalidated' and result['score']['resources']['total']['calls']==3
                 for changes in ({'expected_outcome_review_sha256':'0'*64}, {'outcome_reviewer_spec':{**spec,'output_tokens':99}}):
                     with pytest.raises(ContractError):
@@ -1458,7 +1458,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
             with RunArchive.open(tmp_path/'outcome') as outcome_archive:
                 def outcome_factory(req):
                     return outcome_review_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',request=req,spec=spec)
-                review_fresh_outcome(archive,journal,ledger,StandInTransport([raw({'assessment':'yes','reason':'source'})]),
+                review_fresh_outcome(archive,journal,ledger,StandInTransport([raw({'assessment':'yes','reason':'source','citations':[{'revision_id':ref['source_revisions'][0],'quote':'Tests must pass.'}]})]),
                     review_archive=outcome_archive,reference=ref,expected_reference_sha256=reference_digest(ref),
                     expected_run_sha256=replay.digest,expected_journal_sha256=journal_anchor,provider='stand-in',
                     model=model['id'],max_tokens=100,max_price=cap,reservation_factory=outcome_factory)

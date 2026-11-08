@@ -1257,7 +1257,8 @@
         "T069F",
         "T069G",
         "T069H",
-        "T069I"
+        "T069I",
+        "T069J"
       ],
       "status": "pending",
       "files": [
@@ -4495,6 +4496,24 @@
       "acceptance": "A goal-reserved fresh planner failure retains the original journal anchor and unconsumed outcome review; a timeout cannot qualify as settled.",
       "command": "python -m pytest tests/test_evaluation.py::test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping -q",
       "evidence": "Red: a goal-reserved fresh run with an unavailable empty-packet review could not record its outcome non-review. Green: malformed fresh planner failures remain failed, pending timeouts refuse, and empty-packet review failures remain unknown with pinned original journal; evaluation/review/goal/replay regressions passed 175 and final targeted seven passed. An initial fixture accidentally triggered judge calls and was corrected. V7 execution, real model behavior and billing remain open."
+    },
+    {
+      "id": "T069J",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069F"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_outcome_review.py",
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_outcome_review.py",
+      "test_name": "test_direct_outcome_review_is_blind_budgeted_and_replayable",
+      "action": "Require source-grounded evidence for decisive outcome-review opinions",
+      "acceptance": "Decisive outcome reviews include checked source quotations; unsupported or missing evidence cannot be promoted into outcome categories and legacy reviews remain replayable.",
+      "command": "python -m pytest tests/test_outcome_review.py::test_direct_outcome_review_is_blind_budgeted_and_replayable -q",
+      "evidence": "Red: the blinded reviewer rejected the new citation-bearing response and could previously classify an unsupported opinion. Green: v2 direct/fresh reviews validate exact source quotations, invalid quotes become uncertain, local scoring requires coverage of listed reference evidence, and a synthetic v1 review replays without checked evidence. Evaluation/review/replay/fresh/provider regressions passed 229; final focused reviewer and assignment suites passed 9 and 8. Citation presence does not establish relevance or semantic correctness."
     }
   ]
 }
