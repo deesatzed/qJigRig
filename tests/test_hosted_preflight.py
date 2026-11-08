@@ -16,6 +16,7 @@ from qjig.providers import ProviderRequest, fresh_work_binding, make_call_reserv
 @pytest.mark.parametrize('route',[None,'tencent'])
 def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_path, monkeypatch, route):
     from qjig.hosted_preflight import prepare_hosted_attempt
+    (tmp_path/'env').write_text('OPENROUTER_API_KEY=synthetic-one\n')
     now = datetime.now(timezone.utc)
     account = ({'data': {'limit_remaining': 1, 'include_byok_in_limit': False, 'is_free_tier': False}},
                {'data': {'total_credits': 1, 'total_usage': 0}})
@@ -104,6 +105,28 @@ def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_pat
         monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot', lambda model: raised)
         with pytest.raises(ContractError,match='reservation'):
             call_typed(ledger,transport,request,{},reservation=bound)
+        assert sent==[] and journal.events('r')==[]
+        from qjig.account_client import AccountRefreshError
+        monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot', lambda model: snapshot)
+        def rotate(*args,**kwargs):
+            (tmp_path/'env').write_text('OPENROUTER_API_KEY=synthetic-two\n')
+            return account
+        monkeypatch.setattr('qjig.account_client.fetch_account_snapshot',rotate)
+        restrictions_before=goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0]
+        with pytest.raises(AccountRefreshError,match='credential') as error:
+            prepare_hosted_attempt(ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
+        assert 'synthetic-one' not in str(error.value) and 'synthetic-two' not in str(error.value)
+        assert goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0]==restrictions_before
+        assert sent==[] and journal.events('r')==[]
+        (tmp_path/'env').write_text('OPENROUTER_API_KEY=synthetic-one\n')
+        monkeypatch.setattr('qjig.account_client.fetch_account_snapshot',lambda *args,**kwargs:account)
+        def rotate_during_prices(model):
+            (tmp_path/'env').write_text('OPENROUTER_API_KEY=synthetic-two\n')
+            return snapshot
+        monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot',rotate_during_prices)
+        with pytest.raises(AccountRefreshError,match='credential') as error:
+            prepare_hosted_attempt(ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
+        assert 'synthetic-one' not in str(error.value) and 'synthetic-two' not in str(error.value)
         assert sent==[] and journal.events('r')==[]
 
 

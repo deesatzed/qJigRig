@@ -1,6 +1,7 @@
 """Read-only account refresh; does not authorize provider model calls."""
 from __future__ import annotations
 
+import hmac
 import json
 import urllib.error
 import urllib.request
@@ -24,7 +25,20 @@ def _get(url: str, headers: dict, timeout: float) -> tuple[int, str]:
         return response.status, body.decode('utf-8')
 
 
-def fetch_account_snapshot(env_path: Path, *, get=_get) -> tuple[dict, dict]:
+
+def _require_credential_match(env_path: Path, expected: str) -> None:
+    """Reject credential changes without logging either value or a digest."""
+    current=load_env_value(Path(env_path),'OPENROUTER_API_KEY')
+    try:
+        matches=(isinstance(expected,str) and bool(expected) and isinstance(current,str)
+                 and hmac.compare_digest(current.encode('utf-8'),expected.encode('utf-8')))
+    except UnicodeError:
+        matches=False
+    if not matches:
+        raise AccountRefreshError('account credential changed or unavailable')
+
+
+def fetch_account_snapshot(env_path: Path, *, get=_get, expected_credential: str | None = None) -> tuple[dict, dict]:
     """Read only the fields needed to initialize an account-bound goal policy.
 
     The returned observations are time-sensitive and do not authorize model calls.
@@ -32,6 +46,12 @@ def fetch_account_snapshot(env_path: Path, *, get=_get) -> tuple[dict, dict]:
     key = load_env_value(Path(env_path), 'OPENROUTER_API_KEY')
     if not key:
         raise AccountRefreshError('account credential unavailable')
+    if expected_credential is not None:
+        try:
+            if not hmac.compare_digest(key.encode('utf-8'),expected_credential.encode('utf-8')):
+                raise AccountRefreshError('account credential changed or unavailable')
+        except (AttributeError,UnicodeError):
+            raise AccountRefreshError('account credential changed or unavailable') from None
     try:
         responses = []
         for endpoint in ('key', 'credits'):
@@ -50,12 +70,14 @@ def fetch_account_snapshot(env_path: Path, *, get=_get) -> tuple[dict, dict]:
         raise AccountRefreshError('account observations unavailable or invalid') from None
 
 
-def refresh_account_constraints(goal, env_path: Path, *, get=_get) -> None:
+def refresh_account_constraints(goal, env_path: Path, *, get=_get, expected_credential: str | None = None) -> None:
     """Fetch after a quiescent baseline, then persist a restriction.
 
     Account data is a time-sensitive source claim. No hosted request is authorized,
     and separate BYOK billing and concurrent external spending remain unknown.
     """
     baseline = goal.account_refresh_baseline()
-    snapshot = fetch_account_snapshot(env_path, get=get)
+    snapshot = fetch_account_snapshot(env_path, get=get, **({'expected_credential':expected_credential} if expected_credential is not None else {}))
+    if expected_credential is not None:
+        _require_credential_match(env_path,expected_credential)
     goal.restrict_account_snapshot(baseline, snapshot)

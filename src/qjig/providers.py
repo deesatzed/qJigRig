@@ -254,7 +254,7 @@ def load_env_value(path: Path, name: str) -> str | None:
     """Read one variable from a dotenv-style file at call time. Never logs or returns other values."""
     try:
         lines = Path(path).read_text(encoding="utf-8").splitlines()
-    except OSError:
+    except (OSError, UnicodeError):
         return None
     for line in lines:
         line = line.strip()

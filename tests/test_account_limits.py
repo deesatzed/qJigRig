@@ -144,3 +144,21 @@ def test_initial_account_snapshot_is_sanitized_and_can_bind_goal(tmp_path):
     limit=Budget(2,100,0.6)
     with GoalBudget.open(tmp_path/'g.sqlite',total=limit,per_request=limit,allocations={'s':limit},account_snapshot=snapshot):
         pass
+
+
+def test_account_snapshot_rejects_changed_credential_before_network(tmp_path):
+    from qjig.account_client import fetch_account_snapshot,AccountRefreshError
+    env=tmp_path/'env';env.write_text('OPENROUTER_API_KEY=synthetic-new\n')
+    sent=[]
+    with pytest.raises(AccountRefreshError,match='credential') as error:
+        fetch_account_snapshot(env,get=lambda *args:sent.append(args),expected_credential='synthetic-old')
+    assert sent==[] and 'synthetic-old' not in str(error.value) and 'synthetic-new' not in str(error.value)
+
+
+def test_account_snapshot_rejects_invalid_credential_file_safely(tmp_path):
+    from qjig.account_client import fetch_account_snapshot,AccountRefreshError
+    env=tmp_path/'env';env.write_bytes(b'OPENROUTER_API_KEY=secret-\xff')
+    sent=[]
+    with pytest.raises(AccountRefreshError) as error:
+        fetch_account_snapshot(env,get=lambda *args:sent.append(args))
+    assert sent==[] and 'secret' not in str(error.value)

@@ -52,7 +52,8 @@ def _verify_hosted_accounting_binding(goal, journal, env_path: Path) -> None:
 def prepare_hosted_attempt(ledger: BudgetLedger, request: ProviderRequest, reservation: CallReservation,
                            *, env_path: Path, max_age_seconds: int, clock=None) -> dict:
     """Refresh account and pricing for a pre-reserved physical call, without sending it."""
-    from .account_client import refresh_account_constraints
+    from .account_client import AccountRefreshError,_require_credential_match,refresh_account_constraints
+    from .providers import load_env_value
     from .pricing import fetch_endpoint_snapshot
     if (not isinstance(ledger, BudgetLedger) or ledger._goal_budget is None
             or not ledger._goal_budget._account_bound or not isinstance(request, ProviderRequest)
@@ -64,6 +65,9 @@ def prepare_hosted_attempt(ledger: BudgetLedger, request: ProviderRequest, reser
         raise ContractError('hosted attempt requires an account-bound goal and reserved work')
     goal = ledger._goal_budget
     _verify_hosted_accounting_binding(goal,ledger._journal,Path(env_path))
+    credential=load_env_value(Path(env_path),'OPENROUTER_API_KEY')
+    if not credential:
+        raise AccountRefreshError('account credential unavailable')
     if goal.audit_journal(ledger._journal)['status'] != 'verified':
         raise BudgetExceeded('accounting', 'goal and journal must be reconciled before preflight')
     run_set = goal.check_required_work(reservation.required_id, request_id=ledger._request_id,
@@ -71,7 +75,7 @@ def prepare_hosted_attempt(ledger: BudgetLedger, request: ProviderRequest, reser
         tokens=reservation.input_tokens + request.max_tokens, cost_usd=reservation.cost_usd,
         work_binding_sha256=reservation.work_binding_sha256)
     goal.bind_hosted_journal(ledger._journal)
-    refresh_account_constraints(goal, Path(env_path))
+    refresh_account_constraints(goal, Path(env_path),expected_credential=credential)
     goal._check_capacity(ledger._request_id, ledger._partition, 0, 0, Decimal(0))
     snapshot = fetch_endpoint_snapshot(request.model)
     now = clock() if clock is not None else datetime.now(timezone.utc)
@@ -79,6 +83,7 @@ def prepare_hosted_attempt(ledger: BudgetLedger, request: ProviderRequest, reser
                                         max_age_seconds=max_age_seconds)
     if goal.audit_journal(ledger._journal)['status'] != 'verified':
         raise BudgetExceeded('accounting', 'goal and journal changed during preflight')
+    _require_credential_match(Path(env_path),credential)
     candidate=(estimate_candidate_hosted_attempt(request,input_tokens=reservation.input_tokens,snapshot=snapshot,
                                                   now=now,max_age_seconds=max_age_seconds) if request.route is not None else None)
     return {'run_set':run_set, 'pricing':price, 'candidate_pricing':candidate, 'billing_assurance':'unknown',

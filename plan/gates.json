@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "babffccd5e66b62f0101eb96968d91fc73dfe968c841d29b367ca72c8004a8cf",
-  "queue_sha256": "68cd241176a4b2d4d31cc5b7c891b039e8102c05e96ebe7062de1b8e4dcfe658",
+  "queue_sha256": "256c279f9a4c60fa3d8ebf7467e8400ee9e3d7072b3b7d68700a4354f1f6ad55",
   "gates": [
     {
       "id": "F01",
@@ -106,7 +106,8 @@
         "R08O",
         "R08P",
         "R08Q",
-        "R08R"
+        "R08R",
+        "R08S"
       ],
       "evidence": []
     },
@@ -678,6 +679,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
       "queue_evidence_assertion": "Red: an account-bound reserved typed call refused without running preflight. Green: typed-call path refreshes account and checks exact endpoint pricing, rejects increased prices, and refuses before HTTP or journal intent for both routed and unrouted synthetic cases. Hosted-preflight/provider/goal/config/service regressions passed 111 with one optional skip. This is a nonauthorizing partial path; FreshWorkbench and transport still refuse, and full billing and prior-spend assurance remain open."
+    },
+    {
+      "id": "R08S",
+      "status": "unverified",
+      "task_ids": [
+        "R08S"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
+      "queue_evidence_assertion": "Red: rotating the credential during account refresh did not refuse; malformed UTF-8 also escaped as a decoding error. Green: mismatch before account HTTP, rotation during refresh and price lookup, and malformed files refuse without model transport or credential disclosure. Hosted-preflight/account/goal/provider/config/service regressions passed 121 with 1 optional skip. This is a nonauthorizing check and cannot prevent coordinated rollback or a change after its final check."
     },
     {
       "id": "R09",

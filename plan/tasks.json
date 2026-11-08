@@ -1464,7 +1464,8 @@
         "R08N",
         "R08O",
         "R08P",
-        "R08R"
+        "R08R",
+        "R08S"
       ],
       "status": "pending",
       "files": [],
@@ -4972,6 +4973,25 @@
       "acceptance": "A draft report maps findings, repair tasks, original milestones and known verification limits without claiming completion or treating queue status as proof.",
       "command": "python -m pytest tests/test_gates.py::test_inventory_covers_goal_findings_repairs_and_original_tasks_without_claiming_proof -q",
       "evidence": "Prepared an explicitly incomplete evidence map from the current queue, gate inventory, control-file hashes and documented verification checkpoints. Inventory focused test passed. This is a draft, not final acceptance or authentication of queue statements; T074 remains pending."
+    },
+    {
+      "id": "R08S",
+      "phase": "repair",
+      "depends_on": [
+        "R08R"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/account_client.py",
+        "src/qjig/hosted_preflight.py",
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_hosted_preflight.py",
+      "test_name": "test_preflight_requires_account_and_current_prices_for_reserved_work",
+      "action": "Bind account observations to the same credential throughout hosted preflight",
+      "acceptance": "A credential changed during account refresh or endpoint pricing causes a sanitized refusal before dispatch; no credential or digest is logged.",
+      "command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
+      "evidence": "Red: rotating the credential during account refresh did not refuse; malformed UTF-8 also escaped as a decoding error. Green: mismatch before account HTTP, rotation during refresh and price lookup, and malformed files refuse without model transport or credential disclosure. Hosted-preflight/account/goal/provider/config/service regressions passed 121 with 1 optional skip. This is a nonauthorizing check and cannot prevent coordinated rollback or a change after its final check."
     }
   ]
 }
