@@ -53,6 +53,20 @@ class ProviderRequest:
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
+def estimate_hosted_input_tokens(prompt: str) -> int:
+    """Conservative heuristic, not a provider-verified token bound.
+
+    Two tokens per UTF-8 byte plus 4096 tokens for message framing is a
+    deliberately generous reservation; provider behavior may still exceed it.
+    """
+    if not isinstance(prompt, str):
+        raise ContractError("hosted prompt must be text")
+    try:
+        return 4096 + 2 * len(prompt.encode('utf-8'))
+    except UnicodeEncodeError as exc:
+        raise ContractError("hosted prompt must be UTF-8 encodable") from exc
+
+
 def openrouter_wire_payload_v1(request: ProviderRequest) -> str:
     """Serialize the v1 OpenRouter request body; headers are deliberately excluded."""
     body = {"model": request.model, "max_tokens": request.max_tokens,
@@ -348,7 +362,9 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
         if reservation.work_binding_sha256 != fresh_work_binding(request, reservation.input_tokens, reservation.pricing_sha256):
             raise ContractError("reservation work configuration differs")
     if isinstance(transport, OpenRouterTransport):
-        raise BudgetExceeded("preflight_unavailable", "hosted calls require complete input, cost and goal-wide reservations")
+        if reservation is None or reservation.input_tokens < estimate_hosted_input_tokens(request.prompt):
+            raise BudgetExceeded("preflight_unavailable", "hosted input reservation does not cover the approved estimate")
+        raise BudgetExceeded("preflight_unavailable", "hosted calls require cost and goal-wide preflight")
 
     def attempt():
         call_id = ledger.last_call_id()

@@ -469,3 +469,28 @@ def test_direct_openrouter_send_cannot_bypass_preflight(tmp_path, monkeypatch):
     with pytest.raises(BudgetExceeded, match='preflight'):
         adapter.send(REQ)
     assert sent == []
+
+
+def test_hosted_input_estimate_accounts_for_utf8_and_fixed_framing():
+    from qjig.providers import estimate_hosted_input_tokens
+    from qjig.contracts import ContractError
+    assert estimate_hosted_input_tokens('') >= 4096
+    assert estimate_hosted_input_tokens('é') > estimate_hosted_input_tokens('a')
+    assert estimate_hosted_input_tokens('a' * 1000) >= estimate_hosted_input_tokens('') + 1000
+    with pytest.raises(ContractError):
+        estimate_hosted_input_tokens(None)
+
+
+def test_hosted_request_refuses_underestimated_input_before_provider_call(tmp_path):
+    from qjig.budgets import BudgetExceeded
+    from qjig.providers import CallReservation, estimate_hosted_input_tokens
+    req = ProviderRequest('planner', 'openrouter', 'model', 'évidence', 50)
+    reservation = CallReservation(req.input_sha256(), estimate_hosted_input_tokens(req.prompt) - 1,
+                                  0.1, '0' * 64, 'estimated')
+    sent = []
+    with Journal.open(tmp_path / 'journal.sqlite') as journal:
+        ledger = BudgetLedger(Budget(2, 10000, 1), journal, 'r')
+        with pytest.raises(BudgetExceeded, match='estimate'):
+            call_typed(ledger, OpenRouterTransport(_env(tmp_path), post=lambda *a: sent.append(a)),
+                       req, SCHEMA, reservation=reservation)
+        assert sent == [] and journal.events('r') == []
