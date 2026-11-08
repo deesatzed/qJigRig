@@ -736,6 +736,25 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
         assert score['conditional_answer']=='yes' and score['conditional_comparison']==comparison
         assert score['reference_expected_answer']=='yes' and score['request_answer'] is None
         assert score['required_evidence_covered'] is covered and score['semantic_assurance']=='not_assessed'
+        from qjig.evaluation_scoring import fresh_journal_digest
+        from qjig.evaluation_semantic_review import review_fresh_semantics
+        journal_hash=fresh_journal_digest(journal,ledger._request_id)
+        with RunArchive.open(tmp_path/'semantic-review') as semantic_archive:
+            with pytest.raises(ContractError):
+                review_fresh_semantics(archive,journal,ledger,StandInTransport([]),reference=ref,
+                    expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                    expected_journal_sha256='0'*64,review_archive=semantic_archive,
+                    provider='stand-in',model='reviewer',max_tokens=100)
+            assert not semantic_archive.events()
+            semantic=review_fresh_semantics(archive,journal,ledger,StandInTransport([raw({'assessment':'supported','reason':'source supports conditional graph'})]),
+                    reference=ref,expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                    expected_journal_sha256=journal_hash,review_archive=semantic_archive,
+                    provider='stand-in',model='reviewer',max_tokens=100)
+            assert semantic['request_status']=='deferred' and semantic['request_answer'] is None
+            assert semantic['conditional_answer']=='yes' and semantic['assurance']=='synthetic_unvalidated'
+            review_prompt=next(e['data']['prompt'] for e in semantic_archive.events() if e['kind']=='request')
+            assert gold.decode() not in review_prompt and ledger._request_id not in review_prompt
+            assert 'conditional_answer' in review_prompt and 'deferred' in review_prompt
         recorded = journal._con.execute("SELECT payload FROM events WHERE kind='receipt' LIMIT 1").fetchone()[0]
         corrupted = json.loads(recorded); corrupted['usage']['cost_usd'] = 0
         journal._con.execute('DROP TRIGGER events_no_update')
