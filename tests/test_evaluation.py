@@ -665,7 +665,8 @@ def test_locked_direct_run_binds_case_without_exposing_reference(tmp_path):
 
 
 @pytest.mark.parametrize(('reference_quote', 'comparison', 'covered'), [('Tests must pass.', 'matches_reference', True), ('# Checks', 'unknown_review', False)])
-def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path, reference_quote, comparison, covered):
+@pytest.mark.parametrize('routed', [False, True])
+def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path, reference_quote, comparison, covered, routed):
     import json
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
     from qjig.budgets import BudgetLedger
@@ -746,10 +747,21 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
                     expected_journal_sha256='0'*64,review_archive=semantic_archive,
                     provider='stand-in',model='reviewer',max_tokens=100)
             assert not semantic_archive.events()
-            semantic=review_fresh_semantics(archive,journal,ledger,StandInTransport([raw({'assessment':'supported','reason':'source supports conditional graph'})]),
+            class RoutedStandIn(StandInTransport):
+                def send(self, request):
+                    from qjig.providers import openrouter_wire_payload_v5
+                    response=super().send(request)
+                    metadata={'wire_payload_format':'openrouter.chat.v5',
+                              'wire_payload_sha256':hashlib.sha256(openrouter_wire_payload_v5(request).encode()).hexdigest()}
+                    return RawResponse(response.http_status,response.body,response.usage,metadata=metadata)
+            options={'provider':'openrouter','route':'provider-a/fp4','max_price':{'prompt':2,'completion':3}} if routed else {'provider':'stand-in'}
+            response=raw({'assessment':'supported','reason':'source supports conditional graph'})
+            review_transport=RoutedStandIn([response]) if routed else StandInTransport([response])
+            semantic=review_fresh_semantics(archive,journal,ledger,review_transport,
                     reference=ref,expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
                     expected_journal_sha256=journal_hash,review_archive=semantic_archive,
-                    provider='stand-in',model='reviewer',max_tokens=100)
+                    model='reviewer',max_tokens=100,**options)
+            assert semantic_archive.context().get('route') == options.get('route')
             assert semantic['request_status']=='deferred' and semantic['request_answer'] is None
             assert semantic['conditional_answer']=='yes' and semantic['assurance']=='synthetic_unvalidated'
             review_prompt=next(e['data']['prompt'] for e in semantic_archive.events() if e['kind']=='request')
@@ -780,6 +792,19 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
             with pytest.raises(ContractError):
                 score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
                     expected_reference_sha256=reference_digest(ref),expected_journal_sha256='0'*64,original_run_only=True)
+            if routed:
+                semantic_archive._con.execute('DROP TRIGGER context_no_update')
+                saved=semantic_archive.context()
+                changed={**saved,'route':'provider-b/fp4'}
+                encoded=json.dumps(changed,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+                semantic_archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',
+                                              (encoded,hashlib.sha256(encoded.encode()).hexdigest()))
+                assert verify_fresh_semantic_review(archive,journal,semantic_archive,reference=ref,
+                    expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                    expected_journal_sha256=journal_hash)['status']=='invalid'
+                encoded=json.dumps(saved,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+                semantic_archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',
+                                              (encoded,hashlib.sha256(encoded.encode()).hexdigest()))
             semantic_archive._con.execute('DROP TRIGGER event_no_update')
             seq,encoded=semantic_archive._con.execute("SELECT seq,data FROM events WHERE kind='review_record'").fetchone()
             changed=json.loads(encoded); changed['conditional_answer']='no'

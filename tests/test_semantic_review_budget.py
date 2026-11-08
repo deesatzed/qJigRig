@@ -49,7 +49,8 @@ def test_pinned_original_run_replays_after_review_consumes_same_request_budget(t
 
 
 @pytest.mark.parametrize('malformed', [False, True])
-def test_direct_semantic_review_excludes_private_reference_and_replays_original(tmp_path, malformed):
+@pytest.mark.parametrize('routed', [False, True])
+def test_direct_semantic_review_excludes_private_reference_and_replays_original(tmp_path, malformed, routed):
     from qjig.evaluation_semantic_review import review_direct_semantics
     source=b'Tests must pass.'
     private=b'PRIVATE_REFERENCE_LABEL'
@@ -69,8 +70,18 @@ def test_direct_semantic_review_excludes_private_reference_and_replays_original(
         run_direct(search,request,ledger,StandInTransport([answer]),archive=archive,
                    provider='stand-in',model='model',max_tokens=100,as_of='2026-11-07',entities=[])
         digest=verify_direct_archive(archive,journal)['sha256']
-        outcome=review_direct_semantics(archive,journal,ledger,StandInTransport([opinion]),review_archive=review_archive,
-                                        expected_run_sha256=digest,provider='stand-in',model='reviewer',max_tokens=100)
+        class RoutedStandIn(StandInTransport):
+            def send(self, request):
+                from qjig.providers import openrouter_wire_payload_v5
+                response=super().send(request)
+                metadata={'wire_payload_format':'openrouter.chat.v5',
+                          'wire_payload_sha256':hashlib.sha256(openrouter_wire_payload_v5(request).encode()).hexdigest()}
+                return RawResponse(response.http_status,response.body,response.usage,metadata=metadata)
+        options={'provider':'openrouter','route':'provider-a/fp4','max_price':{'prompt':2,'completion':3}} if routed else {'provider':'stand-in'}
+        transport=RoutedStandIn([opinion]) if routed else StandInTransport([opinion])
+        outcome=review_direct_semantics(archive,journal,ledger,transport,review_archive=review_archive,
+                                        expected_run_sha256=digest,model='reviewer',max_tokens=100,**options)
+        assert review_archive.context().get('route') == options.get('route')
         assert outcome['assessment']==('uncertain' if malformed else 'supported')
         assert outcome['assurance']=='synthetic_unvalidated'
         assert outcome['failure']==('malformed_output' if malformed else None)
@@ -100,7 +111,24 @@ def test_direct_semantic_review_excludes_private_reference_and_replays_original(
         assert score['classification']=='matches_reference'
         assert score['journal_scope']=='original_run_prefix' and score['semantic_assurance']=='not_assessed'
         assert ledger.used_calls()==2
+        if routed:
+            review_archive._con.execute('DROP TRIGGER context_no_update')
+            saved=review_archive.context()
+            changed={**saved,'route':'provider-b/fp4'}
+            encoded=json.dumps(changed,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+            review_archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',
+                                        (encoded,hashlib.sha256(encoded.encode()).hexdigest()))
+            assert verify_direct_semantic_review(archive,journal,review_archive,expected_run_sha256=digest)['status']=='invalid'
+            encoded=json.dumps(saved,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+            review_archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',
+                                        (encoded,hashlib.sha256(encoded.encode()).hexdigest()))
         review_archive._con.execute('DROP TRIGGER event_no_update')
+        if routed:
+            seq,original=review_archive._con.execute("SELECT seq,data FROM events WHERE kind='response'").fetchone()
+            changed=json.loads(original); changed['metadata']['wire_payload_sha256']='0'*64
+            review_archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),seq))
+            assert verify_direct_semantic_review(archive,journal,review_archive,expected_run_sha256=digest)['status']=='invalid'
+            review_archive._con.execute('UPDATE events SET data=? WHERE seq=?',(original,seq))
         seq,encoded=review_archive._con.execute("SELECT seq,data FROM events WHERE kind='review_record'").fetchone()
         changed=json.loads(encoded); changed['assessment']='unsupported'
         review_archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),seq))

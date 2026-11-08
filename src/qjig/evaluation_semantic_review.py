@@ -13,7 +13,7 @@ from dataclasses import asdict
 
 from .budgets import BudgetLedger
 from .contracts import ContractError
-from .evaluation_replay import verify_direct_archive
+from .evaluation_replay import _check_wire, verify_direct_archive
 from .journal import Journal
 from .providers import (CallReservation, FieldSpec, OpenRouterTransport, ProviderRequest, StandInTransport,
                         _validate, call_typed)
@@ -42,7 +42,7 @@ def _review_prompt(archive: RunArchive, context: dict, result: dict):
 
 def review_direct_semantics(archive: RunArchive, journal: Journal, ledger: BudgetLedger, transport, *,
                             review_archive: RunArchive, expected_run_sha256: str, provider: str,
-                            model: str, max_tokens: int, max_price=None, reservation_factory=None) -> dict:
+                            model: str, max_tokens: int, max_price=None, reservation_factory=None, route: str | None = None) -> dict:
     """Review only an anchored saved answer and its source revisions under the same request budget."""
     if (not isinstance(archive, RunArchive) or not isinstance(review_archive, RunArchive)
             or archive is review_archive or not isinstance(journal, Journal)
@@ -64,7 +64,7 @@ def review_direct_semantics(archive: RunArchive, journal: Journal, ledger: Budge
     if review_archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0] or review_archive.events():
         raise ContractError('semantic review requires an unused archive')
     prompt,revisions=_review_prompt(archive,context,results[0])
-    pr=ProviderRequest('semantic_review',provider,model,prompt,max_tokens,max_price=max_price)
+    pr=ProviderRequest('semantic_review',provider,model,prompt,max_tokens,max_price=max_price,route=route)
     binding={'reviewed_run_sha256':expected_run_sha256}
     reservation=reservation_factory(pr) if reservation_factory is not None else None
     if ledger._goal_budget is not None and (not isinstance(reservation, CallReservation)
@@ -73,7 +73,8 @@ def review_direct_semantics(archive: RunArchive, journal: Journal, ledger: Budge
     review_archive.record_context({'schema':'qjig.direct-semantic-review.v1',**binding,
         'source_revisions':context['source_revisions'], 'provider':provider, 'model':model,
         'prompt_sha256':hashlib.sha256(prompt.encode('utf-8')).hexdigest(),
-        'max_tokens':max_tokens, 'max_price':dict(pr.max_price) if pr.max_price is not None else None})
+        'max_tokens':max_tokens, 'max_price':dict(pr.max_price) if pr.max_price is not None else None,
+        **({'route':route} if route is not None else {})})
     for revision in revisions:
         review_archive.add_revision(revision)
     call=call_typed(ledger,transport,pr,_REVIEW_SCHEMA,reservation=reservation,archive=review_archive,
@@ -102,6 +103,7 @@ def verify_direct_semantic_review(archive: RunArchive, journal: Journal, review_
         context=archive.context(); saved=review_archive.context(); events=review_archive.events()
         expected_keys={'schema','reviewed_run_sha256','source_revisions','provider','model',
                        'prompt_sha256','max_tokens','max_price'}
+        if 'route' in saved: expected_keys.add('route')
         if (set(saved)!=expected_keys or saved['schema']!='qjig.direct-semantic-review.v1'
                 or saved['reviewed_run_sha256']!=expected_run_sha256
                 or saved['source_revisions']!=context['source_revisions']
@@ -113,7 +115,7 @@ def verify_direct_semantic_review(archive: RunArchive, journal: Journal, review_
         if any(review_archive.revision(rev.revision_id) != rev for rev in revisions):
             raise ContractError('review sources differ')
         pr=ProviderRequest('semantic_review',saved['provider'],saved['model'],prompt,saved['max_tokens'],
-                           max_price=saved['max_price'])
+                           max_price=saved['max_price'],route=saved.get('route'))
         if saved['prompt_sha256']!=hashlib.sha256(prompt.encode('utf-8')).hexdigest():
             raise ContractError('review prompt differs')
         if [event['kind'] for event in events] != ['request','response','validation','review_record']:
@@ -123,6 +125,7 @@ def verify_direct_semantic_review(archive: RunArchive, journal: Journal, review_
         expected_request={'stage':pr.stage,'provider':pr.provider,'model':pr.model,'prompt':pr.prompt,
                           'max_tokens':pr.max_tokens,'input_sha256':pr.input_sha256()}
         if pr.max_price is not None: expected_request['max_price']=dict(pr.max_price)
+        if pr.route is not None: expected_request['route']=pr.route
         if events[0]['data']!=expected_request: raise ContractError('review request differs')
         response=events[1]['data']; body=response['body']
         if hashlib.sha256(body.encode('utf-8')).hexdigest()!=response['body_sha256']:
@@ -141,9 +144,12 @@ def verify_direct_semantic_review(archive: RunArchive, journal: Journal, review_
                 or intent.payload.get('request_max_price')!=saved['max_price']
                 or receipt.payload.get('raw_sha256')!=response['body_sha256']
                 or receipt.payload.get('usage')!=(response['usage'] or {})
+                or receipt.payload.get('metadata')!=response['metadata']
+                or receipt.payload.get('note')!=response['note']
                 or receipt.payload.get('validation')!=('ok' if failure is None else failure)):
             raise ContractError('review journal differs')
         transport=receipt.payload.get('transport','')
+        _check_wire(pr,response.get('metadata'),transport)
         if transport.startswith('STAND_IN:'):
             assurance='synthetic_unvalidated'
         elif transport.startswith('LIVE:'):
@@ -193,7 +199,7 @@ def _fresh_review_prompt(archive: RunArchive, context: dict, conditional: str):
 def review_fresh_semantics(archive: RunArchive, journal: Journal, ledger: BudgetLedger, transport, *,
                            reference: dict, expected_reference_sha256: str, expected_run_sha256: str,
                            expected_journal_sha256: str, review_archive: RunArchive, provider: str,
-                           model: str, max_tokens: int, max_price=None, reservation_factory=None) -> dict:
+                           model: str, max_tokens: int, max_price=None, reservation_factory=None, route: str | None = None) -> dict:
     """Review the conditional graph while preserving the request-level deferral.
 
     The reference is checked locally against the saved run; its contents and
@@ -223,7 +229,7 @@ def review_fresh_semantics(archive: RunArchive, journal: Journal, ledger: Budget
     if review_archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0] or review_archive.events():
         raise ContractError('semantic review requires an unused archive')
     prompt,matching,revisions=_fresh_review_prompt(archive,context,conditional)
-    pr=ProviderRequest('semantic_review',provider,model,prompt,max_tokens,max_price=max_price)
+    pr=ProviderRequest('semantic_review',provider,model,prompt,max_tokens,max_price=max_price,route=route)
     reservation=reservation_factory(pr) if reservation_factory is not None else None
     if ledger._goal_budget is not None and (not isinstance(reservation,CallReservation)
             or reservation.required_id is None or reservation.work_binding_sha256 is None):
@@ -232,7 +238,8 @@ def review_fresh_semantics(archive: RunArchive, journal: Journal, ledger: Budget
     review_archive.record_context({'schema':'qjig.fresh-semantic-review.v1',**binding,
         'source_revisions':matching,'reference_sha256':expected_reference_sha256,
         'provider':provider,'model':model,'prompt_sha256':hashlib.sha256(prompt.encode('utf-8')).hexdigest(),
-        'max_tokens':max_tokens,'max_price':dict(pr.max_price) if pr.max_price is not None else None})
+        'max_tokens':max_tokens,'max_price':dict(pr.max_price) if pr.max_price is not None else None,
+        **({'route':route} if route is not None else {})})
     for revision in revisions:
         review_archive.add_revision(revision)
     call=call_typed(ledger,transport,pr,_REVIEW_SCHEMA,reservation=reservation,archive=review_archive,
@@ -269,6 +276,7 @@ def verify_fresh_semantic_review(archive: RunArchive, journal: Journal, review_a
         keys={'schema','reviewed_run_sha256','reviewed_journal_sha256','source_revisions','reference_sha256',
               'provider','model','prompt_sha256','max_tokens','max_price'}
         prompt,matching,revisions=_fresh_review_prompt(archive,context,conditional)
+        if 'route' in saved: keys.add('route')
         if (set(saved)!=keys or saved['schema']!='qjig.fresh-semantic-review.v1'
                 or saved['reviewed_run_sha256']!=expected_run_sha256
                 or saved['reviewed_journal_sha256']!=expected_journal_sha256
@@ -277,7 +285,7 @@ def verify_fresh_semantic_review(archive: RunArchive, journal: Journal, review_a
                 or any(review_archive.revision(rev.revision_id)!=rev for rev in revisions)):
             raise ContractError('fresh review context or sources differ')
         pr=ProviderRequest('semantic_review',saved['provider'],saved['model'],prompt,saved['max_tokens'],
-                           max_price=saved['max_price'])
+                           max_price=saved['max_price'],route=saved.get('route'))
         if saved['prompt_sha256']!=hashlib.sha256(prompt.encode('utf-8')).hexdigest():
             raise ContractError('fresh review prompt differs')
         if [e['kind'] for e in events]!=['request','response','validation','review_record']:
@@ -287,6 +295,7 @@ def verify_fresh_semantic_review(archive: RunArchive, journal: Journal, review_a
         expected_request={'stage':pr.stage,'provider':pr.provider,'model':pr.model,'prompt':pr.prompt,
                           'max_tokens':pr.max_tokens,'input_sha256':pr.input_sha256()}
         if pr.max_price is not None: expected_request['max_price']=dict(pr.max_price)
+        if pr.route is not None: expected_request['route']=pr.route
         if events[0]['data']!=expected_request: raise ContractError('review request differs')
         response=events[1]['data']; body=response['body']
         if hashlib.sha256(body.encode('utf-8')).hexdigest()!=response['body_sha256']:
@@ -303,9 +312,12 @@ def verify_fresh_semantic_review(archive: RunArchive, journal: Journal, review_a
                 or intent.payload.get('context_binding')!=binding or intent.payload.get('request_max_price')!=saved['max_price']
                 or receipt.payload.get('raw_sha256')!=response['body_sha256']
                 or receipt.payload.get('usage')!=(response['usage'] or {})
+                or receipt.payload.get('metadata')!=response['metadata']
+                or receipt.payload.get('note')!=response['note']
                 or receipt.payload.get('validation')!=('ok' if failure is None else failure)):
             raise ContractError('review journal differs')
         transport=receipt.payload.get('transport','')
+        _check_wire(pr,response.get('metadata'),transport)
         if transport.startswith('STAND_IN:'): assurance='synthetic_unvalidated'
         elif transport.startswith('LIVE:'): assurance='ai_reviewed_unvalidated'
         else: raise ContractError('review transport unknown')

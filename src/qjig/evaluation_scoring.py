@@ -734,7 +734,8 @@ def score_reviewed_reserved_assignment(goal, archive, journal, reference: dict, 
     if (not isinstance(saved, dict) or saved.get('provider') != reviewer_spec['provider']
             or saved.get('model') != reviewer_spec['model']['id']
             or saved.get('max_tokens') != reviewer_spec['output_tokens']
-            or saved.get('max_price') != reviewer_spec['max_price']):
+            or saved.get('max_price') != reviewer_spec['max_price']
+            or saved.get('route') != reviewer_spec.get('route')):
         raise ContractError('semantic reviewer configuration differs')
     assignment = context.get('evaluation_assignment', {})
     row = goal._con.execute("SELECT w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id "
