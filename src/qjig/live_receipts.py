@@ -205,6 +205,8 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
                 raise ContractError('score digest differs')
             if outcome_enabled and score.get('outcome_review',{}).get('reason')=='original_no_call_refusal_unverified':
                 issues.append('no_call_refusal_unverified')
+            if outcome_enabled and score.get('outcome_review',{}).get('reason')=='original_followup_refusal_unverified':
+                issues.append('followup_refusal_unverified')
             checked += 1
         except (OSError, sqlite3.Error, ContractError, ValueError, TypeError, KeyError, IndexError):
             invalid.append('scored_receipt_invalid')

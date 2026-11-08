@@ -19,3 +19,7 @@ After the audit snapshot, T069L extended the reserved non-review path to an orig
 ## Follow-up: no-call direct refusal
 
 T069M permits a direct run that records a pre-call budget/preflight refusal, with no journal events and no consumed request work, to retain both non-review records as `original_no_call_refusal_unverified` and its outcome as unknown. Receipt inspection explicitly reports this condition as incomplete. The archived reason is an assertion; this does not establish that a particular budget was exhausted or classify it as a verified failure. An uncertain call remains unresolved. The evaluation/review/replay/goal regressions passed 191.
+
+## Follow-up: refusal after a settled direct search
+
+T069N preserves a replay-verified initial direct search and its accounted usage when the followup is refused before dispatch. The followup and both review slots remain unused; the refusal cause is unverified, the outcome is unknown, and receipt inspection reports incomplete. A focused synthetic test checked the retained call and cost; evaluation/review/replay/goal regressions passed 192. This is not evidence of complete billing or proof that the refusal was caused by actual exhaustion.

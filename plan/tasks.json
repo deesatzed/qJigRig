@@ -1261,7 +1261,8 @@
         "T069J",
         "T069K",
         "T069L",
-        "T069M"
+        "T069M",
+        "T069N"
       ],
       "status": "pending",
       "files": [
@@ -4727,6 +4728,24 @@
       "acceptance": "The rubric derivation test uses a self-contained valid synthetic design and locks and passes in an isolated installed test tree without .local data.",
       "command": "python -m pytest tests/test_factorial_synthetic.py::test_synthetic_rubric_design_rebinds_without_mutating_draft -q",
       "evidence": "Red: clean-install staged suite could not find ignored .local draft, with 711 passed, 1 failed and 1 skipped; installed browser journey passed. Green: focused self-contained test passed; full clean-install rerun passed with installed browser 1 passed and staged suite 712 passed, 1 skipped. The skipped nested clean-install test avoids recursive execution. No live provider validation."
+    },
+    {
+      "id": "T069N",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069M"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py",
+        "src/qjig/live_receipts.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Retain accounted direct followup refusal as an incomplete unknown outcome",
+      "acceptance": "A settled initial search followed by an attributed pre-call refusal retains its accounted call, leaves review slots unused, remains unknown, and makes receipt inspection incomplete.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Red: a verified initial search followed by a pre-call budget refusal was rejected before non-review. Green: the retained first call and its cost replay with verified accounting; the unattempted final and review slots remain unconsumed, outcome remains unknown and receipt inspection reports incomplete. Focused test passed and evaluation/review/replay/goal regressions passed 192. The refusal cause is not independently established."
     }
   ]
 }

@@ -658,6 +658,29 @@ def _direct_no_call_refusal(goal, archive, journal, score):
             and goal._con.execute('SELECT 1 FROM required_work WHERE request_id=? AND attempt_id IS NOT NULL LIMIT 1',(rid,)).fetchone() is None)
 
 
+
+def _direct_followup_refusal(goal, archive, journal, score):
+    """Keep settled prior work when a later direct call was not attempted."""
+    context=archive.context()
+    if (not isinstance(context,dict) or not str(context.get('schema','')).startswith('qjig.direct-evaluation.')
+            or score.get('classification')!='unknown_review' or score.get('failure_verified') is not False):
+        return False
+    rid=context.get('request',{}).get('request_id')
+    results=[event['data'] for event in archive.events() if event['kind']=='run_result']
+    if not isinstance(rid,str) or len(results)!=1 or results[0].get('failure')!='BudgetExceeded':
+        return False
+    calls=results[0].get('call_ids');events=journal.events(rid)
+    if (not isinstance(calls,list) or len(calls)!=1 or len(events)!=2
+            or [event.kind for event in events]!=['intent','receipt']
+            or any(event.call_id!=calls[0] or event.stage!='direct_initial' for event in events)
+            or journal.pending(rid)):
+        return False
+    slots=goal._con.execute("SELECT stage,attempt_id FROM required_work WHERE request_id=? AND stage IN ('direct_initial','direct_final')",(rid,)).fetchall()
+    return (len(slots)==2 and {stage:attempt for stage,attempt in slots}.get('direct_initial')==events[0].payload.get('goal_attempt_id')
+            and {stage:attempt for stage,attempt in slots}.get('direct_initial') is not None
+            and any(stage=='direct_final' and attempt is None for stage,attempt in slots))
+
+
 def unavailable_failure_review(goal,archive,journal,reference,review_archive,*,partition,expected_plan_sha256,
                                expected_run_sha256,expected_reference_sha256,reviewer_spec,
                                expected_journal_sha256=None,expected_review_sha256=None,record=False):
@@ -675,7 +698,8 @@ def unavailable_failure_review(goal,archive,journal,reference,review_archive,*,p
                         and result.get('review_status')=='unavailable'
                         and result.get('review_failure')=='review_context_or_storage_error')
     no_call_refusal=_direct_no_call_refusal(goal,archive,journal,result)
-    if (not (settled_failure or unavailable_review or no_call_refusal) or result.get('reconciliation_required') is not False
+    followup_refusal=_direct_followup_refusal(goal,archive,journal,result)
+    if (not (settled_failure or unavailable_review or no_call_refusal or followup_refusal) or result.get('reconciliation_required') is not False
             or result.get('recorded_answer') is not None or result.get('conditional_answer') is not None):
         raise ContractError('verified settled failure without an answer required')
     slot=semantic_review_allocation(request_id=rid,partition=partition,spec=reviewer_spec)
@@ -688,7 +712,7 @@ def unavailable_failure_review(goal,archive,journal,reference,review_archive,*,p
     saved={'schema':'qjig.semantic-review-failure.v1','request_id':rid,'reviewed_run_sha256':expected_run_sha256,
            'reference_sha256':expected_reference_sha256,'journal_sha256':expected_journal_sha256,
            'work_id':slot['work_id'],
-           'reason':'original_no_call_refusal_unverified' if no_call_refusal else 'original_review_unavailable' if unavailable_review else 'original_'+result['classification']}
+           'reason':'original_no_call_refusal_unverified' if no_call_refusal else 'original_followup_refusal_unverified' if followup_refusal else 'original_review_unavailable' if unavailable_review else 'original_'+result['classification']}
     outcome={'assessment':'uncertain','assurance':'not_reviewed','reason':saved['reason']}
     if record:
         if (review_archive.events() or review_archive.revision_ids() or review_archive.source_ids()
@@ -808,7 +832,8 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
                  and score.get('reconciliation_required') is False and not journal.pending(request_id)
                  and score.get('conditional_answer') is None and not any(e.stage=='outcome_review' for e in journal.events(request_id)))
     no_call_refusal=_direct_no_call_refusal(goal,archive,journal,score)
-    if result['review'].get('assurance')!='not_reviewed' or not (applicability or settled or unavailable or no_call_refusal):
+    followup_refusal=_direct_followup_refusal(goal,archive,journal,score)
+    if result['review'].get('assurance')!='not_reviewed' or not (applicability or settled or unavailable or no_call_refusal or followup_refusal):
         raise ContractError('eligible deferral, settled failure or unavailable review required')
     slot=outcome_review_allocation(request_id=request_id,partition=partition,spec=outcome_reviewer_spec)
     row=goal._con.execute("SELECT w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id "
@@ -819,7 +844,7 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
     saved={'schema':'qjig.outcome-review-unavailable.v1','reviewed_run_sha256':expected_run_sha256,
            'reference_sha256':expected_reference_sha256,'semantic_review_sha256':expected_review_sha256,
            'request_id':request_id,'work_id':slot['work_id'],
-           'reason':'source_applicability_unestablished' if applicability else 'original_no_call_refusal_unverified' if no_call_refusal else 'original_review_unavailable' if unavailable else 'original_'+score['classification'],
+           'reason':'source_applicability_unestablished' if applicability else 'original_no_call_refusal_unverified' if no_call_refusal else 'original_followup_refusal_unverified' if followup_refusal else 'original_review_unavailable' if unavailable else 'original_'+score['classification'],
            **({'journal_sha256':expected_journal_sha256} if settled or unavailable else {})}
     outcome={'assessment':'uncertain','assurance':'not_reviewed','reason':saved['reason']}
     if record:

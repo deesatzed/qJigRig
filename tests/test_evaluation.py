@@ -2083,7 +2083,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             reopened._con.execute("UPDATE evaluation_campaign_events SET payload='{}' WHERE kind='started'")
 
 
-@pytest.mark.parametrize(('mismatch','rubric_bound'),[(m,False) for m in ['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_timeout']]+[('outcome_batch',True)])
+@pytest.mark.parametrize(('mismatch','rubric_bound'),[(m,False) for m in ['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_followup_budget','outcome_runner_timeout']]+[('outcome_batch',True)])
 def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path,mismatch,rubric_bound,monkeypatch):
     import copy,json
     from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN,UNKNOWN_BOUND
@@ -2132,7 +2132,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
         cases['holdout']['lock']['reference_sha256']=reference_digest(cases['holdout']['reference'])
         hashes['holdout']=case_lock_digest(cases['holdout']['lock'])
     scope='other' if mismatch=='scope' else 'project'
-    interval=Interval('2027-01-01',OPEN) if mismatch=='date' else Interval(UNKNOWN_BOUND,OPEN) if mismatch in ('unknown','semantic_unknown','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_timeout') else Interval('2020-01-01',OPEN)
+    interval=Interval('2027-01-01',OPEN) if mismatch=='date' else Interval(UNKNOWN_BOUND,OPEN) if mismatch in ('unknown','semantic_unknown','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_followup_budget','outcome_runner_timeout') else Interval('2020-01-01',OPEN)
     member=MemberMetadata(rev,scope,interval,entity_keys=frozenset({'other'}) if mismatch=='entity' else frozenset())
     wrong=ApplicabilityInputs(Collection((member,)),frozenset({'target'}) if mismatch=='entity' else frozenset(),'2026-11-07',False)
     cases['holdout']['applicability_inputs']=wrong;metadata['holdout']=applicability_digest(wrong)
@@ -2141,9 +2141,9 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
     if mismatch in ('semantic_route','semantic_route_unknown'): spec={**spec,'provider':'openrouter','route':'provider-a/fp4'}
     config={k:dict(spec) for k in (('direct','planner','judge','reviewer','semantic_reviewer') if mismatch in ('semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown') else ('direct','planner','judge','reviewer'))}
-    if mismatch in ('outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_timeout'):
+    if mismatch in ('outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_followup_budget','outcome_runner_timeout'):
         config={k:dict(spec) for k in ('direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer')}
-    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'private-synthetic-batch-secret-32-bytes',**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_timeout') else {}))
+    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'private-synthetic-batch-secret-32-bytes',**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_followup_budget','outcome_runner_timeout') else {}))
     total=Budget(800,200000,10);per=Budget(30,6000,1)
     allocations={'development':Budget(200,50000,2),'pilot':Budget(200,50000,2),'holdout':Budget(400,100000,6)}
     calls=[];usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
@@ -2172,22 +2172,33 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal,Journal.open(tmp_path/'journal.sqlite') as journal:
         reserve_evaluation_plan(goal,'batch',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'batch',expected_plan_sha256=plan['sha256'])
-        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_timeout') else {}),**({'rubric_text':'Synthetic frozen rubric'} if rubric_bound else {}))
-        if mismatch in ('outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_timeout'):
+        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_followup_budget','outcome_runner_timeout') else {}),**({'rubric_text':'Synthetic frozen rubric'} if rubric_bound else {}))
+        if mismatch in ('outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_followup_budget','outcome_runner_timeout'):
             from qjig.evaluation_campaign import run_campaign_assignment
             from qjig.evaluation_scoring import score_outcome_reviewed_assignment
             from qjig.run_archive import RunArchive
-            target=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']=='direct_full_evidence' and a['repeat']==1)
+            selected_arm='direct_retrieval' if mismatch=='outcome_runner_followup_budget' else 'direct_full_evidence'
+            target=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']==selected_arm and a['repeat']==1)
             data=cases['holdout'];rid=target['request_id'];ref=data['reference']
             response=TimeoutError('synthetic timeout') if mismatch=='outcome_runner_timeout' else RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'yes','citations':[{'entry_id':'forged','quote':'fake'}]}) if mismatch=='outcome_runner_unsupported' else 'not json',usage)
+            if mismatch=='outcome_runner_followup_budget':
+                response=RawResponse(200,json.dumps({'action':'search','query':'checks','answer':None,'citations':[]}),usage)
             transport=StandInTransport([response])
+            if mismatch=='outcome_runner_followup_budget':
+                from qjig.budgets import BudgetExceeded
+                from qjig.direct_preflight import direct_slot_reservation as original_reservation
+                def refuse_followup(*args,**kwargs):
+                    req=kwargs['request']
+                    if req.stage=='direct_final' and req.prompt: raise BudgetExceeded('synthetic','refused before followup')
+                    return original_reservation(*args,**kwargs)
+                monkeypatch.setattr('qjig.direct_preflight.direct_slot_reservation',refuse_followup)
             if mismatch=='outcome_runner_budget':
                 from qjig.budgets import BudgetExceeded
                 def refuse(*args,**kwargs): raise BudgetExceeded('synthetic','refused before call')
                 monkeypatch.setattr('qjig.direct_preflight.direct_slot_reservation',refuse)
-            base=tmp_path/'runs'/rid if mismatch=='outcome_runner_budget' else tmp_path/'failed'
-            review_path=base/'semantic-review' if mismatch=='outcome_runner_budget' else tmp_path/'semantic'
-            outcome_path=base/'outcome-review' if mismatch=='outcome_runner_budget' else tmp_path/'outcome'
+            base=tmp_path/'runs'/rid if mismatch in ('outcome_runner_budget','outcome_runner_followup_budget') else tmp_path/'failed'
+            review_path=base/'semantic-review' if mismatch in ('outcome_runner_budget','outcome_runner_followup_budget') else tmp_path/'semantic'
+            outcome_path=base/'outcome-review' if mismatch in ('outcome_runner_budget','outcome_runner_followup_budget') else tmp_path/'outcome'
             with RunArchive.open(base) as archive,RunArchive.open(review_path) as review_archive,RunArchive.open(outcome_path) as outcome_archive:
                 options=dict(applicability_inputs=data['applicability_inputs'],transport=transport,archive=archive,journal=journal,
                     config=config,want=1,max_bytes=5000,expected_config_sha256=config_hash,
@@ -2204,12 +2215,20 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                     partition='holdout',expected_plan_sha256=plan['sha256'],expected_run_sha256=receipt['run_sha256'],
                     expected_reference_sha256=reference_digest(ref),expected_review_sha256=receipt['semantic_review_sha256'],
                     reviewer_spec=spec,expected_outcome_review_sha256=receipt['outcome_review_sha256'],outcome_reviewer_spec=spec)
-                assert scored['outcome_category']==('unknown_assessment' if mismatch=='outcome_runner_budget' else 'failed') and scored['outcome_assurance']=='not_reviewed'
-                assert scored['score']['classification']==('unknown_review' if mismatch=='outcome_runner_budget' else 'unsupported' if mismatch=='outcome_runner_unsupported' else 'malformed')
+                assert scored['outcome_category']==('unknown_assessment' if mismatch in ('outcome_runner_budget','outcome_runner_followup_budget') else 'failed') and scored['outcome_assurance']=='not_reviewed'
+                assert scored['score']['classification']==('unknown_review' if mismatch in ('outcome_runner_budget','outcome_runner_followup_budget') else 'unsupported' if mismatch=='outcome_runner_unsupported' else 'malformed')
                 assert not journal.pending(rid)
                 slots=goal._con.execute("SELECT stage,attempt_id FROM required_work WHERE request_id=? AND stage IN ('semantic_review','outcome_review')",(rid,)).fetchall()
                 assert len(slots)==2 and all(attempt is None for _,attempt in slots)
                 assert campaign.status()['scored']==1
+                if mismatch=='outcome_runner_followup_budget':
+                    assert scored['outcome_review']['reason']=='original_followup_refusal_unverified'
+                    assert goal.audit_journal(journal)['status']=='verified' and len(journal.events(rid))==2
+                    assert scored['score']['resources']['total']['calls']==1
+                    assert scored['score']['resources']['total']['cost_usd']==0.0001
+                    from qjig.live_receipts import inspect_campaign_receipts
+                    inspection=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()})
+                    assert inspection['status']=='incomplete' and 'followup_refusal_unverified' in inspection['issues']
                 if mismatch=='outcome_runner_budget':
                     assert scored['outcome_review']['reason']=='original_no_call_refusal_unverified'
                     assert journal.events(rid)==[]
