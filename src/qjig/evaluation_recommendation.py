@@ -1,6 +1,7 @@
 """Read-only, evidence-gated two-baseline recommendation reconstruction."""
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sqlite3
@@ -15,6 +16,55 @@ from .run_archive import RunArchive
 from .journal import Journal
 from .live_receipts import inspect_campaign_receipts
 
+
+
+
+_RUBRIC_IMPLEMENTATION_FILES = (
+    'evaluation.py', 'evaluation_recommendation.py', 'evaluation_scoring.py',
+    'evaluation_outcome_review.py', 'evaluation_semantic_review.py',
+    'evaluation_replay.py', 'evaluation_campaign.py', 'evaluation_budget.py',
+    'evaluation_cases.py', 'live_receipts.py',
+)
+
+
+def make_rubric_contract() -> dict:
+    """Describe the provisional policy and bind current implementation bytes.
+
+    This identity does not certify the policy's semantic or clinical correctness.
+    """
+    directory=Path(__file__).resolve().parent
+    try:
+        hashes={name:hashlib.sha256((directory/name).read_bytes()).hexdigest()
+                for name in _RUBRIC_IMPLEMENTATION_FILES}
+    except OSError as exc:
+        raise ContractError('rubric implementation unavailable') from exc
+    return {'schema':'qjig.rubric-contract.v1',
+        'policy':'qjig.provisional-pair-decision.v1',
+        'categories':{'supported_match':2,'reference_misaligned':1,'failed':0,'unknown_assessment':None},
+        'pairs':{'higher':1,'equal':0.5,'lower':0,'denominator':'all_assigned_pairs','unknown':'null'},
+        'thresholds':{'remove_below':0.4,'retain_at_least':0.6},
+        'combination':'both_retain_or_both_remove_else_revise',
+        'incomplete':['missing_assigned_work','missing_resource_record','unreconciled_call',
+                      'no_call_refusal_unverified','followup_refusal_unverified','invalid_receipt_or_isolation'],
+        'review_assurance':'ai_reviewed_unvalidated',
+        'implementation_sha256':hashes}
+
+
+def verify_rubric_contract(text: str) -> dict:
+    """Verify the exact canonical policy and selected local source-file identities."""
+    if not isinstance(text,str):
+        raise ContractError('invalid rubric contract')
+    try:
+        if len(text.encode('utf-8'))>100000:
+            raise ContractError('invalid rubric contract')
+        value=json.loads(text)
+        canonical=json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False)
+    except (ValueError,TypeError,UnicodeError) as exc:
+        raise ContractError('invalid rubric contract') from exc
+    if text!=canonical or value!=make_rubric_contract():
+        raise ContractError('rubric contract or implementation differs')
+    return {'policy':value['policy'],'sha256':hashlib.sha256(text.encode('utf-8')).hexdigest(),
+            'assurance':'implementation_identity_not_semantic_validation'}
 
 
 def provisional_pair_decision(design: dict, metrics: dict, *, expected_design_sha256: str) -> dict:

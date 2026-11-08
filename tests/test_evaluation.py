@@ -2903,3 +2903,26 @@ def test_two_baseline_provisional_decision_policy():
     with pytest.raises(ContractError):
         provisional_pair_decision(changed, {'direct_full_evidence':0.8,'direct_retrieval':0.8},
                                   expected_design_sha256=validate_evaluation_design(changed))
+
+
+def test_versioned_rubric_contract_binds_policy_and_implementation(tmp_path,monkeypatch):
+    import json
+    from pathlib import Path
+    from qjig.evaluation_recommendation import make_rubric_contract, verify_rubric_contract
+    contract=make_rubric_contract()
+    text=json.dumps(contract,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+    checked=verify_rubric_contract(text)
+    assert checked['policy']=='qjig.provisional-pair-decision.v1'
+    assert checked['assurance']=='implementation_identity_not_semantic_validation'
+    changed=json.loads(text);changed['pairs']['unknown']='zero'
+    with pytest.raises(ContractError): verify_rubric_contract(json.dumps(changed))
+    changed=json.loads(text);changed['implementation_sha256']['evaluation_scoring.py']='0'*64
+    with pytest.raises(ContractError): verify_rubric_contract(json.dumps(changed))
+    with pytest.raises(ContractError): verify_rubric_contract(text+' ')
+    with pytest.raises(ContractError): verify_rubric_contract('\ud800')
+    original_read=Path.read_bytes
+    def changed_bytes(path):
+        raw=original_read(path)
+        return raw+b'\n# changed' if path.name=='evaluation_scoring.py' else raw
+    monkeypatch.setattr(Path,'read_bytes',changed_bytes)
+    with pytest.raises(ContractError): verify_rubric_contract(text)
