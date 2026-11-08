@@ -51,7 +51,24 @@ def load_fresh_config(path: Path) -> FreshWorkbench:
         planner_price=planner['max_price'], judge_price=judge['max_price'], reviewer=reviewer)
     state_dir = Path(data['state_dir'])
     env_path = Path(data['env_path'])
-    return FreshWorkbench(state_dir, goal_factory=lambda: GoalBudget.open(state_dir / 'goal.sqlite', total=total,
-                          per_request=per_request, allocations=allocations),
+    def account_bound_goal():
+        # Refresh only when a run starts; configuration loading never contacts the provider.
+        from .account_client import fetch_account_snapshot, refresh_account_constraints
+        path = state_dir / 'goal.sqlite'
+        if path.is_symlink():
+            raise ContractError('unsafe goal ledger path')
+        if not path.exists():
+            snapshot = fetch_account_snapshot(env_path)
+            return GoalBudget.open(path, total=total, per_request=per_request,
+                                   allocations=allocations, account_snapshot=snapshot)
+        goal = GoalBudget.resume_account_bound(path, total=total, per_request=per_request,
+                                                allocations=allocations)
+        try:
+            refresh_account_constraints(goal, env_path)
+        except BaseException:
+            goal.close()
+            raise
+        return goal
+    return FreshWorkbench(state_dir, goal_factory=account_bound_goal,
                           transport_factory=lambda: OpenRouterTransport(env_path), partition=data['partition'],
                           planner=planner, judge=judge, reviewer=reviewer, budget=per_request)

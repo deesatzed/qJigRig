@@ -65,3 +65,36 @@ def test_invalid_fresh_configuration_is_rejected_before_state_creation(tmp_path,
     path = tmp_path/'config.json'; path.write_text(json.dumps(config))
     with pytest.raises(ContractError): load_fresh_config(path)
     assert not (tmp_path/'state').exists()
+
+
+def test_configured_goal_refreshes_account_before_using_persistent_budget(tmp_path, monkeypatch):
+    config = config_for(tmp_path)
+    path = tmp_path / 'config.json'
+    path.write_text(json.dumps(config))
+    backend = load_fresh_config(path)
+    observations = [
+        ({'data': {'limit_remaining': 10, 'include_byok_in_limit': False, 'is_free_tier': False}},
+         {'data': {'total_credits': 10, 'total_usage': 0}}),
+        ({'data': {'limit_remaining': 0.4, 'include_byok_in_limit': False, 'is_free_tier': False}},
+         {'data': {'total_credits': 10, 'total_usage': 9.6}}),
+    ]
+    monkeypatch.setattr('qjig.account_client.fetch_account_snapshot', lambda path, **kwargs: observations.pop(0))
+    with backend.goal_factory() as goal:
+        assert goal._account_bound
+    with backend.goal_factory() as goal:
+        assert goal._con.execute('SELECT COUNT(*) FROM account_restrictions').fetchone()[0] == 1
+    assert observations == []
+
+
+def test_configured_goal_rejects_unavailable_account_before_creating_ledger(tmp_path, monkeypatch):
+    from qjig.account_client import AccountRefreshError
+    config = config_for(tmp_path)
+    path = tmp_path / 'config.json'
+    path.write_text(json.dumps(config))
+    backend = load_fresh_config(path)
+    def unavailable(*args, **kwargs):
+        raise AccountRefreshError('account observations unavailable or invalid')
+    monkeypatch.setattr('qjig.account_client.fetch_account_snapshot', unavailable)
+    with pytest.raises(AccountRefreshError):
+        backend.goal_factory()
+    assert not (tmp_path / 'state' / 'goal.sqlite').exists()
