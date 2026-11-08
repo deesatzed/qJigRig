@@ -1,0 +1,9 @@
+# Synthetic v4 campaign verification
+
+This is an integration exercise using stand-in responses, authored unvalidated case references and declared synthetic applicability. It is not a live model evaluation, independent accuracy evidence or a frozen decision policy.
+
+The retained ignored campaign is `.local/verification/full-factorial-synthetic-86c07pjx`. A private synthetic manifest was reconstructed from that same campaign and draft case data at `synthetic-manifest.json`; its SHA-256 is `b8d216a7b4042ecac9070d0ffe2dfbe06d61a254e714d6d3fada64f1c8b3eeca`. Because these anchors were derived from the same retained state, they are consistency checks, not independent provenance. Keep the private manifest out of Git.
+
+`python scripts/verify_live_receipts.py --manifest .local/verification/full-factorial-synthetic-86c07pjx/synthetic-manifest.json --sha256 b8d216a7b4042ecac9070d0ffe2dfbe06d61a254e714d6d3fada64f1c8b3eeca` exited 1 with `status: incomplete` and `provider_attribution_not_live`. It reconstructed 105 of 105 scored assignments, including their separate review records, and checked all 16 declared cases. Its ledger reported 330 stand-in attempts and complete synthetic usage; the fixture's $0.033 is not actual expenditure. Provider authenticity, independent labels, semantic accuracy and label isolation beyond declared exact artifacts remain unestablished.
+
+Four holdout reconstructions compared each direct baseline with each fresh intervention arm. Each had 10 assigned and 10 recorded pairs; every fresh request remained unknown/deferred, and all review assessments were uncertain. Two combined-arm reviews were explicitly not performed because their original plan review was unavailable. Outcome support stayed null, and no retain/revise/remove recommendation follows from these fixtures.
