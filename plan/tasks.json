@@ -1249,7 +1249,8 @@
       "phase": "P6",
       "depends_on": [
         "T068",
-        "T069A"
+        "T069A",
+        "T069B"
       ],
       "status": "pending",
       "files": [
@@ -4343,6 +4344,24 @@
       "acceptance": "Enumerate all case and repeat pairs; classify missing and unknown as incomplete; preserve separately scoped comparison and caller attribution.",
       "command": "python -m pytest tests/test_evaluation.py::test_paired_outcome_metric_keeps_assigned_denominator_and_unknowns -q",
       "evidence": "Red: paired outcome assertion calculator was absent. Green: design-anchored six-pair fixture preserves missing and unknown outcomes, rejects duplicate or invalid pairs, and computes tie/win/loss arithmetic; evaluation/gates/semantic-review/replay regressions passed 112. Categories are caller assertions, not review records or a recommendation; full T068 remains open."
+    },
+    {
+      "id": "T069B",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069A",
+        "T068O"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/outcome_preflight.py"
+      ],
+      "test_file": "tests/test_outcome_preflight.py",
+      "test_name": "test_outcome_review_reserves_distinct_route_bound_work",
+      "action": "Reserve a separate budgeted request-outcome review slot",
+      "acceptance": "Outcome review has distinct stage and immutable route-bound allocation; incorrect stage or route cannot consume the reserved slot.",
+      "command": "python -m pytest tests/test_outcome_preflight.py::test_outcome_review_reserves_distinct_route_bound_work -q",
+      "evidence": "Red: separate outcome-review reservation module was absent. Green: synthetic outcome work has its own stage and route-bound slot; wrong stage or route cannot consume it, and successful stand-in usage reconciles. Outcome/semantic/goal/preflight/provider regressions passed 106. No reviewer, prompt, campaign integration, semantic assessment or hosted authorization is claimed."
     }
   ]
 }
