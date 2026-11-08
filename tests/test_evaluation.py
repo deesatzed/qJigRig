@@ -755,6 +755,17 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
             review_prompt=next(e['data']['prompt'] for e in semantic_archive.events() if e['kind']=='request')
             assert gold.decode() not in review_prompt and ledger._request_id not in review_prompt
             assert 'conditional_answer' in review_prompt and 'deferred' in review_prompt
+            from qjig.evaluation_semantic_review import verify_fresh_semantic_review
+            checked=verify_fresh_semantic_review(archive,journal,semantic_archive,reference=ref,
+                expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                expected_journal_sha256=journal_hash)
+            assert checked['status']=='unanchored' and checked['assessment']=='supported'
+            assert verify_fresh_semantic_review(archive,journal,semantic_archive,reference=ref,
+                expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                expected_journal_sha256=journal_hash,expected_review_sha256=checked['sha256'])['status']=='structurally_verified'
+            assert verify_fresh_semantic_review(archive,journal,semantic_archive,reference=ref,
+                expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                expected_journal_sha256=journal_hash,expected_review_sha256='0'*64)['status']=='invalid'
             replayed_score=score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
                 expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash,original_run_only=True)
             assert replayed_score['journal_scope']=='original_run_prefix'
@@ -769,6 +780,13 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
             with pytest.raises(ContractError):
                 score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
                     expected_reference_sha256=reference_digest(ref),expected_journal_sha256='0'*64,original_run_only=True)
+            semantic_archive._con.execute('DROP TRIGGER event_no_update')
+            seq,encoded=semantic_archive._con.execute("SELECT seq,data FROM events WHERE kind='review_record'").fetchone()
+            changed=json.loads(encoded); changed['conditional_answer']='no'
+            semantic_archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),seq))
+            assert verify_fresh_semantic_review(archive,journal,semantic_archive,reference=ref,
+                expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                expected_journal_sha256=journal_hash)['status']=='invalid'
         recorded = journal._con.execute("SELECT payload FROM events WHERE kind='receipt' LIMIT 1").fetchone()[0]
         corrupted = json.loads(recorded); corrupted['usage']['cost_usd'] = 0
         journal._con.execute('DROP TRIGGER events_no_update')
