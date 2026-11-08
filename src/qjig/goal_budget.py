@@ -125,6 +125,31 @@ class GoalBudget:
             raise
         return cls(con, total, per_request, dict(allocations), account_snapshot is not None)
 
+    def bind_hosted_journal(self, journal) -> None:
+        """Bind hosted preflight to one local journal path; not authentication or rollback protection."""
+        from .journal import Journal
+        if not isinstance(journal, Journal) or not self._account_bound:
+            raise ContractError('account-bound goal and persistent journal required')
+        rows=journal._con.execute('PRAGMA database_list').fetchall()
+        filename=next((row[2] for row in rows if row[1]=='main'),None)
+        if not isinstance(filename,str) or not filename:
+            raise ContractError('persistent journal binding required')
+        path=str(Path(filename).resolve())
+        self._con.execute('BEGIN IMMEDIATE')
+        try:
+            self._con.execute('CREATE TABLE IF NOT EXISTS hosted_journal_binding (id INTEGER PRIMARY KEY CHECK(id=1), path TEXT NOT NULL)')
+            self._con.execute("CREATE TRIGGER IF NOT EXISTS hosted_journal_no_update BEFORE UPDATE ON hosted_journal_binding BEGIN SELECT RAISE(ABORT, 'hosted journal binding immutable'); END")
+            self._con.execute("CREATE TRIGGER IF NOT EXISTS hosted_journal_no_delete BEFORE DELETE ON hosted_journal_binding BEGIN SELECT RAISE(ABORT, 'hosted journal binding immutable'); END")
+            row=self._con.execute('SELECT path FROM hosted_journal_binding WHERE id=1').fetchone()
+            if row is None:
+                self._con.execute('INSERT INTO hosted_journal_binding VALUES(1,?)',(path,))
+            elif row[0]!=path:
+                raise ContractError('hosted journal binding differs; recovery required')
+            self._con.execute('COMMIT')
+        except BaseException:
+            self._con.execute('ROLLBACK')
+            raise
+
     def account_refresh_baseline(self) -> str:
         """Capture a quiescent ledger state before fetching a new account snapshot.
 

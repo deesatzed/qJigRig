@@ -35,6 +35,7 @@ def prepare_hosted_attempt(ledger: BudgetLedger, request: ProviderRequest, reser
         partition=ledger._partition, stage=request.stage, provider=request.provider, model=request.model,
         tokens=reservation.input_tokens + request.max_tokens, cost_usd=reservation.cost_usd,
         work_binding_sha256=reservation.work_binding_sha256)
+    goal.bind_hosted_journal(ledger._journal)
     refresh_account_constraints(goal, Path(env_path))
     goal._check_capacity(ledger._request_id, ledger._partition, 0, 0, Decimal(0))
     snapshot = fetch_endpoint_snapshot(request.model)

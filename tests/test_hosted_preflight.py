@@ -50,9 +50,35 @@ def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_pat
         if route:assert result['pricing']['route']==route and result['pricing']['route_count']==1
         assert journal.events('r') == []
         assert goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0] == 1
+        with Journal.open(tmp_path/'other-journal.sqlite') as other:
+            other_ledger=BudgetLedger(limit,other,'r',goal_budget=goal,partition='smoke')
+            with pytest.raises(ContractError,match='journal.*binding'):
+                prepare_hosted_attempt(other_ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
         raised = {**snapshot, 'endpoints':[{**snapshot['endpoints'][0],
                   'pricing':{'prompt':'0.1','completion':'0.2','discount':0}}]}
         monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot', lambda model: raised)
         with pytest.raises(ContractError, match='reservation'):
             prepare_hosted_attempt(ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
         assert journal.events('r') == []
+
+
+def test_hosted_journal_binding_survives_restart_and_rejects_memory(tmp_path):
+    account=({'data':{'limit_remaining':1,'include_byok_in_limit':False,'is_free_tier':False}},
+             {'data':{'total_credits':1,'total_usage':0}})
+    limit=Budget(5,10000,0.5)
+    path=tmp_path/'goal.sqlite'
+    with GoalBudget.open(path,total=limit,per_request=limit,allocations={'smoke':limit},account_snapshot=account) as goal:
+        with Journal.open(':memory:') as memory:
+            with pytest.raises(ContractError,match='persistent journal'):
+                goal.bind_hosted_journal(memory)
+        with Journal.open(tmp_path/'first.sqlite') as first:
+            goal.bind_hosted_journal(first)
+        import sqlite3
+        with pytest.raises(sqlite3.IntegrityError):
+            goal._con.execute("UPDATE hosted_journal_binding SET path='different'")
+    with GoalBudget.resume_account_bound(path,total=limit,per_request=limit,allocations={'smoke':limit}) as goal:
+        with Journal.open(tmp_path/'first.sqlite') as first:
+            goal.bind_hosted_journal(first)
+        with Journal.open(tmp_path/'second.sqlite') as second:
+            with pytest.raises(ContractError,match='journal.*binding'):
+                goal.bind_hosted_journal(second)
