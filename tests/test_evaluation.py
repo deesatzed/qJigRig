@@ -1784,6 +1784,8 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                 assert all(gold.decode() not in p and rid not in p and arm not in p for p in prompts)
                 entries[arm]={'archive':archive,'journal':journal,'reference':ref,'run_sha256':receipt['run_sha256'],
                               'reference_sha256':reference_digest(ref),'journal_sha256':receipt['journal_sha256']}
+                if driver=='runner_semantic':
+                    entries[arm].update(review_archive=semantic_archive,review_sha256=receipt['semantic_review_sha256'])
                 with pytest.raises(ContractError):campaign.claim(rid)
                 continue
             claim=campaign.claim(rid)
@@ -1833,6 +1835,18 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
         assert goal.audit_journal(journal)['status']=='verified'
         if driver=='runner_semantic':
             assert campaign.status()['scored']==5
+            pair=[entries['direct_retrieval'],entries['combined']]
+            opts=dict(plan_id='factorial',expected_plan_sha256=plan['sha256'],expected_design_sha256=digest,
+                      baseline_arm='direct_retrieval',candidate_arm='combined',expected_config_sha256=config_digest)
+            report=build_reserved_holdout_comparison(goal,design,pair,**opts)
+            assert report['recorded_pairs']==1 and report['missing_pairs']==5 and report['outcome_support'] is None
+            assert report['semantic_reviews']['uncertain']==2 and report['semantic_reviews']['assurance']=='unvalidated'
+            assert {r['arm'] for r in report['semantic_reviews']['records']}=={'direct_retrieval','combined'}
+            assert all(r['case_id']=='holdout' and r['repeat']==1 for r in report['semantic_reviews']['records'])
+            with pytest.raises(ContractError):
+                build_reserved_holdout_comparison(goal,design,[pair[0],{**pair[1],'review_sha256':'0'*64}],**opts)
+            with pytest.raises(ContractError):
+                build_reserved_holdout_comparison(goal,design,pair,**{**opts,'expected_config_sha256':'0'*64})
             return
         for arm in ('direct_full_evidence','retrieval_only','decomposition_only','combined'):
             report=build_reserved_holdout_comparison(goal,design,[entries['direct_retrieval'],entries[arm]],plan_id='factorial',
