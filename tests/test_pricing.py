@@ -93,3 +93,26 @@ def test_endpoint_fetch_refuses_redirect_and_does_not_return_unchecked_body():
         fetch_endpoint_snapshot('tencent/hy4', get=lambda url, timeout: (302, '{}'))
     with pytest.raises(ContractError):
         fetch_endpoint_snapshot('unapproved/model', get=lambda url, timeout: pytest.fail('unexpected request'))
+
+
+def test_endpoint_snapshot_model_reserves_across_all_routes_and_rejects_unknown_prices():
+    from datetime import datetime, timezone
+    from qjig.pricing import model_from_endpoint_snapshot
+    from qjig.providers import ProviderRequest, make_call_reservation
+    now = datetime(2026, 11, 7, tzinfo=timezone.utc)
+    first = {'model_id':'tencent/hy4','provider_name':'A','context_length':1000,'max_completion_tokens':100,
+             'pricing':{'prompt':'0.000001','completion':'0.000002','discount':0}}
+    second = {'model_id':'tencent/hy4','provider_name':'B','context_length':800,'max_completion_tokens':80,
+              'pricing':{'prompt':'0.000003','completion':'0.000001','input_cache_read':'0.000001','discount':0}}
+    snapshot = {'model':'tencent/hy4','source':'openrouter_public_endpoint_catalog',
+                'observed_at':now.isoformat(),'endpoints':[first,second]}
+    model = model_from_endpoint_snapshot(snapshot, now=now, max_age_seconds=30)
+    req = ProviderRequest('judge','openrouter','tencent/hy4','question',50,
+                          max_price={'prompt':10,'completion':20})
+    bound = make_call_reservation(req,model,input_tokens=100,input_bound_provenance='synthetic estimate')
+    assert Decimal(str(bound.cost_usd)) >= Decimal('0.0005')
+    changed = {**snapshot,'endpoints':[first,{**second,'pricing':{**second['pricing'],'discount':0.5}}]}
+    with pytest.raises(ContractError):
+        model_from_endpoint_snapshot(changed,now=now,max_age_seconds=30)
+    with pytest.raises(ContractError):
+        model_from_endpoint_snapshot(snapshot,now=now.replace(minute=1),max_age_seconds=30)

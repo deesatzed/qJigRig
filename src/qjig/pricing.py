@@ -131,3 +131,43 @@ def fetch_endpoint_snapshot(model: str, *, get=_get_endpoint_catalog) -> dict:
                 'source': 'openrouter_public_endpoint_catalog'}
     except (OSError, ValueError, TypeError, UnicodeError, urllib.error.URLError) as exc:
         raise ContractError('endpoint lookup unavailable or invalid') from exc
+
+
+def model_from_endpoint_snapshot(snapshot: dict, *, now: datetime, max_age_seconds: int) -> dict:
+    """Build a conservative all-listed-endpoint model from a fresh snapshot.
+
+    This checks a provider assertion, not routing enforcement, completeness of
+    provider metadata, future prices, account billing or hosted authorization.
+    """
+    if (not isinstance(snapshot, dict) or snapshot.get('source') != 'openrouter_public_endpoint_catalog'
+            or not isinstance(now, datetime) or now.tzinfo is None
+            or type(max_age_seconds) is not int or max_age_seconds < 1):
+        raise ContractError('invalid endpoint snapshot provenance')
+    try:
+        observed = datetime.fromisoformat(snapshot['observed_at'])
+        if observed.tzinfo is None:
+            raise ValueError('timestamp has no timezone')
+        age = (now - observed).total_seconds()
+        if age < 0 or age > max_age_seconds:
+            raise ValueError('snapshot is stale or from the future')
+        checked = parse_endpoint_snapshot({'data': {'id': snapshot['model'], 'endpoints': snapshot['endpoints']}},
+                                          expected_model=snapshot['model'])
+        maxima = {}
+        for endpoint in checked['endpoints']:
+            model = {'id':checked['model'], 'context_length':endpoint['context_length'],
+                     'top_provider':{'max_completion_tokens':endpoint['max_completion_tokens']},
+                     'pricing':endpoint['pricing']}
+            # Validate all categories, discounts and overrides without assuming
+            # that a route excluded by today's prices will stay excluded later.
+            upper_cost(model, input_tokens=1, output_tokens=1)
+            pricing = endpoint['pricing']
+            for item in [pricing, *pricing.get('overrides', [])]:
+                for key in (_INPUT_RATES | _OUTPUT_RATES) & item.keys():
+                    maxima[key] = max(maxima.get(key, Decimal(0)), _rate(item[key]))
+        return {'id':checked['model'],
+                'context_length':min(e['context_length'] for e in checked['endpoints']),
+                'top_provider':{'max_completion_tokens':min(e['max_completion_tokens'] for e in checked['endpoints'])},
+                'pricing':{key:str(value) for key,value in maxima.items()},
+                'endpoint_snapshot': snapshot}
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ContractError('endpoint snapshot cannot bound current routes') from exc
