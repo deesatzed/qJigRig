@@ -191,3 +191,32 @@ def model_from_endpoint_snapshot(snapshot: dict, *, now: datetime, max_age_secon
                 'endpoint_snapshot': snapshot}
     except (KeyError, TypeError, ValueError, OverflowError) as exc:
         raise ContractError('endpoint snapshot cannot bound current routes') from exc
+
+
+def candidate_provider_pricing(snapshot: dict, *, provider_slug: str, now: datetime, max_age_seconds: int) -> dict:
+    """Estimate one provider's catalog variants; this cannot authorize or pin a request.
+
+    The caller must separately bind and enforce routing, check fresh pricing,
+    account for all billing categories and retain provider-failure handling.
+    """
+    import re
+    if (not isinstance(provider_slug,str)
+            or not re.fullmatch(r'[a-z0-9][a-z0-9-]*(?:/[a-z0-9][a-z0-9-]*)*',provider_slug)):
+        raise ContractError('invalid provider slug')
+    try:
+        checked=parse_endpoint_snapshot({'data':{'id':snapshot['model'],'endpoints':snapshot['endpoints']}},
+                                        expected_model=snapshot['model'])
+        tags=[endpoint.get('tag') for endpoint in checked['endpoints']]
+        if any(not isinstance(tag,str) or not re.fullmatch(r'[a-z0-9][a-z0-9-]*(?:/[a-z0-9][a-z0-9-]*)*',tag)
+               for tag in tags):
+            raise ContractError('ambiguous endpoint routing tags')
+        selected=[endpoint for endpoint in checked['endpoints']
+                  if endpoint['tag']==provider_slug or endpoint['tag'].startswith(provider_slug+'/')]
+        if not selected:
+            raise ContractError('provider has no listed endpoints')
+        filtered={**snapshot,'endpoints':selected}
+        model=model_from_endpoint_snapshot(filtered,now=now,max_age_seconds=max_age_seconds)
+        return {'provider_slug':provider_slug,'route_count':len(selected),'model':model,
+                'assurance':'catalog_route_candidate_only','hosted_authorized':False}
+    except (KeyError,TypeError,ValueError) as exc:
+        raise ContractError('invalid provider route candidate') from exc

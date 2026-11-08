@@ -139,3 +139,32 @@ def test_current_endpoint_prices_must_fit_the_existing_request_reservation():
     increased = {**snapshot,'endpoints':[{**endpoint,'pricing':{**endpoint['pricing'],'prompt':'0.001'}}]}
     with pytest.raises(ContractError, match='reservation'):
         check_current_endpoint_cost(request,reservation,snapshot=increased,now=now,max_age_seconds=30)
+
+
+def test_provider_route_candidate_keeps_all_matching_variants_and_refuses_ambiguous_tags():
+    from datetime import datetime,timezone
+    from qjig.pricing import candidate_provider_pricing
+    now=datetime(2026,11,7,tzinfo=timezone.utc)
+    def endpoint(tag,prompt):
+        return {'model_id':'tencent/hy4','provider_name':'Synthetic','tag':tag,'context_length':1000,
+                'max_completion_tokens':100,'pricing':{'prompt':prompt,'completion':'0.000002','discount':0}}
+    snapshot={'model':'tencent/hy4','source':'openrouter_public_endpoint_catalog','observed_at':now.isoformat(),
+              'endpoints':[endpoint('alpha/fp8','0.000001'),endpoint('alpha/us','0.000003'),endpoint('other/fp8','0.01')]}
+    candidate=candidate_provider_pricing(snapshot,provider_slug='alpha',now=now,max_age_seconds=60)
+    assert candidate['route_count']==2 and candidate['model']['pricing']['prompt']=='0.000003'
+    assert candidate['hosted_authorized'] is False and candidate['assurance']=='catalog_route_candidate_only'
+    with pytest.raises(ContractError):
+        candidate_provider_pricing(snapshot,provider_slug='missing',now=now,max_age_seconds=60)
+    with pytest.raises(ContractError):
+        candidate_provider_pricing({**snapshot,'endpoints':snapshot['endpoints']+[endpoint(None,'0.1')]},
+                                   provider_slug='alpha',now=now,max_age_seconds=60)
+    with pytest.raises(ContractError):
+        candidate_provider_pricing(snapshot,provider_slug='alpha/*',now=now,max_age_seconds=60)
+    from datetime import timedelta
+    with pytest.raises(ContractError):
+        candidate_provider_pricing(snapshot,provider_slug='alpha',now=now+timedelta(seconds=61),max_age_seconds=60)
+    changed=endpoint('alpha/fp8','0.000001');changed['pricing']['web_search']='0.01'
+    with pytest.raises(ContractError):
+        candidate_provider_pricing({**snapshot,'endpoints':[changed]},provider_slug='alpha',now=now,max_age_seconds=60)
+    variant=candidate_provider_pricing(snapshot,provider_slug='alpha/us',now=now,max_age_seconds=60)
+    assert variant['route_count']==1 and variant['model']['pricing']['prompt']=='0.000003'
