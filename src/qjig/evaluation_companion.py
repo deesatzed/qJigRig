@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import re
 from decimal import Decimal
 
 from .contracts import ContractError
@@ -125,6 +126,8 @@ def summarize_companion_assertions(reports: dict, *, additional_reports: dict | 
 def group_holdout_interventions(design: dict, companion: dict, *, expected_design_sha256: str, partition: str = 'holdout') -> dict:
     """Group caller-asserted request outcomes by frozen intervention links."""
     from .evaluation import validate_evaluation_design
+    if not isinstance(expected_design_sha256,str) or not re.fullmatch(r'[0-9a-f]{64}',expected_design_sha256):
+        raise ContractError('frozen design anchor required')
     validate_evaluation_design(design,expected_digest=expected_design_sha256)
     if partition not in ('development','pilot','holdout'):
         raise ContractError('invalid intervention partition')
@@ -167,6 +170,8 @@ def group_holdout_interventions(design: dict, companion: dict, *, expected_desig
 def summarize_campaign_assertions(design: dict, records: list[dict], *, expected_design_sha256: str) -> dict:
     """Summarize every assigned partition from caller-asserted scored records."""
     from .evaluation import validate_evaluation_design
+    if not isinstance(expected_design_sha256,str) or not re.fullmatch(r'[0-9a-f]{64}',expected_design_sha256):
+        raise ContractError('frozen design anchor required')
     validate_evaluation_design(design,expected_digest=expected_design_sha256)
     if not isinstance(records,list):raise ContractError('campaign records required')
     families={item['id']:item['partition'] for item in design['families']}

@@ -77,6 +77,8 @@ def test_group_holdout_interventions_preserves_missing_and_unknown():
     missing=next(r for r in changed if r['arm']=='combined' and r['repeat']==2)
     assert missing['intervention'] is None and missing['category_changed'] is None
     assert result['groups']['missing_decisive']==[] and result['groups']['irrelevant_change']==[]
+    with pytest.raises(ContractError): group_holdout_interventions(design,{'arms':arms},expected_design_sha256=None)
+    with pytest.raises(ContractError): group_holdout_interventions(design,{'arms':arms},expected_design_sha256='0'*64)
     duplicate=copy.deepcopy(arms);duplicate['combined']['cases'].append(row('holdout',1,'failed'))
     with pytest.raises(ContractError):
         group_holdout_interventions(design,{'arms':duplicate},expected_design_sha256=digest)
@@ -108,6 +110,9 @@ def test_campaign_companion_preserves_partitions_and_pilot_interventions():
     assert all(row['category_changed'] is None for row in result['interventions']['pilot']['groups']['changed_decisive'])
     with pytest.raises(ContractError): summarize_campaign_assertions(design,records[:-1],expected_design_sha256=digest)
     with pytest.raises(ContractError): summarize_campaign_assertions(design,records+[records[0]],expected_design_sha256=digest)
+    with pytest.raises(ContractError): summarize_campaign_assertions(design,records,expected_design_sha256=None)
+    with pytest.raises(ContractError): summarize_campaign_assertions(design,records,expected_design_sha256='x'*64)
+    with pytest.raises(ContractError): summarize_campaign_assertions(design,records,expected_design_sha256='0'*64)
 
 
 def test_arm_configuration_discloses_access_and_work_differences():

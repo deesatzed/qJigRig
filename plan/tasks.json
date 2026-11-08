@@ -4584,7 +4584,8 @@
         "T072I",
         "T072J",
         "T072K",
-        "T072L"
+        "T072L",
+        "T072M"
       ],
       "status": "pending",
       "files": [
@@ -4936,6 +4937,23 @@
       "acceptance": "Per-arm stage totals preserve unknown usage, reconcile assignment call counts, and do not double-count shared comparison records.",
       "command": "python -m pytest tests/test_evaluation_companion.py::test_companion_counts_unique_arms_and_preserves_unknown_usage -q",
       "evidence": "Red: per-arm stage totals were absent; additional tests exposed unchecked inconsistent token and cost totals. Green: stage counts and known/unknown usage reconcile to each assignment and shared arms remain deduplicated; evaluation/review/replay/goal regressions passed 197. A prior synthetic run reconstructed combined holdout stage calls, but its provider attribution and source contract remain incomplete. No real cost or provider behavior is established."
+    },
+    {
+      "id": "T072M",
+      "phase": "evaluation",
+      "depends_on": [
+        "T072K"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_companion.py"
+      ],
+      "test_file": "tests/test_evaluation_companion.py",
+      "test_name": "test_campaign_companion_preserves_partitions_and_pilot_interventions",
+      "action": "Require explicit frozen design anchors for campaign and intervention reports",
+      "acceptance": "A missing, malformed or mismatched design digest refuses before grouped or partitioned results are produced.",
+      "command": "python -m pytest tests/test_evaluation_companion.py::test_campaign_companion_preserves_partitions_and_pilot_interventions -q",
+      "evidence": "Red: campaign and intervention summaries accepted a missing design digest. Green: missing, malformed and mismatched anchors refuse; focused companion tests passed 4 and evaluation/review/replay/gate regressions passed 157. This does not authenticate caller-provided anchors or validate semantic judgments."
     }
   ]
 }
