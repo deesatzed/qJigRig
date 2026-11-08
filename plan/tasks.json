@@ -1340,7 +1340,9 @@
       "depends_on": [
         "T062",
         "T072",
-        "T073A"
+        "T073A",
+        "T073B",
+        "T073C"
       ],
       "status": "pending",
       "files": [
@@ -4708,6 +4710,23 @@
       "acceptance": "Exact reserved calls traverse bound ledger, account and endpoint checks from call_typed; preflight failures refuse before transport and unknown billing still prevents dispatch.",
       "command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
       "evidence": "Red: an account-bound reserved typed call refused without running preflight. Green: typed-call path refreshes account and checks exact endpoint pricing, rejects increased prices, and refuses before HTTP or journal intent for both routed and unrouted synthetic cases. Hosted-preflight/provider/goal/config/service regressions passed 111 with one optional skip. This is a nonauthorizing partial path; FreshWorkbench and transport still refuse, and full billing and prior-spend assurance remain open."
+    },
+    {
+      "id": "T073C",
+      "phase": "verification",
+      "depends_on": [
+        "T071I"
+      ],
+      "status": "complete",
+      "files": [
+        "tests/test_factorial_synthetic.py"
+      ],
+      "test_file": "tests/test_factorial_synthetic.py",
+      "test_name": "test_synthetic_rubric_design_rebinds_without_mutating_draft",
+      "action": "Remove ignored local draft dependency from installed-package synthetic rubric test",
+      "acceptance": "The rubric derivation test uses a self-contained valid synthetic design and locks and passes in an isolated installed test tree without .local data.",
+      "command": "python -m pytest tests/test_factorial_synthetic.py::test_synthetic_rubric_design_rebinds_without_mutating_draft -q",
+      "evidence": "Red: clean-install staged suite could not find ignored .local draft, with 711 passed, 1 failed and 1 skipped; installed browser journey passed. Green: focused self-contained test passed; full clean-install rerun passed with installed browser 1 passed and staged suite 712 passed, 1 skipped. The skipped nested clean-install test avoids recursive execution. No live provider validation."
     }
   ]
 }

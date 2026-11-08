@@ -46,15 +46,21 @@ def test_synthetic_factorial_configuration_has_opt_in_outcome_review():
 def test_synthetic_rubric_design_rebinds_without_mutating_draft():
     import copy
     import hashlib
-    import json
     import pytest
     from qjig.evaluation import validate_evaluation_design
     from qjig.evaluation_cases import case_lock_digest
     path=Path(__file__).resolve().parents[1]/'scripts'/'smoke_factorial_synthetic.py'
     spec=importlib.util.spec_from_file_location('synthetic_factorial_rubric',path)
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-    design=json.loads((module.DRAFT/'design.json').read_text())
-    locks=json.loads((module.DRAFT/'private/case_locks.json').read_text())
+    from test_evaluation import _sample_design
+    design=_sample_design()
+    lock={'schema':'qjig.evaluation-case.v1','case_id':'dev',
+          'design_sha256':validate_evaluation_design(design),'question':'Do checks pass?',
+          'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07',
+          'entities':[],'historical_as_known':False,
+          'sources':[{'path':'synthetic.txt','sha256':hashlib.sha256(b'synthetic').hexdigest()}],
+          'reference_sha256':hashlib.sha256(b'fictional reference').hexdigest()}
+    locks={'dev':{'lock':lock,'sha256':case_lock_digest(lock)}}
     original_design=copy.deepcopy(design);original_locks=copy.deepcopy(locks)
     new_design,new_locks=module.synthetic_rubric_design(design,locks)
     digest=validate_evaluation_design(new_design)
