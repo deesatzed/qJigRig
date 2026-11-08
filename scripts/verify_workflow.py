@@ -17,6 +17,7 @@ def run_offline(*, run=subprocess.run):
     checks = {
         'authored_browser_restart_export': [sys.executable, 'scripts/verify_saved_run_browser.py'],
         'review_browser_intervention': [sys.executable, 'scripts/verify_review_browser.py'],
+        'fresh_browser_journey': [sys.executable, '-m', 'pytest', 'tests/test_workflow_browser.py::test_complete_synthetic_fresh_browser_journey', '-q'],
         'two_browser_clients': [sys.executable, '-m', 'pytest', 'tests/test_source_browser.py::test_two_browser_clients_show_cross_client_source_change', '-q'],
         'two_role_clients': [sys.executable, '-m', 'pytest', 'tests/test_agents.py::test_two_role_clients_share_actual_local_service', '-q'],
         'interruption_recovery': [sys.executable, '-m', 'pytest', 'tests/test_fresh_process_crash.py::test_process_exit_leaves_incomplete_fresh_run_without_retry', '-q'],
@@ -41,9 +42,7 @@ def run_offline(*, run=subprocess.run):
             results[name] = {'status':status,'exit_code':result.returncode,'output':output[-4000:]}
         except (OSError, subprocess.TimeoutExpired) as exc:
             results[name] = {'status':'unavailable','exit_code':None,'output':str(exc)}
-    # Separate checks are not evidence of a single end-to-end fresh-browser journey.
-    unmet = ['complete_fresh_browser_journey_unverified']
-    unmet.extend(name for name, value in results.items() if value['status'] != 'passed')
+    unmet = [name for name, value in results.items() if value['status'] != 'passed']
     return {'status':'incomplete' if unmet else 'passed','checks':results,'unmet':unmet,
             'hosted_provider':'not_exercised','evidence':'synthetic_local_checks'}
 

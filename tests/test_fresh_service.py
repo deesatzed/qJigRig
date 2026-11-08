@@ -98,8 +98,9 @@ def test_configured_service_runs_fresh_pipeline_and_preserves_deferral(tmp_path)
             with playwright.sync_playwright() as p:
                 browser = p.chromium.launch(headless=True, executable_path=os.environ['QJIG_CHROMIUM_PATH'])
                 try:
-                    page = browser.new_page()
+                    page = browser.new_page(viewport={'width':390,'height':844})
                     page.goto(f'http://127.0.0.1:{server.server_address[1]}/')
+                    assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
                     form = page.locator('#fresh-form')
                     form.locator('[name=question]').fill('Refund limit?')
                     form.locator('[name=scope]').fill('project')
