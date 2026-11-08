@@ -220,3 +220,30 @@ def candidate_provider_pricing(snapshot: dict, *, provider_slug: str, now: datet
                 'assurance':'catalog_route_candidate_only','hosted_authorized':False}
     except (KeyError,TypeError,ValueError) as exc:
         raise ContractError('invalid provider route candidate') from exc
+
+
+def candidate_token_price_bound(model: dict, *, input_tokens: int, output_tokens: int, max_price: dict) -> dict:
+    """Compare catalog and routing rates without treating either as a second charge.
+
+    Cache categories remain additive. This is candidate arithmetic, not a
+    dispatch reservation, provider enforcement guarantee or complete bill.
+    """
+    import math
+    if (not isinstance(max_price,dict) or set(max_price)!={'prompt','completion'}
+            or any(type(value) not in (int,float) or not math.isfinite(value) or value < 0
+                   for value in max_price.values())):
+        raise ContractError('invalid routing price ceiling')
+    # Reuse complete validation of token bounds, model, discount, overrides and categories.
+    upper_cost(model,input_tokens=input_tokens,output_tokens=output_tokens)
+    pricing=model['pricing'];discount=_discount_fraction(pricing);rates={}
+    for item in [pricing,*pricing.get('overrides',[])]:
+        for name in (_INPUT_RATES | _OUTPUT_RATES) & item.keys():
+            rates[name]=max(rates.get(name,Decimal(0)),_undiscounted_rate(item[name],discount))
+    with localcontext() as ctx:
+        ctx.prec=80
+        ctx.rounding=ROUND_CEILING
+        prompt=max(rates['prompt'],Decimal(str(max_price['prompt']))/Decimal(1000000))
+        completion=max(rates['completion'],Decimal(str(max_price['completion']))/Decimal(1000000))
+        cache=sum((rates.get(name,Decimal(0)) for name in _INPUT_RATES-{'prompt'}),Decimal(0))
+        cost=(prompt+cache)*input_tokens+completion*output_tokens
+    return {'cost_usd':cost,'assurance':'candidate_arithmetic_only','hosted_authorized':False}

@@ -168,3 +168,22 @@ def test_provider_route_candidate_keeps_all_matching_variants_and_refuses_ambigu
         candidate_provider_pricing({**snapshot,'endpoints':[changed]},provider_slug='alpha',now=now,max_age_seconds=60)
     variant=candidate_provider_pricing(snapshot,provider_slug='alpha/us',now=now,max_age_seconds=60)
     assert variant['route_count']==1 and variant['model']['pricing']['prompt']=='0.000003'
+
+
+def test_candidate_price_bound_does_not_duplicate_prompt_rates_and_retains_cache_categories():
+    from qjig.pricing import candidate_token_price_bound
+    model={'id':'synthetic/model','context_length':1000,'top_provider':{'max_completion_tokens':100},
+           'pricing':{'prompt':'0.000001','completion':'0.000002','input_cache_read':'0.0000003',
+                      'input_cache_write':'0.0000005','discount':0,
+                      'overrides':[{'prompt':'0.000004','completion':'0.000003','min_prompt_tokens':500}]}}
+    result=candidate_token_price_bound(model,input_tokens=100,output_tokens=50,
+                                       max_price={'prompt':5,'completion':2})
+    # Prompt ceiling is 5/M; catalog completion override 3/M; both cache rates remain additive.
+    assert result['cost_usd']==Decimal('0.00073')
+    assert result['assurance']=='candidate_arithmetic_only' and result['hosted_authorized'] is False
+    for caps in ({'prompt':True,'completion':2},{'prompt':5},{'prompt':5,'completion':float('nan')}):
+        with pytest.raises(ContractError):
+            candidate_token_price_bound(model,input_tokens=100,output_tokens=50,max_price=caps)
+    with pytest.raises(ContractError):
+        candidate_token_price_bound({**model,'pricing':{**model['pricing'],'web_search':'0.1'}},
+                                    input_tokens=100,output_tokens=50,max_price={'prompt':5,'completion':2})
