@@ -119,3 +119,31 @@ def test_v2_workbenches_share_goal_and_journal_across_state_directories(tmp_path
     with second.goal_factory() as goal:
         assert goal.totals().max_calls == 1
     assert first.journal_path == second.journal_path == tmp_path / 'shared-goal' / 'journal.sqlite'
+
+
+def test_v2_rejects_switching_goal_directory_for_same_credential_root(tmp_path):
+    config = config_for(tmp_path)
+    config.update(schema='qjig.fresh-config.v2', goal_dir=str(tmp_path / 'first-goal'))
+    path = tmp_path / 'config.json'
+    path.write_text(json.dumps(config))
+    load_fresh_config(path)
+    config['state_dir'] = str(tmp_path / 'other-state')
+    config['goal_dir'] = str(tmp_path / 'second-goal')
+    path.write_text(json.dumps(config))
+    with pytest.raises(ContractError, match='goal directory'):
+        load_fresh_config(path)
+    assert not (tmp_path / 'second-goal' / 'goal.sqlite').exists()
+
+
+def test_v2_binding_rejects_legacy_config_that_could_reset_budget(tmp_path):
+    config = config_for(tmp_path)
+    config.update(schema='qjig.fresh-config.v2', goal_dir=str(tmp_path / 'shared'))
+    path = tmp_path / 'config.json'
+    path.write_text(json.dumps(config))
+    load_fresh_config(path)
+    config.pop('goal_dir')
+    config['schema'] = 'qjig.fresh-config.v1'
+    config['state_dir'] = str(tmp_path / 'other-state')
+    path.write_text(json.dumps(config))
+    with pytest.raises(ContractError, match='v2 configuration required'):
+        load_fresh_config(path)

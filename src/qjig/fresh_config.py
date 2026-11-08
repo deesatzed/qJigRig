@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from decimal import Decimal
 from pathlib import Path
 
@@ -10,6 +11,36 @@ from .fresh_preflight import fresh_run_allocations
 from .fresh_service import FreshWorkbench
 from .goal_budget import GoalBudget
 from .providers import OpenRouterTransport
+
+
+def _bind_goal_directory(env_path: Path, goal_dir: Path, *, version: str) -> None:
+    """Bind v2 workbenches to one local accounting directory per credential root.
+
+    The local anchor is not tamper-proof and does not cover other entrypoints.
+    """
+    anchor_dir = env_path.resolve().parent / '.local'
+    anchor = anchor_dir / 'qjig-active-goal-directory'
+    if anchor_dir.is_symlink() or anchor.is_symlink():
+        raise ContractError('unsafe goal directory anchor')
+    if version == 'qjig.fresh-config.v1':
+        if anchor.exists():
+            raise ContractError('goal directory already bound; v2 configuration required')
+        return
+    anchor_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    expected = str(goal_dir.resolve())
+    try:
+        fd = os.open(anchor, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+    except FileExistsError:
+        try:
+            if anchor.is_symlink() or anchor.read_text(encoding='utf-8') != expected:
+                raise ContractError('goal directory differs from existing binding')
+        except (OSError, UnicodeError) as exc:
+            raise ContractError('goal directory binding unavailable') from exc
+    else:
+        with os.fdopen(fd, 'w', encoding='utf-8') as output:
+            output.write(expected)
+            output.flush()
+            os.fsync(output.fileno())
 
 
 def load_fresh_config(path: Path) -> FreshWorkbench:
@@ -61,6 +92,7 @@ def load_fresh_config(path: Path) -> FreshWorkbench:
     goal_dir = Path(data['goal_dir']) if version == 'qjig.fresh-config.v2' else state_dir
     if goal_dir.is_symlink():
         raise ContractError('unsafe goal directory')
+    _bind_goal_directory(env_path, goal_dir, version=version)
     goal_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     def account_bound_goal():
         # Refresh only when a run starts; configuration loading never contacts the provider.
