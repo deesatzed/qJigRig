@@ -762,6 +762,58 @@ def score_reviewed_reserved_assignment(goal, archive, journal, reference: dict, 
     return {**score,'review':review}
 
 
+
+def score_outcome_reviewed_assignment(goal, archive, journal, reference: dict, review_archive, outcome_archive, *,
+                                      partition: str, expected_plan_sha256: str, expected_run_sha256: str,
+                                      expected_reference_sha256: str, expected_review_sha256: str,
+                                      reviewer_spec: dict, expected_outcome_review_sha256: str,
+                                      outcome_reviewer_spec: dict, expected_journal_sha256: str | None = None) -> dict:
+    """Bind both reviews to reserved work; classify only reference-relative, unvalidated outcomes."""
+    from .evaluation_outcome_review import verify_direct_outcome_review, verify_fresh_outcome_review
+    from .outcome_preflight import outcome_review_allocation
+    from .run_archive import RunArchive
+    if not isinstance(outcome_archive,RunArchive) or not isinstance(expected_outcome_review_sha256,str) or not _SHA.fullmatch(expected_outcome_review_sha256):
+        raise ContractError('anchored outcome review archive required')
+    result=score_reviewed_reserved_assignment(goal,archive,journal,reference,review_archive,partition=partition,
+        expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
+        expected_reference_sha256=expected_reference_sha256,expected_review_sha256=expected_review_sha256,
+        reviewer_spec=reviewer_spec,expected_journal_sha256=expected_journal_sha256)
+    context=archive.context(); request_id=context['request']['request_id']; saved=outcome_archive.context()
+    slot=outcome_review_allocation(request_id=request_id,partition=partition,spec=outcome_reviewer_spec)
+    if (not isinstance(saved,dict) or saved.get('provider')!=outcome_reviewer_spec['provider']
+            or saved.get('model')!=outcome_reviewer_spec['model']['id']
+            or saved.get('max_tokens')!=outcome_reviewer_spec['output_tokens']
+            or saved.get('max_price')!=outcome_reviewer_spec['max_price']
+            or saved.get('route')!=outcome_reviewer_spec.get('route')):
+        raise ContractError('outcome reviewer configuration differs')
+    assignment=context['evaluation_assignment']
+    row=goal._con.execute("SELECT w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id "
+        "WHERE s.set_id=? AND w.work_id=? AND w.request_id=?",
+        ('evaluation:'+assignment['plan_id'],slot['work_id'],request_id)).fetchone()
+    intents=[e for e in journal.events(request_id) if e.kind=='intent' and e.stage=='outcome_review']
+    if (row is None or row[0] is None or len(intents)!=1 or intents[0].payload.get('goal_attempt_id')!=row[0]
+            or intents[0].payload.get('required_id')!=slot['work_id']
+            or intents[0].payload.get('work_binding_sha256')!=slot['work_binding_sha256']):
+        raise ContractError('outcome review reserved work differs')
+    if context.get('schema')=='qjig.fresh-context.v1':
+        review=verify_fresh_outcome_review(archive,journal,outcome_archive,reference=reference,
+            expected_reference_sha256=expected_reference_sha256,expected_run_sha256=expected_run_sha256,
+            expected_journal_sha256=expected_journal_sha256,expected_review_sha256=expected_outcome_review_sha256)
+    else:
+        review=verify_direct_outcome_review(archive,journal,outcome_archive,expected_run_sha256=expected_run_sha256,
+                                             expected_review_sha256=expected_outcome_review_sha256)
+    if review.get('status')!='structurally_verified':
+        raise ContractError('outcome review is not structurally verified')
+    score=result['score']; expected=score['reference_expected_answer']; assessed=review['assessment']
+    category='unknown_assessment'
+    if expected in ('yes','no','conflict') and assessed==expected:
+        actual=score.get('recorded_answer') if 'recorded_answer' in score else score.get('request_answer')
+        if actual!=expected:
+            category='reference_misaligned'
+        elif result['review']['assessment']=='supported' and score.get('required_evidence_covered') is True:
+            category='supported_match'
+    return {**result,'outcome_review':review,'outcome_category':category,'outcome_assurance':review['assurance']}
+
 def summarize_holdout_comparison(design: dict, records: list[dict], *, expected_design_sha256: str,
                                  baseline_arm: str, candidate_arm: str) -> dict:
     """Pair request-level mechanical scores; records and arm mappings are caller assertions.

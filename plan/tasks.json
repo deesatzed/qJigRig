@@ -1253,7 +1253,8 @@
         "T069B",
         "T069C",
         "T069D",
-        "T069E"
+        "T069E",
+        "T069F"
       ],
       "status": "pending",
       "files": [
@@ -4421,6 +4422,25 @@
       "acceptance": "All assignments reserve one separate outcome review with frozen reviewer and route, while execution refuses until outcome scoring and receipt replay are integrated.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_freezes_distinct_outcome_review_work_before_execution -q",
       "evidence": "Red: factorial configuration rejected a separate outcome reviewer. Green: each stand-in or routed assignment reserves a distinct outcome review alongside semantic review, freezes v7 configuration with bounded quota, rejects altered reviewer work and refuses claims before integration; evaluation/review/goal regressions passed 142. Execution, review receipts, affordability and hosted billing remain open."
+    },
+    {
+      "id": "T069F",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069C",
+        "T069D",
+        "T069E"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_goal_budgeted_case_requires_matching_reserved_assignment",
+      "action": "Bind reviewed request outcome to reserved assignment and private reference",
+      "acceptance": "Only an anchored outcome review in its own consumed reserved slot may inform a labeled local outcome category; uncertain or conflicting reviews remain unknown.",
+      "command": "python -m pytest tests/test_evaluation.py::test_goal_budgeted_case_requires_matching_reserved_assignment -q",
+      "evidence": "Red: reserved outcome-review scorer was absent. Green: direct and fresh stand-in assignments verify separately anchored semantic and outcome reviews, exact consumed outcome slot and local reference; disagreement/uncertainty stays unknown and fresh request remains deferred. Evaluation/review/replay/goal regressions passed 167; final targeted 8 passed. This covers completed reviewable runs only, not unavailable reviews, campaign v7 execution or validated correctness."
     }
   ]
 }

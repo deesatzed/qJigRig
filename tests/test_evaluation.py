@@ -1131,7 +1131,8 @@ def test_complete_evaluation_reservation_is_atomic_and_restart_safe(tmp_path):
 
 
 @pytest.mark.parametrize(('mode','arm'), [('full','direct_full_evidence'),('catalog','retrieval_only')])
-def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,arm):
+@pytest.mark.parametrize('outcome_assessment',['yes','no','uncertain'])
+def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,arm,outcome_assessment):
     import json
     from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN
     from qjig.budgets import BudgetLedger
@@ -1158,10 +1159,11 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,
           'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
           'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
     case_hashes={c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']};case_hashes['holdout']=case_lock_digest(lock)
-    templates={arm:{'direct_initial':1,'semantic_review':1} for arm in design['arms']}
+    templates={arm:{'direct_initial':1,'semantic_review':1,'outcome_review':1} for arm in design['arms']}
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
     from qjig.semantic_preflight import semantic_review_allocation,semantic_review_reservation
+    from qjig.outcome_preflight import outcome_review_allocation,outcome_review_reservation
     families={f['id']:f['partition'] for f in design['families']};assignments=[]
     for case in design['cases']:
         partition=families[case['family']]
@@ -1170,12 +1172,13 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,
                 rid='opaque-'+str(len(assignments));work=direct_run_allocations(request_id=rid,partition=partition,provider='stand-in',model=model,
                          input_tokens=100,output_tokens=100,max_price=cap,followups=0)
                 work.append(semantic_review_allocation(request_id=rid,partition=partition,spec=spec))
+                work.append(outcome_review_allocation(request_id=rid,partition=partition,spec=spec))
                 assignments.append({'case_id':case['id'],'arm':assigned_arm,'repeat':repeat,'request_id':rid,'work':work})
     plan=make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=d)
     inputs=ApplicabilityInputs(Collection(tuple(MemberMetadata(rev,'project',Interval('2020-01-01',OPEN))
                                                for rev in ref['source_revisions'])),frozenset(),'2026-11-07',False)
     target=next(x for x in assignments if x['case_id']=='holdout' and x['arm']==arm);rid=target['request_id']
-    total=Budget(120,24000,1);per=Budget(2,400,0.1);alloc={'development':Budget(30,6000,0.2),'pilot':Budget(30,6000,0.2),'holdout':Budget(60,12000,0.2)}
+    total=Budget(180,36000,1);per=Budget(3,600,0.1);alloc={'development':Budget(45,9000,0.2),'pilot':Budget(45,9000,0.2),'holdout':Budget(90,18000,0.2)}
     response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),{'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.0001})
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=alloc) as goal,Journal.open(tmp_path/'j.sqlite') as journal,RunArchive.open(tmp_path/'archive') as archive:
         reserve_evaluation_plan(goal,'study',plan,expected_plan_sha256=plan['sha256'])
@@ -1245,6 +1248,25 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,
             bound=score_reviewed_reserved_assignment(goal,archive,journal,ref,review_archive,**kwargs)
             assert bound['review']['assessment']=='uncertain' and bound['review']['assurance']=='synthetic_unvalidated'
             assert bound['review']['sha256']==review_hash and bound['score']['resources']['total']['calls']==2
+            from qjig.evaluation_outcome_review import review_direct_outcome,verify_direct_outcome_review
+            from qjig.evaluation_scoring import score_outcome_reviewed_assignment
+            with RunArchive.open(tmp_path/'outcome') as outcome_archive:
+                def outcome_factory(req):
+                    return outcome_review_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',request=req,spec=spec)
+                outcome_raw=RawResponse(200,json.dumps({'assessment':outcome_assessment,'reason':'source'}),
+                                        {'prompt_tokens':10,'completion_tokens':3,'cost_usd':0.0001})
+                review_direct_outcome(archive,journal,ledger,StandInTransport([outcome_raw]),review_archive=outcome_archive,
+                    expected_run_sha256=replay['sha256'],provider='stand-in',model=model['id'],max_tokens=100,
+                    max_price=cap,reservation_factory=outcome_factory)
+                outcome_hash=verify_direct_outcome_review(archive,journal,outcome_archive,expected_run_sha256=replay['sha256'])['sha256']
+                result=score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
+                    expected_outcome_review_sha256=outcome_hash,outcome_reviewer_spec=spec,**kwargs)
+                assert result['outcome_category']==('reference_misaligned' if outcome_assessment=='yes' else 'unknown_assessment')
+                assert result['outcome_assurance']=='synthetic_unvalidated' and result['score']['resources']['total']['calls']==3
+                for changes in ({'expected_outcome_review_sha256':'0'*64}, {'outcome_reviewer_spec':{**spec,'output_tokens':99}}):
+                    with pytest.raises(ContractError):
+                        score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
+                            **{**kwargs,'expected_outcome_review_sha256':outcome_hash,'outcome_reviewer_spec':spec,**changes})
             for changed in ({'expected_review_sha256':'0'*64}, {'reviewer_spec':{**spec,'output_tokens':99}}):
                 with pytest.raises(ContractError):
                     score_reviewed_reserved_assignment(goal,archive,journal,ref,review_archive,**{**kwargs,**changed})
@@ -1292,6 +1314,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
     cap = {'prompt':2,'completion':3}
     spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
     from qjig.semantic_preflight import semantic_review_allocation,semantic_review_reservation
+    from qjig.outcome_preflight import outcome_review_allocation,outcome_review_reservation
     family_partitions = {f['id']:f['partition'] for f in design['families']}
     assignments, templates = [], {}
     for case in design['cases']:
@@ -1307,6 +1330,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
                     work = direct_run_allocations(request_id=rid,partition=partition,provider='stand-in',model=model,
                         input_tokens=100,output_tokens=100,max_price=cap,followups=0)
                 work.append(semantic_review_allocation(request_id=rid,partition=partition,spec=spec))
+                work.append(outcome_review_allocation(request_id=rid,partition=partition,spec=spec))
                 templates[arm] = dict(Counter(x['stage'] for x in work))
                 assignments.append({'case_id':case['id'],'arm':arm,'repeat':repeat,'request_id':rid,'work':work})
     plan = make_evaluation_plan(design,case_hashes,templates,assignments,expected_design_sha256=digest)
@@ -1393,6 +1417,23 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
             scored_review=score_reviewed_reserved_assignment(goal,archive,journal,ref,review_archive,**kwargs)
             assert scored_review['review']['assessment']=='supported' and scored_review['score']['request_status']=='deferred'
             assert scored_review['score']['request_answer'] is None and scored_review['score']['resources']['total']['calls']==4
+            from qjig.evaluation_outcome_review import review_fresh_outcome,verify_fresh_outcome_review
+            from qjig.evaluation_scoring import score_outcome_reviewed_assignment
+            with RunArchive.open(tmp_path/'outcome') as outcome_archive:
+                def outcome_factory(req):
+                    return outcome_review_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',request=req,spec=spec)
+                review_fresh_outcome(archive,journal,ledger,StandInTransport([raw({'assessment':'yes','reason':'source'})]),
+                    review_archive=outcome_archive,reference=ref,expected_reference_sha256=reference_digest(ref),
+                    expected_run_sha256=replay.digest,expected_journal_sha256=journal_anchor,provider='stand-in',
+                    model=model['id'],max_tokens=100,max_price=cap,reservation_factory=outcome_factory)
+                outcome_hash=verify_fresh_outcome_review(archive,journal,outcome_archive,reference=ref,
+                    expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                    expected_journal_sha256=journal_anchor)['sha256']
+                reviewed=score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
+                    expected_outcome_review_sha256=outcome_hash,outcome_reviewer_spec=spec,**kwargs)
+                assert reviewed['outcome_category']=='reference_misaligned'
+                assert reviewed['score']['request_status']=='deferred' and reviewed['score']['request_answer'] is None
+                assert reviewed['score']['resources']['total']['calls']==5
             with pytest.raises(ContractError):
                 score_reviewed_reserved_assignment(goal,archive,journal,ref,review_archive,**{**kwargs,'expected_journal_sha256':'0'*64})
         # Even if the context and replay are rehashed, another assignment cannot be relabeled.
