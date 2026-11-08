@@ -33,7 +33,8 @@ def record_applicability_deferral(archive,request,case_binding,assignment,inputs
     if not verdicts or all(v['combined']==Applicability.MATCH.value for v in verdicts.values()):
         raise ContractError('deferral requires an unestablished source')
     stage_context={name:{'provider':spec['provider'],'model':spec['model']['id'],
-                         'max_tokens':spec['output_tokens'],'max_price':spec['max_price']}
+                         'max_tokens':spec['output_tokens'],'max_price':spec['max_price'],
+                         **({'route':spec['route']} if 'route' in spec else {})}
                    for name,spec in stages.items() if name in ('planner','judge','reviewer')}
     archive.record_context({'schema':'qjig.applicability-deferral.v1','request':request.to_dict(),
         'case_binding':case_binding,'evaluation_assignment':assignment,'applicability_inputs':inputs.to_dict(),
