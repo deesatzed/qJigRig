@@ -62,6 +62,13 @@ def synthetic_rubric_design(design, locks):
     return derived,derived_locks
 
 
+
+def synthetic_canonical_rubric():
+    """Produce the current canonical contract for synthetic runs only."""
+    from qjig.evaluation_recommendation import make_rubric_contract
+    return json.dumps(make_rubric_contract(),sort_keys=True,separators=(',',':'),ensure_ascii=False)
+
+
 def main():
     parser=argparse.ArgumentParser(description='Run only synthetic draft responses; no provider calls.')
     parser.add_argument('--resume',type=Path,help='Existing synthetic verification directory to resume')
@@ -69,7 +76,10 @@ def main():
     parser.add_argument('--outcome',action='store_true',help='Reserve and execute separate outcome-review slots')
     parser.add_argument('--judge-pairs',type=int,help='Explicit bounded judge pairs per fresh assignment')
     parser.add_argument('--rubric',action='store_true',help='Use a derived synthetic v8 rubric-bound design')
+    parser.add_argument('--canonical-rubric',action='store_true',help='Freeze the current machine-readable rubric contract')
     args=parser.parse_args()
+    if args.canonical_rubric and not args.rubric:
+        parser.error('--canonical-rubric requires --rubric')
     if args.rubric and not args.outcome:
         parser.error('--rubric requires --outcome')
     if args.outcome and (not args.semantic or args.judge_pairs is None):
@@ -139,7 +149,7 @@ def main():
          Journal.open(directory/'journal.sqlite') as journal:
         reservation=reserve_evaluation_plan(goal,'draft-synthetic',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'draft-synthetic',expected_plan_sha256=plan['sha256'])
-        config_hash=campaign.freeze_config(config,want=3,max_bytes=6000,case_applicability=metadata,max_judge_pairs=args.judge_pairs,**({'rubric_text':Path('docs/evaluation/2026-11-08-provisional-comparison-rubric.md').read_text()} if args.rubric else {}))
+        config_hash=campaign.freeze_config(config,want=3,max_bytes=6000,case_applicability=metadata,max_judge_pairs=args.judge_pairs,**({'rubric_text':synthetic_canonical_rubric() if args.canonical_rubric else Path('docs/evaluation/2026-11-08-provisional-comparison-rubric.md').read_text()} if args.rubric else {}))
         pending=campaign.status()['in_progress']
         if pending:
             rid=pending[0];assignment=next(a for a in plan['manifest']['assignments'] if a['request_id']==rid)

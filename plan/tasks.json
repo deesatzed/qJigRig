@@ -1305,7 +1305,8 @@
         "T071F",
         "T071G",
         "T071H",
-        "T071I"
+        "T071I",
+        "T071J"
       ],
       "status": "pending",
       "files": [
@@ -4766,6 +4767,24 @@
       "acceptance": "The rubric declares exact paired and refusal policy, binds relevant current source bytes, and rejects changed text or implementation; this structural contract alone does not validate model judgments.",
       "command": "python -m pytest tests/test_evaluation.py::test_versioned_rubric_contract_binds_policy_and_implementation -q",
       "evidence": "Red: versioned rubric contract did not exist. Green: exact canonical JSON binds provisional pair and refusal rules to selected local scoring, review, evaluation, replay and inspection source-file hashes; changed policy, hash, file bytes, noncanonical text and invalid Unicode refuse. Evaluation/review/replay/gate regressions passed 153; targeted test passed after adding file-drift case. This is source identity, not proof of semantic correctness, loaded-code identity or a verified campaign recommendation."
+    },
+    {
+      "id": "T071J",
+      "phase": "evaluation",
+      "depends_on": [
+        "T071I",
+        "T072F"
+      ],
+      "status": "complete",
+      "files": [
+        "scripts/smoke_factorial_synthetic.py"
+      ],
+      "test_file": "tests/test_factorial_synthetic.py",
+      "test_name": "test_synthetic_canonical_rubric_is_valid_and_opt_in",
+      "action": "Exercise full synthetic campaign frozen with the canonical rubric contract",
+      "acceptance": "The full assigned draft runs and resumes under the canonical contract, both comparisons reconstruct, and synthetic attribution prevents a final recommendation.",
+      "command": "python -m pytest tests/test_factorial_synthetic.py::test_synthetic_canonical_rubric_is_valid_and_opt_in -q",
+      "evidence": "Red: the synthetic harness could not freeze the canonical source-bound rubric. Green: full synthetic campaign recorded 105 assignments, 567 reserved slots and 432 stand-in calls; resume added none. Read-only inspection checked 105 receipts and 16 cases and reported provider_attribution_not_live. Both 10-pair holdout comparisons remained unknown and yielded no recommendation. Harness/evaluation/review tests passed 133. Anchors are locally derived, not independent provenance or live evidence."
     }
   ]
 }

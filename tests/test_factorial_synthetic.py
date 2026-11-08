@@ -70,3 +70,18 @@ def test_synthetic_rubric_design_rebinds_without_mutating_draft():
     assert design==original_design and locks==original_locks
     altered=copy.deepcopy(locks);next(iter(altered.values()))['lock']['question']='changed'
     with pytest.raises(ValueError): module.synthetic_rubric_design(design,altered)
+
+
+def test_synthetic_canonical_rubric_is_valid_and_opt_in():
+    import os
+    import subprocess
+    import sys
+    from qjig.evaluation_recommendation import verify_rubric_contract
+    root=Path(__file__).resolve().parents[1]
+    path=root/'scripts'/'smoke_factorial_synthetic.py'
+    spec=importlib.util.spec_from_file_location('synthetic_canonical_rubric',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    assert verify_rubric_contract(module.synthetic_canonical_rubric())['policy']=='qjig.provisional-pair-decision.v1'
+    result=subprocess.run([sys.executable,str(path),'--canonical-rubric'],cwd=root,
+                          env={**os.environ,'PYTHONPATH':str(root/'src')},capture_output=True,text=True,timeout=10)
+    assert result.returncode==2 and '--canonical-rubric requires --rubric' in result.stderr
