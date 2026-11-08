@@ -2,6 +2,15 @@
 
 **Checkpoint:** 2026-11-08; source commit `65d96cc` plus the explicitly dirty local control files. This is an evidence map, not a completion claim. The goal remains active. Queue statuses and caller-supplied hashes are assertions, not proof of execution, provider authenticity or semantic accuracy. Recheck current state before using this snapshot.
 
+## Update after the historical checkpoint
+
+At source commit `77bb04e`, the queue records **237 complete and 33 pending** entries. These statuses are assertions, not completion proof. The remainder of this report is the historical `65d96cc` evidence map: its task tables, hashes and findings have not been comprehensively reconciled with later changes. The final T074 report remains pending.
+
+- At `f3ebdc2`, the checkout suite passed 715 tests with 8 skips; an isolated installation passed its synthetic browser journey and copied offline suite (722 passed, 1 skipped). All seven synthetic workflow checks passed in an environment with Playwright and local Chrome. See the [offline checkpoint](verification/2026-11-08-current-offline-checkpoint.md). These results predate subsequent response-handling code changes and are not current full-suite evidence for `77bb04e`.
+- The later bounded-response and post-response-read uncertainty changes each passed focused provider, budget, preflight and replay regressions; the latest run passed 99. Repo verification checked 270 tasks. Neither change enables hosted dispatch. See the task evidence for R08V and R08W in the [current queue](../plan/tasks.json).
+- The [interim hosted boundary review](verification/hosted-boundary-review/REVIEW.md) identified billing, actual guarded dispatch and the callable internal adapter as open. Its unbounded-response finding was subsequently addressed by R08V; it is an interim review, not final project-wide security acceptance.
+- The latest read-only [account capability check](verification/2026-11-08-account-evidence-capabilities.md) observed that the configured key is not a management key and its cap excludes BYOK. These are time-sensitive provider claims; prior-goal charges and applicable billing categories remain unresolved.
+
 ## Current blockers and limits
 
 - Hosted transport remains disabled. Prior goal spending is not fully reconciled; BYOK/plugin and other billable categories are not fully assured. The last approximately $6.22 credit and $18 key remainder are historical observations, and the illustrative current-additive v7 allocation exceeded observed credit before smoke and acceptance. See [spend inventory](verification/2026-11-07-goal-spend-inventory.md), [affordability probe](verification/2026-11-08-v7-affordability-probe.md), and [cost-bound investigation](verification/2026-11-08-token-cost-bound-investigation.md).
