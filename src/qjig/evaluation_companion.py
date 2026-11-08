@@ -94,3 +94,43 @@ def summarize_companion_assertions(reports: dict, *, additional_reports: dict | 
                 'unknown_usage_calls':sum(item['unknown_usage_calls'] for item in totals),'latency_seconds':exact('latency_seconds')}}
     return {'schema':'qjig.holdout-companion.v1','arms':summaries,'assurance':'caller_asserted_unverified',
             'scope':'holdout_five_arms_only' if additional_reports is not None else 'holdout_three_arms_only'}
+
+
+def group_holdout_interventions(design: dict, companion: dict, *, expected_design_sha256: str) -> dict:
+    """Group caller-asserted request outcomes by frozen intervention links."""
+    from .evaluation import validate_evaluation_design
+    validate_evaluation_design(design,expected_digest=expected_design_sha256)
+    arms=companion.get('arms') if isinstance(companion,dict) else None
+    if not isinstance(arms,dict) or set(arms)!=set(design['arms']):
+        raise ContractError('all intervention arms required')
+    families={item['id']:item['partition'] for item in design['families']}
+    cases={case['id']:case for case in design['cases'] if families[case['family']]=='holdout'}
+    repeats=design['repeats']['holdout']
+    categories={'supported_match','reference_misaligned','failed','unknown_assessment'}
+    indexed={}
+    for arm,summary in arms.items():
+        rows=summary.get('cases') if isinstance(summary,dict) else None
+        if not isinstance(rows,list):raise ContractError('intervention case rows required')
+        for row in rows:
+            if not isinstance(row,dict):raise ContractError('invalid intervention row')
+            case,repeat=row.get('case_id'),row.get('repeat')
+            if (not isinstance(case,str) or case not in cases or type(repeat) is not int or not 1<=repeat<=repeats
+                    or row.get('category') not in categories or (case,arm,repeat) in indexed):
+                raise ContractError('invalid or duplicate intervention row')
+            indexed[(case,arm,repeat)]=row
+    groups={name:[] for name in ('changed_decisive','missing_decisive','irrelevant_change')}
+    for case in sorted(cases.values(),key=lambda item:item['id']):
+        parent=case['parent']
+        if parent is None:continue
+        for group in groups:
+            if group not in case['categories']:continue
+            for arm in sorted(arms):
+                for repeat in range(1,repeats+1):
+                    before=indexed.get((parent,arm,repeat));after=indexed.get((case['id'],arm,repeat))
+                    known=before is not None and after is not None and before['category']!='unknown_assessment' and after['category']!='unknown_assessment'
+                    groups[group].append({'parent_case':parent,'intervention_case':case['id'],'arm':arm,'repeat':repeat,
+                        'parent':before,'intervention':after,
+                        'category_changed':before['category']!=after['category'] if known else None})
+    return {'schema':'qjig.grouped-holdout-interventions.v1','design_sha256':expected_design_sha256,
+            'groups':groups,'assurance':'caller_asserted_unverified',
+            'interpretation':'category_changes_are_not_semantic_accuracy'}

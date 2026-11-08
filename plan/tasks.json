@@ -1280,7 +1280,8 @@
       "depends_on": [
         "T069",
         "T070A",
-        "T070B"
+        "T070B",
+        "T070C"
       ],
       "status": "pending",
       "files": [
@@ -4860,6 +4861,24 @@
       "acceptance": "All five holdout arms retain unique outcomes and resources, shared baseline and candidate records are not double counted, and conflicting or missing pairs fail.",
       "command": "python -m pytest tests/test_evaluation_companion.py::test_companion_counts_unique_arms_and_preserves_unknown_usage -q",
       "evidence": "Red: the companion accepted only three arms and the recommendation omitted ablations. Green: both ablation comparisons feed a five-arm summary, shared records are deduplicated and inconsistent or missing pairs refuse; evaluation/review/replay/gate regressions passed 154. The retained synthetic run reconstructed 10 unknown holdout assignments per arm and remained incomplete for synthetic attribution and source drift. Grouped interventions, full campaign reporting and live evidence remain open."
+    },
+    {
+      "id": "T070C",
+      "phase": "evaluation",
+      "depends_on": [
+        "T072J"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_companion.py",
+        "src/qjig/evaluation_recommendation.py"
+      ],
+      "test_file": "tests/test_evaluation_companion.py",
+      "test_name": "test_group_holdout_interventions_preserves_missing_and_unknown",
+      "action": "Group five-arm holdout intervention pairs from frozen parent links",
+      "acceptance": "Changed, missing and irrelevant interventions remain grouped by case, arm and repeat; missing or unknown outcomes stay explicit without claiming semantic truth.",
+      "command": "python -m pytest tests/test_evaluation_companion.py::test_group_holdout_interventions_preserves_missing_and_unknown -q",
+      "evidence": "Red: no grouped five-arm request-outcome intervention report existed. Green: design-anchored changed, missing and irrelevant intervention groups retain parent/child rows by arm and repeat; missing or unknown outcomes remain explicit. Evaluation/review/replay/gate regressions passed 155. The previous synthetic campaign reconstructed ten unknown pairs per group, with source drift and synthetic attribution; live and semantic evidence remain open."
     }
   ]
 }

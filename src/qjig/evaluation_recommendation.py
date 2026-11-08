@@ -127,6 +127,7 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
     comparison_details=None
     ablation_details=None
     companion=None
+    interventions=None
     # A fully anchored synthetic campaign can produce diagnostics, but never a
     # recommendation. All other incomplete or invalid inspection blocks reads.
     if (frozen['schema']=='qjig.campaign-config.v8' and inspection['status']!='invalid'
@@ -168,20 +169,22 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
                 ablation_details[arm]=build_reserved_holdout_comparison(campaign._goal,design,selected,plan_id=campaign._plan_id,
                     expected_plan_sha256=campaign._digest,expected_design_sha256=expected_design_sha256,
                     baseline_arm='direct_retrieval',candidate_arm=arm,expected_config_sha256=expected_config_sha256)
-            from .evaluation_companion import summarize_companion_assertions
+            from .evaluation_companion import summarize_companion_assertions,group_holdout_interventions
             companion=summarize_companion_assertions(comparison_details,additional_reports=ablation_details)
             companion['assurance']='structurally_reconstructed_unvalidated'
+            interventions=group_holdout_interventions(design,companion,expected_design_sha256=expected_design_sha256)
+            interventions['assurance']='structurally_reconstructed_unvalidated'
     if inspection['status']=='structurally_complete' and not issues and rubric_checked is not None and comparisons is not None:
         result=provisional_pair_decision(design,{name:value['outcome_support'] for name,value in comparisons.items()},
                                          expected_design_sha256=expected_design_sha256)
         recommendation=result['decision']
         return {'status':'evaluated' if recommendation is not None else 'inconclusive',
                 'recommendation':recommendation,'baseline_decisions':result['baseline_decisions'],
-                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,
+                'issues':[],'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,
                 'resource_scope':'campaign_totals_in_inspection_shared_arms_repeated_in_comparisons',
                 'assurance':'structural_and_ai_reviewed_unvalidated',
                 'rubric_assurance':rubric_checked['assurance']}
     return {'status':'invalid' if inspection['status']=='invalid' else 'incomplete','recommendation':None,
-            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,
+            'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,'comparison_details':comparison_details,'ablation_details':ablation_details,'companion':companion,'interventions':interventions,
             'resource_scope':'campaign_totals_in_inspection_shared_arms_repeated_in_comparisons',
             'assurance':'no_recommendation'}

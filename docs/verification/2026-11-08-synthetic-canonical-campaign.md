@@ -19,3 +19,7 @@ After the companion-summary implementation changed, the prior frozen rubric no l
 ## Five-arm holdout diagnostic
 
 After adding the two ablation comparisons, read-only reconstruction of this retained synthetic run reported 10 holdout assignments and 10 unknown outcomes for each of the five arms. Fixture call counts were 30 direct full-evidence, 30 direct retrieval, 30 retrieval-only, 60 decomposition-only and 54 combined, counted once per arm. The current source differs from the frozen rubric and attribution is synthetic, so the result remains incomplete with no recommendation. This is holdout-only diagnostic evidence, not a full campaign/intervention report or real spending.
+
+## Grouped holdout intervention diagnostic
+
+The current read-only reconstruction groups changed-decisive, missing-decisive and irrelevant-change holdout interventions by parent/child, arm and repeat. The retained fixture has 10 pairs in each group; all have an unknown or missing category comparison. This is a comparison of attributed categories, not proof of semantic accuracy. The retained run still has synthetic attribution and a source-contract mismatch, so it remains incomplete and yields no recommendation.

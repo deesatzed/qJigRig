@@ -2482,6 +2482,8 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                         assert evaluated['companion']['arms']['retrieval_only']['assignments']==1
                         assert evaluated['companion']['arms']['decomposition_only']['assignments']==1
                         assert evaluated['companion']['arms']['direct_retrieval']['resources']['calls']==3
+                        assert len(evaluated['interventions']['groups']['changed_decisive'])==10
+                        assert all(row['category_changed'] is None for row in evaluated['interventions']['groups']['changed_decisive'])
                         patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:fake_comparison(k['baseline_arm'],None,k['candidate_arm']))
                         inconclusive=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
                             expected_design_sha256=digest,expected_config_sha256=config_hash)

@@ -44,3 +44,28 @@ def test_companion_counts_unique_arms_and_preserves_unknown_usage():
     with pytest.raises(ContractError): summarize_companion_assertions(reports,additional_reports={'retrieval_only':extras['retrieval_only']})
     changed=copy.deepcopy(extras);changed['retrieval_only']['scored_assignments'][0]['score']['required_evidence_covered']=False
     with pytest.raises(ContractError): summarize_companion_assertions(reports,additional_reports=changed)
+
+
+def test_group_holdout_interventions_preserves_missing_and_unknown():
+    from test_evaluation import _sample_design
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_companion import group_holdout_interventions
+    design=_sample_design();digest=validate_evaluation_design(design)
+    def row(case,repeat,category):
+        return {'case_id':case,'repeat':repeat,'category':category,'review_assurance':'synthetic_unvalidated',
+                'evidence_covered':None,'request_status':'deferred','classification':'unknown_review'}
+    arms={arm:{'cases':[row('holdout',1,'supported_match'),row('holdout-changed',1,'failed'),
+                        row('holdout',2,'unknown_assessment')]} for arm in design['arms']}
+    result=group_holdout_interventions(design,{'arms':arms},expected_design_sha256=digest)
+    assert result['assurance']=='caller_asserted_unverified'
+    changed=result['groups']['changed_decisive']
+    assert len(changed)==10
+    first=next(r for r in changed if r['arm']=='combined' and r['repeat']==1)
+    assert first['parent']['category']=='supported_match' and first['intervention']['category']=='failed'
+    assert first['category_changed'] is True
+    missing=next(r for r in changed if r['arm']=='combined' and r['repeat']==2)
+    assert missing['intervention'] is None and missing['category_changed'] is None
+    assert result['groups']['missing_decisive']==[] and result['groups']['irrelevant_change']==[]
+    duplicate=copy.deepcopy(arms);duplicate['combined']['cases'].append(row('holdout',1,'failed'))
+    with pytest.raises(ContractError):
+        group_holdout_interventions(design,{'arms':duplicate},expected_design_sha256=digest)
