@@ -1,3 +1,11 @@
+# Active usable-app queue (2026-11-08)
+
+The user removed the full model comparison and research evaluation from completion requirements. Follow [plan/app-tasks.json](plan/app-tasks.json) and [the usable-app plan](docs/plans/2026-11-08-usable-app-plan.md). Preserve the research task DAG and its historical records; its pending research entries are not app-completion gates. Do not treat the old gate manifest as acceptance for this new scope.
+
+---
+
+## Historical research queue
+
 # qJig task queue
 
 This queue implements GOAL.md. T001–T048 are complete; T049–T074 remain pending. The machine-readable queue includes repair tasks R01–R09 for findings F01–F09 and additional bounded subtasks; its statuses are authoritative. Historical task identities and evidence remain intact.

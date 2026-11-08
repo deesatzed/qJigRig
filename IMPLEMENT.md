@@ -1,3 +1,9 @@
+# Active execution amendment (2026-11-08)
+
+The deliverable is the usable local app described in plan/app-tasks.json and docs/plans/2026-11-08-usable-app-plan.md; the historical research task sequence below does not gate this outcome. Apply failure-first testing to behavioral changes, preserve source and interpretation distinctions, use the existing root .env without exposing it, and exercise the real provider within the amended caps.
+
+---
+
 # Execution contract
 
 The current deliverable is the operational workbench and evaluation defined in GOAL.md. T001–T048 are complete; follow the amended dependencies in plan/tasks.json. Source workbenches remain read-only review inputs.

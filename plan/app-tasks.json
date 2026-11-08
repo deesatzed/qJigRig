@@ -1,0 +1,41 @@
+{
+  "schema": "qjig.usable-app-tasks.v1",
+  "goal": "usable local app with existing key and bounded spend",
+  "tasks": [
+    {
+      "id": "APP01",
+      "status": "complete",
+      "depends_on": [],
+      "action": "Inspect and document real app baseline and provider refusal",
+      "acceptance": "Current source, UI and provider path are identified with reproducible evidence.",
+      "evidence": "At 2026-11-08 baseline, local browser synthetic workflow passed all seven checks and isolated installed browser journey passed; src/qjig/fresh_service.py rejects OpenRouterTransport before run, and src/qjig/providers.py refuses send and typed hosted dispatch. See docs/verification/2026-11-08-current-offline-checkpoint.md. No current app provider execution is claimed."
+    },
+    {
+      "id": "APP02",
+      "status": "pending",
+      "depends_on": [
+        "APP01"
+      ],
+      "action": "Implement practical persistent budget and journal guarded real-provider path",
+      "acceptance": "Actual app entrypoint dispatches only with configured key, local budget and durable intent; uncertainty blocks blind retry."
+    },
+    {
+      "id": "APP03",
+      "status": "pending",
+      "depends_on": [
+        "APP02"
+      ],
+      "action": "Exercise bounded real-provider and browser user journey",
+      "acceptance": "A sanitized real-provider receipt and real local browser import, question, evidence and reopen walkthrough exist."
+    },
+    {
+      "id": "APP04",
+      "status": "pending",
+      "depends_on": [
+        "APP03"
+      ],
+      "action": "Verify installation and regressions; write truthful app handoff",
+      "acceptance": "Relevant tests, browser, clean install, scoped review and user instructions have current evidence."
+    }
+  ]
+}
