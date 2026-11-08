@@ -755,6 +755,20 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
             review_prompt=next(e['data']['prompt'] for e in semantic_archive.events() if e['kind']=='request')
             assert gold.decode() not in review_prompt and ledger._request_id not in review_prompt
             assert 'conditional_answer' in review_prompt and 'deferred' in review_prompt
+            replayed_score=score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
+                expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash,original_run_only=True)
+            assert replayed_score['journal_scope']=='original_run_prefix'
+            assert replayed_score['request_status']=='deferred' and replayed_score['conditional_answer']=='yes'
+            assert ledger.used_calls()==5
+            with pytest.raises(ContractError):
+                score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
+                    expected_reference_sha256=reference_digest(ref),original_run_only=True)
+            with pytest.raises(ContractError):
+                score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
+                    expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash)
+            with pytest.raises(ContractError):
+                score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
+                    expected_reference_sha256=reference_digest(ref),expected_journal_sha256='0'*64,original_run_only=True)
         recorded = journal._con.execute("SELECT payload FROM events WHERE kind='receipt' LIMIT 1").fetchone()[0]
         corrupted = json.loads(recorded); corrupted['usage']['cost_usd'] = 0
         journal._con.execute('DROP TRIGGER events_no_update')

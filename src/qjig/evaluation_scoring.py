@@ -221,7 +221,8 @@ def summarize_intervention_pairs(design: dict, records: list[dict], *, expected_
 
 
 def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha256: str,
-                        expected_reference_sha256: str, expected_journal_sha256: str | None = None) -> dict:
+                        expected_reference_sha256: str, expected_journal_sha256: str | None = None,
+                        original_run_only: bool = False) -> dict:
     """Score a replayed fresh graph separately from its mandatory request deferral.
 
     Exact reference quotes seen in model support statements are mechanical
@@ -239,7 +240,40 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
         raise ContractError('fresh run is not structurally verified')
     context, events = archive.context(), archive.events()
     request, inputs = context['request'], context['applicability_inputs']
-    if expected_journal_sha256 is not None:
+    if type(original_run_only) is not bool:
+        raise ContractError('invalid journal scope')
+    recorded_prefix = None
+    if original_run_only:
+        if (replay.status != 'structurally_verified' or not isinstance(expected_journal_sha256,str)
+                or not _SHA.fullmatch(expected_journal_sha256)):
+            raise ContractError('anchored completed fresh journal required')
+        original_requests=[e for e in events if e['kind']=='request']
+        journal_events=journal.events(request['request_id'])
+        if not original_requests:
+            raise ContractError('fresh request identity missing')
+        last_call=original_requests[-1]['call_id']
+        matches=[i for i,e in enumerate(journal_events) if e.call_id==last_call and e.kind=='receipt']
+        if len(matches)!=1:
+            raise ContractError('fresh terminal receipt missing or ambiguous')
+        split=matches[0]+1
+        recorded_prefix=journal_events[:split]
+        seen=set()
+        for event in journal_events[split:]:
+            if event.stage!='semantic_review':
+                raise ContractError('unexpected later journal event')
+            if event.kind=='intent':
+                expected_binding={'reviewed_run_sha256':expected_run_sha256,
+                                  'reviewed_journal_sha256':expected_journal_sha256}
+                if event.call_id in seen or event.payload.get('context_binding')!=expected_binding:
+                    raise ContractError('fresh semantic review binding differs')
+                seen.add(event.call_id)
+            elif event.call_id not in seen:
+                raise ContractError('semantic review terminal has no intent')
+        encoded=json.dumps([asdict(e) for e in recorded_prefix],sort_keys=True,separators=(',',':'),
+                           ensure_ascii=False,allow_nan=False).encode('utf-8')
+        if not hmac.compare_digest(hashlib.sha256(encoded).hexdigest(),expected_journal_sha256):
+            raise ContractError('fresh original journal anchor differs')
+    elif expected_journal_sha256 is not None:
         _fresh_journal_for_scoring(journal, request['request_id'], expected_journal_sha256)
     binding = context.get('evaluation_case_binding')
     if (not isinstance(binding, dict) or binding.get('case_id') != reference['case_id']
@@ -260,7 +294,7 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
             return _score_fresh_receipt_failure(context, events, journal, reference, expected_run_sha256, ref_hash, recorded, reconciliations)
         return _score_fresh_planner_failure(context, events, journal, reference, expected_run_sha256, ref_hash, recorded, reconciliations)
     requests = [e for e in events if e['kind'] == 'request']
-    recorded = journal.events(request['request_id'])
+    recorded = recorded_prefix if original_run_only else journal.events(request['request_id'])
     if len(recorded) != 2 * len(requests):
         raise ContractError('fresh journal call count differs')
     responses = {e['call_id']: e['data'] for e in events if e['kind'] == 'response'}
@@ -303,12 +337,15 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
     answer = {Outcome.TRUE: 'yes', Outcome.FALSE: 'no', Outcome.UNKNOWN: 'unknown', Outcome.CONFLICT: 'conflict'}[graph]
     comparison = ('unknown_review' if not covered else
                   'matches_reference' if answer == reference['expected_answer'] else 'differs_from_reference')
-    return {'case_id': reference['case_id'], 'run_sha256': expected_run_sha256, 'reference_sha256': ref_hash,
+    result_score = {'case_id': reference['case_id'], 'run_sha256': expected_run_sha256, 'reference_sha256': ref_hash,
             'reference_provenance': reference['provenance'], 'request_status': 'deferred', 'request_answer': None,
             'request_deferral_reason': 'plan_coverage_unestablished', 'deferral_assurance': 'not_adjudicated',
             'conditional_answer': answer, 'conditional_comparison': comparison, 'reference_expected_answer': reference['expected_answer'],
             'required_evidence_covered': covered,
             'semantic_assurance': 'not_assessed'}
+    if original_run_only:
+        result_score['journal_scope'] = 'original_run_prefix'
+    return result_score
 
 
 
