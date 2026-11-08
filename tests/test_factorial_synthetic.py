@@ -41,3 +41,26 @@ def test_synthetic_factorial_configuration_has_opt_in_outcome_review():
     import pytest
     with pytest.raises(ValueError):
         module.stage_configuration(stage,semantic=False,outcome=True)
+
+
+def test_synthetic_rubric_design_rebinds_without_mutating_draft():
+    import copy
+    import hashlib
+    import json
+    import pytest
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_cases import case_lock_digest
+    path=Path(__file__).resolve().parents[1]/'scripts'/'smoke_factorial_synthetic.py'
+    spec=importlib.util.spec_from_file_location('synthetic_factorial_rubric',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    design=json.loads((module.DRAFT/'design.json').read_text())
+    locks=json.loads((module.DRAFT/'private/case_locks.json').read_text())
+    original_design=copy.deepcopy(design);original_locks=copy.deepcopy(locks)
+    new_design,new_locks=module.synthetic_rubric_design(design,locks)
+    digest=validate_evaluation_design(new_design)
+    assert digest != validate_evaluation_design(design)
+    assert new_design['criteria']['retain']['threshold']==0.6
+    assert all(v['lock']['design_sha256']==digest and v['sha256']==case_lock_digest(v['lock']) for v in new_locks.values())
+    assert design==original_design and locks==original_locks
+    altered=copy.deepcopy(locks);next(iter(altered.values()))['lock']['question']='changed'
+    with pytest.raises(ValueError): module.synthetic_rubric_design(design,altered)

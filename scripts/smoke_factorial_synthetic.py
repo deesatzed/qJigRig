@@ -40,13 +40,38 @@ def stage_configuration(spec, *, semantic, outcome=False):
     return {name:dict(spec) for name in names}
 
 
+
+def synthetic_rubric_design(design, locks):
+    """Derive fixture-only decision criteria and rebind validated draft locks."""
+    import copy
+    original_digest=validate_evaluation_design(design)
+    for record in locks.values():
+        if (case_lock_digest(record['lock']) != record['sha256']
+                or record['lock']['design_sha256'] != original_digest):
+            raise ValueError('draft case anchor differs')
+    derived=copy.deepcopy(design)
+    derived['criteria']={
+        'remove':{'metric':'outcome_support','operator':'<','threshold':0.4},
+        'revise':{'metric':'outcome_support','operator':'range','threshold':[0.4,0.6]},
+        'retain':{'metric':'outcome_support','operator':'>=','threshold':0.6}}
+    digest=validate_evaluation_design(derived)
+    derived_locks=copy.deepcopy(locks)
+    for record in derived_locks.values():
+        record['lock']['design_sha256']=digest
+        record['sha256']=case_lock_digest(record['lock'])
+    return derived,derived_locks
+
+
 def main():
     parser=argparse.ArgumentParser(description='Run only synthetic draft responses; no provider calls.')
     parser.add_argument('--resume',type=Path,help='Existing synthetic verification directory to resume')
     parser.add_argument('--semantic',action='store_true',help='Reserve and execute semantic-review slots')
     parser.add_argument('--outcome',action='store_true',help='Reserve and execute separate outcome-review slots')
     parser.add_argument('--judge-pairs',type=int,help='Explicit bounded judge pairs per fresh assignment')
+    parser.add_argument('--rubric',action='store_true',help='Use a derived synthetic v8 rubric-bound design')
     args=parser.parse_args()
+    if args.rubric and not args.outcome:
+        parser.error('--rubric requires --outcome')
     if args.outcome and (not args.semantic or args.judge_pairs is None):
         parser.error('--outcome requires --semantic and --judge-pairs')
     if args.judge_pairs is not None and (not args.semantic or not 1 <= args.judge_pairs <= 12):
@@ -54,6 +79,8 @@ def main():
     design=json.loads((DRAFT/'design.json').read_text())
     locks=json.loads((DRAFT/'private/case_locks.json').read_text())
     refs=json.loads((DRAFT/'private/references.json').read_text())
+    if args.rubric:
+        design,locks=synthetic_rubric_design(design,locks)
     design_hash=validate_evaluation_design(design)
     protected=[{'path':str(path.relative_to(DRAFT)),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
                for path in sorted((DRAFT/'private').iterdir()) if path.is_file() and not path.is_symlink()]
@@ -112,7 +139,7 @@ def main():
          Journal.open(directory/'journal.sqlite') as journal:
         reservation=reserve_evaluation_plan(goal,'draft-synthetic',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'draft-synthetic',expected_plan_sha256=plan['sha256'])
-        config_hash=campaign.freeze_config(config,want=3,max_bytes=6000,case_applicability=metadata,max_judge_pairs=args.judge_pairs)
+        config_hash=campaign.freeze_config(config,want=3,max_bytes=6000,case_applicability=metadata,max_judge_pairs=args.judge_pairs,**({'rubric_text':Path('docs/evaluation/2026-11-08-provisional-comparison-rubric.md').read_text()} if args.rubric else {}))
         pending=campaign.status()['in_progress']
         if pending:
             rid=pending[0];assignment=next(a for a in plan['manifest']['assignments'] if a['request_id']==rid)
