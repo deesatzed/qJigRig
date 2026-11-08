@@ -769,7 +769,7 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
                                expected_reference_sha256: str, expected_review_sha256: str, reviewer_spec: dict,
                                outcome_reviewer_spec: dict, expected_journal_sha256: str | None = None,
                                expected_outcome_review_sha256: str | None = None, record: bool = False) -> dict:
-    """Record a non-review for an anchored applicability deferral or settled failure."""
+    """Record a non-review for an anchored deferral, settled failure or unavailable review."""
     from .outcome_preflight import outcome_review_allocation
     from .run_archive import RunArchive
     if (not isinstance(outcome_archive,RunArchive) or outcome_archive is archive or outcome_archive is review_archive
@@ -787,8 +787,12 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
              and score.get('reconciliation_required') is False and not journal.pending(request_id)
              and score.get('recorded_answer') is None and score.get('conditional_answer') is None
              and not any(e.stage=='outcome_review' for e in journal.events(request_id)))
-    if result['review'].get('assurance')!='not_reviewed' or not (applicability or settled):
-        raise ContractError('no-call applicability deferral or settled failure required')
+    unavailable=(context.get('schema')=='qjig.fresh-context.v1' and score.get('classification')=='unknown_review'
+                 and score.get('review_status')=='unavailable' and score.get('review_failure')=='review_context_or_storage_error'
+                 and score.get('reconciliation_required') is False and not journal.pending(request_id)
+                 and score.get('conditional_answer') is None and not any(e.stage=='outcome_review' for e in journal.events(request_id)))
+    if result['review'].get('assurance')!='not_reviewed' or not (applicability or settled or unavailable):
+        raise ContractError('eligible deferral, settled failure or unavailable review required')
     slot=outcome_review_allocation(request_id=request_id,partition=partition,spec=outcome_reviewer_spec)
     row=goal._con.execute("SELECT w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id "
         "WHERE s.set_id=? AND w.work_id=? AND w.request_id=?",
@@ -798,8 +802,8 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
     saved={'schema':'qjig.outcome-review-unavailable.v1','reviewed_run_sha256':expected_run_sha256,
            'reference_sha256':expected_reference_sha256,'semantic_review_sha256':expected_review_sha256,
            'request_id':request_id,'work_id':slot['work_id'],
-           'reason':'source_applicability_unestablished' if applicability else 'original_'+score['classification'],
-           **({'journal_sha256':expected_journal_sha256} if settled else {})}
+           'reason':'source_applicability_unestablished' if applicability else 'original_review_unavailable' if unavailable else 'original_'+score['classification'],
+           **({'journal_sha256':expected_journal_sha256} if settled or unavailable else {})}
     outcome={'assessment':'uncertain','assurance':'not_reviewed','reason':saved['reason']}
     if record:
         if (outcome_archive.events() or outcome_archive.revision_ids() or outcome_archive.source_ids()

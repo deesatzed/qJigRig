@@ -1256,7 +1256,8 @@
         "T069E",
         "T069F",
         "T069G",
-        "T069H"
+        "T069H",
+        "T069I"
       ],
       "status": "pending",
       "files": [
@@ -4477,6 +4478,23 @@
       "acceptance": "A settled original failure retains a distinct anchored unavailable review and a failed category; unreconciled attempts cannot qualify.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "Red: settled original failure was refused by the outcome non-review path. Green: a goal-reserved malformed direct attempt records a verified failed outcome without consuming either review slot; a synthetic timeout remains pending and cannot be recorded as settled. Evaluation/review/goal/replay regressions passed 170. Fresh failure coverage, v7 execution, provider authenticity and billing remain open."
+    },
+    {
+      "id": "T069I",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069H"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping",
+      "action": "Verify settled and uncertain fresh outcome-review failures",
+      "acceptance": "A goal-reserved fresh planner failure retains the original journal anchor and unconsumed outcome review; a timeout cannot qualify as settled.",
+      "command": "python -m pytest tests/test_evaluation.py::test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping -q",
+      "evidence": "Red: a goal-reserved fresh run with an unavailable empty-packet review could not record its outcome non-review. Green: malformed fresh planner failures remain failed, pending timeouts refuse, and empty-packet review failures remain unknown with pinned original journal; evaluation/review/goal/replay regressions passed 175 and final targeted seven passed. An initial fixture accidentally triggered judge calls and was corrected. V7 execution, real model behavior and billing remain open."
     }
   ]
 }

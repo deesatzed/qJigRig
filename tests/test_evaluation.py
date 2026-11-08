@@ -1274,8 +1274,8 @@ def test_goal_budgeted_case_requires_matching_reserved_assignment(tmp_path,mode,
         assert plan['sha256'] not in prompt and rid not in prompt and arm not in prompt
 
 
-@pytest.mark.parametrize(('mode','target_arm'), [('catalog','combined'),('full','decomposition_only')])
-def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(tmp_path,mode,target_arm):
+@pytest.mark.parametrize(('mode','target_arm','failure_mode'), [(mode,arm,failure) for mode,arm in [('catalog','combined'),('full','decomposition_only')] for failure in (None,'malformed','timeout')] + [('catalog','combined','empty_packet')])
+def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(tmp_path,mode,target_arm,failure_mode):
     import json
     from collections import Counter
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
@@ -1300,11 +1300,12 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
     sources, protected = [item('code',code)], [item('label',gold)]
     design = _sample_design(); design['families'][4]['source_hashes'] = [sources[0]['sha256']]
     digest = validate_evaluation_design(design)
-    ref = make_reference(case_id='holdout', request=Request('hidden','Do tests pass?','reviewer','1','project'),
+    question='Unmatched zyzzword?' if failure_mode=='empty_packet' else 'Do tests pass?'
+    ref = make_reference(case_id='holdout', request=Request('hidden',question,'reviewer','1','project'),
         sources=load_isolated_sources(tmp_path,sources,protected), as_of='2026-11-07', entities=[],
         historical_as_known=False, expected_answer='yes', provenance='authored_unvalidated',
         evidence=[{'path':'code','quote':'Tests must pass.'}])
-    lock = {'schema':'qjig.evaluation-case.v1','case_id':'holdout','design_sha256':digest,'question':'Do tests pass?',
+    lock = {'schema':'qjig.evaluation-case.v1','case_id':'holdout','design_sha256':digest,'question':question,
         'role':'reviewer','role_version':'1','scope':'project','as_of':'2026-11-07','entities':[],
         'historical_as_known':False,'sources':sources,'reference_sha256':reference_digest(ref)}
     case_hashes = {c['id']:hashlib.sha256(c['id'].encode()).hexdigest() for c in design['cases']}
@@ -1325,7 +1326,7 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
                 if arm in ('combined','decomposition_only'):
                     work = fresh_run_allocations(request_id=rid,partition=partition,provider='stand-in',
                         planner_model=model,judge_model=model,planner_input=100,planner_output=100,
-                        judge_input=100,judge_output=100,planner_price=cap,judge_price=cap)
+                        judge_input=100,judge_output=100,planner_price=cap,judge_price=cap,reviewer=spec)
                 else:
                     work = direct_run_allocations(request_id=rid,partition=partition,provider='stand-in',model=model,
                         input_tokens=100,output_tokens=100,max_price=cap,followups=0)
@@ -1353,6 +1354,41 @@ def test_reserved_combined_assignment_runs_and_replays_without_leaking_mapping(t
             return fresh_slot_reservation(goal,'evaluation:study',request_id=rid,partition='holdout',
                 request=req,model=model,input_tokens=100,input_bound_provenance='synthetic')
         binding = {'plan_id':'study','plan_sha256':plan['sha256'],'arm':target_arm,'repeat':1}
+        if failure_mode:
+            from qjig.evaluation_scoring import fresh_journal_digest,unavailable_failure_review,unavailable_outcome_review,score_outcome_reviewed_assignment
+            response=(TimeoutError('synthetic timeout') if failure_mode=='timeout' else
+                      raw({'predicates':[{'id':'p','question':'unmatched zyzzword'}],'expression':{'ref':'p'}})
+                      if failure_mode=='empty_packet' else RawResponse(200,'not json',usage))
+            failed=run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=digest,
+                expected_case_sha256=case_lock_digest(lock),applicability_inputs=inputs,ledger=ledger,
+                transport=StandInTransport([response]),archive=archive,planner=('stand-in',model['id']),judge=('stand-in',model['id']),
+                planner_max_tokens=100,judge_max_tokens=100,planner_max_price=cap,judge_max_price=cap,
+                reservation_factory=factory,assignment_binding=binding,evidence_mode=mode,
+                **({'reviewer':('stand-in',model['id']),'reviewer_max_tokens':100,'reviewer_max_price':cap,
+                    'review_reservation_factory':factory} if failure_mode=='empty_packet' else {}))
+            assert failed.status=='deferred'
+            replay=verify_archive(archive);assert replay.status=='incomplete'
+            journal_hash=fresh_journal_digest(journal,rid)
+            args=dict(partition='holdout',expected_plan_sha256=plan['sha256'],expected_run_sha256=replay.digest,
+                      expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash,reviewer_spec=spec)
+            with RunArchive.open(tmp_path/'semantic-failure') as review_archive,RunArchive.open(tmp_path/'outcome-failure') as outcome_archive:
+                if failure_mode=='timeout':
+                    with pytest.raises(ContractError):
+                        unavailable_failure_review(goal,archive,journal,ref,review_archive,record=True,**args)
+                    assert journal.pending(rid) and not outcome_archive.events()
+                    return
+                semantic=unavailable_failure_review(goal,archive,journal,ref,review_archive,record=True,**args)
+                kwargs={**args,'expected_review_sha256':semantic['review']['sha256'],'outcome_reviewer_spec':spec}
+                outcome=unavailable_outcome_review(goal,archive,journal,ref,review_archive,outcome_archive,record=True,**kwargs)
+                assert outcome['outcome_category']==('unknown_assessment' if failure_mode=='empty_packet' else 'failed')
+                assert outcome['score']['classification']==('unknown_review' if failure_mode=='empty_packet' else 'malformed')
+                checked=score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
+                    expected_outcome_review_sha256=outcome['outcome_review']['sha256'],**kwargs)
+                assert checked['outcome_category']==outcome['outcome_category'] and checked['score']['request_answer'] is None
+                with pytest.raises(ContractError):
+                    score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
+                        **{**kwargs,'expected_journal_sha256':'0'*64,'expected_outcome_review_sha256':outcome['outcome_review']['sha256']})
+            return
         transport = StandInTransport(responses)
         with pytest.raises(ContractError):
             run_locked_fresh(tmp_path,design,lock,ref,protected,expected_design_sha256=digest,
