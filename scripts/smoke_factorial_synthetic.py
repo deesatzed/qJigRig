@@ -40,7 +40,10 @@ def main():
     parser=argparse.ArgumentParser(description='Run only synthetic draft responses; no provider calls.')
     parser.add_argument('--resume',type=Path,help='Existing synthetic verification directory to resume')
     parser.add_argument('--semantic',action='store_true',help='Reserve and execute semantic-review slots')
+    parser.add_argument('--judge-pairs',type=int,help='Explicit bounded judge pairs per fresh assignment')
     args=parser.parse_args()
+    if args.judge_pairs is not None and (not args.semantic or not 1 <= args.judge_pairs <= 12):
+        parser.error('--judge-pairs requires --semantic and a value from 1 to 12')
     design=json.loads((DRAFT/'design.json').read_text())
     locks=json.loads((DRAFT/'private/case_locks.json').read_text())
     refs=json.loads((DRAFT/'private/references.json').read_text())
@@ -66,7 +69,7 @@ def main():
     spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':{'prompt':2,'completion':3}}
     config=stage_configuration(spec,semantic=args.semantic)
     plan=build_factorial_allocation(design,case_hashes,config,expected_design_sha256=design_hash,
-                                    assignment_secret=b'synthetic-campaign-fixture-secret-only')
+                                    assignment_secret=b'synthetic-campaign-fixture-secret-only',max_judge_pairs=args.judge_pairs)
     parent=Path('.local/verification');parent.mkdir(parents=True,exist_ok=True)
     if args.resume is not None:
         directory=args.resume
@@ -100,7 +103,7 @@ def main():
          Journal.open(directory/'journal.sqlite') as journal:
         reservation=reserve_evaluation_plan(goal,'draft-synthetic',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'draft-synthetic',expected_plan_sha256=plan['sha256'])
-        config_hash=campaign.freeze_config(config,want=3,max_bytes=6000,case_applicability=metadata)
+        config_hash=campaign.freeze_config(config,want=3,max_bytes=6000,case_applicability=metadata,max_judge_pairs=args.judge_pairs)
         pending=campaign.status()['in_progress']
         if pending:
             rid=pending[0];assignment=next(a for a in plan['manifest']['assignments'] if a['request_id']==rid)
@@ -145,7 +148,7 @@ def main():
         if goal.audit_journal(journal)['status']!='verified':
             raise RuntimeError('synthetic goal and journal accounting differ')
         print(json.dumps({'status':'synthetic_complete','directory':str(directory),'assignments':reservation['assignments'],
-                          'reserved_slots':reservation['work_items'],'synthetic_calls_by_stage':dict(Counter(e.stage for e in journal.all_events() if e.kind=='intent')),
+                          'reserved_slots':reservation['work_items'],'judge_pairs_per_fresh_assignment':args.judge_pairs,'synthetic_calls_by_stage':dict(Counter(e.stage for e in journal.all_events() if e.kind=='intent')),
                           'semantic_assurance':'not_assessed','provider_calls':0}),flush=True)
 
 
