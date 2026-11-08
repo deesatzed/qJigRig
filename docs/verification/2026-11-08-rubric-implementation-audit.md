@@ -15,3 +15,7 @@ Focused command: `python -m pytest tests/test_evaluation.py::test_goal_budgeted_
 ## Follow-up: settled unsupported citations
 
 After the audit snapshot, T069L extended the reserved non-review path to an original direct run whose unsupported citation is verified by replay and whose provider attempt is settled. The campaign records it as a failed outcome with both later review slots unconsumed. This does not resolve how to classify verified budget exhaustion or a reconciled timeout; pending and uncertain physical attempts remain blocked. The evaluation/review/replay/goal regressions passed 190.
+
+## Follow-up: no-call direct refusal
+
+T069M permits a direct run that records a pre-call budget/preflight refusal, with no journal events and no consumed request work, to retain both non-review records as `original_no_call_refusal_unverified` and its outcome as unknown. Receipt inspection explicitly reports this condition as incomplete. The archived reason is an assertion; this does not establish that a particular budget was exhausted or classify it as a verified failure. An uncertain call remains unresolved. The evaluation/review/replay/goal regressions passed 191.

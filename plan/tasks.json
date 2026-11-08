@@ -1260,7 +1260,8 @@
         "T069I",
         "T069J",
         "T069K",
-        "T069L"
+        "T069L",
+        "T069M"
       ],
       "status": "pending",
       "files": [
@@ -4671,6 +4672,24 @@
       "acceptance": "A direct invalid citation with a verified settled receipt is scored failed with both review slots unconsumed; uncertain attempts remain unresolved.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "Red: a settled direct unsupported citation was rejected before semantic non-review. Green: campaign archives a failed outcome with both review slots unconsumed, no pending call and a replayable score; existing uncertain timeout remains pending. Evaluation, review, replay and goal regressions passed 190. This does not resolve budget-refusal policy or provider billing."
+    },
+    {
+      "id": "T069M",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069L"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_scoring.py",
+        "src/qjig/live_receipts.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Retain a direct no-call refusal as a separately anchored unknown outcome",
+      "acceptance": "A no-call direct refusal with no consumed or pending work yields attributed non-review and unknown outcome, never a failed classification; uncertain calls still refuse scoring.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Red: no-call direct refusal was rejected by non-review; then receipt inspection did not expose the refusal. Green: reserved direct refusal records an unverified reason and unknown outcome, makes zero calls, consumes no slots, and forces receipt inspection incomplete. Uncertain timeouts still refuse scoring; evaluation/review/replay/goal regressions passed 191. The refusal cause is not independently proved and verified budget-exhaustion policy remains open."
     }
   ]
 }

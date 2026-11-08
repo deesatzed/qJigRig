@@ -203,6 +203,8 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
             encoded = json.dumps(score, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf-8')
             if hashlib.sha256(encoded).hexdigest() != receipt['score_sha256']:
                 raise ContractError('score digest differs')
+            if outcome_enabled and score.get('outcome_review',{}).get('reason')=='original_no_call_refusal_unverified':
+                issues.append('no_call_refusal_unverified')
             checked += 1
         except (OSError, sqlite3.Error, ContractError, ValueError, TypeError, KeyError, IndexError):
             invalid.append('scored_receipt_invalid')
