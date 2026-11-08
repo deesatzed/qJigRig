@@ -165,3 +165,42 @@ def test_v2_missing_initialized_ledger_cannot_reset_goal_budget(tmp_path, monkey
     with pytest.raises(ContractError, match='ledger.*missing'):
         backend.goal_factory()
     assert not ledger.exists()
+
+
+def test_v2_rejects_replacement_account_bound_ledger(tmp_path, monkeypatch):
+    from qjig.contracts import Budget
+    from qjig.goal_budget import GoalBudget
+    observations=({'data':{'limit_remaining':10,'include_byok_in_limit':False,'is_free_tier':False}},
+                  {'data':{'total_credits':10,'total_usage':0}})
+    monkeypatch.setattr('qjig.account_client.fetch_account_snapshot',lambda path,**kwargs:observations)
+    config=config_for(tmp_path)
+    config.update(schema='qjig.fresh-config.v2',goal_dir=str(tmp_path/'shared'))
+    path=tmp_path/'config.json';path.write_text(json.dumps(config))
+    backend=load_fresh_config(path)
+    with backend.goal_factory() as goal:
+        goal.reserve('old-attempt','old-request','smoke',tokens=100,cost_usd=0.1)
+        goal.record_usage('old-attempt',input_tokens=50,output_tokens=10,cost_usd=0.01)
+    replacement=tmp_path/'replacement.sqlite'
+    with GoalBudget.open(replacement,total=Budget.from_dict(config['total']),
+            per_request=Budget.from_dict(config['per_request']),
+            allocations={k:Budget.from_dict(v) for k,v in config['allocations'].items()},
+            account_snapshot=observations):
+        pass
+    os.replace(replacement,tmp_path/'shared'/'goal.sqlite')
+    with pytest.raises(ContractError,match='identity'):
+        backend.goal_factory()
+
+
+def test_v2_missing_ledger_identity_requires_recovery(tmp_path, monkeypatch):
+    observations=({'data':{'limit_remaining':10,'include_byok_in_limit':False,'is_free_tier':False}},
+                  {'data':{'total_credits':10,'total_usage':0}})
+    monkeypatch.setattr('qjig.account_client.fetch_account_snapshot',lambda path,**kwargs:observations)
+    config=config_for(tmp_path)
+    config.update(schema='qjig.fresh-config.v2',goal_dir=str(tmp_path/'shared'))
+    path=tmp_path/'config.json';path.write_text(json.dumps(config))
+    backend=load_fresh_config(path)
+    with backend.goal_factory():
+        pass
+    (tmp_path/'.local'/'qjig-active-goal-identity').unlink()
+    with pytest.raises(ContractError,match='identity.*missing'):
+        backend.goal_factory()

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
+import sqlite3
 from decimal import Decimal
 from pathlib import Path
 
@@ -64,6 +66,41 @@ def _mark_goal_initialized(env_path: Path, goal_dir: Path, *, allow_existing: bo
             output.write(expected)
             output.flush()
             os.fsync(output.fileno())
+
+
+
+def _bind_ledger_identity(goal: GoalBudget, env_path: Path) -> None:
+    """Detect a replacement database after local adoption; not rollback protection."""
+    anchor = env_path.resolve().parent / '.local' / 'qjig-active-goal-identity'
+    if anchor.is_symlink():
+        raise ContractError('unsafe goal ledger identity anchor')
+    con=goal._con
+    con.execute('CREATE TABLE IF NOT EXISTS local_ledger_identity (id INTEGER PRIMARY KEY CHECK(id=1), identity TEXT NOT NULL)')
+    row=con.execute('SELECT identity FROM local_ledger_identity WHERE id=1').fetchone()
+    if row is not None:
+        try:
+            identity=anchor.read_text(encoding='ascii')
+        except FileNotFoundError:
+            raise ContractError('goal ledger identity anchor missing; recovery required') from None
+        except (OSError,UnicodeError) as exc:
+            raise ContractError('goal ledger identity unavailable') from exc
+        if (anchor.is_symlink() or len(identity)!=64 or any(c not in '0123456789abcdef' for c in identity)
+                or row[0]!=identity):
+            raise ContractError('goal ledger identity differs; recovery required')
+        return
+    try:
+        fd=os.open(anchor,os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os,'O_NOFOLLOW',0),0o600)
+    except FileExistsError:
+        raise ContractError('goal ledger identity differs; recovery required') from None
+    identity=secrets.token_hex(32)
+    with os.fdopen(fd,'w',encoding='ascii') as output:
+        output.write(identity)
+        output.flush()
+        os.fsync(output.fileno())
+    try:
+        con.execute('INSERT INTO local_ledger_identity VALUES(1,?)',(identity,))
+    except sqlite3.Error as exc:
+        raise ContractError('goal ledger identity initialization failed; recovery required') from exc
 
 
 def load_fresh_config(path: Path) -> FreshWorkbench:
@@ -131,13 +168,22 @@ def load_fresh_config(path: Path) -> FreshWorkbench:
             snapshot = fetch_account_snapshot(env_path)
             if version == 'qjig.fresh-config.v2':
                 _mark_goal_initialized(env_path, goal_dir, allow_existing=False)
-            return GoalBudget.open(path, total=total, per_request=per_request,
-                                   allocations=allocations, account_snapshot=snapshot)
+            goal=GoalBudget.open(path, total=total, per_request=per_request,
+                                 allocations=allocations, account_snapshot=snapshot)
+            try:
+                if version == 'qjig.fresh-config.v2':
+                    _bind_ledger_identity(goal,env_path)
+            except BaseException:
+                goal.close()
+                raise
+            return goal
         if version == 'qjig.fresh-config.v2':
             _mark_goal_initialized(env_path, goal_dir, allow_existing=True)
         goal = GoalBudget.resume_account_bound(path, total=total, per_request=per_request,
                                                 allocations=allocations)
         try:
+            if version == 'qjig.fresh-config.v2':
+                _bind_ledger_identity(goal,env_path)
             refresh_account_constraints(goal, env_path)
         except BaseException:
             goal.close()
