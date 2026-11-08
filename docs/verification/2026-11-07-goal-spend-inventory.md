@@ -8,3 +8,7 @@ This is a local inventory, not a provider billing statement or proof that no unr
 - The user's current root `.env` authenticated in a read-only account check. The key showed an $18 remaining limit and the account approximately $6.22 available at that moment; the observations can change and do not identify prior goal-attributable usage. No key, identifier, prompt or account response is retained here.
 
 No live inference was performed for this inventory. Reconcile any newly discovered prior goal attempt, and do not silently treat unjournaled or uncertain spending as zero. A single persistent policy still needs to be established and shared by all execution entrypoints.
+
+## Follow-up local scan — 2026-11-08
+
+A read-only recursive scan of `.local` found 1,184 non-symlink `*.sqlite` files. Eleven had an `events` table with journal identity columns; their intent rows contained 1,767 `stand-in` entries and no other recorded provider label. All 1,184 databases opened and were inspected without a SQLite or filesystem error. This includes generated synthetic campaign archives, whose counts are fixture activity and not provider spending. The scan did not search other roots, authenticate database contents, inspect provider billing statements, or prove that unjournaled calls do not exist. It does not establish prior-goal spending completeness or authorize hosted dispatch.
