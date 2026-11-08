@@ -926,8 +926,19 @@ def build_reserved_holdout_comparison(goal, design: dict, entries: list[dict], *
     report['plan_sha256'] = digest
     report['scored_assignments'] = records
     if semantic:
+        review_index={(review['case_id'],review['repeat'],review['arm']):review for review in reviews}
+        def review_side(case, repeat, arm):
+            review=review_index.get((case,repeat,arm))
+            if review is None:
+                return None
+            scope=('not_reviewed' if review['assurance']=='not_reviewed' else
+                   'conditional_graph' if arm in ('combined','decomposition_only') else 'request_answer')
+            return {'assessment':review['assessment'],'assurance':review['assurance'],'scope':scope}
+        review_pairs=[{'case_id':pair['case_id'],'repeat':pair['repeat'],
+                       'baseline':review_side(pair['case_id'],pair['repeat'],baseline_arm),
+                       'candidate':review_side(pair['case_id'],pair['repeat'],candidate_arm)} for pair in report['pairs']]
         report['semantic_reviews']={'assurance':'unvalidated',
             **{name:sum(review['assessment']==name for review in reviews) for name in ('supported','unsupported','uncertain')},
             'not_reviewed':sum(review['assurance']=='not_reviewed' for review in reviews),
-            'records':reviews}
+            'records':reviews,'pairs':review_pairs}
     return report

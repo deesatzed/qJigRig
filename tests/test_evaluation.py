@@ -1843,6 +1843,10 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             assert report['semantic_reviews']['uncertain']==2 and report['semantic_reviews']['assurance']=='unvalidated'
             assert {r['arm'] for r in report['semantic_reviews']['records']}=={'direct_retrieval','combined'}
             assert all(r['case_id']=='holdout' and r['repeat']==1 for r in report['semantic_reviews']['records'])
+            reviewed_pair=next(p for p in report['semantic_reviews']['pairs'] if p['case_id']=='holdout' and p['repeat']==1)
+            assert reviewed_pair['baseline']=={'assessment':'uncertain','assurance':'synthetic_unvalidated','scope':'request_answer'}
+            assert reviewed_pair['candidate']=={'assessment':'uncertain','assurance':'synthetic_unvalidated','scope':'conditional_graph'}
+            assert sum(p['baseline'] is None or p['candidate'] is None for p in report['semantic_reviews']['pairs'])==5
             with pytest.raises(ContractError):
                 build_reserved_holdout_comparison(goal,design,[pair[0],{**pair[1],'review_sha256':'0'*64}],**opts)
             with pytest.raises(ContractError):
