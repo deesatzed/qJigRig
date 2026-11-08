@@ -21,7 +21,8 @@ from .run_archive import RunArchive
 def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, archive_root: Path, *, references: dict,
                               expected_config_sha256: str | None = None, expected_run_sha256: dict | None = None,
                               expected_reference_sha256: dict | None = None, expected_journal_sha256: dict | None = None,
-                              expected_review_sha256: dict | None = None, case_root: Path | None = None, case_inputs: dict | None = None) -> dict:
+                              expected_review_sha256: dict | None = None, expected_outcome_review_sha256: dict | None = None,
+                              case_root: Path | None = None, case_inputs: dict | None = None) -> dict:
     """Inspect assigned work and retained scores without creating archives or calling providers.
 
     Callers must quiesce the separate stores and supply trusted external plan and
@@ -71,7 +72,15 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
     if (not isinstance(expected_review_sha256, dict) or any(key not in assignments for key in expected_review_sha256)
             or any(not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value) for value in expected_review_sha256.values())):
         raise ContractError('invalid external review anchors')
-    semantic = frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6')
+    if expected_outcome_review_sha256 is None:
+        expected_outcome_review_sha256 = {}
+    if (not isinstance(expected_outcome_review_sha256,dict) or any(key not in assignments for key in expected_outcome_review_sha256)
+            or any(not isinstance(value,str) or not re.fullmatch(r'[0-9a-f]{64}',value) for value in expected_outcome_review_sha256.values())):
+        raise ContractError('invalid external outcome review anchors')
+    outcome_enabled=frozen is not None and frozen.get('schema')=='qjig.campaign-config.v7'
+    if outcome_enabled and scored-set(expected_outcome_review_sha256):
+        issues.append('outcome_review_anchor_unavailable')
+    semantic = frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7')
     if semantic and scored - set(expected_review_sha256):
         issues.append('review_anchor_unavailable')
     checked_cases = 0
@@ -174,8 +183,21 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
                         raise ContractError('external review anchor differs')
                     review_con=sqlite3.connect(review_db.resolve().as_uri()+'?mode=ro',uri=True,isolation_level=None)
                     with RunArchive(review_con) as review_archive:
-                        score=score_reviewed_reserved_assignment(campaign._goal,archive,journal,reference,review_archive,
-                            expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=frozen['stages']['semantic_reviewer'],**options)
+                        if outcome_enabled:
+                            from .evaluation_scoring import score_outcome_reviewed_assignment
+                            outcome_path=directory/'outcome-review';outcome_db=outcome_path/'run.sqlite'
+                            if (outcome_path.is_symlink() or outcome_db.is_symlink() or not outcome_path.is_dir() or not outcome_db.is_file()):
+                                raise ContractError('outcome review archive unavailable')
+                            if request_id in expected_outcome_review_sha256 and expected_outcome_review_sha256[request_id]!=receipt['outcome_review_sha256']:
+                                raise ContractError('external outcome review anchor differs')
+                            outcome_con=sqlite3.connect(outcome_db.resolve().as_uri()+'?mode=ro',uri=True,isolation_level=None)
+                            with RunArchive(outcome_con) as outcome_archive:
+                                score=score_outcome_reviewed_assignment(campaign._goal,archive,journal,reference,review_archive,outcome_archive,
+                                    expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=frozen['stages']['semantic_reviewer'],
+                                    expected_outcome_review_sha256=receipt['outcome_review_sha256'],outcome_reviewer_spec=frozen['stages']['outcome_reviewer'],**options)
+                        else:
+                            score=score_reviewed_reserved_assignment(campaign._goal,archive,journal,reference,review_archive,
+                                expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=frozen['stages']['semantic_reviewer'],**options)
                 else:
                     score=score_reserved_assignment(campaign._goal,archive,journal,reference,**options)
             encoded = json.dumps(score, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf-8')

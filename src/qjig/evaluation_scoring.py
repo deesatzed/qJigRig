@@ -1006,16 +1006,18 @@ def build_reserved_holdout_comparison(goal, design: dict, entries: list[dict], *
             raise ContractError('campaign configuration integrity differs')
         config=json.loads(config_value)
     has_semantic=any('semantic_review' in template for template in manifest['stage_templates'].values())
-    semantic=config is not None and config.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6')
+    outcome_enabled=config is not None and config.get('schema')=='qjig.campaign-config.v7'
+    semantic=config is not None and config.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7')
     if (has_semantic and config is not None and not semantic) or (semantic and (not has_semantic
             or not isinstance(expected_config_sha256,str) or not _SHA.fullmatch(expected_config_sha256)
             or not hmac.compare_digest(config_row[1],expected_config_sha256))):
         raise ContractError('semantic campaign configuration anchor required')
     records = []
     reviews = []
+    outcome_records = []
     for entry in entries:
         entry_keys={'archive','journal','reference','run_sha256','reference_sha256','journal_sha256'}
-        if not isinstance(entry,dict) or set(entry) != (entry_keys | ({'review_archive','review_sha256'} if semantic else set())):
+        if not isinstance(entry,dict) or set(entry) != (entry_keys | ({'review_archive','review_sha256'} if semantic else set()) | ({'outcome_archive','outcome_sha256'} if outcome_enabled else set())):
             raise ContractError('invalid holdout archive entry')
         archive = entry['archive']
         try:
@@ -1034,14 +1036,22 @@ def build_reserved_holdout_comparison(goal, design: dict, entries: list[dict], *
             if assigned is None:
                 raise ContractError('campaign assignment unavailable')
             check_archive_config(config,archive.context(),assigned)
-            record=score_reviewed_reserved_assignment(goal,archive,entry['journal'],entry['reference'],entry['review_archive'],
-                expected_review_sha256=entry['review_sha256'],reviewer_spec=config['stages']['semantic_reviewer'],**options)
+            if outcome_enabled:
+                record=score_outcome_reviewed_assignment(goal,archive,entry['journal'],entry['reference'],entry['review_archive'],entry['outcome_archive'],
+                    expected_review_sha256=entry['review_sha256'],reviewer_spec=config['stages']['semantic_reviewer'],
+                    expected_outcome_review_sha256=entry['outcome_sha256'],outcome_reviewer_spec=config['stages']['outcome_reviewer'],**options)
+                outcome_records.append({'case_id':record['score']['case_id'],'repeat':record['repeat'],'arm':record['arm'],
+                                        'category':record['outcome_category'],'assurance':record['outcome_assurance']})
+            else:
+                record=score_reviewed_reserved_assignment(goal,archive,entry['journal'],entry['reference'],entry['review_archive'],
+                    expected_review_sha256=entry['review_sha256'],reviewer_spec=config['stages']['semantic_reviewer'],**options)
             row=goal._con.execute("SELECT payload FROM evaluation_campaign_events WHERE plan_id=? AND request_id=? AND kind='scored'",(plan_id,rid)).fetchone()
             if row is None:
                 raise ContractError('campaign score receipt unavailable')
             receipt=json.loads(row[0])
             encoded_score=json.dumps(record,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
-            if (receipt.get('semantic_review_sha256')!=entry['review_sha256'] or receipt.get('run_sha256')!=entry['run_sha256']
+            if ((outcome_enabled and receipt.get('outcome_review_sha256')!=entry['outcome_sha256'])
+                    or receipt.get('semantic_review_sha256')!=entry['review_sha256'] or receipt.get('run_sha256')!=entry['run_sha256']
                     or receipt.get('reference_sha256')!=entry['reference_sha256'] or receipt.get('journal_sha256')!=entry['journal_sha256']
                     or receipt.get('score_sha256')!=hashlib.sha256(encoded_score).hexdigest()):
                 raise ContractError('campaign score receipt differs')
@@ -1070,6 +1080,22 @@ def build_reserved_holdout_comparison(goal, design: dict, entries: list[dict], *
             **{name:sum(review['assessment']==name for review in reviews) for name in ('supported','unsupported','uncertain')},
             'not_reviewed':sum(review['assurance']=='not_reviewed' for review in reviews),
             'records':reviews,'pairs':review_pairs}
+    if outcome_enabled:
+        by_key={(r['case_id'],r['repeat'],r['arm']):r['category'] for r in outcome_records}
+        outcome_pairs=[]
+        for pair in report['pairs']:
+            key=(pair['case_id'],pair['repeat'])
+            before=by_key.get((*key,baseline_arm));after=by_key.get((*key,candidate_arm))
+            if before is not None and after is not None:
+                outcome_pairs.append({'case_id':key[0],'repeat':key[1],'baseline':before,'candidate':after})
+        if baseline_arm in ('direct_full_evidence','direct_retrieval') and candidate_arm=='combined':
+            paired=summarize_paired_outcome_assertions(design,outcome_pairs,expected_design_sha256=expected_design_sha256,
+                                                       baseline_arm=baseline_arm,candidate_arm=candidate_arm)
+            paired['assurance']='structurally_verified_unvalidated'
+            report['outcome_support']=paired['outcome_support']
+        else:
+            paired=None
+        report['outcome_reviews']={'records':outcome_records,'paired':paired}
     return report
 
 

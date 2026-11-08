@@ -39,7 +39,8 @@ def inspect_manifest(path, expected_sha256=None):
     data=json.loads(raw)
     keys={'schema','goal_db','journal_db','archive_root','plan_id','plan_sha256','config_sha256','references',
           'run_sha256','reference_sha256','journal_sha256','review_sha256','case_root','case_inputs'}
-    if not isinstance(data,dict) or set(data)!=keys or data['schema']!='qjig.live-manifest.v1':
+    if not isinstance(data,dict) or not ((set(data)==keys and data.get('schema')=='qjig.live-manifest.v1') or
+            (set(data)==keys|{'outcome_review_sha256'} and data.get('schema')=='qjig.live-manifest.v2')):
         raise ContractError('invalid live manifest')
     with closing(_open_readonly(data['goal_db'])) as goal_con, closing(_open_readonly(data['journal_db'])) as journal_con:
         row=goal_con.execute('SELECT value FROM policy WHERE id=1').fetchone()
@@ -60,7 +61,7 @@ def inspect_manifest(path, expected_sha256=None):
         report=inspect_campaign_receipts(campaign,journal,Path(data['archive_root']),references=data['references'],
             expected_config_sha256=data['config_sha256'],expected_run_sha256=data['run_sha256'],
             expected_reference_sha256=data['reference_sha256'],expected_journal_sha256=data['journal_sha256'],
-            expected_review_sha256=data['review_sha256'],case_root=Path(data['case_root']) if data['case_root'] else None,
+            expected_review_sha256=data['review_sha256'],expected_outcome_review_sha256=data.get('outcome_review_sha256'),case_root=Path(data['case_root']) if data['case_root'] else None,
             case_inputs=cases)
     report['manifest_sha256']=digest
     if expected_sha256 is None:

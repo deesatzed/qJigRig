@@ -1258,7 +1258,8 @@
         "T069G",
         "T069H",
         "T069I",
-        "T069J"
+        "T069J",
+        "T069K"
       ],
       "status": "pending",
       "files": [
@@ -4514,6 +4515,29 @@
       "acceptance": "Decisive outcome reviews include checked source quotations; unsupported or missing evidence cannot be promoted into outcome categories and legacy reviews remain replayable.",
       "command": "python -m pytest tests/test_outcome_review.py::test_direct_outcome_review_is_blind_budgeted_and_replayable -q",
       "evidence": "Red: the blinded reviewer rejected the new citation-bearing response and could previously classify an unsupported opinion. Green: v2 direct/fresh reviews validate exact source quotations, invalid quotes become uncertain, local scoring requires coverage of listed reference evidence, and a synthetic v1 review replays without checked evidence. Evaluation/review/replay/fresh/provider regressions passed 229; final focused reviewer and assignment suites passed 9 and 8. Citation presence does not establish relevance or semantic correctness."
+    },
+    {
+      "id": "T069K",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069G",
+        "T069H",
+        "T069I",
+        "T069J"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_campaign.py",
+        "src/qjig/acquisition.py",
+        "src/qjig/live_receipts.py",
+        "scripts/verify_live_receipts.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_factorial_allocation_executes_all_arms_with_reserved_review",
+      "action": "Execute and replay campaign assignments with separately anchored outcome reviews",
+      "acceptance": "V7 runs all five stand-in arms, accounts for both reviews, and requires both receipts on restart; missing, changed or unresolved work remains incomplete.",
+      "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
+      "evidence": "Red: v7 five-arm outcome campaign refused execution. Green: stand-in and routed five-arm assignments consume distinct reviews, v7 no-call deferrals and settled failures retain anchored non-reviews, timeouts remain pending, and batch resume/readonly receipt inspection rejects altered or missing review evidence. V2 CLI manifest checks separate outcome anchors; incomplete holdout pairs remain unknown. Evaluation/review/replay/fresh/goal/provider regressions passed 281. Synthetic mechanics only; full corpus, design freeze, real providers and billing remain open."
     }
   ]
 }

@@ -120,10 +120,10 @@ class EvaluationCampaign:
                 started.add(request_id)
             elif kind == 'scored':
                 if (request_id not in started or request_id in scored or not isinstance(data,dict)
-                        or set(data) != ({'plan_sha256','run_sha256','reference_sha256','journal_sha256','score_sha256'} | ({'semantic_review_sha256'} if config_schema in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6') else set()))
+                        or set(data) != ({'plan_sha256','run_sha256','reference_sha256','journal_sha256','score_sha256'} | ({'semantic_review_sha256'} if config_schema in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7') else set()) | ({'outcome_review_sha256'} if config_schema=='qjig.campaign-config.v7' else set()))
                         or data['plan_sha256'] != digest
                         or any(not isinstance(data[k],str) or len(data[k]) != 64 or any(c not in '0123456789abcdef' for c in data[k])
-                               for k in (('run_sha256','reference_sha256','score_sha256','semantic_review_sha256') if config_schema in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6') else ('run_sha256','reference_sha256','score_sha256')))
+                               for k in (('run_sha256','reference_sha256','score_sha256','semantic_review_sha256','outcome_review_sha256') if config_schema=='qjig.campaign-config.v7' else ('run_sha256','reference_sha256','score_sha256','semantic_review_sha256') if config_schema in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7') else ('run_sha256','reference_sha256','score_sha256')))
                         or (data['journal_sha256'] is not None and
                             (not isinstance(data['journal_sha256'],str) or len(data['journal_sha256']) != 64
                              or any(c not in '0123456789abcdef' for c in data['journal_sha256'])))):
@@ -280,8 +280,8 @@ class EvaluationCampaign:
         con.execute('BEGIN IMMEDIATE')
         try:
             manifest,assignments,started,scored = self._snapshot()
-            if any('outcome_review' in template for template in manifest['stage_templates'].values()):
-                raise ContractError('outcome campaign execution is not yet implemented')
+            if any('outcome_review' in template for template in manifest['stage_templates'].values()) and con.execute('SELECT 1 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone() is None:
+                raise ContractError('outcome campaign configuration required')
             if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
                 raise ContractError('assignment unavailable or already claimed')
             if started-scored:
@@ -308,7 +308,8 @@ class EvaluationCampaign:
 
     def finish(self, request_id: str, archive, journal, reference: dict, *, expected_run_sha256: str,
                expected_reference_sha256: str, expected_journal_sha256: str | None = None,
-               semantic_review_archive=None, expected_review_sha256: str | None = None) -> dict:
+               semantic_review_archive=None, expected_review_sha256: str | None = None,
+               outcome_review_archive=None, expected_outcome_review_sha256: str | None = None) -> dict:
         manifest,assignments,started,scored = self._snapshot()
         if request_id not in assignments or request_id not in started or request_id in scored:
             raise ContractError('assignment is not an unfinished claim')
@@ -317,20 +318,25 @@ class EvaluationCampaign:
             raise ContractError('archive request differs from claim')
         config_row=self._goal._con.execute('SELECT value FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
         frozen = json.loads(config_row[0]) if config_row is not None else None
-        if frozen is not None and frozen.get('schema')=='qjig.campaign-config.v7':
-            raise ContractError('outcome campaign execution is not yet implemented')
         if frozen is not None:
             check_archive_config(frozen, archive.context(), assignment)
         family = next(c['family'] for c in manifest['design']['cases'] if c['id']==assignment['case_id'])
         partition = next(f['partition'] for f in manifest['design']['families'] if f['id']==family)
         scoring_options=dict(partition=partition,expected_plan_sha256=self._digest,expected_run_sha256=expected_run_sha256,
             expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256)
-        if frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6'):
+        if frozen is not None and frozen.get('schema')=='qjig.campaign-config.v7':
+            from .evaluation_scoring import score_outcome_reviewed_assignment
+            score=score_outcome_reviewed_assignment(self._goal,archive,journal,reference,semantic_review_archive,outcome_review_archive,
+                expected_review_sha256=expected_review_sha256,reviewer_spec=frozen['stages']['semantic_reviewer'],
+                expected_outcome_review_sha256=expected_outcome_review_sha256,outcome_reviewer_spec=frozen['stages']['outcome_reviewer'],**scoring_options)
+        elif frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6'):
+            if outcome_review_archive is not None or expected_outcome_review_sha256 is not None:
+                raise ContractError('outcome review requires v7 campaign')
             from .evaluation_scoring import score_reviewed_reserved_assignment
             score = score_reviewed_reserved_assignment(self._goal,archive,journal,reference,semantic_review_archive,
                 expected_review_sha256=expected_review_sha256,reviewer_spec=frozen['stages']['semantic_reviewer'],**scoring_options)
         else:
-            if semantic_review_archive is not None or expected_review_sha256 is not None:
+            if semantic_review_archive is not None or expected_review_sha256 is not None or outcome_review_archive is not None or expected_outcome_review_sha256 is not None:
                 raise ContractError('semantic review requires a v4 campaign')
             score = score_reserved_assignment(self._goal,archive,journal,reference,**scoring_options)
         if (score['score']['case_id'],score['arm'],score['repeat']) != (assignment['case_id'],assignment['arm'],assignment['repeat']):
@@ -341,8 +347,10 @@ class EvaluationCampaign:
         score_hash = hashlib.sha256(encoded).hexdigest()
         payload = {'plan_sha256':self._digest,'run_sha256':expected_run_sha256,'reference_sha256':expected_reference_sha256,
                    'journal_sha256':expected_journal_sha256,'score_sha256':score_hash}
-        if frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6'):
+        if frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7'):
             payload['semantic_review_sha256']=expected_review_sha256
+        if frozen is not None and frozen.get('schema')=='qjig.campaign-config.v7':
+            payload['outcome_review_sha256']=expected_outcome_review_sha256
         con = self._goal._con
         con.execute('BEGIN IMMEDIATE')
         try:
@@ -361,7 +369,7 @@ class EvaluationCampaign:
 def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root, design: dict,
                             lock: dict, reference: dict, protected: list[dict], *,
                             applicability_inputs, transport, archive, journal, config: dict,
-                            want: int, max_bytes: int, expected_config_sha256: str, semantic_review_archive=None) -> dict:
+                            want: int, max_bytes: int, expected_config_sha256: str, semantic_review_archive=None, outcome_review_archive=None) -> dict:
     """Run and score one claimed factorial assignment; never retry an interrupted claim.
 
     Input/price bounds, evidence configuration and external anchors are caller
@@ -384,9 +392,8 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             or type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024):
         raise ContractError('invalid campaign run inputs')
     frozen_config=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
-    if frozen_config['schema']=='qjig.campaign-config.v7':
-        raise ContractError('outcome campaign execution is not yet implemented')
-    semantic = frozen_config['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6')
+    outcome_enabled=frozen_config['schema']=='qjig.campaign-config.v7'
+    semantic = frozen_config['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7')
     quota = frozen_config.get('max_judge_pairs')
     if semantic and (not isinstance(semantic_review_archive,RunArchive) or semantic_review_archive is archive
                      or semantic_review_archive.events() or semantic_review_archive.revision_ids() or semantic_review_archive.source_ids()
@@ -394,6 +401,12 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
         raise ContractError('new semantic review archive required')
     if not semantic and semantic_review_archive is not None:
         raise ContractError('semantic review archive requires v4 campaign')
+    if outcome_enabled and (not isinstance(outcome_review_archive,RunArchive) or outcome_review_archive in (archive,semantic_review_archive)
+            or outcome_review_archive.events() or outcome_review_archive.revision_ids() or outcome_review_archive.source_ids()
+            or outcome_review_archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0]):
+        raise ContractError('new outcome review archive required')
+    if not outcome_enabled and outcome_review_archive is not None:
+        raise ContractError('outcome review archive requires v7 campaign')
     manifest,assignments,started,_ = campaign._snapshot()
     if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
         raise ContractError('campaign assignment unavailable')
@@ -421,8 +434,8 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             applicability_deferral = any(combine_applicability(applicability_inputs.verdict(revision.revision_id),
                 scope_applicability(prepared.scope,applicability_inputs.collection.member(revision.revision_id).scope))
                 is not Applicability.MATCH for revision in revisions)
-    if (not isinstance(config,dict) or set(config) != ({'direct','planner','judge','reviewer','semantic_reviewer'} if semantic else {'direct','planner','judge','reviewer'})
-            or any(not isinstance(spec,dict) or set(spec) != ({'provider','model','input_tokens','output_tokens','max_price','route'} if frozen_config['schema']=='qjig.campaign-config.v6' else {'provider','model','input_tokens','output_tokens','max_price'})
+    if (not isinstance(config,dict) or set(config) != ({'direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer'} if outcome_enabled else {'direct','planner','judge','reviewer','semantic_reviewer'} if semantic else {'direct','planner','judge','reviewer'})
+            or any(not isinstance(spec,dict) or set(spec) != ({'provider','model','input_tokens','output_tokens','max_price','route'} if 'route' in spec else {'provider','model','input_tokens','output_tokens','max_price'})
                    for spec in config.values())):
         raise ContractError('invalid campaign stage configuration')
     direct,planner,judge,reviewer=(config[k] for k in ('direct','planner','judge','reviewer'))
@@ -444,6 +457,9 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
     if semantic:
         from .semantic_preflight import semantic_review_allocation
         expected.append(semantic_review_allocation(request_id=request_id,partition=partition,spec=config['semantic_reviewer']))
+    if outcome_enabled:
+        from .outcome_preflight import outcome_review_allocation
+        expected.append(outcome_review_allocation(request_id=request_id,partition=partition,spec=config['outcome_reviewer']))
     if sorted(expected,key=lambda x:x['work_id']) != assignment['work']:
         raise ContractError('campaign configuration differs from reserved work')
     if (archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0] or archive.events()
@@ -533,10 +549,41 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
         if checked.get('status') != 'unanchored':
             raise ContractError('semantic review unavailable or invalid; recovery required')
         review_hash=checked['sha256']
+    outcome_hash=None
+    if outcome_enabled:
+        from .evaluation_scoring import unavailable_outcome_review
+        outcome_spec=config['outcome_reviewer']
+        if original_incomplete or applicability_deferral:
+            checked_outcome=unavailable_outcome_review(campaign._goal,archive,journal,reference,semantic_review_archive,outcome_review_archive,
+                partition=partition,expected_plan_sha256=campaign._digest,expected_run_sha256=run_hash,
+                expected_reference_sha256=reference_digest(reference),expected_journal_sha256=journal_hash,
+                expected_review_sha256=review_hash,reviewer_spec=config['semantic_reviewer'],outcome_reviewer_spec=outcome_spec,record=True)['outcome_review']
+        else:
+            from .evaluation_outcome_review import (review_direct_outcome,review_fresh_outcome,
+                                                     verify_direct_outcome_review,verify_fresh_outcome_review)
+            from .outcome_preflight import outcome_review_reservation
+            def outcome_factory(req):
+                return outcome_review_reservation(campaign._goal,set_id,request_id=request_id,partition=partition,request=req,spec=outcome_spec)
+            outcome_opts=dict(review_archive=outcome_review_archive,expected_run_sha256=run_hash,provider=outcome_spec['provider'],
+                model=outcome_spec['model']['id'],max_tokens=outcome_spec['output_tokens'],max_price=outcome_spec['max_price'],
+                route=outcome_spec.get('route'),reservation_factory=outcome_factory)
+            if arm in ('combined','decomposition_only'):
+                review_fresh_outcome(archive,journal,ledger,transport,reference=reference,expected_reference_sha256=reference_digest(reference),
+                    expected_journal_sha256=journal_hash,**outcome_opts)
+                checked_outcome=verify_fresh_outcome_review(archive,journal,outcome_review_archive,reference=reference,
+                    expected_reference_sha256=reference_digest(reference),expected_run_sha256=run_hash,expected_journal_sha256=journal_hash)
+            else:
+                review_direct_outcome(archive,journal,ledger,transport,**outcome_opts)
+                checked_outcome=verify_direct_outcome_review(archive,journal,outcome_review_archive,expected_run_sha256=run_hash)
+        if checked_outcome.get('status')!='unanchored':
+            raise ContractError('outcome review unavailable or invalid; recovery required')
+        outcome_hash=checked_outcome['sha256']
     receipt=campaign.finish(request_id,archive,journal,reference,expected_run_sha256=run_hash,
         expected_reference_sha256=reference_digest(reference),expected_journal_sha256=journal_hash,
-        **({'semantic_review_archive':semantic_review_archive,'expected_review_sha256':review_hash} if semantic else {}))
-    return {**receipt,'run_sha256':run_hash,'journal_sha256':journal_hash,**({'semantic_review_sha256':review_hash} if semantic else {})}
+        **({'semantic_review_archive':semantic_review_archive,'expected_review_sha256':review_hash} if semantic else {}),
+        **({'outcome_review_archive':outcome_review_archive,'expected_outcome_review_sha256':outcome_hash} if outcome_enabled else {}))
+    return {**receipt,'run_sha256':run_hash,'journal_sha256':journal_hash,**({'semantic_review_sha256':review_hash} if semantic else {}),
+            **({'outcome_review_sha256':outcome_hash} if outcome_enabled else {})}
 
 
 def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: dict, *, journal,
@@ -561,9 +608,8 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
             or not callable(transport_factory) or type(max_assignments) is not int or not 1 <= max_assignments <= 100):
         raise ContractError('invalid campaign batch inputs')
     frozen=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
-    if frozen['schema']=='qjig.campaign-config.v7':
-        raise ContractError('outcome campaign execution is not yet implemented')
-    semantic = frozen['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6')
+    outcome_enabled=frozen['schema']=='qjig.campaign-config.v7'
+    semantic = frozen['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7')
     manifest,assignments,started,scored=campaign._snapshot()
     if design != manifest['design'] or set(cases) != {case['id'] for case in design['cases']}:
         raise ContractError('campaign batch case set differs')
@@ -615,8 +661,19 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
                         or not (review_path/'run.sqlite').is_file()):
                     raise ContractError('scored semantic review archive unavailable')
                 with RunArchive.open(review_path) as review_archive:
-                    score=score_reviewed_reserved_assignment(campaign._goal,archive,journal,data['reference'],review_archive,
-                        expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=frozen['stages']['semantic_reviewer'],**options)
+                    if outcome_enabled:
+                        from .evaluation_scoring import score_outcome_reviewed_assignment
+                        outcome_path=path/'outcome-review'
+                        if (outcome_path.is_symlink() or not outcome_path.is_dir() or (outcome_path/'run.sqlite').is_symlink()
+                                or not (outcome_path/'run.sqlite').is_file()):
+                            raise ContractError('scored outcome review archive unavailable')
+                        with RunArchive.open(outcome_path) as outcome_archive:
+                            score=score_outcome_reviewed_assignment(campaign._goal,archive,journal,data['reference'],review_archive,outcome_archive,
+                                expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=frozen['stages']['semantic_reviewer'],
+                                expected_outcome_review_sha256=receipt['outcome_review_sha256'],outcome_reviewer_spec=frozen['stages']['outcome_reviewer'],**options)
+                    else:
+                        score=score_reviewed_reserved_assignment(campaign._goal,archive,journal,data['reference'],review_archive,
+                            expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=frozen['stages']['semantic_reviewer'],**options)
             else:
                 score=score_reserved_assignment(campaign._goal,archive,journal,data['reference'],**options)
         encoded=json.dumps(score,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
@@ -648,10 +705,16 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
                 if review_path.is_symlink() or (review_path/'run.sqlite').is_symlink():
                     raise ContractError('semantic review path must not be a symlink')
                 review_archive=stack.enter_context(RunArchive.open(review_path))
+            outcome_archive=None
+            if outcome_enabled:
+                outcome_path=path/'outcome-review'
+                if outcome_path.is_symlink() or (outcome_path/'run.sqlite').is_symlink():
+                    raise ContractError('outcome review path must not be a symlink')
+                outcome_archive=stack.enter_context(RunArchive.open(outcome_path))
             run_campaign_assignment(campaign,rid,root,design,data['lock'],data['reference'],data['protected'],
                 applicability_inputs=data['applicability_inputs'],transport=transport_factory(dict(assignment)),
                 archive=archive,journal=journal,config=config,want=want,max_bytes=max_bytes,
-                expected_config_sha256=expected_config_sha256,semantic_review_archive=review_archive)
+                expected_config_sha256=expected_config_sha256,semantic_review_archive=review_archive,outcome_review_archive=outcome_archive)
         executed+=1
     status=campaign.status()
     return {'executed':executed,'assigned':status['assigned'],'scored':status['scored'],

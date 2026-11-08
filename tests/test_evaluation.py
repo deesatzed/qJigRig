@@ -1777,7 +1777,7 @@ def test_factorial_allocation_enumerates_real_arm_work_before_reservation(tmp_pa
         assert goal._con.execute('SELECT COUNT(*) FROM evaluation_plans').fetchone()[0]==0
 
 
-@pytest.mark.parametrize('driver',['manual','runner','runner_v2','runner_semantic','runner_quota','runner_routes'])
+@pytest.mark.parametrize('driver',['manual','runner','runner_v2','runner_semantic','runner_quota','runner_routes','runner_outcome','runner_outcome_routes'])
 def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,driver):
     import json
     from contextlib import ExitStack
@@ -1818,11 +1818,12 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
            'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
-    if driver=='runner_routes': spec={**spec,'provider':'openrouter','route':'provider-a/fp4'}
-    stage_names=('direct','planner','judge','reviewer','semantic_reviewer') if driver in ('runner_semantic','runner_quota','runner_routes') else ('direct','planner','judge','reviewer')
+    if driver in ('runner_routes','runner_outcome_routes'): spec={**spec,'provider':'openrouter','route':'provider-a/fp4'}
+    stage_names=('direct','planner','judge','reviewer','semantic_reviewer') if driver in ('runner_semantic','runner_quota','runner_routes','runner_outcome','runner_outcome_routes') else ('direct','planner','judge','reviewer')
+    if driver in ('runner_outcome','runner_outcome_routes'): stage_names=(*stage_names,'semantic_reviewer','outcome_reviewer') if 'semantic_reviewer' not in stage_names else (*stage_names,'outcome_reviewer')
     plan=build_factorial_allocation(design,case_hashes,{k:dict(spec) for k in stage_names},
                                     expected_design_sha256=digest,assignment_secret=b'synthetic-private-test-secret-32-bytes',
-                                    **({'max_judge_pairs':1} if driver in ('runner_quota','runner_routes') else {}))
+                                    **({'max_judge_pairs':1} if driver in ('runner_quota','runner_routes','runner_outcome','runner_outcome_routes') else {}))
     usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
     raw=lambda value:RawResponse(200,json.dumps(value),usage)
     total=Budget(800,200000,10);per=Budget(30,6000,1)
@@ -1835,7 +1836,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
         campaign=EvaluationCampaign(goal,'factorial',expected_plan_sha256=plan['sha256'])
         from qjig.evaluation_campaign import applicability_digest
         metadata_hashes={case['id']:applicability_digest(inputs) for case in design['cases']}
-        config_digest = campaign.freeze_config({k:dict(spec) for k in stage_names},want=1,max_bytes=5000,case_applicability=metadata_hashes, **({'planner_prompt_version':'exception_applicability_v2'} if driver in ('runner_v2','runner_semantic','runner_quota','runner_routes') else {}), **({'max_judge_pairs':1} if driver in ('runner_quota','runner_routes') else {})) if driver!='manual' else None
+        config_digest = campaign.freeze_config({k:dict(spec) for k in stage_names},want=1,max_bytes=5000,case_applicability=metadata_hashes, **({'planner_prompt_version':'exception_applicability_v2'} if driver in ('runner_v2','runner_semantic','runner_quota','runner_routes','runner_outcome','runner_outcome_routes') else {}), **({'max_judge_pairs':1} if driver in ('runner_quota','runner_routes','runner_outcome','runner_outcome_routes') else {})) if driver!='manual' else None
         if driver=='runner':
             assert campaign.freeze_config({k:dict(spec) for k in stage_names},want=1,max_bytes=5000,case_applicability=metadata_hashes)==config_digest
             with pytest.raises(ContractError):
@@ -1854,12 +1855,15 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                         raw({'supported':False,'quote':'','reason':'synthetic'}),raw({'assessment':'uncertain','reason':'synthetic'})]
                 else:
                     responses=[raw({'action':'answer','query':None,'answer':'unknown','citations':[]})]
-                if driver in ('runner_quota','runner_routes') and arm in ('combined','decomposition_only'):
+                if driver in ('runner_quota','runner_routes','runner_outcome','runner_outcome_routes') and arm in ('combined','decomposition_only'):
                     responses[0]=raw({'predicates':[{'id':'p','question':'Do tests pass?'},{'id':'q','question':'Must tests pass?'}],
                                       'expression':{'op':'and','args':[{'ref':'p'},{'ref':'q'}]}})
-                if driver in ('runner_semantic','runner_quota','runner_routes'):
+                if driver in ('runner_semantic','runner_quota','runner_routes','runner_outcome','runner_outcome_routes'):
                     responses.append(raw({'assessment':'uncertain','reason':'synthetic review'}))
                     semantic_archive=stack.enter_context(RunArchive.open(tmp_path/('semantic-'+arm)))
+                if driver in ('runner_outcome','runner_outcome_routes'):
+                    responses.append(raw({'assessment':'yes','reason':'synthetic','citations':[{'revision_id':ref['source_revisions'][0],'quote':'Tests must pass.'}]}))
+                    outcome_archive=stack.enter_context(RunArchive.open(tmp_path/('outcome-'+arm)))
                 class RoutedStandIn(StandInTransport):
                     def send(self, request):
                         from qjig.providers import openrouter_wire_payload_v5
@@ -1867,12 +1871,19 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                         metadata={'wire_payload_format':'openrouter.chat.v5',
                                   'wire_payload_sha256':hashlib.sha256(openrouter_wire_payload_v5(request).encode()).hexdigest()}
                         return RawResponse(response.http_status,response.body,response.usage,metadata=metadata)
-                transport=RoutedStandIn(responses) if driver=='runner_routes' else StandInTransport(responses)
-                if driver in ('runner_semantic','runner_quota','runner_routes'):
+                transport=RoutedStandIn(responses) if driver in ('runner_routes','runner_outcome_routes') else StandInTransport(responses)
+                if driver in ('runner_semantic','runner_quota','runner_routes','runner_outcome','runner_outcome_routes'):
                     with pytest.raises(ContractError,match='semantic review archive'):
                         run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
                             applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
                             config={k:dict(spec) for k in stage_names},want=1,max_bytes=5000,expected_config_sha256=config_digest)
+                    assert campaign.status()['in_progress']==[] and transport.calls_made==0
+                if driver in ('runner_outcome','runner_outcome_routes'):
+                    with pytest.raises(ContractError,match='outcome review archive'):
+                        run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
+                            applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
+                            config={k:dict(spec) for k in stage_names},want=1,max_bytes=5000,
+                            expected_config_sha256=config_digest,semantic_review_archive=semantic_archive)
                     assert campaign.status()['in_progress']==[] and transport.calls_made==0
                 changed_inputs=ApplicabilityInputs(Collection((MemberMetadata(ref['source_revisions'][0],'other',Interval('2020-01-01',OPEN)),)),frozenset(),'2026-11-07',False)
                 with pytest.raises(ContractError):
@@ -1902,9 +1913,10 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                 receipt=run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,protected,
                     applicability_inputs=inputs,transport=transport,archive=archive,journal=journal,
                     config={k:dict(spec) for k in stage_names},want=1,max_bytes=5000,expected_config_sha256=config_digest,
-                    **({'semantic_review_archive':semantic_archive} if driver in ('runner_semantic','runner_quota','runner_routes') else {}))
-                assert receipt['status']=='scored' and transport.calls_made==((4 if arm in ('combined','decomposition_only') else 1)+(driver in ('runner_semantic','runner_quota','runner_routes')))
-                if driver in ('runner_quota','runner_routes') and arm in ('combined','decomposition_only'):
+                    **({'semantic_review_archive':semantic_archive} if driver in ('runner_semantic','runner_quota','runner_routes','runner_outcome','runner_outcome_routes') else {}),
+                    **({'outcome_review_archive':outcome_archive} if driver in ('runner_outcome','runner_outcome_routes') else {}))
+                assert receipt['status']=='scored' and transport.calls_made==((4 if arm in ('combined','decomposition_only') else 1)+(driver in ('runner_semantic','runner_quota','runner_routes','runner_outcome','runner_outcome_routes'))+(driver in ('runner_outcome','runner_outcome_routes')))
+                if driver in ('runner_quota','runner_routes','runner_outcome','runner_outcome_routes') and arm in ('combined','decomposition_only'):
                     traces=[e['data'] for e in archive.events() if e['kind']=='trace']
                     assert any(t['observation']['reason']=='provider_budget_exceeded' and t['observation']['outcome']=='unknown' for t in traces)
                     assert archive.context()['max_judge_pairs']==1
@@ -1916,7 +1928,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                     archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',(encoded,hashlib.sha256(encoded.encode()).hexdigest()))
                     assert verify_archive(archive).status=='invalid'
                     archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',original)
-                if driver in ('runner_semantic','runner_quota','runner_routes'):
+                if driver in ('runner_semantic','runner_quota','runner_routes','runner_outcome','runner_outcome_routes'):
                     from qjig.evaluation_scoring import score_reviewed_reserved_assignment
                     review_kwargs=dict(partition='holdout',expected_plan_sha256=plan['sha256'],
                         expected_run_sha256=receipt['run_sha256'],expected_journal_sha256=receipt['journal_sha256'],
@@ -1940,12 +1952,25 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
                     changed_context={**archive.context(), 'planner_prompt_version':'legacy_v1'}
                     with pytest.raises(ContractError, match='prompt version'):
                         check_archive_config(frozen,changed_context,assignment)
+                if driver in ('runner_outcome','runner_outcome_routes'):
+                    from qjig.evaluation_scoring import score_outcome_reviewed_assignment
+                    args=dict(partition='holdout',expected_plan_sha256=plan['sha256'],expected_run_sha256=receipt['run_sha256'],
+                        expected_journal_sha256=receipt['journal_sha256'],expected_reference_sha256=reference_digest(ref),
+                        expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=spec,
+                        expected_outcome_review_sha256=receipt['outcome_review_sha256'],outcome_reviewer_spec=spec)
+                    checked=score_outcome_reviewed_assignment(goal,archive,journal,ref,semantic_archive,outcome_archive,**args)
+                    assert checked['outcome_review']['assessment']=='yes' and checked['outcome_review']['evidence_checked']
+                    with pytest.raises(ContractError):
+                        score_outcome_reviewed_assignment(goal,archive,journal,ref,semantic_archive,outcome_archive,
+                            **{**args,'expected_outcome_review_sha256':'0'*64})
                 prompts=[e['data']['prompt'] for e in archive.events() if e['kind']=='request']
                 assert all(gold.decode() not in p and rid not in p and arm not in p for p in prompts)
                 entries[arm]={'archive':archive,'journal':journal,'reference':ref,'run_sha256':receipt['run_sha256'],
                               'reference_sha256':reference_digest(ref),'journal_sha256':receipt['journal_sha256']}
-                if driver in ('runner_semantic','runner_quota','runner_routes'):
+                if driver in ('runner_semantic','runner_quota','runner_routes','runner_outcome','runner_outcome_routes'):
                     entries[arm].update(review_archive=semantic_archive,review_sha256=receipt['semantic_review_sha256'])
+                if driver in ('runner_outcome','runner_outcome_routes'):
+                    entries[arm].update(outcome_archive=outcome_archive,outcome_sha256=receipt['outcome_review_sha256'])
                 with pytest.raises(ContractError):campaign.claim(rid)
                 continue
             claim=campaign.claim(rid)
@@ -1993,6 +2018,16 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             assert receipt['status']=='scored' and len(receipt['score_sha256'])==64
             with pytest.raises(ContractError):campaign.claim(rid)
         assert goal.audit_journal(journal)['status']=='verified'
+        if driver in ('runner_outcome','runner_outcome_routes'):
+            assert campaign.status()['scored']==5
+            pair=[entries['direct_retrieval'],entries['combined']]
+            opts=dict(plan_id='factorial',expected_plan_sha256=plan['sha256'],expected_design_sha256=digest,
+                      baseline_arm='direct_retrieval',candidate_arm='combined',expected_config_sha256=config_digest)
+            report=build_reserved_holdout_comparison(goal,design,pair,**opts)
+            assert report['outcome_support'] is None and report['outcome_reviews']['paired']['missing_pairs']==5
+            with pytest.raises(ContractError):
+                build_reserved_holdout_comparison(goal,design,[pair[0],{**pair[1],'outcome_sha256':'0'*64}],**opts)
+            return
         if driver in ('runner_semantic','runner_quota','runner_routes'):
             assert campaign.status()['scored']==5
             pair=[entries['direct_retrieval'],entries['combined']]
@@ -2048,7 +2083,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             reopened._con.execute("UPDATE evaluation_campaign_events SET payload='{}' WHERE kind='started'")
 
 
-@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout'])
+@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_timeout'])
 def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path,mismatch):
     import copy,json
     from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN,UNKNOWN_BOUND
@@ -2093,7 +2128,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
         cases['holdout']['lock']['reference_sha256']=reference_digest(cases['holdout']['reference'])
         hashes['holdout']=case_lock_digest(cases['holdout']['lock'])
     scope='other' if mismatch=='scope' else 'project'
-    interval=Interval('2027-01-01',OPEN) if mismatch=='date' else Interval(UNKNOWN_BOUND,OPEN) if mismatch in ('unknown','semantic_unknown','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout') else Interval('2020-01-01',OPEN)
+    interval=Interval('2027-01-01',OPEN) if mismatch=='date' else Interval(UNKNOWN_BOUND,OPEN) if mismatch in ('unknown','semantic_unknown','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_timeout') else Interval('2020-01-01',OPEN)
     member=MemberMetadata(rev,scope,interval,entity_keys=frozenset({'other'}) if mismatch=='entity' else frozenset())
     wrong=ApplicabilityInputs(Collection((member,)),frozenset({'target'}) if mismatch=='entity' else frozenset(),'2026-11-07',False)
     cases['holdout']['applicability_inputs']=wrong;metadata['holdout']=applicability_digest(wrong)
@@ -2102,9 +2137,9 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
     if mismatch in ('semantic_route','semantic_route_unknown'): spec={**spec,'provider':'openrouter','route':'provider-a/fp4'}
     config={k:dict(spec) for k in (('direct','planner','judge','reviewer','semantic_reviewer') if mismatch in ('semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown') else ('direct','planner','judge','reviewer'))}
-    if mismatch in ('outcome_unavailable','outcome_failure','outcome_timeout'):
+    if mismatch in ('outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_timeout'):
         config={k:dict(spec) for k in ('direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer')}
-    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'private-synthetic-batch-secret-32-bytes',**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout') else {}))
+    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'private-synthetic-batch-secret-32-bytes',**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_timeout') else {}))
     total=Budget(800,200000,10);per=Budget(30,6000,1)
     allocations={'development':Budget(200,50000,2),'pilot':Budget(200,50000,2),'holdout':Budget(400,100000,6)}
     calls=[];usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
@@ -2117,7 +2152,11 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                        raw({'supported':True,'quote':text,'reason':'synthetic'}),
                        raw({'supported':False,'quote':'','reason':'synthetic'}),raw({'assessment':'uncertain','reason':'synthetic'})]
         else:responses=[raw({'action':'answer','query':None,'answer':'unknown','citations':[]})]
-        if mismatch in ('semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown'):responses.append(raw({'assessment':'uncertain','reason':'synthetic review'}))
+        if mismatch in ('semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown','outcome_batch'):responses.append(raw({'assessment':'uncertain','reason':'synthetic review'}))
+        if mismatch=='outcome_batch':
+            ref=cases[assignment['case_id']]['reference']
+            source=(tmp_path/next(c['family'] for c in design['cases'] if c['id']==assignment['case_id'])).read_text()
+            responses.append(raw({'assessment':'yes','reason':'synthetic','citations':[{'revision_id':ref['source_revisions'][0],'quote':source}]}))
         class RoutedStandIn(StandInTransport):
             def send(self, request):
                 from qjig.providers import openrouter_wire_payload_v5
@@ -2129,7 +2168,33 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal,Journal.open(tmp_path/'journal.sqlite') as journal:
         reserve_evaluation_plan(goal,'batch',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'batch',expected_plan_sha256=plan['sha256'])
-        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout') else {}))
+        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_timeout') else {}))
+        if mismatch in ('outcome_runner_failure','outcome_runner_timeout'):
+            from qjig.evaluation_campaign import run_campaign_assignment
+            from qjig.evaluation_scoring import score_outcome_reviewed_assignment
+            from qjig.run_archive import RunArchive
+            target=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']=='direct_full_evidence' and a['repeat']==1)
+            data=cases['holdout'];rid=target['request_id'];ref=data['reference']
+            response=TimeoutError('synthetic timeout') if mismatch=='outcome_runner_timeout' else RawResponse(200,'not json',usage)
+            transport=StandInTransport([response])
+            with RunArchive.open(tmp_path/'failed') as archive,RunArchive.open(tmp_path/'semantic') as review_archive,RunArchive.open(tmp_path/'outcome') as outcome_archive:
+                options=dict(applicability_inputs=data['applicability_inputs'],transport=transport,archive=archive,journal=journal,
+                    config=config,want=1,max_bytes=5000,expected_config_sha256=config_hash,
+                    semantic_review_archive=review_archive,outcome_review_archive=outcome_archive)
+                if mismatch=='outcome_runner_timeout':
+                    with pytest.raises(ContractError):
+                        run_campaign_assignment(campaign,rid,tmp_path,design,data['lock'],ref,data['protected'],**options)
+                    assert journal.pending(rid) and campaign.status()['in_progress']==[rid]
+                    assert not review_archive.events() and not outcome_archive.events()
+                    return
+                receipt=run_campaign_assignment(campaign,rid,tmp_path,design,data['lock'],ref,data['protected'],**options)
+                assert receipt['status']=='scored' and transport.calls_made==1
+                scored=score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
+                    partition='holdout',expected_plan_sha256=plan['sha256'],expected_run_sha256=receipt['run_sha256'],
+                    expected_reference_sha256=reference_digest(ref),expected_review_sha256=receipt['semantic_review_sha256'],
+                    reviewer_spec=spec,expected_outcome_review_sha256=receipt['outcome_review_sha256'],outcome_reviewer_spec=spec)
+                assert scored['outcome_category']=='failed' and scored['outcome_assurance']=='not_reviewed'
+            return
         if mismatch in ('outcome_failure','outcome_timeout'):
             from qjig.budgets import BudgetLedger
             from qjig.direct_preflight import direct_slot_reservation
@@ -2179,20 +2244,19 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
             from qjig.sources import SourceRevision,decode_source
             target=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']=='decomposition_only' and a['repeat']==1)
             data=cases['holdout'];rid=target['request_id'];ref=data['reference'];lock=data['lock']
-            raw=(tmp_path/lock['sources'][0]['path']).read_bytes()
-            revisions=[SourceRevision.create(lock['sources'][0]['path'],'evaluation_allowlist',decode_source(raw,encoding='utf-8'))]
-            binding={'plan_id':'batch','plan_sha256':plan['sha256'],'arm':'decomposition_only','repeat':1}
-            case_binding={'case_id':'holdout','design_sha256':digest,'case_sha256':hashes['holdout'],'reference_sha256':reference_digest(ref)}
-            request=Request(rid,ref['question'],ref['role'],ref['role_version'],ref['scope'])
+            from qjig.evaluation_campaign import run_campaign_assignment
             with RunArchive.open(tmp_path/'deferred') as archive,RunArchive.open(tmp_path/'semantic') as review_archive,RunArchive.open(tmp_path/'outcome') as outcome_archive:
-                record_applicability_deferral(archive,request,case_binding,binding,data['applicability_inputs'],revisions,want=1,max_bytes=5000,stages=config)
-                run_hash=verify_applicability_deferral(archive,journal)['sha256']
-                semantic=record_unavailable_applicability_review(archive,journal,review_archive,expected_run_sha256=run_hash,
-                    expected_reference_sha256=reference_digest(ref),reviewer_spec=spec,partition='holdout')
-                kwargs=dict(partition='holdout',expected_plan_sha256=plan['sha256'],expected_run_sha256=run_hash,
-                    expected_reference_sha256=reference_digest(ref),expected_review_sha256=semantic['sha256'],reviewer_spec=spec,
+                transport=StandInTransport([])
+                receipt=run_campaign_assignment(campaign,rid,tmp_path,design,lock,ref,data['protected'],
+                    applicability_inputs=data['applicability_inputs'],transport=transport,archive=archive,journal=journal,
+                    config=config,want=1,max_bytes=5000,expected_config_sha256=config_hash,
+                    semantic_review_archive=review_archive,outcome_review_archive=outcome_archive)
+                assert receipt['status']=='scored' and transport.calls_made==0
+                kwargs=dict(partition='holdout',expected_plan_sha256=plan['sha256'],expected_run_sha256=receipt['run_sha256'],
+                    expected_reference_sha256=reference_digest(ref),expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=spec,
                     outcome_reviewer_spec=spec)
-                recorded=unavailable_outcome_review(goal,archive,journal,ref,review_archive,outcome_archive,record=True,**kwargs)
+                recorded=score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
+                    expected_outcome_review_sha256=receipt['outcome_review_sha256'],**kwargs)
                 assert recorded['outcome_category']=='unknown_assessment' and recorded['outcome_review']['assurance']=='not_reviewed'
                 assert not journal.events(rid)
                 replayed=score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
@@ -2292,7 +2356,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                                   expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
         assert second['executed']==2 and second['scored']==4 and second['remaining']==56 and len(set(calls))==4
         assert all(next(a for a in plan['manifest']['assignments'] if a['request_id']==rid)['case_id'].startswith('dev') for rid in calls)
-        if mismatch in ('semantic','semantic_quota','semantic_route'):
+        if mismatch in ('semantic','semantic_quota','semantic_route','outcome_batch'):
             from qjig.live_receipts import inspect_campaign_receipts
             refs={k:v['reference'] for k,v in cases.items()}
             reviews={rid:json.loads(payload)['semantic_review_sha256'] for rid,payload in goal._con.execute(
@@ -2303,6 +2367,47 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
             assert anchored['checked']==4 and 'review_anchor_unavailable' not in anchored['issues']
             wrong={**reviews,calls[0]:'0'*64}
             assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=wrong)['status']=='invalid'
+            if mismatch=='outcome_batch':
+                assert 'outcome_review_anchor_unavailable' in anchored['issues']
+                outcome_hashes={rid:json.loads(payload)['outcome_review_sha256'] for rid,payload in goal._con.execute(
+                    "SELECT request_id,payload FROM evaluation_campaign_events WHERE plan_id=? AND kind='scored'",('batch',))}
+                checked=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,
+                                                 expected_outcome_review_sha256=outcome_hashes)
+                assert checked['checked']==4 and 'outcome_review_anchor_unavailable' not in checked['issues']
+                import subprocess,sys
+                rows={rid:json.loads(payload) for rid,payload in goal._con.execute(
+                    "SELECT request_id,payload FROM evaluation_campaign_events WHERE plan_id=? AND kind='scored'",('batch',))}
+                manifest={'schema':'qjig.live-manifest.v2','goal_db':str(tmp_path/'goal.sqlite'),
+                    'journal_db':str(tmp_path/'journal.sqlite'),'archive_root':str(tmp_path/'runs'),
+                    'plan_id':'batch','plan_sha256':plan['sha256'],'config_sha256':config_hash,'references':refs,
+                    'run_sha256':{rid:v['run_sha256'] for rid,v in rows.items()},
+                    'reference_sha256':{key:reference_digest(value['reference']) for key,value in cases.items()},
+                    'journal_sha256':{rid:v['journal_sha256'] for rid,v in rows.items() if v['journal_sha256'] is not None},
+                    'review_sha256':reviews,'outcome_review_sha256':outcome_hashes,'case_root':str(tmp_path),
+                    'case_inputs':{key:{**value,'applicability_inputs':value['applicability_inputs'].to_dict()} for key,value in cases.items()}}
+                manifest_path=tmp_path/'manifest.json';manifest_path.write_text(json.dumps(manifest))
+                command=[sys.executable,'scripts/verify_live_receipts.py','--manifest',str(manifest_path),
+                         '--sha256',hashlib.sha256(manifest_path.read_bytes()).hexdigest()]
+                process=subprocess.run(command,capture_output=True,text=True,check=False)
+                verified=json.loads(process.stdout)
+                assert process.returncode==1 and verified['checked']==4 and 'outcome_review_anchor_unavailable' not in verified['issues']
+                bad={**outcome_hashes,calls[0]:'0'*64}
+                assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,
+                    expected_outcome_review_sha256=bad)['status']=='invalid'
+                import sqlite3
+                outcome_db=tmp_path/'runs'/calls[0]/'outcome-review'/'run.sqlite'
+                with sqlite3.connect(outcome_db) as con:
+                    con.execute('DROP TRIGGER event_no_update')
+                    seq,original=con.execute("SELECT seq,data FROM events WHERE kind='review_record'").fetchone()
+                    con.execute("UPDATE events SET data='{}' WHERE seq=?",(seq,))
+                assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,
+                    expected_outcome_review_sha256=outcome_hashes)['status']=='invalid'
+                with pytest.raises(ContractError):
+                    run_campaign_batch(campaign,tmp_path,design,cases,journal=journal,archive_root=tmp_path/'runs',config=config,
+                        want=1,max_bytes=5000,expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=1)
+                with sqlite3.connect(outcome_db) as con:
+                    con.execute('DROP TRIGGER event_no_update')
+                    con.execute('UPDATE events SET data=? WHERE seq=?',(original,seq))
             review_db=tmp_path/'runs'/calls[0]/'semantic-review'/'run.sqlite'
             assert review_db.is_file()
             import sqlite3
@@ -2655,7 +2760,7 @@ def test_campaign_freezes_distinct_outcome_review_work_before_execution(tmp_path
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=alloc) as goal:
         reserve_evaluation_plan(goal,'outcome',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'outcome',expected_plan_sha256=plan['sha256'])
-        with pytest.raises(ContractError,match='outcome.*not yet implemented'):
+        with pytest.raises(ContractError,match='outcome campaign configuration required'):
             campaign.claim(plan['manifest']['assignments'][0]['request_id'])
         changed={**config,'outcome_reviewer':{**spec,'output_tokens':99}}
         with pytest.raises(ContractError):
@@ -2663,6 +2768,6 @@ def test_campaign_freezes_distinct_outcome_review_work_before_execution(tmp_path
         anchor=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,max_judge_pairs=1)
         frozen=campaign.require_config(config,want=1,max_bytes=5000,expected_config_sha256=anchor)
         assert frozen['schema']=='qjig.campaign-config.v7'
-        with pytest.raises(ContractError,match='outcome.*not yet implemented'):
-            campaign.claim(plan['manifest']['assignments'][0]['request_id'])
-        assert campaign.status()['in_progress']==[]
+        rid=plan['manifest']['assignments'][0]['request_id']
+        campaign.claim(rid)
+        assert campaign.status()['in_progress']==[rid]
