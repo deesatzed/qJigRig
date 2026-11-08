@@ -112,11 +112,17 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
         expected_review_sha256=expected_review_sha256,expected_outcome_review_sha256=expected_outcome_review_sha256,
         case_root=case_root,case_inputs=case_inputs)
     issues=list(inspection['issues'])
+    rubric_checked=None
     if frozen['schema']=='qjig.campaign-config.v7':
         issues.append('frozen_rubric_binding_unavailable')
     else:
-        # Text identity alone cannot prove that it implements the scoring rubric.
-        issues.append('rubric_semantics_not_verified')
+        try:
+            rubric_checked=verify_rubric_contract(frozen.get('rubric_text'))
+            if expected_config_sha256 is not None:
+                campaign.require_config(frozen['stages'],want=frozen['want'],max_bytes=frozen['max_bytes'],
+                                        expected_config_sha256=expected_config_sha256)
+        except (ContractError,KeyError,TypeError,ValueError):
+            issues.append('rubric_contract_invalid')
     comparisons=None
     # A fully anchored synthetic campaign can produce diagnostics, but never a
     # recommendation. All other incomplete or invalid inspection blocks reads.
@@ -151,6 +157,15 @@ def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal
                     expected_plan_sha256=campaign._digest,expected_design_sha256=expected_design_sha256,
                     baseline_arm=baseline,candidate_arm='combined',expected_config_sha256=expected_config_sha256)
                 comparisons[baseline]=report['outcome_reviews']['paired']
+    if inspection['status']=='structurally_complete' and not issues and rubric_checked is not None and comparisons is not None:
+        result=provisional_pair_decision(design,{name:value['outcome_support'] for name,value in comparisons.items()},
+                                         expected_design_sha256=expected_design_sha256)
+        recommendation=result['decision']
+        return {'status':'evaluated' if recommendation is not None else 'inconclusive',
+                'recommendation':recommendation,'baseline_decisions':result['baseline_decisions'],
+                'issues':[],'inspection':inspection,'comparisons':comparisons,
+                'assurance':'structural_and_ai_reviewed_unvalidated',
+                'rubric_assurance':rubric_checked['assurance']}
     return {'status':'invalid' if inspection['status']=='invalid' else 'incomplete','recommendation':None,
             'issues':sorted(set(issues)),'inspection':inspection,'comparisons':comparisons,
             'assurance':'no_recommendation'}

@@ -2172,7 +2172,10 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal,Journal.open(tmp_path/'journal.sqlite') as journal:
         reserve_evaluation_plan(goal,'batch',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'batch',expected_plan_sha256=plan['sha256'])
-        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_followup_budget','outcome_runner_timeout') else {}),**({'rubric_text':'Synthetic frozen rubric'} if rubric_bound else {}))
+        if rubric_bound:
+            from qjig.evaluation_recommendation import make_rubric_contract
+            rubric_text=json.dumps(make_rubric_contract(),sort_keys=True,separators=(',',':'),ensure_ascii=False)
+        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_followup_budget','outcome_runner_timeout') else {}),**({'rubric_text':rubric_text} if rubric_bound else {}))
         if mismatch in ('outcome_runner_failure','outcome_runner_unsupported','outcome_runner_budget','outcome_runner_followup_budget','outcome_runner_timeout'):
             from qjig.evaluation_campaign import run_campaign_assignment
             from qjig.evaluation_scoring import score_outcome_reviewed_assignment
@@ -2423,7 +2426,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                         expected_outcome_review_sha256=outcome_hashes)
                     assert partial['status']=='incomplete' and partial['recommendation'] is None
                     assert 'unstarted_assignments' in partial['issues']
-                    assert partial['comparisons'] is None and 'rubric_semantics_not_verified' in partial['issues']
+                    assert partial['comparisons'] is None and 'rubric_contract_invalid' not in partial['issues']
                     invalid=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
                         expected_design_sha256=digest,expected_config_sha256=config_hash,expected_review_sha256=reviews,
                         expected_outcome_review_sha256={**outcome_hashes,calls[0]:'0'*64})
@@ -2433,6 +2436,28 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                     assert {'combined','decomposition_only','direct_full_evidence','direct_retrieval'} == {next(a['arm'] for a in plan['manifest']['assignments'] if a['request_id']==rid) for rid in calls}
                     bad={**outcome_hashes,calls[0]:'0'*64}
                     assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,expected_outcome_review_sha256=bad)['status']=='invalid'
+                    # Test the decision gate with explicitly simulated verifier and comparison results.
+                    with monkeypatch.context() as patch:
+                        patch.setattr('qjig.evaluation_recommendation.inspect_campaign_receipts',lambda *a,**k:{'status':'structurally_complete','issues':[]})
+                        patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:{'outcome_reviews':{'paired':{'outcome_support':0.75}}})
+                        evaluated=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
+                            expected_design_sha256=digest,expected_config_sha256=config_hash)
+                        assert evaluated['status']=='evaluated' and evaluated['recommendation']=='retain'
+                        assert evaluated['assurance']=='structural_and_ai_reviewed_unvalidated'
+                        patch.setattr('qjig.evaluation_recommendation.build_reserved_holdout_comparison',lambda *a,**k:{'outcome_reviews':{'paired':{'outcome_support':None}}})
+                        inconclusive=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
+                            expected_design_sha256=digest,expected_config_sha256=config_hash)
+                        assert inconclusive['status']=='inconclusive' and inconclusive['recommendation'] is None
+                        from pathlib import Path
+                        original_read=Path.read_bytes
+                        def changed_bytes(path):
+                            raw=original_read(path)
+                            return raw+b'\n# drift' if path.name=='evaluation_scoring.py' else raw
+                        patch.setattr(Path,'read_bytes',changed_bytes)
+                        drifted=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
+                            expected_design_sha256=digest,expected_config_sha256=config_hash)
+                        assert drifted['status']=='incomplete' and drifted['recommendation'] is None
+                        assert 'rubric_contract_invalid' in drifted['issues']
                     return
                 from qjig.evaluation_recommendation import build_verified_recommendation
                 incomplete=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,

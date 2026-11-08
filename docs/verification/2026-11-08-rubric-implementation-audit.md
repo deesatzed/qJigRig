@@ -23,3 +23,7 @@ T069M permits a direct run that records a pre-call budget/preflight refusal, wit
 ## Follow-up: refusal after a settled direct search
 
 T069N preserves a replay-verified initial direct search and its accounted usage when the followup is refused before dispatch. The followup and both review slots remain unused; the refusal cause is unverified, the outcome is unknown, and receipt inspection reports incomplete. A focused synthetic test checked the retained call and cost; evaluation/review/replay/goal regressions passed 192. This is not evidence of complete billing or proof that the refusal was caused by actual exhaustion.
+
+## Follow-up: decision-path connection
+
+The recommendation entrypoint now checks the canonical rubric contract and selected source-file identities against the anchored v8 configuration before applying the two-baseline policy. It requires `structurally_complete` receipt inspection; synthetic attribution, incomplete/invalid receipts, mismatched contract or source-file drift cannot yield a recommendation. Complete but unknown pair metrics produce `inconclusive`. The positive and inconclusive control-flow checks deliberately simulate verifier and comparison outputs; they do not establish that a real completed campaign exists. The reported result is labeled `structural_and_ai_reviewed_unvalidated`, and source-file identity does not establish the identity of already-loaded code or semantic correctness. Evaluation/review/replay/gate regressions passed 153. Real-provider evidence and the complete companion report remain open.
