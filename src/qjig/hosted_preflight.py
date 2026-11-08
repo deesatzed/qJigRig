@@ -8,6 +8,8 @@ from __future__ import annotations
 from decimal import Decimal
 import hashlib
 import json
+import re
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,6 +18,36 @@ from .contracts import ContractError
 from .providers import (CallReservation, ProviderRequest, check_current_endpoint_cost,
                         fresh_work_binding)
 
+
+
+def _verify_hosted_accounting_binding(goal, journal, env_path: Path) -> None:
+    """Require the v2 configured ledger and journal; this cannot detect coordinated rollback."""
+    anchor_dir=Path(env_path).resolve().parent/'.local'
+    directory_anchor=anchor_dir/'qjig-active-goal-directory'
+    initialized_anchor=anchor_dir/'qjig-active-goal-initialized'
+    identity_anchor=anchor_dir/'qjig-active-goal-identity'
+    if anchor_dir.is_symlink() or any(path.is_symlink() for path in (directory_anchor,initialized_anchor,identity_anchor)):
+        raise ContractError('unsafe goal accounting binding')
+    try:
+        directory=directory_anchor.read_text(encoding='utf-8')
+        if (not directory or not Path(directory).is_absolute() or Path(directory).is_symlink()
+                or str(Path(directory).resolve())!=directory or initialized_anchor.read_text(encoding='utf-8')!=directory):
+            raise ContractError('goal directory binding differs')
+        identity=identity_anchor.read_text(encoding='ascii')
+        row=goal._con.execute('SELECT identity FROM local_ledger_identity WHERE id=1').fetchone()
+        if not re.fullmatch(r'[0-9a-f]{64}',identity) or row is None or row[0]!=identity:
+            raise ContractError('goal identity binding differs')
+        def filename(con):
+            path=next((entry[2] for entry in con.execute('PRAGMA database_list') if entry[1]=='main'),None)
+            if not path:
+                raise ContractError('persistent accounting database required')
+            return Path(path).resolve()
+        if filename(goal._con)!=Path(directory)/'goal.sqlite':
+            raise ContractError('goal directory binding differs')
+        if filename(journal._con)!=Path(directory)/'journal.sqlite':
+            raise ContractError('journal directory binding differs')
+    except (OSError,UnicodeError,sqlite3.Error) as exc:
+        raise ContractError('goal accounting binding unavailable') from exc
 
 def prepare_hosted_attempt(ledger: BudgetLedger, request: ProviderRequest, reservation: CallReservation,
                            *, env_path: Path, max_age_seconds: int, clock=None) -> dict:
@@ -31,6 +63,7 @@ def prepare_hosted_attempt(ledger: BudgetLedger, request: ProviderRequest, reser
                                                                        reservation.pricing_sha256)):
         raise ContractError('hosted attempt requires an account-bound goal and reserved work')
     goal = ledger._goal_budget
+    _verify_hosted_accounting_binding(goal,ledger._journal,Path(env_path))
     if goal.audit_journal(ledger._journal)['status'] != 'verified':
         raise BudgetExceeded('accounting', 'goal and journal must be reconciled before preflight')
     run_set = goal.check_required_work(reservation.required_id, request_id=ledger._request_id,

@@ -41,6 +41,10 @@ def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_pat
     limit = Budget(5, 10000, 0.5)
     with GoalBudget.open(tmp_path/'goal.sqlite', total=limit, per_request=limit,
                          allocations={'smoke':limit},account_snapshot=account) as goal, Journal.open(tmp_path/'journal.sqlite') as journal:
+        from qjig.fresh_config import _bind_goal_directory,_mark_goal_initialized,_bind_ledger_identity
+        _bind_goal_directory(tmp_path/'env',tmp_path,version='qjig.fresh-config.v2')
+        _mark_goal_initialized(tmp_path/'env',tmp_path,allow_existing=False)
+        _bind_ledger_identity(goal,tmp_path/'env')
         goal.reserve_run_set('run-one',[{'work_id':'work-one','request_id':'r','partition':'smoke',
             'tokens':5100,'cost_usd':bound.cost_usd,'stage':'planner','provider':'openrouter',
             'model':'tencent/hy4','work_binding_sha256':binding}])
@@ -56,10 +60,30 @@ def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_pat
 
         assert journal.events('r') == []
         assert goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0] == 1
+        identity_path=tmp_path/'.local'/'qjig-active-goal-identity'
+        saved_identity=identity_path.read_text()
+        identity_path.write_text('0'*64)
+        with pytest.raises(ContractError,match='goal.*binding'):
+            prepare_hosted_attempt(ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
+        identity_path.unlink()
+        with pytest.raises(ContractError,match='goal.*binding'):
+            prepare_hosted_attempt(ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
+        identity_path.write_text(saved_identity)
+        assert goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0] == 1
         with Journal.open(tmp_path/'other-journal.sqlite') as other:
             other_ledger=BudgetLedger(limit,other,'r',goal_budget=goal,partition='smoke')
             with pytest.raises(ContractError,match='journal.*binding'):
                 prepare_hosted_attempt(other_ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
+        alternate=tmp_path/'other-goal';alternate.mkdir()
+        with GoalBudget.open(alternate/'goal.sqlite',total=limit,per_request=limit,allocations={'smoke':limit},account_snapshot=account) as other_goal, Journal.open(alternate/'journal.sqlite') as other_journal:
+            other_goal.reserve_run_set('run-one',[{'work_id':'work-one','request_id':'r','partition':'smoke',
+                'tokens':5100,'cost_usd':bound.cost_usd,'stage':'planner','provider':'openrouter',
+                'model':'tencent/hy4','work_binding_sha256':binding}])
+            other_ledger=BudgetLedger(limit,other_journal,'r',goal_budget=other_goal,partition='smoke')
+            with pytest.raises(ContractError,match='goal.*binding'):
+                prepare_hosted_attempt(other_ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
+            assert not other_journal.events('r')
+            assert other_goal._con.execute('SELECT COUNT(*) FROM account_restrictions').fetchone()[0]==0
         raised = {**snapshot, 'endpoints':[{**snapshot['endpoints'][0],
                   'pricing':{'prompt':'0.1','completion':'0.2','discount':0}}]}
         monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot', lambda model: raised)
