@@ -12,7 +12,7 @@ from .judge import SIDE_SCHEMA, _PROMPT, _combine_sides, _side_from_value
 from .packets import EvidencePacket, PacketItem
 from .planner import _plan_validator, _planner_prompt, corpus_manifest_sha256
 from .plans import parse_plan
-from .providers import ProviderRequest, _validate, openrouter_wire_payload_v1, openrouter_wire_payload_v2
+from .providers import ProviderRequest, _validate, openrouter_wire_payload_v1, openrouter_wire_payload_v2, openrouter_wire_payload_v3
 from .program_review import _REVIEW_SCHEMA, _review_prompt
 from .programs import make_draft, verify_review
 from .run_archive import RunArchive
@@ -211,7 +211,8 @@ def verify_archive(archive: RunArchive, *, expected_digest: str | None = None, j
                 metadata = data.get('metadata')
                 if isinstance(metadata, dict) and 'wire_payload_sha256' in metadata:
                     serializers = {'openrouter.chat.v1': openrouter_wire_payload_v1,
-                                   'openrouter.chat.v2': openrouter_wire_payload_v2}
+                                   'openrouter.chat.v2': openrouter_wire_payload_v2,
+                                   'openrouter.chat.v3': openrouter_wire_payload_v3}
                     serializer = serializers.get(metadata.get('wire_payload_format'))
                     if serializer is None:
                         incomplete.append(f'wire_payload_format_unavailable:{call_id}')

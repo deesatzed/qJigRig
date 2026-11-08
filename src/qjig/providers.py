@@ -85,6 +85,17 @@ def openrouter_wire_payload_v2(request: ProviderRequest) -> str:
     return json.dumps(body, ensure_ascii=False)
 
 
+def openrouter_wire_payload_v3(request: ProviderRequest) -> str:
+    """Request that OpenRouter disable default web-search augmentation.
+
+    Account policies may prevent overrides; this request is not proof that the
+    plugin is disabled or that other workspace features cannot incur charges.
+    """
+    body = json.loads(openrouter_wire_payload_v2(request))
+    body['plugins'] = [{'id': 'web', 'enabled': False}]
+    return json.dumps(body, ensure_ascii=False)
+
+
 @dataclass(frozen=True)
 class CallReservation:
     """A calculated reservation bound to one request; provenance is an assertion, not verification."""
@@ -267,7 +278,7 @@ class OpenRouterTransport:
         if (parsed.scheme != "https" or parsed.netloc != "openrouter.ai"
                 or parsed.path != "/api/v1" or parsed.query or parsed.fragment):
             raise ProviderUnavailable("untrusted provider endpoint; nothing was sent")
-        payload = openrouter_wire_payload_v2(request)
+        payload = openrouter_wire_payload_v3(request)
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         try:
             status, body = self._post(f"{base}/chat/completions", headers, payload, self._timeout)
@@ -286,7 +297,7 @@ class OpenRouterTransport:
         metadata = self._response_metadata(parsed_body) or {}
         # Hash the exact UTF-8 request body passed to the HTTP adapter, excluding headers.
         metadata['wire_payload_sha256'] = hashlib.sha256(payload.encode('utf-8')).hexdigest()
-        metadata['wire_payload_format'] = 'openrouter.chat.v2'
+        metadata['wire_payload_format'] = 'openrouter.chat.v3'
         if not 200 <= status < 300:
             return RawResponse(status, body, self._usage(body), metadata=metadata)
         try:

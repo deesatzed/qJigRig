@@ -431,7 +431,8 @@ def test_openrouter_receipt_binds_exact_sent_payload_without_credentials(tmp_pat
     request = ProviderRequest('judge', 'openrouter', 'vendor/model-x', 'Unicode: α', 50,
                               max_price={'prompt': 0.5, 'completion': 2.0})
     raw = OpenRouterTransport(_env(tmp_path), post=post)._send_unchecked(request)
-    assert raw.metadata['wire_payload_format'] == 'openrouter.chat.v2'
+    assert raw.metadata['wire_payload_format'] == 'openrouter.chat.v3'
+    assert {'id':'web','enabled':False} in json.loads(observed['payload'])['plugins']
     assert raw.metadata['wire_payload_sha256'] == hashlib.sha256(observed['payload'].encode('utf-8')).hexdigest()
     assert 'SECRET' not in repr(raw.metadata)
     assert json.loads(observed['payload'])['usage'] == {'include': True}
