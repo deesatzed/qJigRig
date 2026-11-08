@@ -417,7 +417,7 @@ def test_routing_price_ceiling_is_bound_sent_and_archived(tmp_path):
         stored = archive.events()[0]['data']
         assert stored['max_price'] == ceiling and stored['input_sha256'] == request.input_sha256()
     OpenRouterTransport(_env(tmp_path), post=fake_post)._send_unchecked(request)
-    assert seen['provider']['max_price'] == ceiling
+    assert seen['provider']['max_price'] == {**ceiling, 'request': 0, 'image': 0}
     ceiling['prompt'] = 999
     assert request.input_sha256() == stored['input_sha256']
 
@@ -431,6 +431,7 @@ def test_openrouter_receipt_binds_exact_sent_payload_without_credentials(tmp_pat
     request = ProviderRequest('judge', 'openrouter', 'vendor/model-x', 'Unicode: α', 50,
                               max_price={'prompt': 0.5, 'completion': 2.0})
     raw = OpenRouterTransport(_env(tmp_path), post=post)._send_unchecked(request)
+    assert raw.metadata['wire_payload_format'] == 'openrouter.chat.v2'
     assert raw.metadata['wire_payload_sha256'] == hashlib.sha256(observed['payload'].encode('utf-8')).hexdigest()
     assert 'SECRET' not in repr(raw.metadata)
     assert json.loads(observed['payload'])['usage'] == {'include': True}

@@ -77,6 +77,14 @@ def openrouter_wire_payload_v1(request: ProviderRequest) -> str:
     return json.dumps(body, ensure_ascii=False)
 
 
+def openrouter_wire_payload_v2(request: ProviderRequest) -> str:
+    """Add explicit zero per-request and per-image routing ceilings for capped calls."""
+    body = json.loads(openrouter_wire_payload_v1(request))
+    if request.max_price is not None:
+        body['provider']['max_price'].update(request=0, image=0)
+    return json.dumps(body, ensure_ascii=False)
+
+
 @dataclass(frozen=True)
 class CallReservation:
     """A calculated reservation bound to one request; provenance is an assertion, not verification."""
@@ -236,7 +244,7 @@ class OpenRouterTransport:
         if (parsed.scheme != "https" or parsed.netloc != "openrouter.ai"
                 or parsed.path != "/api/v1" or parsed.query or parsed.fragment):
             raise ProviderUnavailable("untrusted provider endpoint; nothing was sent")
-        payload = openrouter_wire_payload_v1(request)
+        payload = openrouter_wire_payload_v2(request)
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         try:
             status, body = self._post(f"{base}/chat/completions", headers, payload, self._timeout)
@@ -255,7 +263,7 @@ class OpenRouterTransport:
         metadata = self._response_metadata(parsed_body) or {}
         # Hash the exact UTF-8 request body passed to the HTTP adapter, excluding headers.
         metadata['wire_payload_sha256'] = hashlib.sha256(payload.encode('utf-8')).hexdigest()
-        metadata['wire_payload_format'] = 'openrouter.chat.v1'
+        metadata['wire_payload_format'] = 'openrouter.chat.v2'
         if not 200 <= status < 300:
             return RawResponse(status, body, self._usage(body), metadata=metadata)
         try:

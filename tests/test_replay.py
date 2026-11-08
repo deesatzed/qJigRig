@@ -320,3 +320,18 @@ def test_replay_rejects_response_wire_digest_that_differs_from_request(tmp_path)
         report=verify_archive(archive)
         assert report.status=='incomplete'
         assert 'wire_payload_format_unavailable:r#1' in report.issues
+
+
+def test_replay_accepts_historical_v1_openrouter_wire_receipt(tmp_path):
+    import hashlib
+    from qjig.providers import ProviderRequest, RawResponse, openrouter_wire_payload_v1
+    request = ProviderRequest('planner', 'openrouter', 'vendor/model', 'older request', 20,
+                              max_price={'prompt': 0.5, 'completion': 2.0})
+    digest = hashlib.sha256(openrouter_wire_payload_v1(request).encode('utf-8')).hexdigest()
+    response = RawResponse(200, '{}', None, metadata={'wire_payload_format':'openrouter.chat.v1',
+                                                      'wire_payload_sha256':digest})
+    with RunArchive.open(tmp_path / 'historical') as archive:
+        archive.record_context({'schema':'qjig.fresh-context.v1', 'corpus':{}})
+        archive.record_request('r#1', request)
+        archive.record_response('r#1', response)
+        assert verify_archive(archive).status != 'invalid'
