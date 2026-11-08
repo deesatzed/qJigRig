@@ -130,7 +130,7 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
             suffix = journal_events[split:]
             seen = set()
             for event in suffix:
-                if event.stage != 'semantic_review':
+                if event.stage not in ('semantic_review','outcome_review'):
                     raise ContractError('unexpected later journal event')
                 if event.kind == 'intent':
                     if event.call_id in seen or event.payload.get('context_binding') != {'reviewed_run_sha256':expected_digest}:

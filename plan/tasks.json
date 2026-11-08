@@ -1250,7 +1250,8 @@
       "depends_on": [
         "T068",
         "T069A",
-        "T069B"
+        "T069B",
+        "T069C"
       ],
       "status": "pending",
       "files": [
@@ -4362,6 +4363,24 @@
       "acceptance": "Outcome review has distinct stage and immutable route-bound allocation; incorrect stage or route cannot consume the reserved slot.",
       "command": "python -m pytest tests/test_outcome_preflight.py::test_outcome_review_reserves_distinct_route_bound_work -q",
       "evidence": "Red: separate outcome-review reservation module was absent. Green: synthetic outcome work has its own stage and route-bound slot; wrong stage or route cannot consume it, and successful stand-in usage reconciles. Outcome/semantic/goal/preflight/provider regressions passed 106. No reviewer, prompt, campaign integration, semantic assessment or hosted authorization is claimed."
+    },
+    {
+      "id": "T069C",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069B"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_outcome_review.py",
+        "src/qjig/evaluation_replay.py"
+      ],
+      "test_file": "tests/test_outcome_review.py",
+      "test_name": "test_direct_outcome_review_is_blind_budgeted_and_replayable",
+      "action": "Review request evidence independently of private reference labels",
+      "acceptance": "A separate blinded outcome-review call shares the original request budget; its archive and journal replay with original anchors and reject tampering.",
+      "command": "python -m pytest tests/test_outcome_review.py::test_direct_outcome_review_is_blind_budgeted_and_replayable -q",
+      "evidence": "Red: blinded request-outcome reviewer was absent. Green: stand-in direct reviews independently assess the saved question and sources without private labels, arm identity or original answer, share request budget, retain malformed output as uncertain, and structurally replay against the saved run and route; altered review record is rejected. Outcome, semantic, evaluation, replay and provider regressions passed 156. Fresh reviews, campaign integration, verified outcomes and hosted behavior remain open."
     }
   ]
 }
