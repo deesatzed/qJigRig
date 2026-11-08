@@ -2183,6 +2183,26 @@ def test_retained_campaign_inspection_refuses_unstarted_work_without_creating_ar
         assert 'unstarted_assignments' in report['issues']
         assert report['provider_authenticity'] == 'not_established'
         assert not archive_root.exists()
+        import json,subprocess,sys
+        manifest={'schema':'qjig.live-manifest.v1','goal_db':str(tmp_path/'goal.sqlite'),
+                  'journal_db':str(tmp_path/'journal.sqlite'),'archive_root':str(archive_root),
+                  'plan_id':'test','plan_sha256':plan['sha256'],'config_sha256':None,'references':{},
+                  'run_sha256':{},'reference_sha256':{},'journal_sha256':{},'review_sha256':{},
+                  'case_root':None,'case_inputs':None}
+        manifest_path=tmp_path/'manifest.json';manifest_path.write_text(json.dumps(manifest))
+        check=subprocess.run([sys.executable,'scripts/verify_live_receipts.py','--manifest',str(manifest_path)],
+                             capture_output=True,text=True,timeout=15)
+        assert check.returncode==1
+        result=json.loads(check.stdout)
+        assert result['status']=='incomplete' and result['assigned']==60 and result['scored']==0
+        assert 'unstarted_assignments' in result['issues'] and 'manifest_anchor_unavailable' in result['issues']
+        manifest_hash=hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        args=[sys.executable,'scripts/verify_live_receipts.py','--manifest',str(manifest_path),'--sha256']
+        anchored=subprocess.run(args+[manifest_hash],capture_output=True,text=True,timeout=15)
+        assert anchored.returncode==1 and 'manifest_anchor_unavailable' not in json.loads(anchored.stdout)['issues']
+        wrong=subprocess.run(args+['0'*64],capture_output=True,text=True,timeout=15)
+        assert wrong.returncode==1 and json.loads(wrong.stdout)['status']=='invalid'
+        assert not archive_root.exists()
 
 
 def test_semantic_campaign_configuration_freezes_review_slots_before_claim(tmp_path):
