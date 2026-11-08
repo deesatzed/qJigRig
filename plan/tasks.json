@@ -3054,11 +3054,11 @@
         "src/qjig/pricing.py"
       ],
       "test_file": "tests/test_pricing.py",
-      "test_name": "test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse",
-      "action": "Recognize neutral zero-discount metadata in endpoint pricing",
-      "acceptance": "Numeric zero discount is accepted without reducing prices; nonzero, malformed discounts and unknown charges refuse.",
-      "command": "python -m pytest tests/test_pricing.py::test_zero_discount_catalog_metadata_is_neutral_but_other_discounts_refuse -q",
-      "evidence": "Red: synthetic current-shape endpoint pricing with numeric zero discount was rejected as an unknown category. Zero is now accepted without price reduction; nonzero, malformed discounts and unrecognized charges still refuse. Focused pricing/goal/evaluation suite 89 passed; full offline suite 540 passed. Public endpoint catalog read found configured model IDs and discount metadata; availability, token bounds, provider enforcement and complete billing remain unverified and hosted dispatch stays disabled."
+      "test_name": "test_discounts_reserve_at_least_the_undiscounted_price",
+      "action": "Conservatively account for supported endpoint discount metadata",
+      "acceptance": "Zero discount is neutral; fractional discounts reserve an inferred undiscounted upper estimate; malformed discounts and unknown charges refuse.",
+      "command": "python -m pytest tests/test_pricing.py::test_discounts_reserve_at_least_the_undiscounted_price -q",
+      "evidence": "Red: synthetic current-shape endpoint pricing with numeric zero discount was rejected as an unknown category. Zero is now accepted without price reduction; nonzero, malformed discounts and unrecognized charges still refuse. Focused pricing/goal/evaluation suite 89 passed; full offline suite 540 passed. Public endpoint catalog read found configured model IDs and discount metadata; availability, token bounds, provider enforcement and complete billing remain unverified and hosted dispatch stays disabled. Subsequent pricing work replaced the zero-only rule with a conservatively inferred undiscounted estimate; its current focused test is test_discounts_reserve_at_least_the_undiscounted_price. The discount interpretation remains an assumption, not verified billing enforcement."
     },
     {
       "id": "T068I",
