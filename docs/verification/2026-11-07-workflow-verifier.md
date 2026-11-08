@@ -1,0 +1,5 @@
+# Offline workflow verifier
+
+`scripts/verify_workflow.py --offline` runs separate local synthetic checks for an authored browser journey with intervention, restart and verified export; review inspection and stale-source intervention; two browser contexts; two role clients; interruption without retry; and exact review binding. It returns JSON with each check's result and a nonzero exit code if the workflow is incomplete. A skipped browser test is incomplete, not a pass. Set `QJIG_CHROMIUM_PATH` to an available Chrome/Chromium executable and make Playwright available in the Python environment.
+
+On 2026-11-07 the command ran with local Chrome and Playwright: all six checks passed, but the command correctly returned exit code 1 and `complete_fresh_browser_journey_unverified`. These are separate synthetic checks, not a single end-to-end fresh browser journey, hosted-provider evidence, accessibility certification, model-quality evidence or production readiness. The offline verifier makes no provider calls. Its explicit unmet gate must be replaced by actual end-to-end evidence before it can return success.
