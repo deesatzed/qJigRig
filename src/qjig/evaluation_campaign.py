@@ -468,7 +468,9 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             review_direct_semantics(archive,journal,ledger,transport,**opts)
             checked=verify_direct_semantic_review(archive,journal,semantic_review_archive,expected_run_sha256=run_hash)
         else:
-            raise ContractError('semantic review unavailable for applicability deferral; recovery required')
+            from .evaluation_semantic_review import record_unavailable_applicability_review
+            checked=record_unavailable_applicability_review(archive,journal,semantic_review_archive,
+                expected_run_sha256=run_hash,expected_reference_sha256=reference_digest(reference),reviewer_spec=spec,partition=partition)
         if checked.get('status') != 'unanchored':
             raise ContractError('semantic review unavailable or invalid; recovery required')
         review_hash=checked['sha256']

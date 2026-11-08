@@ -327,3 +327,63 @@ def verify_fresh_semantic_review(archive: RunArchive, journal: Journal, review_a
                 'request_status':'deferred','request_answer':None,'conditional_answer':conditional}
     except (ContractError,KeyError,ValueError,TypeError,AttributeError,UnicodeError,OverflowError):
         return invalid
+
+
+def record_unavailable_applicability_review(archive, journal, review_archive, *, expected_run_sha256,
+                                            expected_reference_sha256, reviewer_spec, partition):
+    """Record an explicit non-review only for a replayable no-call applicability deferral."""
+    from .evaluation_deferral import verify_applicability_deferral
+    from .semantic_preflight import semantic_review_allocation
+    if (not isinstance(review_archive, RunArchive) or review_archive is archive or review_archive.events()
+            or review_archive.revision_ids() or review_archive.source_ids()
+            or review_archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0]):
+        raise ContractError('unused semantic review archive required')
+    if verify_applicability_deferral(archive,journal,expected_digest=expected_run_sha256)['status'] != 'structurally_verified':
+        raise ContractError('verified applicability deferral required')
+    context=archive.context(); request_id=context['request']['request_id']
+    if context['case_binding']['reference_sha256'] != expected_reference_sha256:
+        raise ContractError('deferral reference differs')
+    slot=semantic_review_allocation(request_id=request_id,partition=partition,spec=reviewer_spec)
+    saved={'schema':'qjig.semantic-review-unavailable.v1','reviewed_run_sha256':expected_run_sha256,
+           'reference_sha256':expected_reference_sha256,'request_id':request_id,'work_id':slot['work_id'],
+           'reason':'source_applicability_unestablished'}
+    review_archive.record_context(saved)
+    review_archive.record_run_result(request_id,{'assessment':'uncertain','assurance':'not_reviewed',
+                                                  'reason':saved['reason']})
+    return verify_unavailable_applicability_review(archive,journal,review_archive,
+        expected_run_sha256=expected_run_sha256,expected_reference_sha256=expected_reference_sha256,
+        reviewer_spec=reviewer_spec,partition=partition)
+
+
+def verify_unavailable_applicability_review(archive,journal,review_archive,*,expected_run_sha256,
+                                            expected_reference_sha256,reviewer_spec,partition,
+                                            expected_review_sha256=None):
+    from .evaluation_deferral import verify_applicability_deferral
+    from .semantic_preflight import semantic_review_allocation
+    invalid={'status':'invalid','sha256':None}
+    try:
+        if (not isinstance(archive,RunArchive) or not isinstance(review_archive,RunArchive) or archive is review_archive
+                or verify_applicability_deferral(archive,journal,expected_digest=expected_run_sha256)['status']!='structurally_verified'):
+            raise ContractError('verified applicability deferral required')
+        context=archive.context();rid=context['request']['request_id']
+        slot=semantic_review_allocation(request_id=rid,partition=partition,spec=reviewer_spec)
+        saved={'schema':'qjig.semantic-review-unavailable.v1','reviewed_run_sha256':expected_run_sha256,
+               'reference_sha256':expected_reference_sha256,'request_id':rid,'work_id':slot['work_id'],
+               'reason':'source_applicability_unestablished'}
+        if (context['case_binding']['reference_sha256']!=expected_reference_sha256 or review_archive.context()!=saved
+                or review_archive.revision_ids() or review_archive.source_ids()):
+            raise ContractError('unavailable review binding differs')
+        events=review_archive.events()
+        if (len(events)!=1 or events[0]['kind']!='run_result' or events[0]['call_id']!=rid
+                or events[0]['data']!={'assessment':'uncertain','assurance':'not_reviewed','reason':saved['reason']}):
+            raise ContractError('unavailable review record differs')
+        raw=json.dumps({'context':saved,'events':events},sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
+        digest=hashlib.sha256(raw).hexdigest()
+        if expected_review_sha256 is not None and (not isinstance(expected_review_sha256,str)
+                or not re.fullmatch(r'[0-9a-f]{64}',expected_review_sha256)
+                or not hmac.compare_digest(digest,expected_review_sha256)):
+            raise ContractError('unavailable review digest differs')
+        return {'status':'structurally_verified' if expected_review_sha256 else 'unanchored','sha256':digest,
+                'assessment':'uncertain','assurance':'not_reviewed','reason':saved['reason']}
+    except (ContractError,KeyError,ValueError,TypeError,AttributeError,UnicodeError):
+        return invalid

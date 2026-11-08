@@ -658,6 +658,23 @@ def score_reviewed_reserved_assignment(goal, archive, journal, reference: dict, 
     request_id = context.get('request', {}).get('request_id')
     slot = semantic_review_allocation(request_id=request_id, partition=partition, spec=reviewer_spec)
     saved = review_archive.context()
+    if context.get('schema') == 'qjig.applicability-deferral.v1':
+        from .evaluation_semantic_review import verify_unavailable_applicability_review
+        assignment=context['evaluation_assignment']
+        row=goal._con.execute('SELECT w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id '
+            'WHERE s.set_id=? AND w.work_id=? AND w.request_id=?',
+            ('evaluation:'+assignment['plan_id'],slot['work_id'],request_id)).fetchone()
+        if row is None or row[0] is not None:
+            raise ContractError('unavailable review reserved work differs')
+        review=verify_unavailable_applicability_review(archive,journal,review_archive,
+            expected_run_sha256=expected_run_sha256,expected_reference_sha256=expected_reference_sha256,
+            expected_review_sha256=expected_review_sha256,reviewer_spec=reviewer_spec,partition=partition)
+        if review.get('status')!='structurally_verified':
+            raise ContractError('unavailable review is not structurally verified')
+        score=score_reserved_assignment(goal,archive,journal,reference,partition=partition,
+            expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
+            expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256)
+        return {**score,'review':review}
     if (not isinstance(saved, dict) or saved.get('provider') != reviewer_spec['provider']
             or saved.get('model') != reviewer_spec['model']['id']
             or saved.get('max_tokens') != reviewer_spec['output_tokens']
