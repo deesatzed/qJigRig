@@ -19,10 +19,16 @@ def main() -> int:
     env['QJIG_VERIFY_CLEAN_INSTALL'] = '1'
     env.pop('PYTHONPATH', None)
     env.pop('PYTHONHOME', None)
-    return subprocess.run(
-        [sys.executable, '-m', 'pytest', '-q', str(ROOT / 'tests/test_clean_install.py')],
+    result = subprocess.run(
+        [sys.executable, '-m', 'pytest', '-q', '-s', str(ROOT / 'tests/test_clean_install.py')],
         cwd=ROOT, env=env, check=False,
-    ).returncode
+    )
+    if result.returncode:
+        return result.returncode
+    if not env.get('QJIG_CHROMIUM_PATH'):
+        print('INCOMPLETE: QJIG_CHROMIUM_PATH is required for isolated browser and full-suite verification')
+        return 1
+    return 0
 
 
 if __name__ == '__main__':

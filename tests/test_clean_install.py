@@ -110,3 +110,27 @@ print(json.dumps({'run_id':result['run_id']}))
     finally:
         service.terminate()
         service.wait(timeout=10)
+
+    if os.environ.get('QJIG_CHROMIUM_PATH'):
+        deps = subprocess.run([str(python), '-I', '-m', 'pip', 'install', 'pytest>=8', 'playwright'],
+                              cwd=tmp_path, env=clean_env, capture_output=True, text=True, timeout=180)
+        assert deps.returncode == 0, deps.stderr
+        acceptance = tmp_path / 'installed-acceptance'
+        acceptance.mkdir()
+        for name in ('test_fresh_service.py', 'test_workflow_browser.py'):
+            shutil.copy2(repo / 'tests' / name, acceptance / name)
+        browser = subprocess.run([str(python), '-I', '-m', 'pytest', '-q',
+                                  str(acceptance / 'test_workflow_browser.py::test_complete_synthetic_fresh_browser_journey')],
+                                 cwd=acceptance, env=clean_env, capture_output=True, text=True, timeout=120)
+        assert browser.returncode == 0 and '1 passed' in browser.stdout, browser.stdout + browser.stderr
+        print('Installed browser journey: ' + browser.stdout.strip().splitlines()[-1])
+        suite_root = tmp_path / 'installed-suite'
+        suite_root.mkdir()
+        for name in ('tests', 'scripts', 'reports'):
+            shutil.copytree(repo / name, suite_root / name, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+        suite_env = dict(clean_env)
+        suite_env.pop('QJIG_VERIFY_CLEAN_INSTALL', None)
+        suite = subprocess.run([str(python), '-I', '-m', 'pytest', '-q', '-p', 'no:cacheprovider', '-o', 'pythonpath=.'],
+                               cwd=suite_root, env=suite_env, capture_output=True, text=True, timeout=300)
+        assert suite.returncode == 0, suite.stdout + suite.stderr
+        print('Installed offline suite: ' + suite.stdout.strip().splitlines()[-1])
