@@ -42,7 +42,7 @@ class FreshWorkbench:
     """Trusted local configuration, never created from browser-supplied paths or credentials."""
 
     def __init__(self, state_dir: Path, *, goal_factory, transport_factory, partition: str,
-                 planner: dict, judge: dict, reviewer: dict, budget: Budget):
+                 planner: dict, judge: dict, reviewer: dict, budget: Budget, journal_path: Path | None = None):
         if (not callable(goal_factory) or not callable(transport_factory) or not isinstance(budget, Budget)
                 or not isinstance(partition, str) or not partition.strip()):
             raise ContractError('fresh workbench configuration required')
@@ -57,6 +57,7 @@ class FreshWorkbench:
         if self.state_dir.is_symlink():
             raise ContractError('fresh state directory must not be a symlink')
         self.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self.journal_path = Path(journal_path) if journal_path is not None else self.state_dir / 'journal.sqlite'
         self.goal_factory, self.transport_factory = goal_factory, transport_factory
         self.partition, self.planner, self.judge, self.reviewer, self.budget = partition, *specs, budget
 
@@ -102,7 +103,7 @@ class FreshWorkbench:
 
     def _journal_status(self, request_id: str, archive_events: list[dict]) -> tuple[dict, dict]:
         """Read journal accounting; absence or disagreement is unknown, not clear."""
-        path = self.state_dir / 'journal.sqlite'
+        path = self.journal_path
         unknown = ({'status': 'unknown', 'unresolved': []}, {'status': 'unknown'})
         if path.is_symlink() or not path.is_file():
             return unknown
@@ -155,7 +156,7 @@ class FreshWorkbench:
         from .fresh_receipt import make_fresh_receipt
         archive_bytes = self.export(run_id)
         replay = self.replay(run_id)
-        path = self.state_dir / 'journal.sqlite'
+        path = self.journal_path
         if path.is_symlink() or not path.is_file():
             raise ContractError('journal unavailable')
         with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as con:
@@ -243,13 +244,13 @@ class FreshWorkbench:
             raise ContractError('unsupported fresh transport')
         if isinstance(transport, OpenRouterTransport):
             raise BudgetExceeded('preflight_unavailable', 'configured assertions do not establish hosted-call bounds')
-        if (self.state_dir / 'journal.sqlite').is_symlink():
+        if self.journal_path.is_symlink():
             raise ContractError('unsafe journal path')
         goal = self.goal_factory()
         if not isinstance(goal, GoalBudget):
             raise ContractError('persistent goal budget required')
         set_id = 'workbench:' + run_id
-        with goal, Journal.open(self.state_dir / 'journal.sqlite') as journal, Catalog.open(catalog_path) as catalog:
+        with goal, Journal.open(self.journal_path) as journal, Catalog.open(catalog_path) as catalog:
             if journal.events(request.request_id):
                 raise ContractError('fresh request identity already used')
             before = catalog.source_state()

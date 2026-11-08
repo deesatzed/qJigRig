@@ -98,3 +98,24 @@ def test_configured_goal_rejects_unavailable_account_before_creating_ledger(tmp_
     with pytest.raises(AccountRefreshError):
         backend.goal_factory()
     assert not (tmp_path / 'state' / 'goal.sqlite').exists()
+
+
+def test_v2_workbenches_share_goal_and_journal_across_state_directories(tmp_path, monkeypatch):
+    observations = ({'data': {'limit_remaining': 10, 'include_byok_in_limit': False, 'is_free_tier': False}},
+                    {'data': {'total_credits': 10, 'total_usage': 0}})
+    monkeypatch.setattr('qjig.account_client.fetch_account_snapshot', lambda path, **kwargs: observations)
+    config = config_for(tmp_path)
+    config.update(schema='qjig.fresh-config.v2', goal_dir=str(tmp_path / 'shared-goal'))
+    first_path = tmp_path / 'first.json'
+    first_path.write_text(json.dumps(config))
+    first = load_fresh_config(first_path)
+    config['state_dir'] = str(tmp_path / 'second-state')
+    second_path = tmp_path / 'second.json'
+    second_path.write_text(json.dumps(config))
+    second = load_fresh_config(second_path)
+    with first.goal_factory() as goal:
+        goal.reserve('attempt-one', 'request-one', 'smoke', tokens=100, cost_usd=0.1)
+        goal.record_usage('attempt-one', input_tokens=50, output_tokens=10, cost_usd=0.01)
+    with second.goal_factory() as goal:
+        assert goal.totals().max_calls == 1
+    assert first.journal_path == second.journal_path == tmp_path / 'shared-goal' / 'journal.sqlite'

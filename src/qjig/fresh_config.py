@@ -17,8 +17,15 @@ def load_fresh_config(path: Path) -> FreshWorkbench:
     data = json.loads(path.read_text(encoding='utf-8'))
     fields = {'schema', 'state_dir', 'env_path', 'partition', 'total', 'per_request',
               'allocations', 'planner', 'judge', 'reviewer'}
-    if not isinstance(data, dict) or set(data) != fields or data['schema'] != 'qjig.fresh-config.v1':
+    if not isinstance(data, dict):
         raise ContractError('invalid fresh configuration')
+    version = data.get('schema')
+    if version == 'qjig.fresh-config.v2':
+        fields.add('goal_dir')
+    if set(data) != fields or version not in ('qjig.fresh-config.v1', 'qjig.fresh-config.v2'):
+        raise ContractError('invalid fresh configuration')
+    if version == 'qjig.fresh-config.v2' and (not isinstance(data['goal_dir'], str) or not data['goal_dir'].strip()):
+        raise ContractError('goal directory required')
     if any(not isinstance(data[k], str) or not data[k].strip() for k in ('state_dir', 'env_path', 'partition')):
         raise ContractError('fresh paths and partition are required')
     total, per_request = Budget.from_dict(data['total']), Budget.from_dict(data['per_request'])
@@ -51,10 +58,14 @@ def load_fresh_config(path: Path) -> FreshWorkbench:
         planner_price=planner['max_price'], judge_price=judge['max_price'], reviewer=reviewer)
     state_dir = Path(data['state_dir'])
     env_path = Path(data['env_path'])
+    goal_dir = Path(data['goal_dir']) if version == 'qjig.fresh-config.v2' else state_dir
+    if goal_dir.is_symlink():
+        raise ContractError('unsafe goal directory')
+    goal_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     def account_bound_goal():
         # Refresh only when a run starts; configuration loading never contacts the provider.
         from .account_client import fetch_account_snapshot, refresh_account_constraints
-        path = state_dir / 'goal.sqlite'
+        path = goal_dir / 'goal.sqlite'
         if path.is_symlink():
             raise ContractError('unsafe goal ledger path')
         if not path.exists():
@@ -69,6 +80,6 @@ def load_fresh_config(path: Path) -> FreshWorkbench:
             goal.close()
             raise
         return goal
-    return FreshWorkbench(state_dir, goal_factory=account_bound_goal,
+    return FreshWorkbench(state_dir, goal_factory=account_bound_goal, journal_path=goal_dir / 'journal.sqlite',
                           transport_factory=lambda: OpenRouterTransport(env_path), partition=data['partition'],
                           planner=planner, judge=judge, reviewer=reviewer, budget=per_request)
