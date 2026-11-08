@@ -450,6 +450,7 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             raise ContractError('campaign direct archive is not replayable')
         run_hash,journal_hash=replay['sha256'],None
     review_hash = None
+    original_incomplete = not applicability_deferral and (replay.status == 'incomplete' if arm in ('combined','decomposition_only') else replay['status'] == 'incomplete')
     if semantic:
         from .evaluation_semantic_review import (review_direct_semantics,review_fresh_semantics,
                                                   verify_direct_semantic_review,verify_fresh_semantic_review)
@@ -459,7 +460,13 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             return semantic_review_reservation(campaign._goal,set_id,request_id=request_id,partition=partition,request=req,spec=spec)
         opts=dict(review_archive=semantic_review_archive,expected_run_sha256=run_hash,provider=spec['provider'],
                   model=spec['model']['id'],max_tokens=spec['output_tokens'],max_price=spec['max_price'],reservation_factory=review_factory)
-        if arm in ('combined','decomposition_only') and not applicability_deferral:
+        if original_incomplete:
+            from .evaluation_scoring import unavailable_failure_review
+            checked=unavailable_failure_review(campaign._goal,archive,journal,reference,semantic_review_archive,
+                partition=partition,expected_plan_sha256=campaign._digest,expected_run_sha256=run_hash,
+                expected_reference_sha256=reference_digest(reference),expected_journal_sha256=journal_hash,
+                reviewer_spec=spec,record=True)['review']
+        elif arm in ('combined','decomposition_only') and not applicability_deferral:
             review_fresh_semantics(archive,journal,ledger,transport,reference=reference,expected_reference_sha256=reference_digest(reference),
                                    expected_journal_sha256=journal_hash,**opts)
             checked=verify_fresh_semantic_review(archive,journal,semantic_review_archive,reference=reference,

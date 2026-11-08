@@ -642,6 +642,53 @@ def score_reserved_assignment(goal, archive, journal, reference: dict, *, partit
 
 
 
+
+def unavailable_failure_review(goal,archive,journal,reference,review_archive,*,partition,expected_plan_sha256,
+                               expected_run_sha256,expected_reference_sha256,reviewer_spec,
+                               expected_journal_sha256=None,expected_review_sha256=None,record=False):
+    """Bind a non-review to a verified failure with no unresolved paid attempt."""
+    from .semantic_preflight import semantic_review_allocation
+    from .run_archive import RunArchive
+    if not isinstance(review_archive,RunArchive) or review_archive is archive or type(record) is not bool:
+        raise ContractError('separate review archive required')
+    score=score_reserved_assignment(goal,archive,journal,reference,partition=partition,
+        expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
+        expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256)
+    result=score['score'];context=archive.context();rid=context['request']['request_id']
+    if (result.get('failure_verified') is not True or result.get('reconciliation_required') is not False
+            or result.get('classification') not in ('malformed','provider_failure')
+            or result.get('recorded_answer') is not None or result.get('conditional_answer') is not None):
+        raise ContractError('verified settled failure without an answer required')
+    slot=semantic_review_allocation(request_id=rid,partition=partition,spec=reviewer_spec)
+    assignment=context['evaluation_assignment']
+    row=goal._con.execute('SELECT w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id '
+        'WHERE s.set_id=? AND w.work_id=? AND w.request_id=?',
+        ('evaluation:'+assignment['plan_id'],slot['work_id'],rid)).fetchone()
+    if row is None or row[0] is not None or any(e.stage=='semantic_review' for e in journal.events(rid)):
+        raise ContractError('unavailable review slot differs')
+    saved={'schema':'qjig.semantic-review-failure.v1','request_id':rid,'reviewed_run_sha256':expected_run_sha256,
+           'reference_sha256':expected_reference_sha256,'journal_sha256':expected_journal_sha256,
+           'work_id':slot['work_id'],'reason':'original_'+result['classification']}
+    outcome={'assessment':'uncertain','assurance':'not_reviewed','reason':saved['reason']}
+    if record:
+        if (review_archive.events() or review_archive.revision_ids() or review_archive.source_ids()
+                or review_archive._con.execute('SELECT COUNT(*) FROM run_context').fetchone()[0]):
+            raise ContractError('unused review archive required')
+        review_archive.record_context(saved);review_archive.record_run_result(rid,outcome)
+    if review_archive.context()!=saved or review_archive.revision_ids() or review_archive.source_ids():
+        raise ContractError('failure review binding differs')
+    events=review_archive.events()
+    if len(events)!=1 or events[0]['kind']!='run_result' or events[0]['call_id']!=rid or events[0]['data']!=outcome:
+        raise ContractError('failure review record differs')
+    raw=json.dumps({'context':saved,'events':events},sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
+    digest=hashlib.sha256(raw).hexdigest()
+    if expected_review_sha256 is not None and (not isinstance(expected_review_sha256,str)
+            or not _SHA.fullmatch(expected_review_sha256) or not hmac.compare_digest(digest,expected_review_sha256)):
+        raise ContractError('failure review digest differs')
+    review={'status':'structurally_verified' if expected_review_sha256 else 'unanchored','sha256':digest,**outcome}
+    return {**score,'review':review}
+
+
 def score_reviewed_reserved_assignment(goal, archive, journal, reference: dict, review_archive, *,
                                        partition: str, expected_plan_sha256: str, expected_run_sha256: str,
                                        expected_reference_sha256: str, expected_review_sha256: str,
@@ -658,6 +705,11 @@ def score_reviewed_reserved_assignment(goal, archive, journal, reference: dict, 
     request_id = context.get('request', {}).get('request_id')
     slot = semantic_review_allocation(request_id=request_id, partition=partition, spec=reviewer_spec)
     saved = review_archive.context()
+    if isinstance(saved,dict) and saved.get('schema') == 'qjig.semantic-review-failure.v1':
+        return unavailable_failure_review(goal,archive,journal,reference,review_archive,partition=partition,
+            expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
+            expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256,
+            expected_review_sha256=expected_review_sha256,reviewer_spec=reviewer_spec)
     if context.get('schema') == 'qjig.applicability-deferral.v1':
         from .evaluation_semantic_review import verify_unavailable_applicability_review
         assignment=context['evaluation_assignment']
