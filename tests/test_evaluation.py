@@ -2012,7 +2012,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             reopened._con.execute("UPDATE evaluation_campaign_events SET payload='{}' WHERE kind='started'")
 
 
-@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable'])
+@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout'])
 def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path,mismatch):
     import copy,json
     from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN,UNKNOWN_BOUND
@@ -2057,7 +2057,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
         cases['holdout']['lock']['reference_sha256']=reference_digest(cases['holdout']['reference'])
         hashes['holdout']=case_lock_digest(cases['holdout']['lock'])
     scope='other' if mismatch=='scope' else 'project'
-    interval=Interval('2027-01-01',OPEN) if mismatch=='date' else Interval(UNKNOWN_BOUND,OPEN) if mismatch in ('unknown','semantic_unknown','semantic_route_unknown','outcome_unavailable') else Interval('2020-01-01',OPEN)
+    interval=Interval('2027-01-01',OPEN) if mismatch=='date' else Interval(UNKNOWN_BOUND,OPEN) if mismatch in ('unknown','semantic_unknown','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout') else Interval('2020-01-01',OPEN)
     member=MemberMetadata(rev,scope,interval,entity_keys=frozenset({'other'}) if mismatch=='entity' else frozenset())
     wrong=ApplicabilityInputs(Collection((member,)),frozenset({'target'}) if mismatch=='entity' else frozenset(),'2026-11-07',False)
     cases['holdout']['applicability_inputs']=wrong;metadata['holdout']=applicability_digest(wrong)
@@ -2066,9 +2066,9 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
     if mismatch in ('semantic_route','semantic_route_unknown'): spec={**spec,'provider':'openrouter','route':'provider-a/fp4'}
     config={k:dict(spec) for k in (('direct','planner','judge','reviewer','semantic_reviewer') if mismatch in ('semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown') else ('direct','planner','judge','reviewer'))}
-    if mismatch=='outcome_unavailable':
+    if mismatch in ('outcome_unavailable','outcome_failure','outcome_timeout'):
         config={k:dict(spec) for k in ('direct','planner','judge','reviewer','semantic_reviewer','outcome_reviewer')}
-    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'private-synthetic-batch-secret-32-bytes',**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable') else {}))
+    plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'private-synthetic-batch-secret-32-bytes',**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout') else {}))
     total=Budget(800,200000,10);per=Budget(30,6000,1)
     allocations={'development':Budget(200,50000,2),'pilot':Budget(200,50000,2),'holdout':Budget(400,100000,6)}
     calls=[];usage={'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001}
@@ -2093,7 +2093,48 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal,Journal.open(tmp_path/'journal.sqlite') as journal:
         reserve_evaluation_plan(goal,'batch',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'batch',expected_plan_sha256=plan['sha256'])
-        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable') else {}))
+        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout') else {}))
+        if mismatch in ('outcome_failure','outcome_timeout'):
+            from qjig.budgets import BudgetLedger
+            from qjig.direct_preflight import direct_slot_reservation
+            from qjig.evaluation_direct import run_locked_direct
+            from qjig.evaluation_replay import verify_direct_archive
+            from qjig.evaluation_scoring import unavailable_failure_review,unavailable_outcome_review,score_outcome_reviewed_assignment
+            from qjig.run_archive import RunArchive
+            target=next(a for a in plan['manifest']['assignments'] if a['case_id']=='holdout' and a['arm']=='direct_full_evidence' and a['repeat']==1)
+            data=cases['holdout'];rid=target['request_id'];ref=data['reference'];lock=data['lock']
+            binding={'plan_id':'batch','plan_sha256':plan['sha256'],'arm':'direct_full_evidence','repeat':1}
+            ledger=BudgetLedger(per,journal,rid,goal_budget=goal,partition='holdout')
+            def factory(req):
+                return direct_slot_reservation(goal,'evaluation:batch',request_id=rid,partition='holdout',request=req,
+                    model=model,input_tokens=100,input_bound_provenance='synthetic')
+            with RunArchive.open(tmp_path/'failed') as archive,RunArchive.open(tmp_path/'semantic') as review_archive,RunArchive.open(tmp_path/'outcome') as outcome_archive:
+                failed=run_locked_direct(tmp_path,design,lock,ref,data['protected'],expected_design_sha256=digest,
+                    expected_case_sha256=hashes['holdout'],ledger=ledger,transport=StandInTransport([TimeoutError('synthetic timeout') if mismatch=='outcome_timeout' else RawResponse(200,'not json',usage)]),
+                    archive=archive,provider='stand-in',model=model['id'],max_tokens=100,want=1,max_bytes=5000,followups=0,
+                    evidence_mode='full',applicability_inputs=data['applicability_inputs'],reservation_factory=factory,
+                    max_price=cap,assignment_binding=binding)
+                assert failed['status']=='unavailable'
+                run_hash=verify_direct_archive(archive,journal)['sha256']
+                args=dict(partition='holdout',expected_plan_sha256=plan['sha256'],expected_run_sha256=run_hash,
+                          expected_reference_sha256=reference_digest(ref),reviewer_spec=spec)
+                if mismatch=='outcome_timeout':
+                    with pytest.raises(ContractError):
+                        unavailable_failure_review(goal,archive,journal,ref,review_archive,record=True,**args)
+                    assert journal.pending(rid) and not review_archive.events() and not outcome_archive.events()
+                    return
+                semantic=unavailable_failure_review(goal,archive,journal,ref,review_archive,record=True,**args)
+                kwargs={**args,'expected_review_sha256':semantic['review']['sha256'],'outcome_reviewer_spec':spec}
+                outcome=unavailable_outcome_review(goal,archive,journal,ref,review_archive,outcome_archive,record=True,**kwargs)
+                assert outcome['outcome_category']=='failed' and outcome['outcome_review']['assurance']=='not_reviewed'
+                assert outcome['score']['classification']=='malformed' and len(journal.events(rid))==2
+                checked=score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
+                    expected_outcome_review_sha256=outcome['outcome_review']['sha256'],**kwargs)
+                assert checked['outcome_category']=='failed'
+                with pytest.raises(ContractError):
+                    score_outcome_reviewed_assignment(goal,archive,journal,ref,review_archive,outcome_archive,
+                        expected_outcome_review_sha256='0'*64,**kwargs)
+            return
         if mismatch=='outcome_unavailable':
             from qjig.evaluation_deferral import record_applicability_deferral,verify_applicability_deferral
             from qjig.evaluation_semantic_review import record_unavailable_applicability_review

@@ -769,7 +769,7 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
                                expected_reference_sha256: str, expected_review_sha256: str, reviewer_spec: dict,
                                outcome_reviewer_spec: dict, expected_journal_sha256: str | None = None,
                                expected_outcome_review_sha256: str | None = None, record: bool = False) -> dict:
-    """Record a non-review only for a structurally verified no-call applicability deferral."""
+    """Record a non-review for an anchored applicability deferral or settled failure."""
     from .outcome_preflight import outcome_review_allocation
     from .run_archive import RunArchive
     if (not isinstance(outcome_archive,RunArchive) or outcome_archive is archive or outcome_archive is review_archive
@@ -780,9 +780,15 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
         expected_reference_sha256=expected_reference_sha256,expected_review_sha256=expected_review_sha256,
         reviewer_spec=reviewer_spec,expected_journal_sha256=expected_journal_sha256)
     context=archive.context(); request_id=context['request']['request_id']; assignment=context['evaluation_assignment']
-    if (context.get('schema')!='qjig.applicability-deferral.v1' or result['review'].get('assurance')!='not_reviewed'
-            or journal.events(request_id) or result['score'].get('request_status')!='deferred'):
-        raise ContractError('no-call applicability deferral required')
+    score=result['score']
+    applicability=(context.get('schema')=='qjig.applicability-deferral.v1' and not journal.events(request_id)
+                   and score.get('request_status')=='deferred')
+    settled=(score.get('failure_verified') is True and score.get('classification') in ('malformed','provider_failure')
+             and score.get('reconciliation_required') is False and not journal.pending(request_id)
+             and score.get('recorded_answer') is None and score.get('conditional_answer') is None
+             and not any(e.stage=='outcome_review' for e in journal.events(request_id)))
+    if result['review'].get('assurance')!='not_reviewed' or not (applicability or settled):
+        raise ContractError('no-call applicability deferral or settled failure required')
     slot=outcome_review_allocation(request_id=request_id,partition=partition,spec=outcome_reviewer_spec)
     row=goal._con.execute("SELECT w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id "
         "WHERE s.set_id=? AND w.work_id=? AND w.request_id=?",
@@ -791,7 +797,9 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
         raise ContractError('unavailable outcome review slot differs')
     saved={'schema':'qjig.outcome-review-unavailable.v1','reviewed_run_sha256':expected_run_sha256,
            'reference_sha256':expected_reference_sha256,'semantic_review_sha256':expected_review_sha256,
-           'request_id':request_id,'work_id':slot['work_id'],'reason':'source_applicability_unestablished'}
+           'request_id':request_id,'work_id':slot['work_id'],
+           'reason':'source_applicability_unestablished' if applicability else 'original_'+score['classification'],
+           **({'journal_sha256':expected_journal_sha256} if settled else {})}
     outcome={'assessment':'uncertain','assurance':'not_reviewed','reason':saved['reason']}
     if record:
         if (outcome_archive.events() or outcome_archive.revision_ids() or outcome_archive.source_ids()
@@ -809,7 +817,7 @@ def unavailable_outcome_review(goal, archive, journal, reference: dict, review_a
             or not _SHA.fullmatch(expected_outcome_review_sha256) or not hmac.compare_digest(digest,expected_outcome_review_sha256)):
         raise ContractError('outcome review digest differs')
     review={'status':'structurally_verified' if expected_outcome_review_sha256 else 'unanchored','sha256':digest,**outcome}
-    return {**result,'outcome_review':review,'outcome_category':'unknown_assessment','outcome_assurance':'not_reviewed'}
+    return {**result,'outcome_review':review,'outcome_category':'failed' if settled else 'unknown_assessment','outcome_assurance':'not_reviewed'}
 
 def score_outcome_reviewed_assignment(goal, archive, journal, reference: dict, review_archive, outcome_archive, *,
                                       partition: str, expected_plan_sha256: str, expected_run_sha256: str,
