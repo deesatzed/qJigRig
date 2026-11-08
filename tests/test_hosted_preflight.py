@@ -130,6 +130,28 @@ def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_pat
         assert sent==[] and journal.events('r')==[]
 
 
+        # The credential captured at the typed entrypoint must still match before
+        # preflight observes the account or changes its restrictions.
+        import qjig.providers as providers
+        (tmp_path/'env').write_text('OPENROUTER_API_KEY=synthetic-one\n')
+        monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot',lambda model:snapshot)
+        observations=[]
+        monkeypatch.setattr('qjig.account_client.fetch_account_snapshot',lambda *a,**kw:observations.append(True) or account)
+        original_load=providers.load_env_value
+        def rotate_after_entry_read(path,name):
+            value=original_load(path,name)
+            (tmp_path/'env').write_text('OPENROUTER_API_KEY=synthetic-two\n')
+            return value
+        monkeypatch.setattr(providers,'load_env_value',rotate_after_entry_read)
+        restrictions_before=goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0]
+        with pytest.raises(AccountRefreshError,match='credential') as error:
+            call_typed(ledger,transport,request,{},reservation=bound)
+        assert 'synthetic-one' not in str(error.value) and 'synthetic-two' not in str(error.value)
+        assert observations==[]
+        assert goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0]==restrictions_before
+        assert sent==[] and journal.events('r')==[]
+
+
 def test_hosted_journal_binding_survives_restart_and_rejects_memory(tmp_path):
     account=({'data':{'limit_remaining':1,'include_byok_in_limit':False,'is_free_tier':False}},
              {'data':{'total_credits':1,'total_usage':0}})

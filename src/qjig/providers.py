@@ -451,7 +451,12 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
         if (ledger._goal_budget is not None and ledger._goal_budget._account_bound
                 and reservation.required_id is not None and reservation.work_binding_sha256 is not None):
             from .hosted_preflight import prepare_hosted_attempt
-            prepare_hosted_attempt(ledger,request,reservation,env_path=transport._env_path,max_age_seconds=60)
+            from .account_client import AccountRefreshError
+            credential = load_env_value(transport._env_path, "OPENROUTER_API_KEY")
+            if not credential:
+                raise AccountRefreshError("account credential unavailable")
+            prepare_hosted_attempt(ledger,request,reservation,env_path=transport._env_path,max_age_seconds=60,
+                                   expected_credential=credential)
         # Account and catalog checks do not resolve BYOK, plugin or prior-spend
         # uncertainty and do not authorize transport.
         raise BudgetExceeded("preflight_unavailable", "hosted calls require complete billing and dispatch safeguards")

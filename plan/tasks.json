@@ -1466,7 +1466,8 @@
         "R08P",
         "R08R",
         "R08S",
-        "R08T"
+        "R08T",
+        "R08U"
       ],
       "status": "pending",
       "files": [],
@@ -5010,6 +5011,24 @@
       "acceptance": "Missing or changed expected credential refuses before HTTP without logging either value; matching dummy credentials exercise only injected fake transport.",
       "command": "python -m pytest tests/test_providers.py::test_adapter_requires_same_credential_before_http -q",
       "evidence": "Red: internal adapter mechanics reached the injected HTTP function without an expected credential. Green: missing or changed expected credential refuses without exposing values, while matching dummy credentials exercise fake HTTP mechanics; provider/replay/preflight/account/goal/config/service regressions passed 143 with 1 optional skip. This matching check is not authorization, is not yet wired to guarded dispatch, and does not prevent other Python code from bypassing private methods."
+    },
+    {
+      "id": "R08U",
+      "phase": "repair",
+      "depends_on": [
+        "R08T"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py",
+        "src/qjig/hosted_preflight.py"
+      ],
+      "test_file": "tests/test_hosted_preflight.py",
+      "test_name": "test_preflight_requires_account_and_current_prices_for_reserved_work",
+      "action": "Bind typed entrypoint and preflight to one in-memory credential",
+      "acceptance": "Credential rotation between typed entrypoint and preflight refuses before account fetch without disclosing credentials; hosted dispatch remains disabled.",
+      "command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
+      "evidence": "Red: rotation after the typed entrypoint credential read still allowed an account observation. Green: rotation refuses before account observation or restriction change without exposing dummy credentials; preflight/account/provider/goal/config/service regressions 122 passed, 1 skipped. Dispatch remains disabled; this check does not resolve billing, physical-send integration, switch-and-restore races or later credential changes."
     }
   ]
 }

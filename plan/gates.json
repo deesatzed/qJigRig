@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "babffccd5e66b62f0101eb96968d91fc73dfe968c841d29b367ca72c8004a8cf",
-  "queue_sha256": "e4b6bca359481051488633c9d138f926c1da010a3d349d256014019c87077e4a",
+  "queue_sha256": "d8ca84f651b50d8ae2df95d10bb8b9931c907ffd70b8d732fbbe2a1f10768e47",
   "gates": [
     {
       "id": "F01",
@@ -108,7 +108,8 @@
         "R08Q",
         "R08R",
         "R08S",
-        "R08T"
+        "R08T",
+        "R08U"
       ],
       "evidence": []
     },
@@ -702,6 +703,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_providers.py::test_adapter_requires_same_credential_before_http -q",
       "queue_evidence_assertion": "Red: internal adapter mechanics reached the injected HTTP function without an expected credential. Green: missing or changed expected credential refuses without exposing values, while matching dummy credentials exercise fake HTTP mechanics; provider/replay/preflight/account/goal/config/service regressions passed 143 with 1 optional skip. This matching check is not authorization, is not yet wired to guarded dispatch, and does not prevent other Python code from bypassing private methods."
+    },
+    {
+      "id": "R08U",
+      "status": "unverified",
+      "task_ids": [
+        "R08U"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
+      "queue_evidence_assertion": "Red: rotation after the typed entrypoint credential read still allowed an account observation. Green: rotation refuses before account observation or restriction change without exposing dummy credentials; preflight/account/provider/goal/config/service regressions 122 passed, 1 skipped. Dispatch remains disabled; this check does not resolve billing, physical-send integration, switch-and-restore races or later credential changes."
     },
     {
       "id": "R09",

@@ -50,7 +50,7 @@ def _verify_hosted_accounting_binding(goal, journal, env_path: Path) -> None:
         raise ContractError('goal accounting binding unavailable') from exc
 
 def prepare_hosted_attempt(ledger: BudgetLedger, request: ProviderRequest, reservation: CallReservation,
-                           *, env_path: Path, max_age_seconds: int, clock=None) -> dict:
+                           *, env_path: Path, max_age_seconds: int, clock=None, expected_credential: str | None = None) -> dict:
     """Refresh account and pricing for a pre-reserved physical call, without sending it."""
     from .account_client import AccountRefreshError,_require_credential_match,refresh_account_constraints
     from .providers import load_env_value
@@ -65,9 +65,10 @@ def prepare_hosted_attempt(ledger: BudgetLedger, request: ProviderRequest, reser
         raise ContractError('hosted attempt requires an account-bound goal and reserved work')
     goal = ledger._goal_budget
     _verify_hosted_accounting_binding(goal,ledger._journal,Path(env_path))
-    credential=load_env_value(Path(env_path),'OPENROUTER_API_KEY')
+    credential = expected_credential if expected_credential is not None else load_env_value(Path(env_path),'OPENROUTER_API_KEY')
     if not credential:
         raise AccountRefreshError('account credential unavailable')
+    _require_credential_match(Path(env_path),credential)
     if goal.audit_journal(ledger._journal)['status'] != 'verified':
         raise BudgetExceeded('accounting', 'goal and journal must be reconciled before preflight')
     run_set = goal.check_required_work(reservation.required_id, request_id=ledger._request_id,
