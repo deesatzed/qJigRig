@@ -43,6 +43,29 @@ def _bind_goal_directory(env_path: Path, goal_dir: Path, *, version: str) -> Non
             os.fsync(output.fileno())
 
 
+def _mark_goal_initialized(env_path: Path, goal_dir: Path, *, allow_existing: bool) -> None:
+    """Durably mark ledger initialization before any new ledger can be created."""
+    marker = env_path.resolve().parent / '.local' / 'qjig-active-goal-initialized'
+    expected = str(goal_dir.resolve())
+    if marker.is_symlink():
+        raise ContractError('unsafe goal ledger marker')
+    try:
+        fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+    except FileExistsError:
+        if not allow_existing:
+            raise ContractError('initialized goal ledger is missing; recovery required')
+        try:
+            if marker.is_symlink() or marker.read_text(encoding='utf-8') != expected:
+                raise ContractError('goal ledger marker differs')
+        except (OSError, UnicodeError) as exc:
+            raise ContractError('goal ledger marker unavailable') from exc
+    else:
+        with os.fdopen(fd, 'w', encoding='utf-8') as output:
+            output.write(expected)
+            output.flush()
+            os.fsync(output.fileno())
+
+
 def load_fresh_config(path: Path) -> FreshWorkbench:
     """Load local settings. Price and token values remain unverified assertions."""
     data = json.loads(path.read_text(encoding='utf-8'))
@@ -101,9 +124,17 @@ def load_fresh_config(path: Path) -> FreshWorkbench:
         if path.is_symlink():
             raise ContractError('unsafe goal ledger path')
         if not path.exists():
+            if version == 'qjig.fresh-config.v2':
+                marker = env_path.resolve().parent / '.local' / 'qjig-active-goal-initialized'
+                if marker.exists() or marker.is_symlink():
+                    raise ContractError('initialized goal ledger is missing; recovery required')
             snapshot = fetch_account_snapshot(env_path)
+            if version == 'qjig.fresh-config.v2':
+                _mark_goal_initialized(env_path, goal_dir, allow_existing=False)
             return GoalBudget.open(path, total=total, per_request=per_request,
                                    allocations=allocations, account_snapshot=snapshot)
+        if version == 'qjig.fresh-config.v2':
+            _mark_goal_initialized(env_path, goal_dir, allow_existing=True)
         goal = GoalBudget.resume_account_bound(path, total=total, per_request=per_request,
                                                 allocations=allocations)
         try:

@@ -147,3 +147,21 @@ def test_v2_binding_rejects_legacy_config_that_could_reset_budget(tmp_path):
     path.write_text(json.dumps(config))
     with pytest.raises(ContractError, match='v2 configuration required'):
         load_fresh_config(path)
+
+
+def test_v2_missing_initialized_ledger_cannot_reset_goal_budget(tmp_path, monkeypatch):
+    observations = ({'data': {'limit_remaining': 10, 'include_byok_in_limit': False, 'is_free_tier': False}},
+                    {'data': {'total_credits': 10, 'total_usage': 0}})
+    monkeypatch.setattr('qjig.account_client.fetch_account_snapshot', lambda path, **kwargs: observations)
+    config = config_for(tmp_path)
+    config.update(schema='qjig.fresh-config.v2', goal_dir=str(tmp_path / 'shared'))
+    path = tmp_path / 'config.json'
+    path.write_text(json.dumps(config))
+    backend = load_fresh_config(path)
+    with backend.goal_factory() as goal:
+        goal.reserve('attempt-one', 'request-one', 'smoke', tokens=100, cost_usd=0.1)
+    ledger = tmp_path / 'shared' / 'goal.sqlite'
+    ledger.unlink()
+    with pytest.raises(ContractError, match='ledger.*missing'):
+        backend.goal_factory()
+    assert not ledger.exists()
