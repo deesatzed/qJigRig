@@ -1251,7 +1251,8 @@
         "T068",
         "T069A",
         "T069B",
-        "T069C"
+        "T069C",
+        "T069D"
       ],
       "status": "pending",
       "files": [
@@ -4381,6 +4382,24 @@
       "acceptance": "A separate blinded outcome-review call shares the original request budget; its archive and journal replay with original anchors and reject tampering.",
       "command": "python -m pytest tests/test_outcome_review.py::test_direct_outcome_review_is_blind_budgeted_and_replayable -q",
       "evidence": "Red: blinded request-outcome reviewer was absent. Green: stand-in direct reviews independently assess the saved question and sources without private labels, arm identity or original answer, share request budget, retain malformed output as uncertain, and structurally replay against the saved run and route; altered review record is rejected. Outcome, semantic, evaluation, replay and provider regressions passed 156. Fresh reviews, campaign integration, verified outcomes and hosted behavior remain open."
+    },
+    {
+      "id": "T069D",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069C"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_outcome_review.py",
+        "src/qjig/evaluation_scoring.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_locked_fresh_run_uses_only_checked_sources_and_hides_reference",
+      "action": "Review fresh request outcomes independently without exposing references or conditional answers",
+      "acceptance": "A separate blind fresh review shares the request budget, retains deferral, and replays after conditional review with anchored original journal and unchanged private labels.",
+      "command": "python -m pytest tests/test_evaluation.py::test_locked_fresh_run_uses_only_checked_sources_and_hides_reference -q",
+      "evidence": "Red: separate fresh outcome reviewer absent. Green: stand-in routed and legacy reviews independently assess applicable sources without private labels or conditional answer, remain deferred, replay against original run and journal after conditional review, preserve malformed responses as uncertain and reject changed references/records. Evaluation/review/replay/fresh regressions passed 168; final targeted 12 passed. No independent semantic correctness, missing-source review, goal-bound campaign integration or hosted execution established."
     }
   ]
 }

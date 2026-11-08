@@ -666,7 +666,8 @@ def test_locked_direct_run_binds_case_without_exposing_reference(tmp_path):
 
 @pytest.mark.parametrize(('reference_quote', 'comparison', 'covered'), [('Tests must pass.', 'matches_reference', True), ('# Checks', 'unknown_review', False)])
 @pytest.mark.parametrize('routed', [False, True])
-def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path, reference_quote, comparison, covered, routed):
+@pytest.mark.parametrize('malformed_outcome', [False, True])
+def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path, reference_quote, comparison, covered, routed, malformed_outcome):
     import json
     from qjig.applicability import ApplicabilityInputs, Collection, Interval, MemberMetadata, OPEN
     from qjig.budgets import BudgetLedger
@@ -783,6 +784,34 @@ def test_locked_fresh_run_uses_only_checked_sources_and_hides_reference(tmp_path
             assert replayed_score['journal_scope']=='original_run_prefix'
             assert replayed_score['request_status']=='deferred' and replayed_score['conditional_answer']=='yes'
             assert ledger.used_calls()==5
+            from qjig.evaluation_outcome_review import review_fresh_outcome, verify_fresh_outcome_review
+            with RunArchive.open(tmp_path/'outcome-review') as outcome_archive:
+                response=RawResponse(200,'not json',usage) if malformed_outcome else raw({'assessment':'yes','reason':'source supports answer'})
+                outcome_transport=RoutedStandIn([response]) if routed else StandInTransport([response])
+                outcome=review_fresh_outcome(archive,journal,ledger,outcome_transport,reference=ref,
+                    expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                    expected_journal_sha256=journal_hash,review_archive=outcome_archive,model='reviewer',max_tokens=100,**options)
+                assert outcome['assessment']==('uncertain' if malformed_outcome else 'yes') and outcome['request_status']=='deferred' and outcome['request_answer'] is None
+                outcome_prompt=next(e['data']['prompt'] for e in outcome_archive.events() if e['kind']=='request')
+                assert gold.decode() not in outcome_prompt and ledger._request_id not in outcome_prompt
+                assert 'conditional_answer' not in outcome_prompt and reference_digest(ref) not in outcome_prompt
+                checked_outcome=verify_fresh_outcome_review(archive,journal,outcome_archive,reference=ref,
+                    expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,expected_journal_sha256=journal_hash)
+                assert checked_outcome['status']=='unanchored' and checked_outcome['assessment']==outcome['assessment']
+                assert verify_fresh_outcome_review(archive,journal,outcome_archive,reference=ref,
+                    expected_reference_sha256='0'*64,expected_run_sha256=replay.digest,expected_journal_sha256=journal_hash)['status']=='invalid'
+                assert verify_fresh_outcome_review(archive,journal,outcome_archive,reference=ref,
+                    expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                    expected_journal_sha256=journal_hash,expected_review_sha256=checked_outcome['sha256'])['status']=='structurally_verified'
+                assert verify_fresh_semantic_review(archive,journal,semantic_archive,reference=ref,
+                    expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,
+                    expected_journal_sha256=journal_hash,expected_review_sha256=checked['sha256'])['status']=='structurally_verified'
+                outcome_archive._con.execute('DROP TRIGGER event_no_update')
+                seq,encoded=outcome_archive._con.execute("SELECT seq,data FROM events WHERE kind='review_record'").fetchone()
+                changed=json.loads(encoded);changed['assessment']='no'
+                outcome_archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),seq))
+                assert verify_fresh_outcome_review(archive,journal,outcome_archive,reference=ref,
+                    expected_reference_sha256=reference_digest(ref),expected_run_sha256=replay.digest,expected_journal_sha256=journal_hash)['status']=='invalid'
             with pytest.raises(ContractError):
                 score_fresh_archive(archive,journal,ref,expected_run_sha256=replay.digest,
                     expected_reference_sha256=reference_digest(ref),original_run_only=True)

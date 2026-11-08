@@ -263,7 +263,7 @@ def score_fresh_archive(archive, journal, reference: dict, *, expected_run_sha25
         recorded_prefix=journal_events[:split]
         seen=set()
         for event in journal_events[split:]:
-            if event.stage!='semantic_review':
+            if event.stage not in ('semantic_review','outcome_review'):
                 raise ContractError('unexpected later journal event')
             if event.kind=='intent':
                 expected_binding={'reviewed_run_sha256':expected_run_sha256,
