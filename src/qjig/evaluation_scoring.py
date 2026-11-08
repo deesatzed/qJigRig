@@ -1006,8 +1006,8 @@ def build_reserved_holdout_comparison(goal, design: dict, entries: list[dict], *
             raise ContractError('campaign configuration integrity differs')
         config=json.loads(config_value)
     has_semantic=any('semantic_review' in template for template in manifest['stage_templates'].values())
-    outcome_enabled=config is not None and config.get('schema')=='qjig.campaign-config.v7'
-    semantic=config is not None and config.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7')
+    outcome_enabled=config is not None and config.get('schema') in ('qjig.campaign-config.v7','qjig.campaign-config.v8')
+    semantic=config is not None and config.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7','qjig.campaign-config.v8')
     if (has_semantic and config is not None and not semantic) or (semantic and (not has_semantic
             or not isinstance(expected_config_sha256,str) or not _SHA.fullmatch(expected_config_sha256)
             or not hmac.compare_digest(config_row[1],expected_config_sha256))):

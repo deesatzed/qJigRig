@@ -423,10 +423,10 @@ def run_fresh(
                 version = config.get('planner_prompt_version', 'legacy_v1')
                 schema = 'qjig.campaign-config.v2' if version == 'legacy_v1' else 'qjig.campaign-config.v3'
                 if (hashlib.sha256(encoded.encode('utf-8')).hexdigest() != digest
-                        or config.get('schema') not in (schema, 'qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7') or version != planner_prompt_version
+                        or config.get('schema') not in (schema, 'qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7','qjig.campaign-config.v8') or version != planner_prompt_version
                         or config.get('max_judge_pairs') != max_judge_pairs
-                        or (max_judge_pairs is not None and config.get('schema') not in ('qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7'))
-                        or (config.get('schema') in ('qjig.campaign-config.v6','qjig.campaign-config.v7') and any(
+                        or (max_judge_pairs is not None and config.get('schema') not in ('qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7','qjig.campaign-config.v8'))
+                        or (config.get('schema') in ('qjig.campaign-config.v6','qjig.campaign-config.v7','qjig.campaign-config.v8') and any(
                             config['stages'][name].get('route') != route
                             for name,route in (('planner',planner_route),('judge',judge_route),('reviewer',reviewer_route))))
                         or config.get('plan_sha256') != binding['plan_sha256']

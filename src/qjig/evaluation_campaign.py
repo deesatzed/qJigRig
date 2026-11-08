@@ -120,10 +120,10 @@ class EvaluationCampaign:
                 started.add(request_id)
             elif kind == 'scored':
                 if (request_id not in started or request_id in scored or not isinstance(data,dict)
-                        or set(data) != ({'plan_sha256','run_sha256','reference_sha256','journal_sha256','score_sha256'} | ({'semantic_review_sha256'} if config_schema in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7') else set()) | ({'outcome_review_sha256'} if config_schema=='qjig.campaign-config.v7' else set()))
+                        or set(data) != ({'plan_sha256','run_sha256','reference_sha256','journal_sha256','score_sha256'} | ({'semantic_review_sha256'} if config_schema in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7','qjig.campaign-config.v8') else set()) | ({'outcome_review_sha256'} if config_schema in ('qjig.campaign-config.v7','qjig.campaign-config.v8') else set()))
                         or data['plan_sha256'] != digest
                         or any(not isinstance(data[k],str) or len(data[k]) != 64 or any(c not in '0123456789abcdef' for c in data[k])
-                               for k in (('run_sha256','reference_sha256','score_sha256','semantic_review_sha256','outcome_review_sha256') if config_schema=='qjig.campaign-config.v7' else ('run_sha256','reference_sha256','score_sha256','semantic_review_sha256') if config_schema in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7') else ('run_sha256','reference_sha256','score_sha256')))
+                               for k in (('run_sha256','reference_sha256','score_sha256','semantic_review_sha256','outcome_review_sha256') if config_schema in ('qjig.campaign-config.v7','qjig.campaign-config.v8') else ('run_sha256','reference_sha256','score_sha256','semantic_review_sha256') if config_schema in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7','qjig.campaign-config.v8') else ('run_sha256','reference_sha256','score_sha256')))
                         or (data['journal_sha256'] is not None and
                             (not isinstance(data['journal_sha256'],str) or len(data['journal_sha256']) != 64
                              or any(c not in '0123456789abcdef' for c in data['journal_sha256'])))):
@@ -303,9 +303,6 @@ class EvaluationCampaign:
         con.execute('BEGIN IMMEDIATE')
         try:
             manifest,assignments,started,scored = self._snapshot()
-            config_row=con.execute('SELECT value FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone()
-            if config_row is not None and json.loads(config_row[0]).get('schema')=='qjig.campaign-config.v8':
-                raise ContractError('rubric-bound campaign execution unavailable')
             if any('outcome_review' in template for template in manifest['stage_templates'].values()) and con.execute('SELECT 1 FROM evaluation_campaign_config WHERE plan_id=?',(self._plan_id,)).fetchone() is None:
                 raise ContractError('outcome campaign configuration required')
             if not isinstance(request_id,str) or request_id not in assignments or request_id in started:
@@ -350,7 +347,7 @@ class EvaluationCampaign:
         partition = next(f['partition'] for f in manifest['design']['families'] if f['id']==family)
         scoring_options=dict(partition=partition,expected_plan_sha256=self._digest,expected_run_sha256=expected_run_sha256,
             expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256)
-        if frozen is not None and frozen.get('schema')=='qjig.campaign-config.v7':
+        if frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v7','qjig.campaign-config.v8'):
             from .evaluation_scoring import score_outcome_reviewed_assignment
             score=score_outcome_reviewed_assignment(self._goal,archive,journal,reference,semantic_review_archive,outcome_review_archive,
                 expected_review_sha256=expected_review_sha256,reviewer_spec=frozen['stages']['semantic_reviewer'],
@@ -373,9 +370,9 @@ class EvaluationCampaign:
         score_hash = hashlib.sha256(encoded).hexdigest()
         payload = {'plan_sha256':self._digest,'run_sha256':expected_run_sha256,'reference_sha256':expected_reference_sha256,
                    'journal_sha256':expected_journal_sha256,'score_sha256':score_hash}
-        if frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7'):
+        if frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7','qjig.campaign-config.v8'):
             payload['semantic_review_sha256']=expected_review_sha256
-        if frozen is not None and frozen.get('schema')=='qjig.campaign-config.v7':
+        if frozen is not None and frozen.get('schema') in ('qjig.campaign-config.v7','qjig.campaign-config.v8'):
             payload['outcome_review_sha256']=expected_outcome_review_sha256
         con = self._goal._con
         con.execute('BEGIN IMMEDIATE')
@@ -418,8 +415,8 @@ def run_campaign_assignment(campaign: EvaluationCampaign, request_id: str, root,
             or type(want) is not int or not 1 <= want <= 100 or type(max_bytes) is not int or not 1 <= max_bytes <= 1024*1024):
         raise ContractError('invalid campaign run inputs')
     frozen_config=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
-    outcome_enabled=frozen_config['schema']=='qjig.campaign-config.v7'
-    semantic = frozen_config['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7')
+    outcome_enabled=frozen_config['schema'] in ('qjig.campaign-config.v7','qjig.campaign-config.v8')
+    semantic = frozen_config['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7','qjig.campaign-config.v8')
     quota = frozen_config.get('max_judge_pairs')
     if semantic and (not isinstance(semantic_review_archive,RunArchive) or semantic_review_archive is archive
                      or semantic_review_archive.events() or semantic_review_archive.revision_ids() or semantic_review_archive.source_ids()
@@ -634,8 +631,8 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
             or not callable(transport_factory) or type(max_assignments) is not int or not 1 <= max_assignments <= 100):
         raise ContractError('invalid campaign batch inputs')
     frozen=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
-    outcome_enabled=frozen['schema']=='qjig.campaign-config.v7'
-    semantic = frozen['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7')
+    outcome_enabled=frozen['schema'] in ('qjig.campaign-config.v7','qjig.campaign-config.v8')
+    semantic = frozen['schema'] in ('qjig.campaign-config.v4','qjig.campaign-config.v5','qjig.campaign-config.v6','qjig.campaign-config.v7','qjig.campaign-config.v8')
     manifest,assignments,started,scored=campaign._snapshot()
     if design != manifest['design'] or set(cases) != {case['id'] for case in design['cases']}:
         raise ContractError('campaign batch case set differs')

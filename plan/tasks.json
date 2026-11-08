@@ -4566,7 +4566,8 @@
         "T069K",
         "T072A",
         "T072C",
-        "T072D"
+        "T072D",
+        "T072E"
       ],
       "status": "pending",
       "files": [
@@ -4613,6 +4614,26 @@
       "acceptance": "Canonical v8 configuration binds supplied rubric text, digest and provisional policy to reserved work before claims; mismatched configuration is rejected; execution stays closed until replay and scoring support v8.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_freezes_rubric_before_any_claim -q",
       "evidence": "Red: freeze_config did not accept a rubric. Green: synthetic rubric and policy are frozen and anchored, repeated freeze is idempotent, changed rubric and wrong anchor refuse, and v8 claims are disabled. Evaluation, review, replay and gate regressions passed 148. Rubric content validity and v8 execution and replay remain open."
+    },
+    {
+      "id": "T072E",
+      "phase": "evaluation",
+      "depends_on": [
+        "T072D"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_campaign.py",
+        "src/qjig/acquisition.py",
+        "src/qjig/evaluation_scoring.py",
+        "src/qjig/live_receipts.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts",
+      "action": "Carry rubric-bound campaign configuration through assignment execution and anchored receipt replay",
+      "acceptance": "V8 runs both reviews through the existing reserved assignment and validates anchored receipts on restart; changed or missing review evidence is rejected. No final recommendation is implied.",
+      "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
+      "evidence": "Red: v8 batch rejected the reserved stage configuration. Green: synthetic v8 batch executed and resumed four development assignments across combined, decomposition, direct full-evidence and direct retrieval arms; inspection rejected wrong configuration and outcome-review anchors. Evaluation, review, replay, fresh-pipeline and gate regressions passed 200. Full v8 factorial run, rubric validity and verified recommendation remain open."
     }
   ]
 }

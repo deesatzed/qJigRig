@@ -2083,8 +2083,8 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             reopened._con.execute("UPDATE evaluation_campaign_events SET payload='{}' WHERE kind='started'")
 
 
-@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_timeout'])
-def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path,mismatch):
+@pytest.mark.parametrize(('mismatch','rubric_bound'),[(m,False) for m in ['scope','date','entity','unknown','semantic','semantic_unknown','semantic_failure','semantic_failure_fresh','semantic_timeout','semantic_no_packet','semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_timeout']]+[('outcome_batch',True)])
+def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path,mismatch,rubric_bound):
     import copy,json
     from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN,UNKNOWN_BOUND
     from qjig.contracts import Budget,Request
@@ -2172,7 +2172,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal,Journal.open(tmp_path/'journal.sqlite') as journal:
         reserve_evaluation_plan(goal,'batch',plan,expected_plan_sha256=plan['sha256'])
         campaign=EvaluationCampaign(goal,'batch',expected_plan_sha256=plan['sha256'])
-        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_timeout') else {}))
+        config_hash=campaign.freeze_config(config,want=1,max_bytes=5000,case_applicability=metadata,**({'max_judge_pairs':1} if mismatch in ('semantic_quota','semantic_route','semantic_route_unknown','outcome_unavailable','outcome_failure','outcome_timeout','outcome_batch','outcome_runner_failure','outcome_runner_timeout') else {}),**({'rubric_text':'Synthetic frozen rubric'} if rubric_bound else {}))
         if mismatch in ('outcome_runner_failure','outcome_runner_timeout'):
             from qjig.evaluation_campaign import run_campaign_assignment
             from qjig.evaluation_scoring import score_outcome_reviewed_assignment
@@ -2378,6 +2378,13 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                 checked=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,
                                                  expected_outcome_review_sha256=outcome_hashes)
                 assert checked['checked']==4 and 'outcome_review_anchor_unavailable' not in checked['issues']
+                if rubric_bound:
+                    assert checked['status']=='incomplete' and 'unstarted_assignments' in checked['issues']
+                    assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_config_sha256='0'*64,expected_review_sha256=reviews,expected_outcome_review_sha256=outcome_hashes)['status']=='invalid'
+                    assert {'combined','decomposition_only','direct_full_evidence','direct_retrieval'} == {next(a['arm'] for a in plan['manifest']['assignments'] if a['request_id']==rid) for rid in calls}
+                    bad={**outcome_hashes,calls[0]:'0'*64}
+                    assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews,expected_outcome_review_sha256=bad)['status']=='invalid'
+                    return
                 from qjig.evaluation_recommendation import build_verified_recommendation
                 incomplete=build_verified_recommendation(campaign,journal,tmp_path/'runs',design=design,references=refs,
                     expected_design_sha256=digest,expected_config_sha256=config_hash,expected_review_sha256=reviews,
@@ -2819,9 +2826,9 @@ def test_campaign_freezes_rubric_before_any_claim(tmp_path):
         with pytest.raises(ContractError):
             campaign.require_config(config,want=1,max_bytes=5000,expected_config_sha256='0'*64)
         with pytest.raises(ContractError): campaign.freeze_config(config,**{**opts,'rubric_text':rubric+' altered'})
-        with pytest.raises(ContractError,match='rubric-bound campaign execution unavailable'):
-            campaign.claim(plan['manifest']['assignments'][0]['request_id'])
-        assert campaign.status()['in_progress']==[]
+        rid=plan['manifest']['assignments'][0]['request_id']
+        campaign.claim(rid)
+        assert campaign.status()['in_progress']==[rid]
 
 
 def test_two_baseline_provisional_decision_policy():
