@@ -66,7 +66,8 @@ def _catalog_incomplete(found):
 def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, transport, *,
                archive: RunArchive, provider: str, model: str, max_tokens: int,
                as_of: str, entities: list[str], historical_as_known: bool = False,
-               reservation_factory=None, max_price=None, case_binding=None, evaluation_assignment=None, required_run_set=None) -> dict:
+               reservation_factory=None, max_price=None, case_binding=None, evaluation_assignment=None, required_run_set=None,
+               route: str | None = None) -> dict:
     """Run a bounded initial retrieval and optional model-requested followup.
 
     Source text is untrusted, valid quotations do not prove relevance or truth,
@@ -84,6 +85,8 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
             raise ValueError
     except (ValueError, TypeError) as exc:
         raise ContractError('invalid direct applicability context') from exc
+    if route is not None:
+        ProviderRequest('direct_initial',provider,model,'',max_tokens,max_price=max_price,route=route)
     context = {'as_of': as_of, 'entities': sorted(entities), 'historical_as_known': historical_as_known}
     if case_binding is not None:
         if (not isinstance(case_binding, dict) or set(case_binding) != {'case_id', 'design_sha256', 'case_sha256', 'reference_sha256'}
@@ -113,7 +116,8 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
                             'source_revisions': sorted(r.revision_id for r in search._revisions), 'applicability': context,
                             'want': search._want, 'max_bytes': search._max_bytes,
                             'followups': search._max_rounds - 1, 'expanded': search._expanded,
-                            'provider': provider, 'model': model, 'max_tokens': max_tokens, 'max_price': max_price})
+                            'provider': provider, 'model': model, 'max_tokens': max_tokens, 'max_price': max_price,
+                            **({'route':route} if route is not None else {})})
     for revision in search._revisions:
         archive.add_revision(revision)
     packets, calls = [], []
@@ -136,7 +140,7 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
         try:
             actual_set = check_direct_slots(ledger._goal_budget, request_id=request.request_id, partition=ledger._partition,
                                provider=provider, model=model, output_tokens=max_tokens, max_price=max_price,
-                               followups=search._max_rounds - 1, reservation_factory=reservation_factory)
+                               followups=search._max_rounds - 1, reservation_factory=reservation_factory,route=route)
             if required_run_set is not None and actual_set != required_run_set:
                 raise ContractError('direct slots differ from evaluation plan')
         except (BudgetExceeded, ContractError):
@@ -144,7 +148,7 @@ def run_direct(search: DirectRetrieval, request: Request, ledger: BudgetLedger, 
                            'call_ids': calls, 'searches': list(search.trace)})
     for step in range(search._max_rounds):
         prompt = _prompt(request, context, packets, step + 1 < search._max_rounds)
-        pr = ProviderRequest('direct_initial' if step == 0 else 'direct_final', provider, model, prompt, max_tokens, max_price=max_price)
+        pr = ProviderRequest('direct_initial' if step == 0 else 'direct_final', provider, model, prompt, max_tokens, max_price=max_price,route=route)
         previous = {event.call_id for event in ledger._journal.events(request.request_id) if event.kind == 'intent'}
         try:
             reservation = reservation_factory(pr) if reservation_factory else None
@@ -175,7 +179,7 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
                       archive: RunArchive, provider: str, model: str, max_tokens: int,
                       want: int, max_bytes: int, followups: int, expanded: bool = False,
                       evidence_mode: str = 'retrieved', reservation_factory=None, max_price=None, assignment_binding=None,
-                      applicability_inputs=None, role_priors=None) -> dict:
+                      applicability_inputs=None, role_priors=None, route: str | None = None) -> dict:
     """Run one checked private case; reference data remains outside model input.
 
     Caller-supplied anchors and protected manifest are not authenticated here.
@@ -223,4 +227,4 @@ def run_locked_direct(root, design: dict, lock: dict, reference: dict, protected
     return run_direct(search, request, ledger, transport, archive=archive, provider=provider, model=model,
                       max_tokens=max_tokens, as_of=prepared.as_of, entities=list(prepared.entities),
                       historical_as_known=prepared.historical_as_known, reservation_factory=reservation_factory,
-                      max_price=max_price, case_binding=binding, evaluation_assignment=assignment_binding, required_run_set=required_set)
+                      max_price=max_price, case_binding=binding, evaluation_assignment=assignment_binding, required_run_set=required_set,route=route)

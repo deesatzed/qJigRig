@@ -321,3 +321,59 @@ def test_reserved_stage_slots_bind_restricted_provider_route(tmp_path):
             changed=ProviderRequest(stage,'openrouter',model['id'],'prompt',50,max_price=cap,route='provider-a/fp8')
             assert selector(allowed).required_id
             with pytest.raises(ContractError):selector(changed)
+
+
+@pytest.mark.parametrize('wire_valid',[True,False])
+def test_direct_run_binds_reserved_route_through_replay(tmp_path,wire_valid):
+    import hashlib,json
+    from qjig.budgets import BudgetLedger
+    from qjig.contracts import Request
+    from qjig.direct_preflight import direct_run_allocations,direct_slot_reservation
+    from qjig.evaluation import DirectRetrieval
+    from qjig.evaluation_direct import run_direct
+    from qjig.evaluation_replay import verify_direct_archive
+    from qjig.journal import Journal
+    from qjig.providers import RawResponse,StandInTransport,openrouter_wire_payload_v5
+    from qjig.run_archive import RunArchive
+    code=b'Tests must pass.';secret=b'private label'
+    (tmp_path/'code').write_bytes(code);(tmp_path/'labels').write_bytes(secret)
+    item=lambda name,raw:{'path':name,'sha256':hashlib.sha256(raw).hexdigest()}
+    search=DirectRetrieval(tmp_path,[item('code',code)],[item('labels',secret)],want=1,max_bytes=3000,followups=0)
+    model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
+           'pricing':{'prompt':'0.000001','completion':'0.000002'}}
+    cap={'prompt':2,'completion':3};route='provider-a/fp4';budget=Budget(5,10000,1)
+    slots=direct_run_allocations(request_id='r',partition='pilot',provider='openrouter',model=model,
+                                 input_tokens=100,output_tokens=50,max_price=cap,followups=0,route=route)
+    response=RawResponse(200,json.dumps({'action':'answer','query':None,'answer':'unknown','citations':[]}),
+                         {'prompt_tokens':10,'completion_tokens':5,'cost_usd':0.0001})
+    class WireStandIn(StandInTransport):
+        def send(self,request):
+            raw=super().send(request)
+            digest=hashlib.sha256(openrouter_wire_payload_v5(request).encode()).hexdigest() if wire_valid else '0'*64
+            return RawResponse(raw.http_status,raw.body,raw.usage,metadata={'wire_payload_format':'openrouter.chat.v5','wire_payload_sha256':digest})
+    with GoalBudget.open(tmp_path/'goal.sqlite',total=budget,per_request=budget,allocations={'pilot':budget}) as goal, Journal.open(tmp_path/'journal.sqlite') as journal, RunArchive.open(tmp_path/'run') as archive:
+        goal.reserve_run_set('direct',slots)
+        def factory(req):return direct_slot_reservation(goal,'direct',request_id='r',partition='pilot',request=req,
+                                                        model=model,input_tokens=100,input_bound_provenance='fixture')
+        bad_search=DirectRetrieval(tmp_path,[item('code',code)],[item('labels',secret)],want=1,max_bytes=3000,followups=0)
+        bad_transport=StandInTransport([])
+        with RunArchive.open(tmp_path/'bad-route') as bad_archive:
+            rejected=run_direct(bad_search,Request('r','Do tests pass?','reviewer','1','project'),
+                BudgetLedger(budget,journal,'r',goal_budget=goal,partition='pilot'),bad_transport,archive=bad_archive,
+                provider='openrouter',model=model['id'],max_tokens=50,as_of='2026-11-07',entities=[],
+                max_price=cap,reservation_factory=factory,route='provider-a/fp8')
+            assert rejected['failure']=='preflight_unavailable' and bad_transport.calls_made==0 and journal.events('r')==[]
+        result=run_direct(search,Request('r','Do tests pass?','reviewer','1','project'),
+            BudgetLedger(budget,journal,'r',goal_budget=goal,partition='pilot'),WireStandIn([response]),
+            archive=archive,provider='openrouter',model=model['id'],max_tokens=50,as_of='2026-11-07',entities=[],
+            max_price=cap,reservation_factory=factory,route=route)
+        assert result['status']=='recorded_unvalidated' and archive.context()['route']==route
+        assert next(e for e in archive.events() if e['kind']=='request')['data']['route']==route
+        assert verify_direct_archive(archive,journal)['status']==('unanchored' if wire_valid else 'invalid')
+        if not wire_valid:return
+        old=archive._con.execute('SELECT data,sha256 FROM run_context WHERE id=1').fetchone()
+        changed=json.loads(old[0]);changed['route']='provider-a/fp8'
+        encoded=json.dumps(changed,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+        archive._con.execute('DROP TRIGGER context_no_update')
+        archive._con.execute('UPDATE run_context SET data=?,sha256=? WHERE id=1',(encoded,hashlib.sha256(encoded.encode()).hexdigest()))
+        assert verify_direct_archive(archive,journal)['status']=='invalid'

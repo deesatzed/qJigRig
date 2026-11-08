@@ -13,8 +13,25 @@ from .evaluation_direct import _prompt, _validator, _catalog_incomplete
 from .indexing import index_entries
 from .journal import Journal
 from .packets import serialize_packet
-from .providers import ProviderRequest
+from .providers import (ProviderRequest, openrouter_wire_payload_v1, openrouter_wire_payload_v2,
+                        openrouter_wire_payload_v3, openrouter_wire_payload_v4, openrouter_wire_payload_v5)
 from .run_archive import RunArchive
+
+
+def _check_wire(request, metadata, transport):
+    if not isinstance(metadata,dict) or 'wire_payload_sha256' not in metadata:
+        if request.route is not None and not str(transport).startswith('STAND_IN:'):
+            raise ContractError('routed direct wire evidence unavailable')
+        return
+    fmt=metadata.get('wire_payload_format')
+    serializers={'openrouter.chat.v1':openrouter_wire_payload_v1,'openrouter.chat.v2':openrouter_wire_payload_v2,
+                 'openrouter.chat.v3':openrouter_wire_payload_v3,'openrouter.chat.v4':openrouter_wire_payload_v4,
+                 'openrouter.chat.v5':openrouter_wire_payload_v5}
+    if fmt not in serializers or (request.route is not None and fmt!='openrouter.chat.v5'):
+        raise ContractError('direct wire format differs')
+    digest=hashlib.sha256(serializers[fmt](request).encode('utf-8')).hexdigest()
+    if not isinstance(metadata['wire_payload_sha256'],str) or not hmac.compare_digest(digest,metadata['wire_payload_sha256']):
+        raise ContractError('direct wire digest differs')
 
 
 def _rebuild_search(context, revisions):
@@ -78,6 +95,12 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
             from .evaluation_budget import validate_assignment_binding
             keys.add('evaluation_assignment')
             validate_assignment_binding(context.get('evaluation_assignment'))
+        if 'route' in context:
+            keys.add('route')
+            ProviderRequest('direct_initial',context['provider'],context['model'],'',context['max_tokens'],
+                            max_price=context['max_price'],route=context['route'])
+            if context['route'] is None:
+                raise ContractError('invalid direct route')
         if set(context) != keys:
             raise ContractError('invalid direct context')
         request = Request.from_dict(context['request'])
@@ -153,12 +176,14 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
             allow = step + 1 < search._max_rounds
             pr = ProviderRequest('direct_initial' if step == 0 else 'direct_final', context['provider'], context['model'],
                                  _prompt(request, context['applicability'], packets, allow, legacy_request_id=context['schema'].endswith('.v1')), context['max_tokens'],
-                                 max_price=context['max_price'])
+                                 max_price=context['max_price'],route=context.get('route'))
             data = sent['data']
             expected_request = {'stage': pr.stage, 'provider': pr.provider, 'model': pr.model, 'prompt': pr.prompt,
                                 'max_tokens': pr.max_tokens, 'input_sha256': pr.input_sha256()}
             if pr.max_price is not None:
                 expected_request['max_price'] = dict(pr.max_price)
+            if pr.route is not None:
+                expected_request['route'] = pr.route
             if sent['call_id'] != call_id or data != expected_request or response['call_id'] != call_id or validated['call_id'] != call_id:
                 raise ContractError('direct request differs')
             body = response['data']['body']
@@ -169,6 +194,7 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
             if failure is not None or validated['data'] != {'value': value, 'failure': None}:
                 raise ContractError('direct response validation differs')
             intent, receipt = journal_events[step * 2:step * 2 + 2]
+            _check_wire(pr,response['data'].get('metadata'),receipt.payload.get('transport'))
             if (intent.kind != 'intent' or receipt.kind != 'receipt' or intent.call_id != call_id or receipt.call_id != call_id
                     or (intent.stage, intent.provider, intent.model, intent.input_sha256) != (pr.stage, pr.provider, pr.model, pr.input_sha256())
                     or (receipt.stage, receipt.provider, receipt.model, receipt.input_sha256) != (pr.stage, pr.provider, pr.model, pr.input_sha256())
@@ -236,11 +262,13 @@ def _verify_failure(context, events, journal_events, revisions, request, digest)
         allow = step + 1 < search._max_rounds
         pr = ProviderRequest('direct_initial' if step == 0 else 'direct_final', context['provider'], context['model'],
                              _prompt(request, context['applicability'], packets, allow, legacy_request_id=context['schema'].endswith('.v1')),
-                             context['max_tokens'], max_price=context['max_price'])
+                             context['max_tokens'], max_price=context['max_price'],route=context.get('route'))
         expected_request = {'stage': pr.stage, 'provider': pr.provider, 'model': pr.model, 'prompt': pr.prompt,
                             'max_tokens': pr.max_tokens, 'input_sha256': pr.input_sha256()}
         if pr.max_price is not None:
             expected_request['max_price'] = dict(pr.max_price)
+        if pr.route is not None:
+            expected_request['route'] = pr.route
         intent, terminal = journal_events[step * 2:step * 2 + 2]
         identity = (pr.stage, pr.provider, pr.model, pr.input_sha256())
         if (sent['call_id'] != call_id or sent['data'] != expected_request or intent.kind != 'intent'
@@ -268,6 +296,7 @@ def _verify_failure(context, events, journal_events, revisions, request, digest)
             raise ContractError('failure response missing')
         validated = events[cursor]; cursor += 1
         response = event['data']; body = response['body']; raw_hash = hashlib.sha256(body.encode('utf-8')).hexdigest()
+        _check_wire(pr,response.get('metadata'),terminal.payload.get('transport'))
         if validated['kind'] != 'validation' or validated['call_id'] != call_id or response['body_sha256'] != raw_hash:
             raise ContractError('failure response differs')
         if 200 <= response['http_status'] < 300:

@@ -53,13 +53,13 @@ def direct_slot_reservation(goal, set_id: str, *, request_id: str, partition: st
 
 
 def check_direct_slots(goal, *, request_id: str, partition: str, provider: str, model: str, output_tokens: int,
-                       max_price: dict, followups: int, reservation_factory) -> str:
+                       max_price: dict, followups: int, reservation_factory, route: str | None = None) -> str:
     """Check every stage is unconsumed and belongs to the same frozen run set."""
     if reservation_factory is None or max_price is None or type(followups) is not int or followups not in (0, 1):
         raise ContractError('direct reservations unavailable')
     sets = set()
     for stage in ('direct_initial', 'direct_final')[:1 + followups]:
-        probe = ProviderRequest(stage, provider, model, '', output_tokens, max_price=max_price)
+        probe = ProviderRequest(stage, provider, model, '', output_tokens, max_price=max_price,route=route)
         bound = reservation_factory(probe)
         if (not isinstance(bound, CallReservation) or bound.request_sha256 != probe.input_sha256()
                 or not _valid_cost(bound.cost_usd) or Decimal(str(bound.cost_usd)) < _ceiling_token_cost(probe, bound.input_tokens)
