@@ -49,7 +49,7 @@ def reference_digest(reference: dict) -> str:
 
 
 def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha256: str,
-                         expected_reference_sha256: str) -> dict:
+                         expected_reference_sha256: str, original_run_only: bool = False) -> dict:
     """Compare a replayed direct answer to one externally pinned private reference.
 
     Exact quote coverage is a narrow mechanical check. It cannot establish that
@@ -59,7 +59,8 @@ def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha2
     if (not isinstance(expected_reference_sha256, str) or not _SHA.fullmatch(expected_reference_sha256)
             or not hmac.compare_digest(ref_hash, expected_reference_sha256)):
         raise ContractError('reference digest mismatch')
-    replay = verify_direct_archive(archive, journal, expected_digest=expected_run_sha256)
+    replay = verify_direct_archive(archive, journal, expected_digest=expected_run_sha256,
+                                   original_run_only=original_run_only)
     if replay['status'] not in ('structurally_verified', 'incomplete') or replay.get('sha256') != expected_run_sha256:
         raise ContractError('direct run is not structurally verified')
     context = archive.context()
@@ -102,11 +103,14 @@ def score_direct_archive(archive, journal, reference: dict, *, expected_run_sha2
         classification = 'unjustified_deferral'
     else:
         classification = 'differs_from_reference'
-    return {'case_id': reference['case_id'], 'run_sha256': expected_run_sha256, 'reference_sha256': ref_hash,
+    result_score = {'case_id': reference['case_id'], 'run_sha256': expected_run_sha256, 'reference_sha256': ref_hash,
             'reference_provenance': reference['provenance'], 'classification': classification,
             'answer_matches_reference': actual == expected, 'required_evidence_covered': covered,
             'recorded_answer': actual, 'reference_expected_answer': expected,
             'semantic_assurance': 'not_assessed'}
+    if original_run_only:
+        result_score['journal_scope'] = 'original_run_prefix'
+    return result_score
 
 
 def make_reference(*, case_id: str, request, sources, as_of: str, entities: list[str], historical_as_known: bool,

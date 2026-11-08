@@ -86,6 +86,19 @@ def test_direct_semantic_review_excludes_private_reference_and_replays_original(
         assert verify_direct_semantic_review(archive,journal,review_archive,expected_run_sha256=digest,
                                              expected_review_sha256='0'*64)['status']=='invalid'
         assert verify_direct_archive(archive,journal,expected_digest=digest,original_run_only=True)['status']=='structurally_verified'
+        from qjig.evaluation_scoring import reference_digest, score_direct_archive
+        reference={'case_id':'case-1','question':request.question,'role':request.role,'role_version':request.role_version,
+                   'scope':request.scope,'as_of':'2026-11-07','entities':[],'historical_as_known':False,
+                   'source_revisions':[search._revisions[0].revision_id],'expected_answer':'yes',
+                   'provenance':'authored_unvalidated','evidence':[{'revision_id':search._revisions[0].revision_id,
+                                                                     'quote':'Tests must pass.'}]}
+        with pytest.raises(ContractError):
+            score_direct_archive(archive,journal,reference,expected_run_sha256=digest,
+                                 expected_reference_sha256=reference_digest(reference))
+        score=score_direct_archive(archive,journal,reference,expected_run_sha256=digest,
+                                   expected_reference_sha256=reference_digest(reference),original_run_only=True)
+        assert score['classification']=='matches_reference'
+        assert score['journal_scope']=='original_run_prefix' and score['semantic_assurance']=='not_assessed'
         assert ledger.used_calls()==2
         review_archive._con.execute('DROP TRIGGER event_no_update')
         seq,encoded=review_archive._con.execute("SELECT seq,data FROM events WHERE kind='review_record'").fetchone()
