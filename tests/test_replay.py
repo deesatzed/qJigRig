@@ -322,13 +322,13 @@ def test_replay_rejects_response_wire_digest_that_differs_from_request(tmp_path)
         assert 'wire_payload_format_unavailable:r#1' in report.issues
 
 
-@pytest.mark.parametrize('version', [1, 2])
+@pytest.mark.parametrize('version', [1, 2, 3, 4])
 def test_replay_accepts_historical_openrouter_wire_receipt(tmp_path, version):
     import hashlib
-    from qjig.providers import ProviderRequest, RawResponse, openrouter_wire_payload_v1, openrouter_wire_payload_v2
+    from qjig.providers import ProviderRequest, RawResponse, openrouter_wire_payload_v1, openrouter_wire_payload_v2, openrouter_wire_payload_v3, openrouter_wire_payload_v4
     request = ProviderRequest('planner', 'openrouter', 'vendor/model', 'older request', 20,
                               max_price={'prompt': 0.5, 'completion': 2.0})
-    serializer = {1:openrouter_wire_payload_v1, 2:openrouter_wire_payload_v2}[version]
+    serializer = {1:openrouter_wire_payload_v1, 2:openrouter_wire_payload_v2, 3:openrouter_wire_payload_v3, 4:openrouter_wire_payload_v4}[version]
     digest = hashlib.sha256(serializer(request).encode('utf-8')).hexdigest()
     response = RawResponse(200, '{}', None, metadata={'wire_payload_format':f'openrouter.chat.v{version}',
                                                       'wire_payload_sha256':digest})
