@@ -472,16 +472,16 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
                 raise AccountRefreshError("account credential unavailable")
             prepare_hosted_attempt(ledger,request,reservation,env_path=transport._env_path,max_age_seconds=60,
                                    expected_credential=credential)
-        # Account and catalog checks do not resolve BYOK, plugin or prior-spend
-        # uncertainty and do not authorize transport.
-        raise BudgetExceeded("preflight_unavailable", "hosted calls require complete billing and dispatch safeguards")
+        else:
+            raise BudgetExceeded("preflight_unavailable", "hosted calls require an account-bound ledger and reserved work")
 
     def attempt():
         call_id = ledger.last_call_id()
         if archive is not None:
             archive.record_request(call_id, request)
         try:
-            raw = transport.send(request)
+            raw = (transport._send_unchecked(request, expected_credential=credential)
+                   if isinstance(transport, OpenRouterTransport) else transport.send(request))
         except TimeoutError as exc:  # sent, outcome unknown
             if archive is not None:
                 try:

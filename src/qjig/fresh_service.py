@@ -242,11 +242,13 @@ class FreshWorkbench:
         transport = self.transport_factory()
         if not isinstance(transport, (StandInTransport, OpenRouterTransport)):
             raise ContractError('unsupported fresh transport')
-        if isinstance(transport, OpenRouterTransport):
-            raise BudgetExceeded('preflight_unavailable', 'configured assertions do not establish hosted-call bounds')
         if self.journal_path.is_symlink():
             raise ContractError('unsafe journal path')
-        goal = self.goal_factory()
+        from .account_client import AccountRefreshError
+        try:
+            goal = self.goal_factory()
+        except AccountRefreshError:
+            raise BudgetExceeded('preflight_unavailable', 'provider account unavailable') from None
         if not isinstance(goal, GoalBudget):
             raise ContractError('persistent goal budget required')
         set_id = 'workbench:' + run_id

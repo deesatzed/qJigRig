@@ -91,17 +91,11 @@ def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_pat
         with pytest.raises(ContractError, match='reservation'):
             prepare_hosted_attempt(ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
         assert journal.events('r') == []
-        # The actual typed-call entrypoint must run the same checks, while billing
-        # uncertainty still stops it before the HTTP adapter or journal intent.
+        # The typed-call entrypoint must refuse changed prices before any intent.
         from qjig.providers import OpenRouterTransport, call_typed
         monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot', lambda model: snapshot)
         sent=[]
         transport=OpenRouterTransport(tmp_path/'env',post=lambda *args: sent.append(args))
-        restrictions_before=goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0]
-        with pytest.raises(BudgetExceeded,match='preflight_unavailable'):
-            call_typed(ledger,transport,request,{},reservation=bound)
-        assert goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0]==restrictions_before+1
-        assert sent==[] and journal.events('r')==[]
         monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot', lambda model: raised)
         with pytest.raises(ContractError,match='reservation'):
             call_typed(ledger,transport,request,{},reservation=bound)
@@ -150,6 +144,22 @@ def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_pat
         assert observations==[]
         assert goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0]==restrictions_before
         assert sent==[] and journal.events('r')==[]
+
+
+        # With a matching credential and reserved work, the actual typed entrypoint
+        # must journal before invoking the injected HTTP adapter and retain usage.
+        monkeypatch.setattr(providers,'load_env_value',original_load)
+        (tmp_path/'env').write_text('OPENROUTER_API_KEY=synthetic-one\n')
+        monkeypatch.setattr('qjig.account_client.fetch_account_snapshot',lambda *a,**kw:account)
+        def fake_post(*args):
+            assert [event.kind for event in journal.events('r')] == ['intent']
+            sent.append(True)
+            return 200, '{"choices":[{"message":{"content":"{}"}}],"usage":{"prompt_tokens":10,"completion_tokens":5,"cost":0.00001,"is_byok":false}}'
+        transport=OpenRouterTransport(tmp_path/'env',post=fake_post)
+        result=call_typed(ledger,transport,request,{},reservation=bound)
+        assert result.ok and result.value=={} and sent==[True]
+        assert [event.kind for event in journal.events('r')]==['intent','receipt']
+        assert goal.audit_journal(journal)['status']=='verified'
 
 
 def test_hosted_journal_binding_survives_restart_and_rejects_memory(tmp_path):
