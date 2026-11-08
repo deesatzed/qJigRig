@@ -21,7 +21,7 @@ from .run_archive import RunArchive
 def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, archive_root: Path, *, references: dict,
                               expected_config_sha256: str | None = None, expected_run_sha256: dict | None = None,
                               expected_reference_sha256: dict | None = None, expected_journal_sha256: dict | None = None,
-                              case_root: Path | None = None, case_inputs: dict | None = None) -> dict:
+                              expected_review_sha256: dict | None = None, case_root: Path | None = None, case_inputs: dict | None = None) -> dict:
     """Inspect assigned work and retained scores without creating archives or calling providers.
 
     Callers must quiesce the separate stores and supply trusted external plan and
@@ -66,6 +66,14 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
     if (not isinstance(expected_journal_sha256, dict) or any(key not in assignments for key in expected_journal_sha256)
             or any(not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value) for value in expected_journal_sha256.values())):
         raise ContractError('invalid external journal anchors')
+    if expected_review_sha256 is None:
+        expected_review_sha256 = {}
+    if (not isinstance(expected_review_sha256, dict) or any(key not in assignments for key in expected_review_sha256)
+            or any(not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value) for value in expected_review_sha256.values())):
+        raise ContractError('invalid external review anchors')
+    semantic = frozen is not None and frozen.get('schema') == 'qjig.campaign-config.v4'
+    if semantic and scored - set(expected_review_sha256):
+        issues.append('review_anchor_unavailable')
     checked_cases = 0
     if case_root is None or case_inputs is None:
         issues.append('case_inputs_unavailable')
@@ -154,10 +162,22 @@ def inspect_campaign_receipts(campaign: EvaluationCampaign, journal: Journal, ar
             with RunArchive(con) as archive:
                 if frozen is not None:
                     check_archive_config(frozen, archive.context(), assignment)
-                score = score_reserved_assignment(campaign._goal, archive, journal, reference,
-                    partition=assignment['work'][0]['partition'], expected_plan_sha256=campaign._digest,
+                options=dict(partition=assignment['work'][0]['partition'], expected_plan_sha256=campaign._digest,
                     expected_run_sha256=receipt['run_sha256'], expected_reference_sha256=receipt['reference_sha256'],
                     expected_journal_sha256=receipt['journal_sha256'])
+                if semantic:
+                    from .evaluation_scoring import score_reviewed_reserved_assignment
+                    review_path=directory/'semantic-review'; review_db=review_path/'run.sqlite'
+                    if (review_path.is_symlink() or review_db.is_symlink() or not review_path.is_dir() or not review_db.is_file()):
+                        raise ContractError('semantic review archive unavailable')
+                    if request_id in expected_review_sha256 and expected_review_sha256[request_id] != receipt['semantic_review_sha256']:
+                        raise ContractError('external review anchor differs')
+                    review_con=sqlite3.connect(review_db.resolve().as_uri()+'?mode=ro',uri=True,isolation_level=None)
+                    with RunArchive(review_con) as review_archive:
+                        score=score_reviewed_reserved_assignment(campaign._goal,archive,journal,reference,review_archive,
+                            expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=frozen['stages']['semantic_reviewer'],**options)
+                else:
+                    score=score_reserved_assignment(campaign._goal,archive,journal,reference,**options)
             encoded = json.dumps(score, sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf-8')
             if hashlib.sha256(encoded).hexdigest() != receipt['score_sha256']:
                 raise ContractError('score digest differs')

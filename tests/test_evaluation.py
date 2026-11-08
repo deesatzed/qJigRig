@@ -1870,7 +1870,7 @@ def test_factorial_allocation_executes_all_arms_with_reserved_review(tmp_path,dr
             reopened._con.execute("UPDATE evaluation_campaign_events SET payload='{}' WHERE kind='started'")
 
 
-@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown'])
+@pytest.mark.parametrize('mismatch',['scope','date','entity','unknown','semantic'])
 def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_path,mismatch):
     import copy,json
     from qjig.applicability import ApplicabilityInputs,Collection,Interval,MemberMetadata,OPEN,UNKNOWN_BOUND
@@ -1917,7 +1917,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
            'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     cap={'prompt':2,'completion':3};spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':cap}
-    config={k:dict(spec) for k in ('direct','planner','judge','reviewer')}
+    config={k:dict(spec) for k in (('direct','planner','judge','reviewer','semantic_reviewer') if mismatch=='semantic' else ('direct','planner','judge','reviewer'))}
     plan=build_factorial_allocation(design,hashes,config,expected_design_sha256=digest,assignment_secret=b'private-synthetic-batch-secret-32-bytes')
     total=Budget(800,200000,10);per=Budget(30,6000,1)
     allocations={'development':Budget(200,50000,2),'pilot':Budget(200,50000,2),'holdout':Budget(400,100000,6)}
@@ -1931,6 +1931,7 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                        raw({'supported':True,'quote':text,'reason':'synthetic'}),
                        raw({'supported':False,'quote':'','reason':'synthetic'}),raw({'assessment':'uncertain','reason':'synthetic'})]
         else:responses=[raw({'action':'answer','query':None,'answer':'unknown','citations':[]})]
+        if mismatch=='semantic':responses.append(raw({'assessment':'uncertain','reason':'synthetic review'}))
         return StandInTransport(responses)
     with GoalBudget.open(tmp_path/'goal.sqlite',total=total,per_request=per,allocations=allocations) as goal,Journal.open(tmp_path/'journal.sqlite') as journal:
         reserve_evaluation_plan(goal,'batch',plan,expected_plan_sha256=plan['sha256'])
@@ -1949,6 +1950,29 @@ def test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts(tmp_p
                                   expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=2)
         assert second['executed']==2 and second['scored']==4 and second['remaining']==56 and len(set(calls))==4
         assert all(next(a for a in plan['manifest']['assignments'] if a['request_id']==rid)['case_id'].startswith('dev') for rid in calls)
+        if mismatch=='semantic':
+            from qjig.live_receipts import inspect_campaign_receipts
+            refs={k:v['reference'] for k,v in cases.items()}
+            reviews={rid:json.loads(payload)['semantic_review_sha256'] for rid,payload in goal._con.execute(
+                "SELECT request_id,payload FROM evaluation_campaign_events WHERE plan_id=? AND kind='scored'",('batch',))}
+            unanchored=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs)
+            assert unanchored['checked']==4 and 'review_anchor_unavailable' in unanchored['issues']
+            anchored=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews)
+            assert anchored['checked']==4 and 'review_anchor_unavailable' not in anchored['issues']
+            wrong={**reviews,calls[0]:'0'*64}
+            assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=wrong)['status']=='invalid'
+            review_db=tmp_path/'runs'/calls[0]/'semantic-review'/'run.sqlite'
+            assert review_db.is_file()
+            import sqlite3
+            with sqlite3.connect(review_db) as con:
+                con.execute('DROP TRIGGER event_no_update')
+                con.execute("UPDATE events SET data='{}' WHERE kind='review_record'")
+            assert inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references=refs,expected_review_sha256=reviews)['status']=='invalid'
+            with pytest.raises(ContractError):
+                run_campaign_batch(campaign,tmp_path,design,cases,journal=journal,archive_root=tmp_path/'runs',config=config,
+                    want=1,max_bytes=5000,expected_config_sha256=config_hash,transport_factory=transport_for,max_assignments=1)
+            assert len(calls)==4 and campaign.status()['scored']==4
+            return
         from qjig.live_receipts import inspect_campaign_receipts
         report=inspect_campaign_receipts(campaign,journal,tmp_path/'runs',references={k:v['reference'] for k,v in cases.items()})
         assert report['status']=='incomplete' and report['checked']==4 and report['scored']==4

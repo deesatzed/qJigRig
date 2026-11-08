@@ -500,8 +500,7 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
             or not callable(transport_factory) or type(max_assignments) is not int or not 1 <= max_assignments <= 100):
         raise ContractError('invalid campaign batch inputs')
     frozen=campaign.require_config(config,want=want,max_bytes=max_bytes,expected_config_sha256=expected_config_sha256)
-    if frozen['schema']=='qjig.campaign-config.v4':
-        raise ContractError('semantic review campaign execution is not implemented')
+    semantic = frozen['schema']=='qjig.campaign-config.v4'
     manifest,assignments,started,scored=campaign._snapshot()
     if design != manifest['design'] or set(cases) != {case['id'] for case in design['cases']}:
         raise ContractError('campaign batch case set differs')
@@ -542,9 +541,21 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
         if reference_digest(data['reference']) != receipt['reference_sha256']:
             raise ContractError('campaign reference differs from receipt')
         with RunArchive.open(path) as archive:
-            score=score_reserved_assignment(campaign._goal,archive,journal,data['reference'],partition=assignment['work'][0]['partition'],
-                expected_plan_sha256=campaign._digest,expected_run_sha256=receipt['run_sha256'],
-                expected_reference_sha256=receipt['reference_sha256'],expected_journal_sha256=receipt['journal_sha256'])
+            check_archive_config(frozen,archive.context(),assignment)
+            options=dict(partition=assignment['work'][0]['partition'],expected_plan_sha256=campaign._digest,
+                         expected_run_sha256=receipt['run_sha256'],expected_reference_sha256=receipt['reference_sha256'],
+                         expected_journal_sha256=receipt['journal_sha256'])
+            if semantic:
+                from .evaluation_scoring import score_reviewed_reserved_assignment
+                review_path=path/'semantic-review'
+                if (review_path.is_symlink() or not review_path.is_dir() or (review_path/'run.sqlite').is_symlink()
+                        or not (review_path/'run.sqlite').is_file()):
+                    raise ContractError('scored semantic review archive unavailable')
+                with RunArchive.open(review_path) as review_archive:
+                    score=score_reviewed_reserved_assignment(campaign._goal,archive,journal,data['reference'],review_archive,
+                        expected_review_sha256=receipt['semantic_review_sha256'],reviewer_spec=frozen['stages']['semantic_reviewer'],**options)
+            else:
+                score=score_reserved_assignment(campaign._goal,archive,journal,data['reference'],**options)
         encoded=json.dumps(score,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode('utf-8')
         if hashlib.sha256(encoded).hexdigest()!=receipt['score_sha256']:
             raise ContractError('campaign scored receipt differs')
@@ -562,11 +573,22 @@ def run_campaign_batch(campaign: EvaluationCampaign, root, design: dict, cases: 
     executed=0
     for assignment in pending[:max_assignments]:
         rid=assignment['request_id'];data=prepared_by_case[assignment['case_id']]
-        with RunArchive.open(archive_base/rid) as archive:
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            path=archive_base/rid
+            if path.is_symlink() or (path/'run.sqlite').is_symlink():
+                raise ContractError('campaign archive path must not be a symlink')
+            archive=stack.enter_context(RunArchive.open(path))
+            review_archive=None
+            if semantic:
+                review_path=path/'semantic-review'
+                if review_path.is_symlink() or (review_path/'run.sqlite').is_symlink():
+                    raise ContractError('semantic review path must not be a symlink')
+                review_archive=stack.enter_context(RunArchive.open(review_path))
             run_campaign_assignment(campaign,rid,root,design,data['lock'],data['reference'],data['protected'],
                 applicability_inputs=data['applicability_inputs'],transport=transport_factory(dict(assignment)),
                 archive=archive,journal=journal,config=config,want=want,max_bytes=max_bytes,
-                expected_config_sha256=expected_config_sha256)
+                expected_config_sha256=expected_config_sha256,semantic_review_archive=review_archive)
         executed+=1
     status=campaign.status()
     return {'executed':executed,'assigned':status['assigned'],'scored':status['scored'],
