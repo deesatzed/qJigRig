@@ -641,6 +641,53 @@ def score_reserved_assignment(goal, archive, journal, reference: dict, *, partit
     return {'arm':assignment['arm'], 'repeat':assignment['repeat'], 'score':score}
 
 
+
+def score_reviewed_reserved_assignment(goal, archive, journal, reference: dict, review_archive, *,
+                                       partition: str, expected_plan_sha256: str, expected_run_sha256: str,
+                                       expected_reference_sha256: str, expected_review_sha256: str,
+                                       reviewer_spec: dict, expected_journal_sha256: str | None = None) -> dict:
+    """Bind an unvalidated review to a reserved assignment and its independently pinned digest."""
+    from .evaluation_semantic_review import verify_direct_semantic_review, verify_fresh_semantic_review
+    from .semantic_preflight import semantic_review_allocation
+    from .run_archive import RunArchive
+    if not isinstance(review_archive, RunArchive):
+        raise ContractError('semantic review archive required')
+    if not isinstance(expected_review_sha256, str) or not _SHA.fullmatch(expected_review_sha256):
+        raise ContractError('semantic review anchor required')
+    context = archive.context()
+    request_id = context.get('request', {}).get('request_id')
+    slot = semantic_review_allocation(request_id=request_id, partition=partition, spec=reviewer_spec)
+    saved = review_archive.context()
+    if (not isinstance(saved, dict) or saved.get('provider') != reviewer_spec['provider']
+            or saved.get('model') != reviewer_spec['model']['id']
+            or saved.get('max_tokens') != reviewer_spec['output_tokens']
+            or saved.get('max_price') != reviewer_spec['max_price']):
+        raise ContractError('semantic reviewer configuration differs')
+    assignment = context.get('evaluation_assignment', {})
+    row = goal._con.execute("SELECT w.attempt_id FROM run_set_work s JOIN required_work w ON s.work_id=w.work_id "
+                            "WHERE s.set_id=? AND w.work_id=? AND w.request_id=?",
+                            ('evaluation:'+assignment.get('plan_id',''),slot['work_id'],request_id)).fetchone()
+    intents = [e for e in journal.events(request_id) if e.kind == 'intent' and e.stage == 'semantic_review']
+    if (row is None or row[0] is None or len(intents) != 1 or intents[0].payload.get('goal_attempt_id') != row[0]
+            or intents[0].payload.get('required_id') != slot['work_id']
+            or intents[0].payload.get('work_binding_sha256') != slot['work_binding_sha256']):
+        raise ContractError('semantic review reserved work differs')
+    if context.get('schema') == 'qjig.fresh-context.v1':
+        review = verify_fresh_semantic_review(archive,journal,review_archive,reference=reference,
+            expected_reference_sha256=expected_reference_sha256,expected_run_sha256=expected_run_sha256,
+            expected_journal_sha256=expected_journal_sha256,expected_review_sha256=expected_review_sha256)
+    else:
+        review = verify_direct_semantic_review(archive,journal,review_archive,expected_run_sha256=expected_run_sha256,
+                                               expected_review_sha256=expected_review_sha256)
+    if review.get('status') != 'structurally_verified':
+        raise ContractError('semantic review is not structurally verified')
+    score = score_reserved_assignment(goal,archive,journal,reference,partition=partition,
+        expected_plan_sha256=expected_plan_sha256,expected_run_sha256=expected_run_sha256,
+        expected_reference_sha256=expected_reference_sha256,expected_journal_sha256=expected_journal_sha256,
+        original_run_only=True)
+    return {**score,'review':review}
+
+
 def summarize_holdout_comparison(design: dict, records: list[dict], *, expected_design_sha256: str,
                                  baseline_arm: str, candidate_arm: str) -> dict:
     """Pair request-level mechanical scores; records and arm mappings are caller assertions.
