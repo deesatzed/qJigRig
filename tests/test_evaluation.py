@@ -2786,3 +2786,28 @@ def test_campaign_freezes_distinct_outcome_review_work_before_execution(tmp_path
         rid=plan['manifest']['assignments'][0]['request_id']
         campaign.claim(rid)
         assert campaign.status()['in_progress']==[rid]
+
+
+def test_two_baseline_provisional_decision_policy():
+    from qjig.evaluation import validate_evaluation_design
+    from qjig.evaluation_recommendation import provisional_pair_decision
+    design = _sample_design()
+    design['criteria'] = {
+        'remove': {'metric':'outcome_support','operator':'<','threshold':0.4},
+        'revise': {'metric':'outcome_support','operator':'range','threshold':[0.4,0.6]},
+        'retain': {'metric':'outcome_support','operator':'>=','threshold':0.6}}
+    digest = validate_evaluation_design(design)
+    for full, retrieval, expected in [(0.6, 0.6, 'retain'), (0.39, 0.39, 'remove'),
+                                      (0.6, 0.39, 'revise'), (0.4, 0.6, 'revise'),
+                                      (None, 0.9, None)]:
+        result = provisional_pair_decision(design, {'direct_full_evidence':full, 'direct_retrieval':retrieval},
+                                           expected_design_sha256=digest)
+        assert result['decision'] == expected
+        assert result['assurance'] == 'asserted_metrics_not_campaign_evidence'
+    with pytest.raises(ContractError):
+        provisional_pair_decision(design, {'direct_full_evidence':0.8}, expected_design_sha256=digest)
+    changed = dict(design); changed['criteria'] = dict(design['criteria'])
+    changed['criteria']['retain'] = {'metric':'outcome_support','operator':'>=','threshold':0.7}
+    with pytest.raises(ContractError):
+        provisional_pair_decision(changed, {'direct_full_evidence':0.8,'direct_retrieval':0.8},
+                                  expected_design_sha256=validate_evaluation_design(changed))

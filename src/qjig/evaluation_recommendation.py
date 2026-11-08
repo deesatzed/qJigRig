@@ -5,11 +5,30 @@ import json
 from pathlib import Path
 
 from .contracts import ContractError
-from .evaluation import validate_decision_criteria
+from .evaluation import decide_from_criteria, validate_decision_criteria
 from .evaluation_campaign import EvaluationCampaign
 from .journal import Journal
 from .live_receipts import inspect_campaign_receipts
 
+
+
+def provisional_pair_decision(design: dict, metrics: dict, *, expected_design_sha256: str) -> dict:
+    """Apply the published provisional policy to asserted, not verified, metrics."""
+    criteria = {
+        'remove': {'metric':'outcome_support','operator':'<','threshold':0.4},
+        'revise': {'metric':'outcome_support','operator':'range','threshold':[0.4,0.6]},
+        'retain': {'metric':'outcome_support','operator':'>=','threshold':0.6}}
+    if not isinstance(design,dict) or design.get('criteria') != criteria:
+        raise ContractError('provisional decision criteria differ')
+    if not isinstance(metrics,dict) or set(metrics) != {'direct_full_evidence','direct_retrieval'}:
+        raise ContractError('both baseline metrics required')
+    decisions = {key: decide_from_criteria(design,value,expected_design_sha256=expected_design_sha256,
+                                           assignments_complete=True,resources_complete=True)
+                 for key,value in metrics.items()}
+    values = set(decisions.values())
+    decision = None if 'inconclusive' in values else 'retain' if values == {'retain'} else 'remove' if values == {'remove'} else 'revise'
+    return {'policy':'qjig.provisional-pair-decision.v1','baseline_decisions':decisions,
+            'decision':decision,'assurance':'asserted_metrics_not_campaign_evidence'}
 
 def build_verified_recommendation(campaign: EvaluationCampaign, journal: Journal, archive_root: Path, *,
                                   design: dict, references: dict, expected_design_sha256: str,

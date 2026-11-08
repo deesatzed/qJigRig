@@ -4564,7 +4564,8 @@
       "phase": "evaluation",
       "depends_on": [
         "T069K",
-        "T072A"
+        "T072A",
+        "T072C"
       ],
       "status": "pending",
       "files": [
@@ -4576,6 +4577,23 @@
       "acceptance": "Reconstruct both baseline comparisons from a versioned rubric-bound campaign; require full anchored inspection and predeclared combination criteria before a result; missing or unknown outcomes do not yield a recommendation.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "In progress: read-only v7 inspection rejects invalid anchors and refuses recommendations because v7 does not freeze the rubric. A versioned verified rubric binding, predeclared two-baseline rule and complete decision path remain open."
+    },
+    {
+      "id": "T072C",
+      "phase": "evaluation",
+      "depends_on": [
+        "T072A"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/evaluation_recommendation.py"
+      ],
+      "test_file": "tests/test_evaluation.py",
+      "test_name": "test_two_baseline_provisional_decision_policy",
+      "action": "Implement the provisional two-baseline combination policy as an explicit versioned contract",
+      "acceptance": "Both baseline metrics and exact predeclared nonoverlapping criteria are required; null metrics remain inconclusive and otherwise the provisional two-baseline rules are applied without issuing a verified campaign recommendation.",
+      "command": "python -m pytest tests/test_evaluation.py::test_two_baseline_provisional_decision_policy -q",
+      "evidence": "Red: provisional pair decision entrypoint absent. Green: exact published thresholds, both baselines, mixed decisions, unknown metric and changed criteria tested; evaluation, outcome-review, semantic-review and gate regressions passed 126. This policy accepts asserted metrics only and is not a verified campaign recommendation or frozen rubric."
     }
   ]
 }
