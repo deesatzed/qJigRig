@@ -78,5 +78,17 @@ def test_direct_semantic_review_excludes_private_reference_and_replays_original(
         assert private.decode() not in prompt and request.request_id not in prompt
         assert 'Tests must pass.' in prompt and 'Do tests pass?' in prompt
         assert any(e['kind']=='review_record' for e in review_archive.events())
+        from qjig.evaluation_semantic_review import verify_direct_semantic_review
+        checked=verify_direct_semantic_review(archive,journal,review_archive,expected_run_sha256=digest)
+        assert checked['status']=='unanchored' and checked['assessment']==outcome['assessment']
+        assert verify_direct_semantic_review(archive,journal,review_archive,expected_run_sha256=digest,
+                                             expected_review_sha256=checked['sha256'])['status']=='structurally_verified'
+        assert verify_direct_semantic_review(archive,journal,review_archive,expected_run_sha256=digest,
+                                             expected_review_sha256='0'*64)['status']=='invalid'
         assert verify_direct_archive(archive,journal,expected_digest=digest,original_run_only=True)['status']=='structurally_verified'
         assert ledger.used_calls()==2
+        review_archive._con.execute('DROP TRIGGER event_no_update')
+        seq,encoded=review_archive._con.execute("SELECT seq,data FROM events WHERE kind='review_record'").fetchone()
+        changed=json.loads(encoded); changed['assessment']='unsupported'
+        review_archive._con.execute('UPDATE events SET data=? WHERE seq=?',(json.dumps(changed),seq))
+        assert verify_direct_semantic_review(archive,journal,review_archive,expected_run_sha256=digest)['status']=='invalid'
