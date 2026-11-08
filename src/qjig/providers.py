@@ -195,20 +195,23 @@ def check_current_endpoint_cost(request: ProviderRequest, reservation: CallReser
     Catalog completeness, future rates and routing enforcement remain provider
     assertions. The caller must acquire and verify account state separately.
     """
-    from .pricing import model_from_endpoint_snapshot
+    from .pricing import candidate_provider_pricing, model_from_endpoint_snapshot
     if (not isinstance(request, ProviderRequest) or request.provider != 'openrouter'
             or request.max_price is None or not isinstance(reservation, CallReservation)
             or reservation.request_sha256 != request.input_sha256()
             or reservation.input_tokens < estimate_hosted_input_tokens(request.prompt)
             or not _valid_cost(reservation.cost_usd)):
         raise ContractError('invalid hosted reservation')
-    model = model_from_endpoint_snapshot(snapshot, now=now, max_age_seconds=max_age_seconds)
+    candidate = (candidate_provider_pricing(snapshot,provider_slug=request.route,now=now,max_age_seconds=max_age_seconds)
+                 if request.route is not None else None)
+    model = candidate['model'] if candidate is not None else model_from_endpoint_snapshot(snapshot, now=now, max_age_seconds=max_age_seconds)
     current = make_call_reservation(request, model, input_tokens=reservation.input_tokens,
                                     input_bound_provenance='approved estimated input')
     if Decimal(str(current.cost_usd)) > Decimal(str(reservation.cost_usd)):
         raise ContractError('current endpoint prices exceed reservation')
     return {'current_cost_usd': current.cost_usd, 'pricing_sha256': current.pricing_sha256,
-            'observed_at': snapshot['observed_at'], 'assurance': 'provider_catalog_assertion'}
+            'observed_at': snapshot['observed_at'], 'assurance': 'provider_catalog_assertion',
+            **({'route':request.route,'route_count':candidate['route_count']} if candidate is not None else {})}
 
 
 ReservationFactory = Callable[[ProviderRequest], CallReservation]

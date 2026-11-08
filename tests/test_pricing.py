@@ -187,3 +187,28 @@ def test_candidate_price_bound_does_not_duplicate_prompt_rates_and_retains_cache
     with pytest.raises(ContractError):
         candidate_token_price_bound({**model,'pricing':{**model['pricing'],'web_search':'0.1'}},
                                     input_tokens=100,output_tokens=50,max_price={'prompt':5,'completion':2})
+
+
+def test_current_route_price_check_covers_all_matching_variants_and_rejects_changes():
+    from datetime import datetime,timezone,timedelta
+    from qjig.pricing import candidate_provider_pricing
+    from qjig.providers import ProviderRequest,make_call_reservation,check_current_endpoint_cost
+    now=datetime(2026,11,7,tzinfo=timezone.utc)
+    def endpoint(tag,rate):
+        return {'model_id':'tencent/hy4','provider_name':'Synthetic','tag':tag,'context_length':100000,
+                'max_completion_tokens':1000,'pricing':{'prompt':rate,'completion':'0.000002','discount':0}}
+    snapshot={'model':'tencent/hy4','source':'openrouter_public_endpoint_catalog','observed_at':now.isoformat(),
+              'endpoints':[endpoint('alpha/fp8','0.000001'),endpoint('alpha/us','0.0000015'),endpoint('other/fp8','0.1')]}
+    request=ProviderRequest('judge','openrouter','tencent/hy4','question',100,max_price={'prompt':2,'completion':4},route='alpha')
+    candidate=candidate_provider_pricing(snapshot,provider_slug='alpha',now=now,max_age_seconds=30)
+    bound=make_call_reservation(request,candidate['model'],input_tokens=5000,input_bound_provenance='fixture')
+    result=check_current_endpoint_cost(request,bound,snapshot=snapshot,now=now,max_age_seconds=30)
+    assert result['current_cost_usd']<=bound.cost_usd and result['route']=='alpha' and result['route_count']==2
+    increased={**snapshot,'endpoints':snapshot['endpoints']+[endpoint('alpha/new','0.01')]}
+    with pytest.raises(ContractError,match='reservation'):
+        check_current_endpoint_cost(request,bound,snapshot=increased,now=now,max_age_seconds=30)
+    changed=ProviderRequest('judge','openrouter','tencent/hy4','question',100,max_price={'prompt':2,'completion':4},route='other')
+    with pytest.raises(ContractError):check_current_endpoint_cost(changed,bound,snapshot=snapshot,now=now,max_age_seconds=30)
+    with pytest.raises(ContractError):check_current_endpoint_cost(request,bound,snapshot=snapshot,now=now+timedelta(seconds=31),max_age_seconds=30)
+    no_tags={**snapshot,'endpoints':[{**endpoint('alpha/fp8','0.000001'),'tag':None}]}
+    with pytest.raises(ContractError):check_current_endpoint_cost(request,bound,snapshot=no_tags,now=now,max_age_seconds=30)
