@@ -1370,7 +1370,8 @@
         "G03",
         "G04",
         "G05",
-        "G06"
+        "G06",
+        "T074A"
       ],
       "status": "pending",
       "files": [
@@ -4954,6 +4955,23 @@
       "acceptance": "A missing, malformed or mismatched design digest refuses before grouped or partitioned results are produced.",
       "command": "python -m pytest tests/test_evaluation_companion.py::test_campaign_companion_preserves_partitions_and_pilot_interventions -q",
       "evidence": "Red: campaign and intervention summaries accepted a missing design digest. Green: missing, malformed and mismatched anchors refuse; focused companion tests passed 4 and evaluation/review/replay/gate regressions passed 157. This does not authenticate caller-provided anchors or validate semantic judgments."
+    },
+    {
+      "id": "T074A",
+      "phase": "verification",
+      "depends_on": [
+        "G06"
+      ],
+      "status": "complete",
+      "files": [
+        "docs/COMPLETION_REPORT.md"
+      ],
+      "test_file": "tests/test_gates.py",
+      "test_name": "test_inventory_covers_goal_findings_repairs_and_original_tasks_without_claiming_proof",
+      "action": "Prepare an explicitly incomplete completion evidence map",
+      "acceptance": "A draft report maps findings, repair tasks, original milestones and known verification limits without claiming completion or treating queue status as proof.",
+      "command": "python -m pytest tests/test_gates.py::test_inventory_covers_goal_findings_repairs_and_original_tasks_without_claiming_proof -q",
+      "evidence": "Prepared an explicitly incomplete evidence map from the current queue, gate inventory, control-file hashes and documented verification checkpoints. Inventory focused test passed. This is a draft, not final acceptance or authentication of queue statements; T074 remains pending."
     }
   ]
 }

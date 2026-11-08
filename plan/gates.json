@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "babffccd5e66b62f0101eb96968d91fc73dfe968c841d29b367ca72c8004a8cf",
-  "queue_sha256": "d6b6e65c24e085ac46921e2e0bf81c502bc1b22903c15ce76b0317328e844452",
+  "queue_sha256": "68cd241176a4b2d4d31cc5b7c891b039e8102c05e96ebe7062de1b8e4dcfe658",
   "gates": [
     {
       "id": "F01",
