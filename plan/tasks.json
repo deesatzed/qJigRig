@@ -1456,7 +1456,8 @@
         "R08M",
         "R08N",
         "R08O",
-        "R08P"
+        "R08P",
+        "R08R"
       ],
       "status": "pending",
       "files": [],
@@ -4690,6 +4691,23 @@
       "acceptance": "A no-call direct refusal with no consumed or pending work yields attributed non-review and unknown outcome, never a failed classification; uncertain calls still refuse scoring.",
       "command": "python -m pytest tests/test_evaluation.py::test_campaign_batch_preflights_all_cases_and_resumes_verified_receipts -q",
       "evidence": "Red: no-call direct refusal was rejected by non-review; then receipt inspection did not expose the refusal. Green: reserved direct refusal records an unverified reason and unknown outcome, makes zero calls, consumes no slots, and forces receipt inspection incomplete. Uncertain timeouts still refuse scoring; evaluation/review/replay/goal regressions passed 191. The refusal cause is not independently proved and verified budget-exhaustion policy remains open."
+    },
+    {
+      "id": "R08R",
+      "phase": "repair",
+      "depends_on": [
+        "R08P"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_hosted_preflight.py",
+      "test_name": "test_preflight_requires_account_and_current_prices_for_reserved_work",
+      "action": "Route configured hosted calls through nonauthorizing account and price preflight before the dispatch refusal",
+      "acceptance": "Exact reserved calls traverse bound ledger, account and endpoint checks from call_typed; preflight failures refuse before transport and unknown billing still prevents dispatch.",
+      "command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
+      "evidence": "Red: an account-bound reserved typed call refused without running preflight. Green: typed-call path refreshes account and checks exact endpoint pricing, rejects increased prices, and refuses before HTTP or journal intent for both routed and unrouted synthetic cases. Hosted-preflight/provider/goal/config/service regressions passed 111 with one optional skip. This is a nonauthorizing partial path; FreshWorkbench and transport still refuse, and full billing and prior-spend assurance remain open."
     }
   ]
 }

@@ -440,7 +440,13 @@ def call_typed(ledger: BudgetLedger, transport: Transport, request: ProviderRequ
     if isinstance(transport, OpenRouterTransport):
         if reservation is None or reservation.input_tokens < estimate_hosted_input_tokens(request.prompt):
             raise BudgetExceeded("preflight_unavailable", "hosted input reservation does not cover the approved estimate")
-        raise BudgetExceeded("preflight_unavailable", "hosted calls require cost and goal-wide preflight")
+        if (ledger._goal_budget is not None and ledger._goal_budget._account_bound
+                and reservation.required_id is not None and reservation.work_binding_sha256 is not None):
+            from .hosted_preflight import prepare_hosted_attempt
+            prepare_hosted_attempt(ledger,request,reservation,env_path=transport._env_path,max_age_seconds=60)
+        # Account and catalog checks do not resolve BYOK, plugin or prior-spend
+        # uncertainty and do not authorize transport.
+        raise BudgetExceeded("preflight_unavailable", "hosted calls require complete billing and dispatch safeguards")
 
     def attempt():
         call_id = ledger.last_call_id()

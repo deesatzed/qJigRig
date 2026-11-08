@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "babffccd5e66b62f0101eb96968d91fc73dfe968c841d29b367ca72c8004a8cf",
-  "queue_sha256": "c827abba2cd426e22474255b702a648c20b0f93fc0d1d6f868c15b1d13774ff1",
+  "queue_sha256": "17f8ba1921e7cf706446947318ea96aba580d984e615fa84cf610c069eb8d86a",
   "gates": [
     {
       "id": "F01",
@@ -105,7 +105,8 @@
         "R08N",
         "R08O",
         "R08P",
-        "R08Q"
+        "R08Q",
+        "R08R"
       ],
       "evidence": []
     },
@@ -666,6 +667,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_fresh_process_crash.py::test_process_exit_leaves_incomplete_fresh_run_without_retry -q",
       "queue_evidence_assertion": "Red: a new request after a synthetic process crash was labeled budget_exceeded. It now returns reconciliation_required and makes no provider call; existing accounting/budget, fresh pipeline and evaluation regressions passed. This does not reconcile the attempt, establish hosted cost bounds or open R08."
+    },
+    {
+      "id": "R08R",
+      "status": "unverified",
+      "task_ids": [
+        "R08R"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
+      "queue_evidence_assertion": "Red: an account-bound reserved typed call refused without running preflight. Green: typed-call path refreshes account and checks exact endpoint pricing, rejects increased prices, and refuses before HTTP or journal intent for both routed and unrouted synthetic cases. Hosted-preflight/provider/goal/config/service regressions passed 111 with one optional skip. This is a nonauthorizing partial path; FreshWorkbench and transport still refuse, and full billing and prior-spend assurance remain open."
     },
     {
       "id": "R09",

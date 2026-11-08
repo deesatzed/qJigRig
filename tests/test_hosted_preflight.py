@@ -16,7 +16,7 @@ from qjig.providers import ProviderRequest, fresh_work_binding, make_call_reserv
 @pytest.mark.parametrize('route',[None,'tencent'])
 def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_path, monkeypatch, route):
     from qjig.hosted_preflight import prepare_hosted_attempt
-    now = datetime(2026, 11, 7, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
     account = ({'data': {'limit_remaining': 1, 'include_byok_in_limit': False, 'is_free_tier': False}},
                {'data': {'total_credits': 1, 'total_usage': 0}})
     snapshot = {'model':'tencent/hy4','source':'openrouter_public_endpoint_catalog','observed_at':now.isoformat(),
@@ -90,6 +90,21 @@ def test_preflight_requires_account_and_current_prices_for_reserved_work(tmp_pat
         with pytest.raises(ContractError, match='reservation'):
             prepare_hosted_attempt(ledger,request,bound,env_path=tmp_path/'env',max_age_seconds=30,clock=lambda:now)
         assert journal.events('r') == []
+        # The actual typed-call entrypoint must run the same checks, while billing
+        # uncertainty still stops it before the HTTP adapter or journal intent.
+        from qjig.providers import OpenRouterTransport, call_typed
+        monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot', lambda model: snapshot)
+        sent=[]
+        transport=OpenRouterTransport(tmp_path/'env',post=lambda *args: sent.append(args))
+        restrictions_before=goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0]
+        with pytest.raises(BudgetExceeded,match='preflight_unavailable'):
+            call_typed(ledger,transport,request,{},reservation=bound)
+        assert goal._con.execute('SELECT count(*) FROM account_restrictions').fetchone()[0]==restrictions_before+1
+        assert sent==[] and journal.events('r')==[]
+        monkeypatch.setattr('qjig.pricing.fetch_endpoint_snapshot', lambda model: raised)
+        with pytest.raises(ContractError,match='reservation'):
+            call_typed(ledger,transport,request,{},reservation=bound)
+        assert sent==[] and journal.events('r')==[]
 
 
 def test_hosted_journal_binding_survives_restart_and_rejects_memory(tmp_path):
