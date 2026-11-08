@@ -31,8 +31,12 @@ from qjig.sources import SourceRevision, decode_source
 DRAFT = Path('.local/evaluation-draft-20261107')
 
 
-def stage_configuration(spec, *, semantic):
+def stage_configuration(spec, *, semantic, outcome=False):
+    if outcome and not semantic:
+        raise ValueError('outcome review requires semantic review')
     names=('direct','planner','judge','reviewer','semantic_reviewer') if semantic else ('direct','planner','judge','reviewer')
+    if outcome:
+        names=(*names,'outcome_reviewer')
     return {name:dict(spec) for name in names}
 
 
@@ -40,8 +44,11 @@ def main():
     parser=argparse.ArgumentParser(description='Run only synthetic draft responses; no provider calls.')
     parser.add_argument('--resume',type=Path,help='Existing synthetic verification directory to resume')
     parser.add_argument('--semantic',action='store_true',help='Reserve and execute semantic-review slots')
+    parser.add_argument('--outcome',action='store_true',help='Reserve and execute separate outcome-review slots')
     parser.add_argument('--judge-pairs',type=int,help='Explicit bounded judge pairs per fresh assignment')
     args=parser.parse_args()
+    if args.outcome and (not args.semantic or args.judge_pairs is None):
+        parser.error('--outcome requires --semantic and --judge-pairs')
     if args.judge_pairs is not None and (not args.semantic or not 1 <= args.judge_pairs <= 12):
         parser.error('--judge-pairs requires --semantic and a value from 1 to 12')
     design=json.loads((DRAFT/'design.json').read_text())
@@ -67,7 +74,7 @@ def main():
     model={'id':'synthetic/model','context_length':10000,'top_provider':{'max_completion_tokens':1000},
            'pricing':{'prompt':'0.000001','completion':'0.000002'}}
     spec={'provider':'stand-in','model':model,'input_tokens':100,'output_tokens':100,'max_price':{'prompt':2,'completion':3}}
-    config=stage_configuration(spec,semantic=args.semantic)
+    config=stage_configuration(spec,semantic=args.semantic,outcome=args.outcome)
     plan=build_factorial_allocation(design,case_hashes,config,expected_design_sha256=design_hash,
                                     assignment_secret=b'synthetic-campaign-fixture-secret-only',max_judge_pairs=args.judge_pairs)
     parent=Path('.local/verification');parent.mkdir(parents=True,exist_ok=True)
@@ -94,6 +101,8 @@ def main():
                         'expression':{'ref':'p'}}
             elif request.stage in ('judge_positive','judge_negative'):
                 result={'supported':False,'quote':'','reason':'synthetic fixture'}
+            elif request.stage=='outcome_review':
+                result={'assessment':'uncertain','reason':'synthetic fixture','citations':[]}
             elif request.stage in ('plan_review','semantic_review'):
                 result={'assessment':'uncertain','reason':'synthetic fixture'}
             else:
@@ -129,9 +138,25 @@ def main():
                             partition=assignment['work'][0]['partition'],expected_plan_sha256=plan['sha256'],
                             expected_run_sha256=run_hash,expected_reference_sha256=reference_digest(ref),
                             expected_journal_sha256=journal_hash,reviewer_spec=config['semantic_reviewer'],record=True)['review']
-                        campaign.finish(rid,archive,journal,ref,expected_run_sha256=run_hash,
-                            expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash,
-                            semantic_review_archive=review_archive,expected_review_sha256=review['sha256'])
+                        if args.outcome:
+                            from qjig.evaluation_scoring import unavailable_outcome_review
+                            outcome_path=archive_path/'outcome-review'
+                            if outcome_path.is_symlink() or not (outcome_path/'run.sqlite').is_file():
+                                raise RuntimeError('interrupted outcome review archive unavailable; no retry attempted')
+                            with RunArchive.open(outcome_path) as outcome_archive:
+                                outcome=unavailable_outcome_review(goal,archive,journal,ref,review_archive,outcome_archive,
+                                    partition=assignment['work'][0]['partition'],expected_plan_sha256=plan['sha256'],
+                                    expected_run_sha256=run_hash,expected_reference_sha256=reference_digest(ref),
+                                    expected_journal_sha256=journal_hash,expected_review_sha256=review['sha256'],
+                                    reviewer_spec=config['semantic_reviewer'],outcome_reviewer_spec=config['outcome_reviewer'],record=True)['outcome_review']
+                                campaign.finish(rid,archive,journal,ref,expected_run_sha256=run_hash,
+                                    expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash,
+                                    semantic_review_archive=review_archive,expected_review_sha256=review['sha256'],
+                                    outcome_review_archive=outcome_archive,expected_outcome_review_sha256=outcome['sha256'])
+                        else:
+                            campaign.finish(rid,archive,journal,ref,expected_run_sha256=run_hash,
+                                expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash,
+                                semantic_review_archive=review_archive,expected_review_sha256=review['sha256'])
                 else:
                     campaign.finish(rid,archive,journal,ref,expected_run_sha256=run_hash,
                                     expected_reference_sha256=reference_digest(ref),expected_journal_sha256=journal_hash)
@@ -149,7 +174,7 @@ def main():
             raise RuntimeError('synthetic goal and journal accounting differ')
         print(json.dumps({'status':'synthetic_complete','directory':str(directory),'assignments':reservation['assignments'],
                           'reserved_slots':reservation['work_items'],'judge_pairs_per_fresh_assignment':args.judge_pairs,'synthetic_calls_by_stage':dict(Counter(e.stage for e in journal.all_events() if e.kind=='intent')),
-                          'semantic_assurance':'not_assessed','provider_calls':0}),flush=True)
+                          'semantic_assurance':'not_assessed','outcome_review_enabled':args.outcome,'provider_calls':0}),flush=True)
 
 
 if __name__=='__main__':

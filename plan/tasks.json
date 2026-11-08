@@ -1300,7 +1300,8 @@
         "T071D",
         "T071E",
         "T071F",
-        "T071G"
+        "T071G",
+        "T071H"
       ],
       "status": "pending",
       "files": [
@@ -4538,6 +4539,24 @@
       "acceptance": "V7 runs all five stand-in arms, accounts for both reviews, and requires both receipts on restart; missing, changed or unresolved work remains incomplete.",
       "command": "python -m pytest tests/test_evaluation.py::test_factorial_allocation_executes_all_arms_with_reserved_review -q",
       "evidence": "Red: v7 five-arm outcome campaign refused execution. Green: stand-in and routed five-arm assignments consume distinct reviews, v7 no-call deferrals and settled failures retain anchored non-reviews, timeouts remain pending, and batch resume/readonly receipt inspection rejects altered or missing review evidence. V2 CLI manifest checks separate outcome anchors; incomplete holdout pairs remain unknown. Evaluation/review/replay/fresh/goal/provider regressions passed 281. Synthetic mechanics only; full corpus, design freeze, real providers and billing remain open."
+    },
+    {
+      "id": "T071H",
+      "phase": "evaluation",
+      "depends_on": [
+        "T069K",
+        "T071G"
+      ],
+      "status": "complete",
+      "files": [
+        "scripts/smoke_factorial_synthetic.py"
+      ],
+      "test_file": "tests/test_factorial_synthetic.py",
+      "test_name": "test_synthetic_factorial_configuration_has_opt_in_outcome_review",
+      "action": "Exercise full draft campaign with both separately reserved reviews",
+      "acceptance": "Synthetic full-denominator v7 run and restart verify both review stages without hosted calls; failures remain explicit and incomplete review claims are not fabricated.",
+      "command": "python -m pytest tests/test_factorial_synthetic.py::test_synthetic_factorial_configuration_has_opt_in_outcome_review -q",
+      "evidence": "Red: the synthetic harness could not configure outcome reviews. Green: all 105 draft assignments completed with 567 reserved slots and 432 stand-in calls; reopening rechecked receipts with unchanged cumulative call counts. A locally generated v2 manifest checked 105 receipts and 16 cases, returning incomplete solely for provider_attribution_not_live. Evidence: docs/verification/2026-11-08-synthetic-v7-campaign.md. Harness/evaluation/review/goal tests passed 163. Synthetic mechanics only; model quality, independent provenance, real billing and provider execution remain open."
     }
   ]
 }
