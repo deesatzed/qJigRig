@@ -297,7 +297,7 @@ def test_replay_rejects_response_wire_digest_that_differs_from_request(tmp_path)
     request=ProviderRequest('planner','openrouter','vendor/model','question α',20,
                             max_price={'prompt':0.5,'completion':2.0})
     adapter=OpenRouterTransport(env,post=lambda *args:(200,json.dumps({'choices':[{'message':{'content':'{}'}}]})))
-    response=adapter._send_unchecked(request)
+    response=adapter._send_unchecked(request,expected_credential='dummy')
     with RunArchive.open(directory) as archive:
         archive.record_context({'schema':'qjig.fresh-context.v1','corpus':{}})
         archive.record_request('r#1',request)

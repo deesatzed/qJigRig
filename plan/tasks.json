@@ -1465,7 +1465,8 @@
         "R08O",
         "R08P",
         "R08R",
-        "R08S"
+        "R08S",
+        "R08T"
       ],
       "status": "pending",
       "files": [],
@@ -4992,6 +4993,23 @@
       "acceptance": "A credential changed during account refresh or endpoint pricing causes a sanitized refusal before dispatch; no credential or digest is logged.",
       "command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
       "evidence": "Red: rotating the credential during account refresh did not refuse; malformed UTF-8 also escaped as a decoding error. Green: mismatch before account HTTP, rotation during refresh and price lookup, and malformed files refuse without model transport or credential disclosure. Hosted-preflight/account/goal/provider/config/service regressions passed 121 with 1 optional skip. This is a nonauthorizing check and cannot prevent coordinated rollback or a change after its final check."
+    },
+    {
+      "id": "R08T",
+      "phase": "repair",
+      "depends_on": [
+        "R08S"
+      ],
+      "status": "complete",
+      "files": [
+        "src/qjig/providers.py"
+      ],
+      "test_file": "tests/test_providers.py",
+      "test_name": "test_adapter_requires_same_credential_before_http",
+      "action": "Bind adapter send mechanics to an explicit expected credential",
+      "acceptance": "Missing or changed expected credential refuses before HTTP without logging either value; matching dummy credentials exercise only injected fake transport.",
+      "command": "python -m pytest tests/test_providers.py::test_adapter_requires_same_credential_before_http -q",
+      "evidence": "Red: internal adapter mechanics reached the injected HTTP function without an expected credential. Green: missing or changed expected credential refuses without exposing values, while matching dummy credentials exercise fake HTTP mechanics; provider/replay/preflight/account/goal/config/service regressions passed 143 with 1 optional skip. This matching check is not authorization, is not yet wired to guarded dispatch, and does not prevent other Python code from bypassing private methods."
     }
   ]
 }

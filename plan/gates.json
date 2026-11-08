@@ -1,7 +1,7 @@
 {
   "schema": "qjig.gate-inventory.v1",
   "goal_sha256": "babffccd5e66b62f0101eb96968d91fc73dfe968c841d29b367ca72c8004a8cf",
-  "queue_sha256": "256c279f9a4c60fa3d8ebf7467e8400ee9e3d7072b3b7d68700a4354f1f6ad55",
+  "queue_sha256": "e4b6bca359481051488633c9d138f926c1da010a3d349d256014019c87077e4a",
   "gates": [
     {
       "id": "F01",
@@ -107,7 +107,8 @@
         "R08P",
         "R08Q",
         "R08R",
-        "R08S"
+        "R08S",
+        "R08T"
       ],
       "evidence": []
     },
@@ -690,6 +691,17 @@
       "queue_status": "complete",
       "queue_command": "python -m pytest tests/test_hosted_preflight.py::test_preflight_requires_account_and_current_prices_for_reserved_work -q",
       "queue_evidence_assertion": "Red: rotating the credential during account refresh did not refuse; malformed UTF-8 also escaped as a decoding error. Green: mismatch before account HTTP, rotation during refresh and price lookup, and malformed files refuse without model transport or credential disclosure. Hosted-preflight/account/goal/provider/config/service regressions passed 121 with 1 optional skip. This is a nonauthorizing check and cannot prevent coordinated rollback or a change after its final check."
+    },
+    {
+      "id": "R08T",
+      "status": "unverified",
+      "task_ids": [
+        "R08T"
+      ],
+      "evidence": [],
+      "queue_status": "complete",
+      "queue_command": "python -m pytest tests/test_providers.py::test_adapter_requires_same_credential_before_http -q",
+      "queue_evidence_assertion": "Red: internal adapter mechanics reached the injected HTTP function without an expected credential. Green: missing or changed expected credential refuses without exposing values, while matching dummy credentials exercise fake HTTP mechanics; provider/replay/preflight/account/goal/config/service regressions passed 143 with 1 optional skip. This matching check is not authorization, is not yet wired to guarded dispatch, and does not prevent other Python code from bypassing private methods."
     },
     {
       "id": "R09",

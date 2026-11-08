@@ -152,7 +152,7 @@ def test_real_adapter_smoke_contract(tmp_path):
     t = OpenRouterTransport(_env(tmp_path), post=fake_post)
     # successful path: labeled live, content extracted, usage reported with its source fields
     assert t.label == "LIVE: openrouter, real model call"
-    raw = t._send_unchecked(ProviderRequest("judge", "openrouter", "vendor/model-x", "Is it?", 50))
+    raw = t._send_unchecked(ProviderRequest("judge", "openrouter", "vendor/model-x", "Is it?", 50), expected_credential="sk-test-SECRET")
     assert raw.http_status == 200 and raw.body == GOOD
     assert raw.usage == {"prompt_tokens": 11, "completion_tokens": 7, "cost_usd": 0.0002,
                          "openrouter_reported_cost_usd": 0.0002, "is_byok": False}
@@ -165,36 +165,36 @@ def test_real_adapter_smoke_contract(tmp_path):
 
     # cost not reported -> unknown, never zero
     t2 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (200, json.dumps({"choices": [{"message": {"content": "x"}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1}})))
-    assert t2._send_unchecked(REQ).usage["cost_usd"] is None
+    assert t2._send_unchecked(REQ, expected_credential='sk-test-SECRET').usage["cost_usd"] is None
     # non-2xx is returned as a failure response, with no usage invented
     t3 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (429, "rate limited"))
-    r = t3._send_unchecked(REQ)
+    r = t3._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     assert (r.http_status, r.body, r.usage) == (429, "rate limited", None)
     # a 200 whose envelope has no choices is kept as raw text so the typed layer records the failure
     # a 200 with no message content (e.g. a reasoning model that spent its whole token cap) is an empty body
     # with the observed cause recorded, so the typed layer fails it as malformed rather than mislabeling it
     empty = json.dumps({"choices": [{"finish_reason": "length", "message": {"content": None}}], "usage": {"prompt_tokens": 3, "completion_tokens": 50}})
-    r4 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (200, empty))._send_unchecked(REQ)
+    r4 = OpenRouterTransport(_env(tmp_path), post=lambda *a: (200, empty))._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     assert r4.body == "" and r4.note == "no_message_content; finish_reason=length" and r4.usage["completion_tokens"] == 50
 
     # unavailable path: no key means the request never leaves; the HTTP layer is not touched
     called = []
     t5 = OpenRouterTransport(_env(tmp_path, "BASE_URL=x\n"), post=lambda *a: called.append(1))
     with pytest.raises(ProviderUnavailable, match="OPENROUTER_API_KEY"):
-        t5._send_unchecked(REQ)
+        t5._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     assert called == []
     with pytest.raises(ProviderUnavailable):
-        OpenRouterTransport(tmp_path / "missing.env", post=lambda *a: called.append(1))._send_unchecked(REQ)
+        OpenRouterTransport(tmp_path / "missing.env", post=lambda *a: called.append(1))._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     # connection refused happens before anything is sent
     def refuse(*a):
         raise ConnectionRefusedError("no route")
     with pytest.raises(ProviderUnavailable):
-        OpenRouterTransport(_env(tmp_path), post=refuse)._send_unchecked(REQ)
+        OpenRouterTransport(_env(tmp_path), post=refuse)._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     # a timeout after sending is outcome-unknown and is left for the journal to treat as uncertain
     def slow(*a):
         raise TimeoutError("read timed out")
     with pytest.raises(TimeoutError):
-        OpenRouterTransport(_env(tmp_path), post=slow)._send_unchecked(REQ)
+        OpenRouterTransport(_env(tmp_path), post=slow)._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     assert load_env_value(_env(tmp_path), "BASE_URL") == "https://openrouter.ai/api/v1"
     assert load_env_value(_env(tmp_path), "NOPE") is None
 
@@ -247,7 +247,7 @@ def test_reject_untrusted_provider_endpoint(tmp_path, base):
     sent = []
     transport = OpenRouterTransport(_env(tmp_path, f"OPENROUTER_API_KEY=dummy\nBASE_URL={base}\n"), post=lambda *args: sent.append(args))
     with pytest.raises(ProviderUnavailable):
-        transport._send_unchecked(REQ)
+        transport._send_unchecked(REQ, expected_credential='dummy')
     assert not sent
 
 
@@ -268,7 +268,7 @@ def test_provider_secrets_do_not_reach_journal_or_errors(tmp_path, kind):
     class FakeHTTPAdapter:
         label = "STAND_IN: injected fake HTTP"
         def send(self, request):
-            return adapter._send_unchecked(request)
+            return adapter._send_unchecked(request, expected_credential=secret)
     transport = FakeHTTPAdapter()
     with Journal.open(tmp_path / "receipt.sqlite") as journal:
         ledger = BudgetLedger(Budget(2, 1000, 1), journal, "safety")
@@ -330,7 +330,7 @@ def test_response_metadata_is_retained_without_credentials(tmp_path):
                            "choices": [{"finish_reason": "stop", "message": {"content": GOOD}}],
                            "usage": {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.01}})
     adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))
-    response = adapter._send_unchecked(REQ)
+    response = adapter._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     assert {k: response.metadata[k] for k in ('response_id', 'model', 'provider', 'finish_reason')} == {
         "response_id": "generation-123", "model": "vendor/model", "provider": "Example", "finish_reason": "stop"}
     with RunArchive.open(tmp_path / "run") as archive:
@@ -348,17 +348,17 @@ def test_escaped_dummy_key_is_redacted_from_response_and_metadata(tmp_path):
     envelope = ('{"id":"' + escaped + '","model":"vendor/model",'
                 '"choices":[{"finish_reason":"stop","message":{"content":"' + escaped + '"}}]}')
     adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))
-    response = adapter._send_unchecked(REQ)
+    response = adapter._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     assert secret not in repr(response)
     assert response.body == "[REDACTED]" and response.metadata["response_id"] == "[REDACTED]"
-    error = OpenRouterTransport(_env(tmp_path), post=lambda *args: (429, envelope))._send_unchecked(REQ)
+    error = OpenRouterTransport(_env(tmp_path), post=lambda *args: (429, envelope))._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     assert secret not in error.body and secret not in repr(error.metadata)
 
 
 def test_no_content_keeps_finish_reason_and_request_id(tmp_path):
     envelope = json.dumps({"id": "generation-length", "model": "vendor/model",
                            "choices": [{"finish_reason": "length", "message": {"content": None}}]})
-    response = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))._send_unchecked(REQ)
+    response = OpenRouterTransport(_env(tmp_path), post=lambda *args: (200, envelope))._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     assert response.body == "" and response.metadata["response_id"] == "generation-length"
     assert response.metadata["finish_reason"] == "length"
 
@@ -385,7 +385,7 @@ def test_http_error_preserves_reported_usage_for_budget_and_journal(tmp_path):
     envelope = json.dumps({'error': {'message': 'upstream failed'}, 'usage': {
         'prompt_tokens': 11, 'completion_tokens': 7, 'cost': 0.02, 'is_byok': False}})
     adapter = OpenRouterTransport(_env(tmp_path), post=lambda *args: (502, envelope))
-    raw = adapter._send_unchecked(REQ)
+    raw = adapter._send_unchecked(REQ, expected_credential='sk-test-SECRET')
     assert raw.http_status == 502
     assert raw.usage == {'prompt_tokens': 11, 'completion_tokens': 7, 'cost_usd': 0.02,
                          'openrouter_reported_cost_usd': 0.02, 'is_byok': False}
@@ -416,7 +416,7 @@ def test_routing_price_ceiling_is_bound_sent_and_archived(tmp_path):
         archive.record_request('call', request)
         stored = archive.events()[0]['data']
         assert stored['max_price'] == ceiling and stored['input_sha256'] == request.input_sha256()
-    OpenRouterTransport(_env(tmp_path), post=fake_post)._send_unchecked(request)
+    OpenRouterTransport(_env(tmp_path), post=fake_post)._send_unchecked(request, expected_credential='sk-test-SECRET')
     assert seen['provider']['max_price'] == {**ceiling, 'request': 0, 'image': 0}
     ceiling['prompt'] = 999
     assert request.input_sha256() == stored['input_sha256']
@@ -430,7 +430,7 @@ def test_openrouter_receipt_binds_exact_sent_payload_without_credentials(tmp_pat
         return 200, LIVE_BODY
     request = ProviderRequest('judge', 'openrouter', 'vendor/model-x', 'Unicode: α', 50,
                               max_price={'prompt': 0.5, 'completion': 2.0})
-    raw = OpenRouterTransport(_env(tmp_path), post=post)._send_unchecked(request)
+    raw = OpenRouterTransport(_env(tmp_path), post=post)._send_unchecked(request, expected_credential='sk-test-SECRET')
     assert raw.metadata['wire_payload_format'] == 'openrouter.chat.v4'
     assert {'id':'web','enabled':False} in json.loads(observed['payload'])['plugins']
     assert {'id':'response-healing','enabled':False} in json.loads(observed['payload'])['plugins']
@@ -515,7 +515,7 @@ def test_provider_route_is_bound_to_request_wire_and_work_identity(tmp_path):
     with RunArchive.open(tmp_path/'run') as archive:
         archive.record_request('r',request)
         assert archive.events()[0]['data']['route']=='relace/fp4'
-    response=OpenRouterTransport(_env(tmp_path),post=post)._send_unchecked(request)
+    response=OpenRouterTransport(_env(tmp_path),post=post)._send_unchecked(request, expected_credential='sk-test-SECRET')
     body=json.loads(seen['body'])
     assert body['provider']['only']==['relace/fp4'] and body['provider']['allow_fallbacks'] is False
     assert response.metadata['wire_payload_format']=='openrouter.chat.v5'
@@ -524,3 +524,15 @@ def test_provider_route_is_bound_to_request_wire_and_work_identity(tmp_path):
             ProviderRequest('judge','openrouter','vendor/model-x','Question?',50,max_price=price,route=bad)
     with pytest.raises(ContractError):
         ProviderRequest('judge','openrouter','vendor/model-x','Question?',50,route='relace')
+
+
+def test_adapter_requires_same_credential_before_http(tmp_path):
+    env=_env(tmp_path,'OPENROUTER_API_KEY=synthetic-new\n')
+    sent=[]
+    adapter=OpenRouterTransport(env,post=lambda *args:sent.append(args))
+    with pytest.raises(ProviderUnavailable) as missing:
+        adapter._send_unchecked(REQ)
+    with pytest.raises(ProviderUnavailable) as changed:
+        adapter._send_unchecked(REQ,expected_credential='synthetic-old')
+    assert not sent
+    assert all(secret not in str(error.value) for error in (missing,changed) for secret in ('synthetic-old','synthetic-new'))

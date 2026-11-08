@@ -5,6 +5,7 @@ HTTP success with unusable output is a failure that keeps a receipt (raw text an
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import math
 import re
@@ -302,11 +303,18 @@ class OpenRouterTransport:
         """Refuse public hosted dispatch until full preflight is implemented."""
         raise BudgetExceeded("preflight_unavailable", "hosted calls require complete input, cost and goal-wide reservations")
 
-    def _send_unchecked(self, request: ProviderRequest) -> RawResponse:
-        """Adapter mechanics only; never call for hosted work without preflight."""
+    def _send_unchecked(self, request: ProviderRequest, *, expected_credential: str | None = None) -> RawResponse:
+        """Adapter mechanics only; matching a credential is not dispatch authorization."""
         key = load_env_value(self._env_path, "OPENROUTER_API_KEY")
         if not key:
             raise ProviderUnavailable("OPENROUTER_API_KEY not available; nothing was sent")
+        try:
+            matches=(isinstance(expected_credential,str) and bool(expected_credential)
+                     and hmac.compare_digest(key.encode('utf-8'),expected_credential.encode('utf-8')))
+        except UnicodeError:
+            matches=False
+        if not matches:
+            raise ProviderUnavailable('provider credential changed or unavailable; nothing was sent')
         base = (load_env_value(self._env_path, "BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/")
         parsed = urllib.parse.urlsplit(base)
         if (parsed.scheme != "https" or parsed.netloc != "openrouter.ai"
