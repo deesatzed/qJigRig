@@ -42,7 +42,8 @@ def _rebuild_search(context, revisions):
     return search
 
 
-def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_digest: str | None = None) -> dict:
+def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_digest: str | None = None,
+                          original_run_only: bool = False) -> dict:
     """Reconstruct successful direct runs; failures and missing work remain incomplete.
 
     Digest anchoring detects changes relative to the supplied digest, not source
@@ -88,6 +89,33 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
                 or type(context['expanded']) is not bool):
             raise ContractError('invalid direct sources or bounds')
         journal_events = journal.events(request.request_id)
+        if type(original_run_only) is not bool:
+            raise ContractError('invalid journal scope')
+        if original_run_only:
+            if not isinstance(expected_digest, str) or not re.fullmatch(r'[0-9a-f]{64}', expected_digest):
+                raise ContractError('anchored digest required for original run prefix')
+            results = [e for e in events if e['kind'] == 'run_result']
+            if len(results) != 1 or results[0]['data'].get('status') != 'recorded_unvalidated':
+                raise ContractError('completed direct run required for prefix replay')
+            ids = results[0]['data'].get('call_ids')
+            if not isinstance(ids, list) or not ids:
+                raise ContractError('direct call identity missing')
+            matches = [i for i, e in enumerate(journal_events) if e.call_id == ids[-1] and e.kind == 'receipt']
+            if len(matches) != 1:
+                raise ContractError('direct terminal receipt missing or ambiguous')
+            split = matches[0] + 1
+            suffix = journal_events[split:]
+            seen = set()
+            for event in suffix:
+                if event.stage != 'semantic_review':
+                    raise ContractError('unexpected later journal event')
+                if event.kind == 'intent':
+                    if event.call_id in seen or event.payload.get('context_binding') != {'reviewed_run_sha256':expected_digest}:
+                        raise ContractError('semantic review binding differs')
+                    seen.add(event.call_id)
+                elif event.call_id not in seen:
+                    raise ContractError('semantic review terminal has no intent')
+            journal_events = journal_events[:split]
         snapshot = {'context': context, 'events': events, 'journal': [asdict(e) for e in journal_events],
                     'revisions': [r.revision_id for r in revisions]}
         raw = json.dumps(snapshot, sort_keys=True, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf-8')
@@ -161,8 +189,11 @@ def verify_direct_archive(archive: RunArchive, journal: Journal, *, expected_dig
                     'citations': value['citations'], 'call_ids': call_ids, 'searches': list(search.trace)}
         if results[0]['call_id'] != request.request_id or result != expected:
             raise ContractError('direct result differs')
-        return {'status': 'structurally_verified' if expected_digest is not None else 'unanchored',
-                'sha256': digest, 'semantic_assurance': 'not_assessed'}
+        result_report = {'status': 'structurally_verified' if expected_digest is not None else 'unanchored',
+                         'sha256': digest, 'semantic_assurance': 'not_assessed'}
+        if original_run_only:
+            result_report['journal_scope'] = 'original_run_prefix'
+        return result_report
     except (ContractError, KeyError, ValueError, TypeError, AttributeError, UnicodeError, OverflowError):
         return invalid
 
